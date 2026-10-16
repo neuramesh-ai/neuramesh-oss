@@ -3,6 +3,7 @@ export * from './articles';
 export * from './images';
 export * from './filmprompt';
 export * from './artifacts';
+export * from './artifact-mime';
 export * from './states';
 export * from './workspaces';
 export * from './compute';

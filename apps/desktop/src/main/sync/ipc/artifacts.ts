@@ -177,7 +177,7 @@ export function registerArtifactIpc(deps: {
 
   ipcMain.handle('nm:thread-artifacts', async (_e, { threadId }: { threadId: string }) => {
     const local = await db().getAll<{ id: string }>(
-      `select a.id, a.kind, a.name, a.mime, a.inline_content, a.size_bytes, a.promoted, a.message_id, a.task_id, a.created_at
+      `select a.id, a.kind, a.name, a.mime, a.inline_content, a.storage_path, a.content_hash, a.size_bytes, a.promoted, a.message_id, a.task_id, a.created_at
          from artifacts a join messages m on m.id = a.message_id
         where m.thread_id = ? order by a.created_at asc`,
       [threadId],

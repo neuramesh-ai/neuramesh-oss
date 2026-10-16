@@ -9,19 +9,48 @@ import type { RailSection } from './parts';
 
 const nm = nmBridge;
 
+function ArtifactOpenButton({ artifact: a, onOpenDoc }: { artifact: ChannelArtifactRow; onOpenDoc?: (d: { label: string; file: string; doc: string }) => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const open = async () => {
+    setLoading(true); setError(null);
+    try {
+      const row = a.storage_path?.startsWith('brain:') || !a.inline_content ? (await nm?.artifact(a.id))?.artifact : a;
+      if (!row?.inline_content) throw new Error('The file content is unavailable.');
+      onOpenDoc?.({ label: a.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), file: a.name, doc: row.inline_content });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'The file could not load.'); }
+    finally { setLoading(false); }
+  };
+  return <><button className="artchip" disabled={loading} aria-busy={loading} onClick={() => void open()}>
+    <span className="akind">{a.kind}</span> <span className="aname">{a.name}</span>
+  </button>{error && <span role="alert">{error}</span>}</>;
+}
+
+export function useThreadArtifactInventory(threadId: string, rowCount: number) {
+  const [loaded, setLoaded] = useState<{ threadId: string; rows: ChannelArtifactRow[]; error: string | null } | null>(null);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let dead = false, busy = false;
+    const load = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        if (!nm) throw new Error('The artifact service is unavailable.');
+        const result = await nm.threadArtifacts(threadId);
+        if (!dead) setLoaded({ threadId, rows: result.artifacts, error: null });
+      } catch (reason) {
+        if (!dead) setLoaded(previous => ({ threadId, rows: previous?.threadId === threadId ? previous.rows : [], error: reason instanceof Error ? reason.message : 'Artifacts could not load.' }));
+      } finally { busy = false; }
+    };
+    void load();
+    const interval = setInterval(() => void load(), 5000);
+    return () => { dead = true; clearInterval(interval); };
+  }, [threadId, rowCount, retry]);
+  const current = loaded?.threadId === threadId ? loaded : null;
+  return { rows: current?.rows ?? [], error: current?.error ?? null, loading: !current, retry: () => setRetry(n => n + 1) };
+}
 export function useThreadArtifacts(threadId: string, rowCount: number) {
-// This conversation's own produced files — the Artifacts section of its rail. A chat writes
-// real files (docs/34) and until now they carded in the transcript and were reachable nowhere
-// else; the rail is where standing reference lives, whether or not a task stands behind it.
-const [loaded, setLoaded] = useState<{ threadId: string; rows: ChannelArtifactRow[] } | null>(null);
-useEffect(() => {
-  let dead = false;
-  const load = () => { void nm?.threadArtifacts(threadId).then((r) => { if (!dead) setLoaded({ threadId, rows: r.artifacts }); }, () => {}); };
-  load();
-  const iv = setInterval(load, 5000);
-  return () => { dead = true; clearInterval(iv); };
-}, [threadId, rowCount]);
-  return loaded?.threadId === threadId ? loaded.rows : [];
+  return useThreadArtifactInventory(threadId, rowCount).rows;
 }
 
 /**
@@ -46,9 +75,7 @@ export function convoArtifactSection(
       <div className="tarts">
         {arts.map((a) => (
           <span key={a.id} className="artgroup">
-            <button className="artchip" onClick={() => a.inline_content && onOpenDoc?.({ label: a.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), file: a.name, doc: a.inline_content })}>
-              <span className="akind">{a.kind}</span> <span className="aname">{a.name}</span>
-            </button>
+            <ArtifactOpenButton artifact={a} {...(onOpenDoc ? { onOpenDoc } : {})} />
             <button className={`star${Number(a.promoted) === 1 ? ' on' : ''}`} title={Number(a.promoted) === 1 ? 'in the channel library' : 'promote to channel library'} disabled={Number(a.promoted) === 1} onClick={() => void nm?.promoteArtifact(a.id)}>
               {Number(a.promoted) === 1 ? '★' : '☆'}
             </button>

@@ -1,4 +1,5 @@
-import { overviewSourceFiles, overviewOutputFiles } from '../thread/overview-model';
+import { CodingMessageBody, codingDelivery, type CodingDisplayDoors } from '../thread/CodingMessageBody';
+import { overviewSourceFiles } from '../thread/overview-model';
 import { ThreadOverviewBody, useThreadOverview } from '../thread/ThreadOverview';
 import { codingOverviewSections, artifactOverviewSection, sourceOverviewSection } from '../thread/overview-sections';
 import { AttachLightbox } from '../thread/AttachLightbox';
@@ -40,7 +41,6 @@ import { useCodeReview } from '../engineering/useCodeReview';
 import { ThreadCrumb, ThreadStatusChip, type HeadStatus } from '../thread/parts';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { Md } from '../md/Md';
-import { MARKER_RE } from '../thread/markers';
 import { UnitCard } from '../thread/ThreadMessage';
 import { repoLabel } from '../composer/RepoChip';
 import { IconAlert, IconCode, IconThreads } from '../ui/icons';
@@ -51,7 +51,7 @@ import { parseGitHubConnected, parseKindMarker, parseModeMarker, parseNeed, pars
  *  session's first prompt, so the transcript carries it. While the session waits for GitHub, the gate
  *  seat holds the one GitHub card, so a card rex posted before the thread turned to code is not drawn
  *  twice (docs/design/repo-connect-2026-10). `answers` hands a card its decision row (answers.ts). */
-function ThreadRows({ rows, agents, repoName, onOpenTask, answers, hideNeeds = false }: { rows: MessageRow[]; agents: AgentRow[]; repoName: string | null; onOpenTask?: ((taskId: string) => void) | undefined; answers: (messageId: string) => Map<string, string>; hideNeeds?: boolean }) {
+function ThreadRows({ rows, agents, repoName, onOpenTask, answers, hideNeeds = false, display }: { display?: CodingDisplayDoors; rows: MessageRow[]; agents: AgentRow[]; repoName: string | null; onOpenTask?: ((taskId: string) => void) | undefined; answers: (messageId: string) => Map<string, string>; hideNeeds?: boolean }) {
   return rows.map((m) => {
     const connected = parseGitHubConnected(m.body);
     if (connected) return <div key={m.id} className="srundiv"><span>GitHub connected · {connected} · {sessionRunLabel(m.created_at, Date.now())}</span></div>;
@@ -64,13 +64,13 @@ function ThreadRows({ rows, agents, repoName, onOpenTask, answers, hideNeeds = f
     return (
       <div key={m.id} className={`msg${m.author_kind === 'human' ? ' human mine' : ''}`}>
         {agent ? <span className="av"><AgentAvatar name={agent.name} emoji={agent.emoji} size={26} radius={4} role={agent.role} /></span> : null}
-        <div className="body">{agent ? <div className="head"><b>{agent.name}</b></div> : null}<Md text={m.body.replace(MARKER_RE, '').trim()} answers={answers(m.id)} /></div>
+        <div className="body">{agent ? <div className="head"><b>{agent.name}</b></div> : null}<CodingMessageBody text={m.body} {...display} answers={answers(m.id)} /></div>
       </div>
     );
   });
 }
 
-export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, onReposChanged, projects, projectId, workspaceId, codeSession, pickedRepoId, pickedSelection, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, decisions, onOpenTask, onOpenDoc, codeSlot, codeTab, onCodeTab, onCodeCounts }: {
+export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, onReposChanged, projects, projectId, workspaceId, codeSession, pickedRepoId, pickedSelection, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, decisions, onOpenTask, onOpenDoc, onOpenWhiteboard, onOpenArticle, codeSlot, codeTab, onCodeTab, onCodeCounts }: {
   threadId: string;
   thread: Pick<ThreadRow, 'id' | 'title' | 'task_id'> | null;
   back: string;
@@ -104,7 +104,9 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   decisions: AnswerDecisionRow[];
   /** the unit card's door — the peek, as every #N ref opens */
   onOpenTask?: (taskId: string) => void;
-  onOpenDoc?: (d: { label: string; file: string; doc: string }) => void;
+  onOpenDoc?: CodingDisplayDoors['onOpenDoc'];
+  onOpenWhiteboard?: CodingDisplayDoors['onOpenWhiteboard'];
+  onOpenArticle?: CodingDisplayDoors['onOpenArticle'];
   /** the side panel's code pane: the code face's body portals in there, as a conversation's details do */
   codeSlot?: HTMLElement | null;
   /** which of the coding thread's own tabs the panel shows (null while another tab is in front) */
@@ -127,8 +129,8 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   // the transcript draws the root as the session's first prompt. With no session open, the prelude draws it, so the
   // person's own ask stays in view above the gate
   const opened = !!active;
-  const prelude = useMemo(() => rows.filter((m) => (m.id !== root?.id || !opened) && !parseTaskUnitRef(m.body)), [rows, root?.id, opened]);
-  const postlude = useMemo(() => rows.filter((m) => !!parseTaskUnitRef(m.body)), [rows]);
+  const prelude = useMemo(() => rows.filter((m) => (m.id !== root?.id || !opened) && !codingDelivery(m.body)), [rows, root?.id, opened]);
+  const postlude = useMemo(() => rows.filter((m) => codingDelivery(m.body)), [rows]);
   const answersFor = useMemo(() => answersResolver(rows, decisions), [rows, decisions]);
   const signs = useMemo(() => connectedSigns(rows, answersFor), [rows, answersFor]);
   // the repository, in order: the synced row's, the chip's pick that birthed this thread, the project's primary
@@ -165,8 +167,8 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   const workPlan = useWorkPlan(active, () => onCodeTabRef.current?.('plan', true));
   const review = useCodeReview(active, () => onCodeTabRef.current?.('changes', true));
   // the strip's counts: the changes, the checkpoints, the Work Plan's mark
-  const counts = active ? codeCountsOf(active) : null;
-  const countKey = counts ? `${counts.changes}|${counts.checkpoints}|${counts.plan}` : '';
+  const counts = active ? codeCountsOf(active, artifacts.rows.length) : null;
+  const countKey = counts ? `${counts.artifacts}|${counts.changes}|${counts.checkpoints}|${counts.plan}` : '';
   useEffect(() => { onCodeCounts?.(counts); }, [countKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onCodeCounts?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   // the transcript follows the newest row, as the conversation thread does
@@ -185,6 +187,7 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
     continueInAct: () => harness ? engineering.update(continueEngineeringInAct(active)) : engineering.continueInAct(active),
     dismissHandoff: () => harness ? engineering.update(dismissEngineeringModeHandoff(active)) : engineering.dismissModeHandoff(active),
   } : null;
+  const display: CodingDisplayDoors = { onOpenDoc, onOpenArticle, onOpenWhiteboard, onOpenTask, fileRef: artifacts.fileRef, onOpenFile: artifacts.openFile, onAnswer: act && canExecute && active?.state !== 'streaming' && active?.state !== 'awaiting_approval' ? text => act.send(text, []) : undefined };
   // the seat holds the GitHub gate (CodingGate ranks a live approval first): a card above it is a second door
   const seatAsksGitHub = active ? active.blockedOn === 'github' && !active.pendingApproval : !repoRow && !codeSession;
   const [sources, setSources] = useState<{ owner: string; rows: AttachmentRow[] }>({ owner: threadId, rows: [] });
@@ -195,7 +198,7 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
       plan: () => workPlan.open(), changes: () => review.open(), files: () => onCodeTab?.('files', true),
       approval: () => { if (active?.pendingApproval?.changes?.length) review.open(); else { const gate = listRef.current?.closest('.codingthread')?.querySelector<HTMLElement>('.gateseat button'); gate?.focus(); } },
     }, { machine: machineName, task: unitId && onOpenTask ? () => onOpenTask(unitId) : undefined }),
-    artifactOverviewSection(overviewOutputFiles(artifacts.rows, rows), onOpenDoc), sourceOverviewSection(overviewSourceFiles(sources.owner === threadId ? sources.rows : [], rows), (row) => setSource({ owner: threadId, row })),
+    artifacts.error ? { id: 'artifacts', label: 'Artifacts', items: [{ id: 'artifact-error', label: 'Artifacts could not refresh', detail: 'Open to retry', open: () => onCodeTab?.('artifacts', true) }] } : artifactOverviewSection(artifacts.rows, onOpenDoc), sourceOverviewSection(overviewSourceFiles(sources.owner === threadId ? sources.rows : [], rows).filter(row => !artifacts.rows.some(artifact => artifact.id === row.id)), (row) => setSource({ owner: threadId, row })),
   ]);
   return (
     <div className="threadpanel convo codingthread" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
@@ -208,7 +211,7 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
         {overview.toggle}
       </div>
       <div className="thread-title-row"><span className="convotitle" title={title}>{title}</span></div>
-      {codeSlot && active ? createPortal(<CodePanel selectedReview={review.selectedReview} selectedPlan={workPlan.text} selectedPath={review.path} onSelectPath={review.select} session={active} tab={wbTab} onTab={setWbTab} onSession={engineering.update} onRestore={restore} restoreUnavailable={!harness && !canExecute} />, codeSlot) : null}
+      {codeSlot && active ? createPortal(<CodePanel artifacts={artifacts.pane} artifactRef={artifacts.fileRef} onOpenArtifact={artifacts.openFile} selectedReview={review.selectedReview} selectedPlan={workPlan.text} selectedPath={review.path} onSelectPath={review.select} session={active} tab={wbTab} onTab={setWbTab} onSession={engineering.update} onRestore={restore} restoreUnavailable={!harness && !canExecute} />, codeSlot) : null}
       {!harness && runtime !== 'ready' && (
         <div className={`engnotice engruntime codingnotice${runtime === 'checking' ? '' : ' warning'}`} role="status">
           <span className="engnoticeico"><IconAlert s={14} /></span>
@@ -219,10 +222,9 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
         <div className="convomain">
           <ThreadOverviewBody overview={overview} label={repoName ?? title}>
           <div className="tmsgs convomsgs" ref={listRef}>
-            <ThreadRows rows={prelude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} hideNeeds={seatAsksGitHub} />
-            {active ? <CodingTranscript session={active} onOpenReview={review.openReview} onApproval={canExecute ? act?.approve : undefined} fileRef={artifacts.fileRef} onOpenFile={artifacts.openFile} onOpenWorkPlan={workPlan.open} /> : null}
-            {artifacts.card}
-            <ThreadRows rows={postlude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} />
+            <ThreadRows display={display} rows={prelude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} hideNeeds={seatAsksGitHub} />
+            {active ? <CodingTranscript {...display} session={active} artifacts={{ rows: artifacts.timelineRows, card: artifacts.cardFor }} onOpenReview={review.openReview} onApproval={canExecute ? act?.approve : undefined} fileRef={artifacts.fileRef} onOpenFile={artifacts.openFile} onOpenWorkPlan={workPlan.open} /> : artifacts.card}
+            <ThreadRows display={display} rows={postlude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} />
           </div>
           </ThreadOverviewBody>
           <GitHubSigns.Provider value={signs}>

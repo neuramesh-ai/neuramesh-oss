@@ -1,3 +1,4 @@
+import { DEFAULT_ENGINEERING_AGENT } from './selection';
 import { lastMessageIndex, updateMessage, collapseReasoning, finishStreamingMessages } from './transcript-state';
 import { createEngineeringPlanProgress, isEngineeringPlanProgress } from './plan-progress';
 import { applyEngineeringSelection, recordEngineeringAuthors } from './selection-events';
@@ -228,14 +229,15 @@ function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<
     const category = wire['category'] as PermissionCategory;
     const toolName = String(wire['toolName'] ?? 'tool');
     const changes = Array.isArray(wire['changes']) ? normalizeEngineeringChanges(wire['changes'] as EngineeringChange[]) : remoteChange(toolName, wire['input']);
+    const displayTitle: Record<string, string> = { show_artifact: 'Share artifact', create_whiteboard: 'Create whiteboard', update_whiteboard: 'Update whiteboard', list_whiteboards: 'List whiteboards', read_whiteboard: 'Read whiteboard', draft_article: 'Create article', share_images: 'Generate images' };
     const command = toolName === 'run_commands' || toolName === 'fetch_web_content' ? textValue(wire['input']) : undefined;
     const messages = engineeringReviewMessages(session);
     const approvalId = String(wire['approvalId']);
     return { ...session, messages: changes.length && !messages.some((m) => m.review?.id === approvalId)
       ? [...finishStreamingMessages(messages, true), changeReviewMessage(approvalId, changes, 'proposed', stamp())] : messages, state: 'awaiting_approval', activeActivity: null, proposedChanges: changes, pendingApproval: {
       id: String(wire['approvalId']), category,
-      title: category === 'edit' ? 'Apply proposed file changes' : category === 'command' ? 'Execute command' : category === 'web' ? 'Fetch web content' : category === 'mcp' ? 'Use MCP tool' : 'Read repository files',
-      detail: `${toolName} requested by Engineering`, ...(command ? { command } : {}), ...(changes.length ? { changes } : {}),
+      title: displayTitle[toolName] ?? (category === 'edit' ? 'Apply proposed file changes' : category === 'command' ? 'Execute command' : category === 'web' ? 'Fetch web content' : category === 'mcp' ? 'Use MCP tool' : 'Read repository files'),
+      detail: `${toolName} requested by ${session.agent?.name || DEFAULT_ENGINEERING_AGENT.name}`, ...(command ? { command } : {}), ...(changes.length ? { changes } : {}),
       continuation: category === 'edit' ? 'apply' : category === 'command' ? 'verify' : 'inspect',
     }, updatedAt: stamp() };
   }

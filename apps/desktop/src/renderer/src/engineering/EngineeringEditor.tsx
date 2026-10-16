@@ -1,16 +1,17 @@
 import type { EngineeringChangeReview } from '@neuramesh/shared';
 import { changeReviewLabel } from './EngineeringChangeCard';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { IconBranch, IconCode, IconFile, IconHistory, IconTerm, IconThreads } from '../ui/icons';
 import { TerminalView, type TermHandle } from '../wtabs/guests';
 import type { EngineeringSession } from './domain';
 import { restoreEngineeringCheckpoint } from './checkpoints';
 import { scrollEngineeringPane } from './layout';
 import { EngineeringWorkPlan } from './EngineeringWorkPlan';
+import { EngineeringArtifacts } from './EngineeringArtifacts';
 import { EngineeringReview } from './EngineeringReview';
 import { reviewFiles } from './change-review';
 
-export type EngineeringWorkspaceTab = 'changes' | 'files' | 'plan' | 'checkpoints' | 'terminal';
+export type EngineeringWorkspaceTab = 'changes' | 'artifacts' | 'files' | 'plan' | 'checkpoints' | 'terminal';
 
 const stateLabel = (state: EngineeringSession['state']) => ({
   idle: 'Ready', streaming: 'Working', awaiting_approval: 'Needs approval', resumable: 'Paused', completed: 'Complete', error: 'Blocked',
@@ -30,6 +31,7 @@ export function EngineeringWorkspaceTabs({ tab, onTab, changeCount = 0, disabled
     <div className="engworktabs" role="group" aria-label="Code workspace">
       <button className={tab === 'changes' ? 'on' : ''} disabled={disabled} aria-pressed={tab === 'changes'} onClick={() => select('changes')}><IconCode s={12} /> Changes {changeCount ? <span>{changeCount}</span> : null}</button>
       <button className={tab === 'files' ? 'on' : ''} disabled={disabled} aria-pressed={tab === 'files'} onClick={() => select('files')}><IconFile s={12} /> Files</button>
+      <button className={tab === 'artifacts' ? 'on' : ''} disabled={disabled} aria-pressed={tab === 'artifacts'} onClick={() => select('artifacts')}><IconFile s={12} /> Artifacts</button>
       <button className={tab === 'plan' ? 'on' : ''} disabled={disabled} aria-pressed={tab === 'plan'} onClick={() => select('plan')}><IconThreads s={12} /> Work Plan</button>
       <button className={tab === 'checkpoints' ? 'on' : ''} disabled={disabled} aria-pressed={tab === 'checkpoints'} onClick={() => select('checkpoints')}><IconHistory s={12} /> Checkpoints</button>
       <button className={tab === 'terminal' ? 'on' : ''} disabled={disabled} aria-label="Open a Code terminal" aria-pressed={tab === 'terminal'} onClick={() => select('terminal')}><IconTerm s={12} /> Terminal</button>
@@ -69,7 +71,7 @@ export function EngineeringWorkspaceHeader({ session, sessionCount, tab, onTab, 
   );
 }
 
-export function EngineeringEditor({ session, onSession, onRestore, restoreUnavailable, tab, selectedPath, onSelectPath, selectedPlan, selectedReview }: {
+export function EngineeringEditor({ session, onSession, onRestore, restoreUnavailable, tab, selectedPath, onSelectPath, selectedPlan, selectedReview, artifacts, artifactRef, onOpenArtifact }: {
   session: EngineeringSession;
   onSession: (session: EngineeringSession) => void;
   onRestore?: (checkpointId: string) => void;
@@ -80,6 +82,9 @@ export function EngineeringEditor({ session, onSession, onRestore, restoreUnavai
   selectedPath?: string | null;
   selectedPlan?: string | null;
   selectedReview?: EngineeringChangeReview | null;
+  artifacts?: ReactNode;
+  artifactRef?: (path: string) => boolean;
+  onOpenArtifact?: (path: string) => void;
   onSelectPath?: (path: string) => void;
 }) {
   const files = useMemo(() => reviewFiles(selectedReview?.changes ?? session.pendingApproval?.changes ?? session.changes), [selectedReview, session.pendingApproval?.changes, session.changes]);
@@ -103,9 +108,10 @@ export function EngineeringEditor({ session, onSession, onRestore, restoreUnavai
         {selectedReview && (tab === 'changes' || tab === 'files') ? <div className="engreviewversion" role="status">{changeReviewLabel(selectedReview.status)} · Selected change set</div> : null}
         <button className="engeditorback" onClick={() => scrollEngineeringPane('.engconversation')} aria-label="Return to Code conversation"><IconThreads s={12} /></button>
         {tab === 'changes' && (files.length
-          ? <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} />
+          ? <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} artifactRef={artifactRef} onOpenArtifact={onOpenArtifact} />
           : <div className="engeditorempty"><IconCode s={30} /><b>No changes yet</b><span>Plan first, then switch to Act. Proposed patches appear here in full before approval.</span></div>)}
-        {tab === 'files' && <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} source />}
+        {tab === 'files' && <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} source artifactRef={artifactRef} onOpenArtifact={onOpenArtifact} />}
+        {tab === 'artifacts' && (artifacts ?? <EngineeringArtifacts threadId={session.id} revision={session.messages.length} />)}
         {tab === 'plan' && ((selectedPlan ?? session.workPlan)
           ? <EngineeringWorkPlan progress={!selectedPlan || selectedPlan === session.workPlan ? session.planProgress : null} earlier={!!selectedPlan && selectedPlan !== session.workPlan} text={(selectedPlan ?? session.workPlan)!} />
           : <div className="engeditorempty"><IconThreads s={30} /><b>No Work Plan yet</b><span>Send a request in Plan mode. The durable plan stays here when you switch to Act.</span></div>)}

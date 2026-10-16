@@ -1,13 +1,13 @@
 import type { ClineCore } from '@cline/sdk';
 import type { EngineeringRuntimeEvent } from '../../engineering-protocol';
-import type { EngineeringConversation } from './engineering-conversation';
+import { ArtifactUploadError, type EngineeringConversation } from './engineering-conversation';
 
 export function checkpointEngineering(core: ClineCore | null, conversation: EngineeringConversation | undefined, sessionId: string | undefined,
   metadata: Record<string, unknown>, log: (line: string) => void, emit: (event: EngineeringRuntimeEvent) => void, isClosed: () => boolean): void {
   if (!core || !conversation || !sessionId) return;
   void conversation.checkpoint(core, sessionId, metadata).catch((error: unknown) => {
     log(`brain_checkpoint_pending: ${error instanceof Error ? error.message : 'upload failed'}`);
-    if (!isClosed()) emit({ type: 'error', code: 'BRAIN_SYNC_PENDING', recoverable: true, message: 'This turn is saved on this device. Cloud sync needs a retry before another device can continue.' });
+    if (!isClosed()) emit({ type: 'error', code: 'BRAIN_SYNC_PENDING', recoverable: true, message: error instanceof ArtifactUploadError ? `The conversation is saved, but some deliverables are unavailable. ${error.message}` : 'This turn is saved on this device. Cloud sync needs a retry before another device can continue.' });
   });
 }
 

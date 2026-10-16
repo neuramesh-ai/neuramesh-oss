@@ -1,8 +1,9 @@
+import type { EngineeringDisplayTool } from './engineering-display';
 import { checkpointEngineering, shutdownEngineering } from './engineering-checkpoint';
 import { EngineeringPromptQueue, forwardEngineeringUsage } from './engineering-turn';
 import type { ClineCore, CoreSessionEvent, ToolExecutors } from '@cline/sdk';
 import { isEngineeringCommand, type EngineeringCommand, type EngineeringControls, type EngineeringMachineOpenMeta, type EngineeringRuntimeEvent } from '../../engineering-protocol';
-import { recoverEngineeringPlanProgress, engineeringEffort, type EngineeringSelection, type PolicyRule } from '@neuramesh/shared';
+import { recoverEngineeringPlanProgress, recoverRecordedEngineeringPlan, engineeringEffort, type EngineeringAgent, type EngineeringSelection, type PolicyRule } from '@neuramesh/shared';
 import { requestEngineeringApproval } from './engineering-approvals';
 import { createEngineeringChangeRefresh } from './engineering-changes';
 import { projectEngineeringCoreEvent } from './engineering-events';
@@ -42,6 +43,7 @@ export class ClineChannelSession {
     private readonly setThreadTitle?: (title: string) => Promise<unknown>,
     /** why this machine refused the open model: nothing runs until a new pick replaces it (engineering-host.ts) */
     private refusal: string | null = null,
+    private readonly displayTools?: (agent?: EngineeringAgent) => EngineeringDisplayTool[],
   ) {
     this.provider = provider;
     this.modelId = modelId;
@@ -60,11 +62,15 @@ export class ClineChannelSession {
       && record.metadata?.['repoId'] === this.meta.repoId
       && record.metadata?.['actorId'] === this.meta.actorId);
     if (!this.resumeMessages?.length && prior) this.resumeMessages = await this.core.readMessages(prior.sessionId).catch(() => undefined);
-    this.emit({ type: 'plan_progress', progress: recoverEngineeringPlanProgress(this.resumeMessages) });
+    this.emit({ type: 'plan_progress', progress: await this.readPlanProgress() });
     this.emit({ type: 'ready', provider: this.provider.providerId, model: this.provider.modelId, cwd: this.cwd, modelId: this.modelId, brainPack: this.brainPack, agent: this.provider.agent, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort), ...(this.conversation ? { recordedRevision: this.conversation.brain.revision() } : {}) }); if (this.refusal) this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal });
   }
 
   private readPlanMessages = async (): Promise<unknown> => this.core && this.sessionId ? readRuntimeMessages(this.core, this.sessionId) : this.resumeMessages;
+  private readPlanProgress = async () => {
+    const messages = await this.readPlanMessages();
+    return this.conversation ? recoverRecordedEngineeringPlan({ events: [...this.conversation.brain.events()], runtimeMessages: Array.isArray(messages) ? messages : [], metadata: this.conversation.brain.metadata() }) : recoverEngineeringPlanProgress(messages);
+  };
 
   private async createRuntimeCore(provider: EngineeringProviderResolution): Promise<ClineCore> {
     const core = await this.createCore(engineeringCoreOptions(provider, this.meta.threadId,
@@ -86,14 +92,8 @@ export class ClineChannelSession {
       return;
     }
     if (value.type === 'configure') { void this.switchModel(value.selection.modelId, null, value.selection).catch((error: unknown) => this.fail(error)); return; }
-    if (value.type === 'model') {
-      void this.switchModel(value.modelId, null).catch((error: unknown) => this.fail(error));
-      return;
-    }
-    if (value.type === 'brain') {
-      void this.switchModel(null, value.brainPack).catch((error: unknown) => this.fail(error));
-      return;
-    }
+    if (value.type === 'model') { void this.switchModel(value.modelId, null).catch((error: unknown) => this.fail(error)); return; }
+    if (value.type === 'brain') { void this.switchModel(null, value.brainPack).catch((error: unknown) => this.fail(error)); return; }
     if (value.type === 'approval') {
       const resolve = this.pending.get(value.approvalId);
       if (!resolve) return this.emit({ type: 'error', code: 'APPROVAL_GONE', recoverable: true, message: 'That approval is no longer pending.' });
@@ -148,7 +148,7 @@ export class ClineChannelSession {
       }
       if (!this.sessionId) {
         const startedMode = this.controls.mode;
-        const started = await this.core.start(engineeringRuntimeInput({ setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls, prompt: command.prompt, initialMessages: this.resumeMessages, ...attached }));
+        const started = await this.core.start(engineeringRuntimeInput({ displayTools: this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls, prompt: command.prompt, initialMessages: this.resumeMessages, ...attached }));
         this.sessionId = started.sessionId;
         this.sessionMode = startedMode;
         this.resumeMessages = undefined;
@@ -196,12 +196,9 @@ export class ClineChannelSession {
       this.conversation?.record('model.change', { from: this.provider.modelId, to: nextProvider.modelId, provider: nextProvider.providerId });
       this.core = nextCore;
       this.provider = nextProvider; this.refusal = null;
-      this.modelId = modelId;
+      this.modelId = modelId; this.brainPack = brainPack;
       if (selection) { this.meta.agentId = selection.agentId; this.meta.reasoningEffort = engineeringEffort(modelId, selection.reasoningEffort); }
-      this.brainPack = brainPack;
-      this.sessionId = null;
-      this.sessionMode = null;
-      this.resumeMessages = messages;
+      this.sessionId = null; this.sessionMode = null; this.resumeMessages = messages;
       this.conversation?.brain.setRuntime(messages ?? [], { ...this.conversation.brain.metadata(), ...this.runtimeMetadata() });
       if (previousCore && previousCore !== nextCore) await previousCore.dispose('Neuramesh Code model changed').catch(() => {});
       this.emit({ type: 'model_changed', provider: nextProvider.providerId, model: nextProvider.modelId, modelId, brainPack, agent: nextProvider.agent, reasoningEffort: engineeringEffort(modelId, this.meta.reasoningEffort) });
@@ -261,10 +258,13 @@ export class ClineChannelSession {
     }
     this.running = true; this.emit({ type: 'status', status: 'running' });
     try {
-      const restoredSessionId = await restoreRuntimeCheckpoint(this.core, this.sessionId, checkpointRunCount, this.cwd, engineeringRuntimeInput({ setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls }));
+      const restoredSessionId = await restoreRuntimeCheckpoint(this.core, this.sessionId, checkpointRunCount, this.cwd, engineeringRuntimeInput({ displayTools: this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls }));
       this.resumeMessages = undefined; this.sessionId = restoredSessionId; this.sessionMode = this.controls.mode;
       this.emit({ type: 'restored', checkpointRunCount });
-      this.emit({ type: 'plan_progress', progress: recoverEngineeringPlanProgress(await this.readPlanMessages()) }); this.refreshChanges();
+      const progress = recoverEngineeringPlanProgress(await this.readPlanMessages());
+      this.conversation?.record('plan.restored', { checkpointRunCount, progress });
+      await this.conversation?.checkpoint(this.core, this.sessionId, this.runtimeMetadata());
+      this.emit({ type: 'plan_progress', progress }); this.refreshChanges();
     } finally {
       this.running = false; if (!this.closed) this.emit({ type: 'status', status: 'idle' });
     }

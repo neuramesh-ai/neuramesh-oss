@@ -5,8 +5,16 @@
 .kind { font: 10px var(--fmono); color: var(--muted); }
 .path { flex: 1; min-width: 0; font: 11px var(--fmono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.commands { min-width: 0; max-height: min(32vh, 280px); overflow-y: auto; }
-.commands .command { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.6; }
-.commandLabel { margin: 0 10px 5px; color: var(--muted); font: 10px var(--fmono); }
+.commands { min-width: 0; max-height: min(38vh, 360px); overflow: auto; }
+.commands:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.commandFrame { margin: 0 11px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--code); overflow: hidden; }
+.commandLabel { padding: 7px 13px; border-bottom: 1px solid var(--border); color: color-mix(in srgb, var(--codeink) 80%, var(--muted)); font: 10px var(--fmono); }
+.commandPre { margin: 0; }
+.commands .command { margin: 0; padding: 12px 13px; background: transparent; border-radius: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; font-size: 12px; line-height: 1.7; }
+/* Keep the editor's syntax hues readable on both light and dark code surfaces. */
+.command :global(.tk-s) { color: color-mix(in srgb, var(--done) 50%, var(--codeink)); }
+.command :global(.tk-k) { color: color-mix(in srgb, var(--review) 50%, var(--codeink)); }
+.command :global(.tk-v) { color: color-mix(in srgb, var(--warm) 50%, var(--codeink)); }
+.command :global(.tk-c) { color: color-mix(in srgb, var(--dim) 50%, var(--codeink)); }
 
 :global(:root[data-look='paper']) .file { border-color: transparent; }

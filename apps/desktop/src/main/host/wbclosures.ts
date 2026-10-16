@@ -10,8 +10,9 @@ import { whiteboardShareBody } from '@neuramesh/shared';
 import type { WhiteboardToolClosures } from '../harness/toolbus';
 import type { HostCtx } from './ctx';
 
-export function makeWbClosures(ctx: HostCtx & {
+export function makeWbClosures(ctx: Pick<HostCtx, 'post'> & {
   apiUrl: string;
+  get?: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<Response>;
 }) {
   const { apiUrl, post } = ctx;
 
@@ -24,7 +25,7 @@ export function makeWbClosures(ctx: HostCtx & {
     ch: { id: string; workspace_id: string },
     at: { taskId?: string; threadId?: string },
   ): WhiteboardToolClosures {
-    const get = async (path: string) => fetch(`${apiUrl}${path}`, { headers: await apiAuthHeaders(apiUrl, actor as Actor) });
+    const get = async (path: string) => ctx.get ? ctx.get(path, actor) : fetch(`${apiUrl}${path}`, { headers: await apiAuthHeaders(apiUrl, actor as Actor) });
     return {
       list: async (i) => {
         try {

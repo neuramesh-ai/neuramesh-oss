@@ -154,30 +154,27 @@ export function ProcPopover({ procs, onKill, onClose }: { procs: ProcList; onKil
   );
 }
 
-// the ambient utility cluster: editor / browser / terminal openers + background-processes
-// count + the sync/live status pill (founder call 2026-07-07: ambient status belongs on
-// ambient chrome, not a view's topbar). Icon-only — tooltips carry the names.
-//
-// It lives on the FRAME TOP's right end, after the ⌘K search pill (the shell round, 2026-08-10:
-// these show on almost every page, so they ride the one chrome row that does — and the old
-// dock's ⌘ tile folds into the search pill, so `onCmdK` renders only where no pill exists).
-// The top-dock mode keeps its bottom DockBar: that mode hides the frame top entirely.
-export function UtilCluster({ activeKind, onKind, dockOpen, onDock, dockCount = 0, procCount, procOpen, onProc, procs, onKill, status, onCmdK, overflow }: {
+/** The right-panel switch stays beside notifications, at the edge it opens. */
+export function SidePanelToggle({ open, onToggle, freshCount = 0 }: {
+  open: boolean; onToggle: () => void; freshCount?: number;
+}) {
+  return (
+    <button className={`bellbtn sidepaneltoggle${open ? ' on' : ''}`} onClick={onToggle}
+      aria-pressed={open} aria-keyshortcuts="Meta+J Control+J" data-tip="Side panel · ⌘J"
+      aria-label={freshCount ? `Side panel, ${freshCount} new` : 'Side panel'}>
+      <IconDockRight s={15} />
+      {freshCount > 0 && <span className="belln">{freshCount}</span>}
+    </button>
+  );
+}
+
+// Persistent workspace tools live below Search in sidebars, or in the top dock's bottom strip.
+export function UtilCluster({ activeKind, onKind, procCount, procOpen, onProc, procs, onKill, status, onCmdK }: {
   activeKind: WTabKind | null; onKind: (kind: 'terminal' | 'browser') => void;
-  /** the SIDE DOCK is showing at the frame's right edge (rail-ink round 3, 2026-09-04) */
-  dockOpen: boolean;
-  /** …and this is its toggle: the ONE switch for the one right panel (the side-panel round,
-   *  2026-10-03; the Workbench card and its own toggle retired) */
-  onDock: () => void;
-  /** tabs that arrived behind while the panel was folded: the button counts them */
-  dockCount?: number;
   procCount: number; procOpen: boolean; onProc: () => void;
   procs: ProcList; onKill: (kind: 'agent' | 'terminal', id: string) => void; status?: React.ReactNode;
   onCmdK?: () => void;
-  /** narrow-window fallback: the three openers fold into one ⋯ menu instead of wrapping */
-  overflow?: boolean;
 }) {
-  const [more, setMore] = useState(false);
   const kinds: Array<['browser' | 'terminal', React.ComponentType<{ s?: number }>, string]> = [
     ['browser', IconGlobe, 'Browser'], ['terminal', IconTerm, 'Terminal'],
   ];
@@ -186,26 +183,9 @@ export function UtilCluster({ activeKind, onKind, dockOpen, onDock, dockCount = 
   return (
     <>
       {onCmdK && <button className="dockbarbtn ico" onClick={onCmdK} data-tip="Quick actions · ⌘K" aria-label="Quick actions (⌘K)"><IconCmd s={15} /></button>}
-      <button className={`dockbarbtn ico utilkind${dockOpen ? ' on' : ''}`} onClick={onDock} aria-pressed={dockOpen} data-tip="Side panel · ⌘J" aria-label={dockCount ? `Side panel, ${dockCount} new` : 'Side panel'}><IconDockRight s={15} />{dockCount > 0 && <span className="dockbarbadge fresh">{dockCount}</span>}</button>
       {kinds.map(([k, Icon, label]) => (
         <button key={k} className={`dockbarbtn ico utilkind${activeKind === k ? ' on' : ''}`} onClick={() => onKind(k)} data-tip={label} aria-label={label}><Icon s={15} /></button>
       ))}
-      {overflow && (
-        <span className="ftutilmorewrap">
-          <button className="dockbarbtn ico ftutilmore" onClick={() => setMore((v) => !v)} aria-label="More tools" aria-expanded={more} data-tip="Side panel · Browser · Terminal">⋯</button>
-          {more && (
-            <>
-              <div className="ftmenuveil" onClick={() => setMore(false)} />
-              <div className="viewmenu ftutilmenu">
-                <button onClick={() => { setMore(false); onDock(); }}><span className="ftmi"><IconDockRight s={14} /></span><span className="ftmlbl"><b>Side panel</b></span></button>
-                {kinds.map(([k, Icon, label]) => (
-                  <button key={k} onClick={() => { setMore(false); onKind(k); }}><span className="ftmi"><Icon s={14} /></span><span className="ftmlbl"><b>{label}</b></span></button>
-                ))}
-              </div>
-            </>
-          )}
-        </span>
-      )}
       <div className="dockbarproc">
         <button className={`dockbarbtn ico${procOpen ? ' on' : ''}`} onClick={onProc} data-tip="Background processes" aria-label="Background processes">
           <IconActivity s={15} />
@@ -218,9 +198,7 @@ export function UtilCluster({ activeKind, onKind, dockOpen, onDock, dockCount = 
   );
 }
 
-// the top-dock mode's bottom strip — that mode hides the frame top, so the cluster keeps its
-// old berth there (with the ⌘K tile, which has no search pill to fold into). Side docks render
-// UtilCluster on the frame top instead; this band no longer mounts for them.
+// Top-dock navigation keeps workspace tools in a bottom strip.
 export function DockBar(props: Parameters<typeof UtilCluster>[0]) {
   return (
     <div className="dockbar">

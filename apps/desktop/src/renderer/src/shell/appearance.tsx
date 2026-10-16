@@ -95,7 +95,7 @@ export function AppearancePanel({ pref, active, onPick, onClose }: { pref: Theme
           const system = look === 'paper' ? 'paper-system' : 'system';
           const label = look === 'paper' ? 'Paper' : 'Elevated';
           const choices: { id: ThemePref; label: string; desc: string; theme?: ThemeDef }[] = [
-            { id: system, label: 'Sync with system', desc: look === 'paper' ? 'Paper light by day, paper dark by night.' : 'Light by day, dark by night.' },
+            { id: system, label: 'Sync with system', desc: look === 'paper' ? 'Paper light by day, paper dark by night.' : 'Light or Soft Dark, following your system.' },
             ...THEMES.filter((t) => t.look === look).map((theme) => ({ ...theme, theme })),
           ];
           return <section key={look} aria-label={label}>
@@ -104,7 +104,7 @@ export function AppearancePanel({ pref, active, onPick, onClose }: { pref: Theme
               {choices.map((choice) => <label key={choice.id} className={`themecard${pref === choice.id ? ' sel' : ''}`}>
                 <input className="themeinput" type="radio" name="appearance-theme" value={choice.id} checked={pref === choice.id} onChange={() => onPick(choice.id)}
                   aria-label={choice.id === system ? `${label}: Sync with system` : choice.label} aria-describedby={`theme-desc-${choice.id}`} />
-                {choice.theme ? <ThemePreview theme={choice.theme} /> : <div aria-hidden="true" className={`themeprev ${look}`} style={{ background: look === 'paper' ? 'linear-gradient(135deg, #212121 0 50%, #f7f6f3 50% 100%)' : 'linear-gradient(135deg, #1d1d1d 0 50%, #fbf3e8 50% 100%)', borderColor: 'var(--border2)' }}><span className="tpsys" /></div>}
+                {choice.theme ? <ThemePreview theme={choice.theme} /> : <div aria-hidden="true" className={`themeprev ${look}`} style={{ background: look === 'paper' ? 'linear-gradient(135deg, #212121 0 50%, #f7f6f3 50% 100%)' : 'linear-gradient(135deg, #232323 0 50%, #f4f2ec 50% 100%)', borderColor: 'var(--border2)' }}><span className="tpsys" /></div>}
                 <div className="themeinfo">
                   <div className="themename">{choice.label}{choice.id === system && pref === system && <span className="themeon"> · {THEMES.find((t) => t.id === active)?.label}</span>}</div>
                   <div className="themedesc" id={`theme-desc-${choice.id}`}>{choice.desc}</div>

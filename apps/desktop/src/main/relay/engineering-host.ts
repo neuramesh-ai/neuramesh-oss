@@ -1,3 +1,4 @@
+import { engineeringDisplayTools, type EngineeringDisplayContext } from './engineering-display';
 import { engineeringThreadNamer } from './engineering-title';
 import { EngineeringSessionRegistry } from './engineering-session-registry';
 import { defaultBaselineRules, isEngineeringSelection, type PolicyRule } from '@neuramesh/shared';
@@ -33,6 +34,7 @@ export interface ClineEngineeringHostOptions {
   /** the thread's worktree with the clone it came from (engineering-workspace.ts). A bare path is a
    *  worktree of the session repository's own cache clone. */
   resolveCwd(meta: EngineeringMachineOpenMeta): Promise<string | EngineeringWorkspace>;
+  resolveDisplayContext?(meta: EngineeringMachineOpenMeta): Promise<EngineeringDisplayContext | null>;
   resolveBrain(meta: EngineeringMachineOpenMeta): Promise<EngineeringBrainResolution>;
   /** Machine-owned policy rules. Browser controls can only narrow session behavior. */
   resolvePolicyRules?(meta: EngineeringMachineOpenMeta): Promise<PolicyRule[]>;
@@ -71,6 +73,7 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
       const saved = conversation?.brain.metadata()?.['selection'];
       if (isEngineeringSelection(saved)) meta = { ...meta, ...saved };
       const brain = await opts.resolveBrain(meta);
+      const displayContext = await opts.resolveDisplayContext?.(meta);
       // a model this machine refuses still opens the thread: it reads, says why once, and a new pick replaces the model.
       // The stand-in has no credential, and the channel starts nothing on it (engineering-channel.ts runPrompt)
       let refused: string | null = null;
@@ -93,7 +96,7 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
         const selected = await opts.resolveBrain({ ...meta, modelId, brainPack, ...(agentId !== undefined ? { agentId } : {}) });
         return { ...await resolveEngineeringProvider(opts, selected, undefined, opts.authProbe), agent: selected.agent, instructions: selected.instructions };
       };
-      const session = new ClineChannelSession(meta, cwd, provider, meta.modelId ?? null, meta.brainPack ?? null, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }), refused);
+      const session = new ClineChannelSession(meta, cwd, provider, meta.modelId ?? null, meta.brainPack ?? null, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }), refused, agent => engineeringDisplayTools({ apiUrl: opts.apiUrl, threadId: meta.threadId, cwd, context: displayContext, conversation, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }, agent));
       try { await session.init(messages); } catch (error) { managedTools?.close(); throw error; }
       record?.opened();
       return record ? record.wrap(session) : session;

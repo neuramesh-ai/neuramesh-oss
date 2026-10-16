@@ -38,8 +38,8 @@ test('a session owns tabs by its kind: Overview, Files with a worktree, the code
   // drafted posts read in a Drafts tab of their own, after Overview and Files
   assert.deepEqual(sessionTabsOf({ key: 'thread:H', kind: 'thread', drafts: true }), ['overview', 'drafts']);
   assert.deepEqual(sessionTabsOf({ key: 'task:T', kind: 'task', files: true, drafts: true }), ['overview', 'files', 'drafts']);
-  assert.deepEqual(sessionTabsOf({ key: 'thread:H', kind: 'coding', drafts: true }), ['changes', 'files', 'plan', 'checkpoints', 'terminal'], 'a coding thread drafts no posts');
-  assert.deepEqual(sessionTabsOf({ key: 'thread:H', kind: 'coding' }), ['changes', 'files', 'plan', 'checkpoints', 'terminal']);
+  assert.deepEqual(sessionTabsOf({ key: 'thread:H', kind: 'coding', drafts: true }), ['changes', 'files', 'artifacts', 'plan', 'checkpoints', 'terminal'], 'a coding thread drafts no posts');
+  assert.deepEqual(sessionTabsOf({ key: 'thread:H', kind: 'coding' }), ['changes', 'files', 'artifacts', 'plan', 'checkpoints', 'terminal']);
   assert.deepEqual(sessionTabsOf({ key: 'room:R', kind: 'room', roomSections: true }), ['overview']);
   assert.deepEqual(sessionTabsOf({ key: 'room:R', kind: 'room' }), [], 'a room home with nothing of its own owns no tab');
   assert.deepEqual(sessionTabsOf({ key: null, kind: null }), []);

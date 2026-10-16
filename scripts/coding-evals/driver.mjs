@@ -3,9 +3,18 @@ import { join, resolve } from 'node:path';
 import { mkdir, writeFile, rename, access, readdir, cp, open, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { exec, root, save, readJson, statusOf, safeEnv, localUrl } from './support.mjs';
-import { start, state, turn, capture, selectModel } from './flow.mjs';
+import { start, state, turn, capture, selectModel, requireApprovals } from './flow.mjs';
 import { preview } from './preview.mjs';
 import { verifyRecording } from './recording.mjs';
+
+async function fullPlanProgress(p) {
+  await p.click('.codingthread [aria-label="Open plan"] >> nth=-1');
+  await p.waitForSelector('[data-work-plan="pane"]');
+  return p.evaluate(() => {
+    const items = [...document.querySelectorAll('[data-work-plan="pane"] [aria-label="Work plan steps"] li')];
+    return { total: items.length, done: items.filter(item => item.classList.contains('complete')).length };
+  });
+}
 
 export async function drive(taskSpace,config) {
   const run=await readJson(join(config.out,'run.json'));
@@ -59,15 +68,19 @@ export async function drive(taskSpace,config) {
         await save(join(dir,'result.json'),result);
         await turn(p,spec,result,dir,{planning:true,cancelFile});
         check('plan card and implementation gate are visible',true);
-        check('progress stays hidden before execution',!(await state(p)).progress);
+        const planned = (await state(p)).progress;
+        check('unfinished new plan shows zero completed steps',planned?.total>0&&planned.done===0);
         check('planning left repository unchanged',!(await exec('git',['status','--porcelain'],{cwd:result.cwd})).stdout.trim());
+        await requireApprovals(p);
+        result.events.push({type:'permissions',edit:'ask',command:'ask'});
         const beforeAct=(await state(p)).replies.length;
         await p.click('[aria-label="Continue in Act mode"] .primary');
         await turn(p,spec,result,join(dir,'implementation'),{replyCount:beforeAct,cancelFile,completionCheck:async()=>(await verifyRecording(run,result,dir,'implementation')).passed});
         result.implementationVerification=await verifyRecording(run,result,dir,'implementation');
         check('agent tests passed inside the coding sandbox',result.implementationVerification.passed);
-        const execution=(await state(p)).progress;
+        const execution=await fullPlanProgress(p);
         check('plan steps explicitly complete after execution',execution?.total>0&&execution.done===execution.total);
+        check('completed plan hides composer progress',!(await state(p)).progress);
         if(spec.followup) {
           assert.ok(!existsSync(cancelFile),'Eval cancelled');
           await selectModel(p,'.codingthread',run.handoffModel);
@@ -90,10 +103,12 @@ export async function drive(taskSpace,config) {
           check('handoff performed a new test run',result.followupVerification.index>result.implementationVerification?.index);
         }
         let s=await state(p);
-        check('final plan steps are complete',s.progress?.total>0&&s.progress.done===s.progress.total);
+        const finalProgress=await fullPlanProgress(p);
+        check('final plan steps are complete',finalProgress.total>0&&finalProgress.done===finalProgress.total);
+        check('final composer progress is hidden',!s.progress);
         if(config.feedback) {
           check('feedback performed a fresh recorded test run',beforeFeedback?.index!==undefined);
-          check('feedback finished every plan step',s.progress?.total>0&&s.progress.done===s.progress.total);
+          check('feedback finished every plan step',finalProgress.total>0&&finalProgress.done===finalProgress.total);
         }
         check('file review approvals occurred',result.events.some(e=>e.type==='review'));
         check('agent requested test execution',result.events.some(e=>e.type==='command'&&/test/.test(e.command)));
@@ -106,12 +121,13 @@ export async function drive(taskSpace,config) {
         check('independent acceptance oracle passes',result.oracle.passed);
         const diff=await exec('git',['diff','--stat'],{cwd:result.cwd});await writeFile(join(dir,'diff-stat.txt'),diff.stdout);
         // A reload must retain the review history and session selection before preview testing.
-        const priorProgress=s.progress;
+        const priorProgress=finalProgress;
         const authors=s.replies.filter(t=>/rex|patch/.test(t));
         await p.reload();await p.waitForSelector('.codingthread .cagent');
         await p.waitForFunction(()=>!document.querySelector('.codingthread .cagent')?.disabled,undefined,{timeout:30000});
         s=await state(p);
-        check('reload retains plan progress',JSON.stringify(s.progress)===JSON.stringify(priorProgress));
+        check('reload retains plan progress',JSON.stringify(await fullPlanProgress(p))===JSON.stringify(priorProgress));
+        check('reload keeps completed composer progress hidden',!s.progress);
         check('reload retains applied review history',s.cards.some(c=>c.status==='applied'));
         check('reload retains agent and model',s.agent.includes('rex')&&s.model.includes(spec.followup?run.handoffModel:run.model));
         check('thread has real assistant responses',authors.length>1);

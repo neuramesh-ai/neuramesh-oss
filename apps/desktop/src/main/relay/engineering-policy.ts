@@ -25,6 +25,16 @@ function strings(value: unknown): string[] {
 
 export function engineeringPolicyActions(toolName: string, input: unknown): PolicyAction[] {
   const value = recordOf(input);
+  if (toolName === 'show_artifact') {
+    const path = typeof value['path'] === 'string' ? value['path'].replace(/^\.\//, '').replace(/^\.nm-artifacts\//, '') : '';
+    if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').some(part => !part || part === '..' || part === '.')) return [];
+    return [{ capability: 'fs.read', path: `.nm-artifacts/${path}` }];
+  }
+  // These app tools have no repository path or model-selected URL. Apply the existing
+  // named-tool workspace policy as well as their read/edit session permission category.
+  if (['create_whiteboard', 'update_whiteboard', 'list_whiteboards', 'read_whiteboard', 'draft_article', 'share_images'].includes(toolName)) {
+    return [{ capability: 'tool.mcp', tool: toolName }];
+  }
   if (toolName === 'read_files') {
     const paths = [...strings(value['files']), ...strings(value['paths']), ...strings(value['path'])];
     return (paths.length ? paths : [undefined]).map((path) => ({ capability: 'fs.read', ...(path ? { path } : {}) }));

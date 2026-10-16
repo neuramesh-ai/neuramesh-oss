@@ -33,6 +33,8 @@ const manifest = {
   url: 'https://neuramesh.app',
   description: 'NeuraMesh reads your releases and drafts the announcement for every account you connected. Read only.',
   redirect_url: `http://127.0.0.1:${PORT}/callback`,
+  // User authorization returns to hq; setup_url only handles installation callbacks.
+  callback_urls: ['https://hq.neuramesh.app/github/callback'],
   setup_url: `${API}/connect/github/callback`,
   setup_on_update: true,
   public: true,

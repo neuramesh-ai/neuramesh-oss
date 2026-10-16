@@ -1,4 +1,4 @@
-/* Shared measurements keep the transcript and composer centered beside the overview. */
+/* Shared measurements keep the transcript, gates and composer centered beside the overview. */
 .threadpanel { --overview-width:252px; --overview-gap:12px; --overview-inset:16px; }
 .thread-overview-body { position:relative; display:flex; flex:1; min-width:0; min-height:0; gap:var(--overview-gap); }
 .thread-overview-transcript { display:flex; flex:1; min-width:0; min-height:0; flex-direction:column; }
@@ -7,6 +7,8 @@
 .overview-head { display:flex; align-items:center; gap:8px; color:var(--muted); margin-bottom:14px; }
 .overview-head > span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .overview-head button { display:grid; place-items:center; width:24px; height:24px; flex-shrink:0; border:0; background:transparent; color:var(--muted); border-radius:var(--r-sm); cursor:pointer; }
+.overview-head [data-tip]::after { left:auto; right:0; transform:translateY(-3px) scale(.97); }
+.overview-head [data-tip]:hover::after { transform:translateY(0) scale(1); }
 .overview-head [data-tip]::after { left:auto; right:0; transform:translateY(-3px) scale(.97); }
 .overview-head [data-tip]:hover::after { transform:translateY(0) scale(1); }
 .thread-overview section + section { margin-top:18px; }
@@ -31,7 +33,8 @@
 .overview-more:hover { color:var(--text); }
 
 /* The narrow inline card consumes no horizontal space. Hidden cards also leave the full column. */
-.threadpanel .thread-overview-body.with-overview ~ .tcompose {
+.threadpanel .thread-overview-body.with-overview ~ .tcompose,
+.threadpanel.codingthread .thread-overview-body.with-overview ~ .gateseat {
   --overview-reserve:calc(var(--overview-width) + var(--overview-gap) + var(--overview-inset));
   width:calc(100% - var(--overview-reserve));
   margin-right:calc(var(--overview-reserve) + max(0px, (100% - var(--overview-reserve) - var(--col)) / 2));

@@ -1,3 +1,4 @@
+import { ENGINEERING_DISPLAY_PROMPT, type EngineeringDisplayTool } from './engineering-display';
 import { engineeringTitleTool } from './engineering-title';
 import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan';
 import { ENGINEERING_PLAN_PROGRESS_PROMPT, WEB_PREVIEW_PROMPT, DEFAULT_ENGINEERING_AGENT, engineeringEffort, type EngineeringRuntimeEvent } from '@neuramesh/shared';
@@ -72,7 +73,9 @@ export function engineeringRuntimeInput({
   userFiles,
   emit,
   readPlanMessages,
+  readPlanProgress,
   setThreadTitle,
+  displayTools = [],
 }: {
   meta: EngineeringMachineOpenMeta;
   cwd: string;
@@ -85,7 +88,9 @@ export function engineeringRuntimeInput({
   userImages?: string[];
   userFiles?: string[];
   readPlanMessages?: () => Promise<unknown>;
+  readPlanProgress?: () => Promise<import('@neuramesh/shared').EngineeringPlanProgress | null>;
   setThreadTitle?: (title: string) => Promise<unknown>;
+  displayTools?: EngineeringDisplayTool[];
   emit?: (event: EngineeringRuntimeEvent) => void;
 }): Parameters<ClineCore['start']>[0] {
   return {
@@ -108,7 +113,7 @@ export function engineeringRuntimeInput({
     },
     // Repository-owned runtime extensions can contain executable hooks and plugins. Code sessions
     // expose only Neuramesh's audited tools, whose side effects pass through policy + sandboxing.
-    localRuntime: { configExtensions: [], ...(emit ? { extraTools: [...(setThreadTitle ? [engineeringTitleTool(setThreadTitle)] : []), ...(controls.mode === 'plan' ? [engineeringPlanTool(emit)] : [engineeringProgressTool(emit, readPlanMessages ?? (async () => initialMessages))])] } : {}) },
+    localRuntime: { configExtensions: [], ...(emit ? { extraTools: [...displayTools, ...(setThreadTitle ? [engineeringTitleTool(setThreadTitle)] : []), ...(controls.mode === 'plan' ? [engineeringPlanTool(emit)] : [engineeringProgressTool(emit, readPlanMessages ?? (async () => initialMessages), readPlanProgress)])] } : {}) },
     config: {
       providerId: provider.providerId,
       modelId: provider.modelId,
@@ -122,7 +127,7 @@ export function engineeringRuntimeInput({
       // options, so unsupported providers simply continue with ordinary text.
       reasoningEffort: engineeringEffort(modelId, meta.reasoningEffort) ?? 'low',
       thinking: true,
-      systemPrompt: `You are ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).name}, the ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).role} agent in NeuraMesh. ${provider.instructions ? `Your agent instructions: ${provider.instructions}\n` : ''}` + 'You are working in a coding conversation. When set_thread_title is available, call it once after you understand the first request, using a clean 2–6 word title describing the topic rather than echoing the prompt. Do not rename a conversation that already has a title-tool receipt.  Work only in the supplied workspace. Respect Plan mode as read-only. For function tools, generate complete JSON arguments matching the tool schema. Keep JSON formatting compact; do not emit padding or an unfinished argument object. Use normal prose for conversational replies. For a requested implementation plan, call propose_work_plan with a formal plan and a separate conversational report. In the report, explain in first person what you actually investigated or resolved, the finding that shaped your approach, two or three key choices with reasons and the verification approach, and the next step for the user. Do not simply repeat the plan summary or checklist. Do not claim you changed files or ran checks unless you actually did. The UI displays this report above the plan card, so after the tool succeeds finish with only one short readiness sentence. Ordinary answers and feature ideas do not need that tool. Explain decisions concisely, use tools for repository facts, and for implementation turns finish with what changed and what was verified. Save generated deliverables, images and portable files in .nm-artifacts/ so the thread can restore them on another device. Never place credentials or secrets in that folder. Never expose the implementation harness or its vendor name to the user.' + '\n\n' + toolUseInstructions + '\n\n' + ENGINEERING_PLAN_PROGRESS_PROMPT + '\n\n' + WEB_PREVIEW_PROMPT,
+      systemPrompt: `You are ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).name}, the ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).role} agent in NeuraMesh. ${provider.instructions ? `Your agent instructions: ${provider.instructions}\n` : ''}` + 'You are working in a coding conversation. When set_thread_title is available, call it once after you understand the first request, using a clean 2–6 word title describing the topic rather than echoing the prompt. Do not rename a conversation that already has a title-tool receipt.  Work only in the supplied workspace. Respect Plan mode as read-only. For function tools, generate complete JSON arguments matching the tool schema. Keep JSON formatting compact; do not emit padding or an unfinished argument object. Use normal prose for conversational replies. For a requested implementation plan, call propose_work_plan with a formal plan and a separate conversational report. In the report, explain in first person what you actually investigated or resolved, the finding that shaped your approach, two or three key choices with reasons and the verification approach, and the next step for the user. Do not simply repeat the plan summary or checklist. Do not claim you changed files or ran checks unless you actually did. The UI displays this report above the plan card, so after the tool succeeds finish with only one short readiness sentence. Ordinary answers and feature ideas do not need that tool. Explain decisions concisely, use tools for repository facts, and for implementation turns finish with what changed and what was verified. Save generated deliverables, images and portable files in .nm-artifacts/ so the thread can restore them on another device. Never place credentials or secrets in that folder. Never expose the implementation harness or its vendor name to the user.' + '\n\n' + toolUseInstructions + '\n\n' + ENGINEERING_PLAN_PROGRESS_PROMPT + '\n\n' + WEB_PREVIEW_PROMPT + '\n\n' + ENGINEERING_DISPLAY_PROMPT,
       maxIterations: 50,
       enableTools: true,
       enableSpawnAgent: false,

@@ -1,20 +1,21 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-export async function validate(taskSpace, {space, out, page='p2'}) {
+export async function validate(taskSpace, {space, out, page='p2', url='http://127.0.0.1:5303/plan-progress.html'}) {
   const task=await taskSpace(space), p=task.page(page), checks=[];
   const check=(name, ok)=>{checks.push({name,passed:!!ok});assert.ok(ok,name);};
   await mkdir(out,{recursive:true});
   await p.cdp('Emulation.setDeviceMetricsOverride',{width:1200,height:900,deviceScaleFactor:1,mobile:false});
-  await p.goto('http://127.0.0.1:5303/plan-progress.html');await p.waitForSelector('.codeplandial');
+  await p.goto(url);await p.waitForSelector('.codeplandial');
   await p.hover('.codeplandial');await p.waitForSelector('.codeplanpeek');
+  check('pointer hover adds no outer ring',await p.evaluate(()=>getComputedStyle(document.querySelector('.codeplandial')).outlineStyle==='none'));
   check('hover shows every step, completed checkmarks and active step',await p.evaluate(()=>document.querySelectorAll('.codeplanpeek li').length===5&&document.querySelectorAll('.codeplanpeek .beatcheck').length===2&&document.querySelectorAll('.codeplanpeek [aria-current="step"]').length===1));
   check('dial centered above composer with visible ring/checkmarks',await p.evaluate(()=>{const d=document.querySelector('.codeplandial').getBoundingClientRect(),c=document.querySelector('.cbox').getBoundingClientRect();return Math.abs(d.x+d.width/2-c.x-c.width/2)<1&&d.bottom<c.top&&getComputedStyle(document.querySelector('.codeplanarc')).stroke!=='none'&&getComputedStyle(document.querySelector('.beatcheck path')).stroke!=='none';}));
   await p.screenshot({path:join(out,'fixture-dark.png')});
   await p.hover('textarea');await p.waitForSelector('.codeplanpeek',{state:'hidden'});
   await p.focus('.codeplandial');await p.waitForSelector('.codeplanpeek');await p.press('.codeplandial','Escape');await p.waitForSelector('.codeplanpeek',{state:'hidden'});
   check('keyboard focus opens and Escape dismisses',true);
-  await p.hover('textarea');await p.hover('.codeplandial');await p.focus('.codeplanpeek');await p.press('.codeplanpeek','Escape');await p.waitForSelector('.codeplanpeek',{state:'hidden'});
+  await p.hover('textarea');await p.hover('.codeplandial');await p.waitForSelector('.codeplanpeek');await p.focus('.codeplanpeek');await p.press('.codeplanpeek','Escape');await p.waitForSelector('.codeplanpeek',{state:'hidden'});
   check('Escape from checklist returns focus to the dial',await p.evaluate(()=>document.activeElement?.classList.contains('codeplandial')));
   await p.click('.codeplandial');await p.hover('textarea');await p.waitForSelector('.codeplanpeek');
   check('click pins checklist for touch and pointer users',true);
@@ -29,10 +30,16 @@ export async function validate(taskSpace, {space, out, page='p2'}) {
   await p.click('loc=role:button[name="Long plan"]');await p.hover('.codeplandial');
   check('30-step checklist scrolls within narrow viewport',await p.evaluate(()=>{const e=document.querySelector('.codeplanpeek'),r=e.getBoundingClientRect(),l=e.querySelector('ol');return r.x>=0&&r.right<=innerWidth&&r.y>=0&&r.bottom<=innerHeight&&l.scrollHeight>l.clientHeight&&l.children.length===30&&document.documentElement.scrollWidth<=innerWidth;}));
   await p.screenshot({path:join(out,'fixture-narrow.png')});
-  await p.click('loc=role:button[name="Complete plan"]');await p.hover('.codeplandial');
-  check('completed plan keeps a full ring and checked history',await p.evaluate(()=>document.querySelector('.codeplanpeek header').textContent.includes('Plan complete')&&document.querySelectorAll('.codeplanpeek .beatcheck').length===30));
-  await p.click('loc=role:button[name="Toggle mode"]');await p.waitForSelector('.codeplandial',{state:'hidden'});check('Plan mode hides execution indicator',true);
-  await p.click('loc=role:button[name="Toggle mode"]');await p.hover('.codeplandial');await p.click('.codeplanopen');await p.waitForSelector('[data-work-plan="pane"]');
+  await p.click('loc=role:button[name="Complete plan"]');await p.waitForSelector('.codeplandial',{state:'hidden'});
+  check('completed plan removes the dial and hover checklist',await p.evaluate(()=>!document.querySelector('.codeplanpeek')));
+  await p.screenshot({path:join(out,'fixture-complete-narrow.png')});
+  await p.cdp('Emulation.setDeviceMetricsOverride',{width:1200,height:900,deviceScaleFactor:1,mobile:false});
+  await p.click('loc=role:button[name="Open saved plan"]');await p.waitForSelector('[data-work-plan="pane"]');
   check('open full plan retains completed step states',await p.evaluate(()=>document.querySelectorAll('[data-work-plan="pane"] li.complete').length===30));
+  await p.screenshot({path:join(out,'fixture-complete.png')});
+  await p.click('loc=role:button[name="New plan"]');await p.waitForSelector('.codeplandial');
+  await p.cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});await p.hover('.codeplandial');
+  check('new plan restores a fresh pending dial in Plan mode',await p.evaluate(()=>document.querySelector('[data-plan-progress]').dataset.completed==='0'&&document.querySelector('.codeplanpeek header').textContent.includes('Ready to start')));
+  await p.screenshot({path:join(out,'fixture-new-plan.png')});
   await writeFile(join(out,'component-checks.json'),JSON.stringify(checks,null,2));console.log(checks);
 }

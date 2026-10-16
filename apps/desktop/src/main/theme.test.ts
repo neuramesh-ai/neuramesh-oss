@@ -17,13 +17,13 @@ test('isThemePref accepts exactly the ids + system', () => {
   assert.equal(isThemePref(''), false);
 });
 
-test('resolveTheme: a concrete pref is itself; system falls back to dark under node', () => {
+test('resolveTheme: a concrete pref is itself; system falls back to Soft Dark under node', () => {
   assert.equal(resolveTheme('cream-oak'), 'cream-oak');
   // no window here — the guard must resolve, not throw (the boot path runs before DOM in tests)
-  assert.equal(systemTheme(), 'dark');
-  assert.equal(resolveTheme('system'), 'dark');
+  assert.equal(systemTheme(), 'soft-dark');
+  assert.equal(resolveTheme('system'), 'soft-dark');
 });
 
 test('loadThemePref survives node (no localStorage) and garbage values', () => {
-  assert.equal(loadThemePref(), 'paper-system');
+  assert.equal(loadThemePref(), 'system');
 });

@@ -1,3 +1,4 @@
+import { shareImage } from './share-image';
 // DRAFTED CONTENT — the image an agent draws for a card, the in-place revision by card
 // letter, and the transcript a turn is built from. Drafts only: publishing is a human's click.
 // Extracted from agents.ts (track B2).
@@ -111,15 +112,7 @@ const { drawBriefed, draftImageFor, drawOnAsk } = makeDraw({
  * same brand tokens, the bytes come back to the caller instead of onto a card.
  */
 async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string): Promise<{ thumb?: string; bytes?: Buffer; error?: string }> {
-  const designer = [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id));
-  const { cred } = await designerImageCred(apiUrl, ch.workspace_id, designer, ownerActorId);
-  if (!cred) return { error: 'no image key connected — add an OpenAI or Gemini key under Image generation' };
-  const brand = await brandTokensFor(db, ch.id);
-  const reviewSeat = providerFor(agent.runtime) === cred.provider ? agent.model : (PACKS[cred.provider === 'openai' ? 'openai-core' : 'gemini-core']?.roles.marketer ?? '');
-  const g = await generateBrandImage(cred, reviewSeat, brand, brief, 'x', agent.name);
-  if (g.error || !g.thumb) return { error: g.error ?? 'the image came back empty' };
-  console.log(`agent_share_image agent=${agent.name} room=#${ch.slug} ok model=${g.model ?? '?'}`);
-  return { thumb: g.thumb, bytes: g.bytes }; // the bytes too, for a caller that keeps a copy
+  return shareImage({ apiUrl, ownerActorId, db, designer: [...agents.values()].find(a => a.role === 'designer' && a.channels.has(ch.id)) }, agent, ch, brief);
 }
 async function reviseContentDrafts(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, t: ThreadTask, m: { id: string; body: string }, mode: string, token: string, onDelta: DeltaFn): Promise<string | null> {
   // draft AND scheduled: a human's free-form "change the drafts" reaches every unpublished post,

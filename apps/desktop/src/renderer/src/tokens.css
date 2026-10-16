@@ -249,53 +249,35 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 
 /* unified nav shell: one dockable panel + the shell body (main + thread panel).
    data-navpos flips the axis — left (default) · right (reverse) · top (column). */
-/* the FRAME model (Cabinet-grade revamp, amended in the shell round 2026-08-10): the window
-   itself is the cream/graphite frame (--win) and owns all global chrome — the fixed .frametop
-   bar (which now carries the ambient utilities + sync pill at its right end) and the naked nav
-   rail. The bottom dock strip retired with that move; its 38px went back to the sheet. The
-   main panel is the one floating SHEET. */
-.shell { display: flex; height: 100vh; background: var(--win); padding: 46px 12px 12px; gap: 4px; }
+/* Global chrome lives in the side nav; the main sheet starts at the window's top edge. */
+.shell { display: flex; height: 100vh; background: var(--win); padding: 12px; gap: 4px; }
 .shell[data-navpos="right"] { flex-direction: row-reverse; }
 /* top-dock mode keeps its bottom DockBar (it hides the frame top), so it keeps the band's room */
 .shell[data-navpos="top"] { flex-direction: column; padding-top: 8px; padding-bottom: 38px; }
 
-/* ── frame top bar — wordmark · project crumb · ⌘K · fixed on the frame ── */
-.frametop { position: fixed; top: 0; left: 0; right: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 16px; z-index: 46; -webkit-app-region: drag; }
+/* Sidebar header and persistent workspace tools. The top dock retains its DockBar. */
+.frametop { position: relative; height: 44px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; -webkit-app-region: drag; }
 .frametop > * { -webkit-app-region: no-drag; }
 .frametop .ftbrand { display: inline-flex; align-items: center; padding: 4px 6px; border-radius: var(--r-md); }
-/* the fold pin — one control for the sidebar, in the frame top where it is reachable from every
-   view. It wears the dock glyph (NOT a chevron: beside the crumb, a chevron reads as another
-   separator) and sits pressed-in while the rail is folded away. */
-.ftfold { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--dim); flex: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.ftfold { margin-left: auto; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-sm); color: var(--dim); flex: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .ftfold:hover { background: var(--hover-bg); color: var(--text); }
 .ftfold.folded { background: var(--sel-bg); color: var(--body); }
 .ftfold svg { display: block; }
-/* the project › surface crumb retired 2026-09-04 (rail-ink round): the head is the mark, the
-   wordmark and the fold — the project lives in the rail's scope row, the surface in its tab. */
-.ftsearch { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--dim); font-size: 12.5px; min-width: 0; flex: 0 1 auto; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.navtools { display: flex; flex-direction: column; flex: none; gap: 6px; padding: 8px 12px 2px; }
+.ftsearch { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: color-mix(in srgb, var(--text) 3%, transparent); color: var(--muted); font-size: 12px; text-align: left; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.ftsearch > svg { flex: none; }
 .ftslbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ftsearch:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); }
-.ftsearch b { margin-left: auto; font: 600 10px var(--fmono); border: 1px solid var(--border2); border-radius: 3px; padding: 1px 5px; color: var(--dim); font-weight: 600; }
-/* the ambient utilities on the frame top's right end (the shell round) — the dock strip's
-   cluster verbatim, minus its ⌘K tile (the search pill is that door). Sits after .ftsearch's
-   auto margin; direct child of .frametop, so the no-drag rule already covers it. */
+.ftsearch:hover { background: var(--hover-bg); color: var(--text); }
+.ftsearch kbd { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
 .ftutils { display: inline-flex; align-items: center; gap: 2px; flex: none; }
-/* the frame top hugs the window TOP, so its popovers open DOWNWARD (the dockbar's opened up) */
-.frametop .procpop { bottom: auto; top: calc(100% + 8px); }
-/* right-edge safety: a centred label on the cluster's last buttons would run off screen —
-   open leftward from the right edge, the .wtico rule's geometry (mirrored anchors get
-   mirrored offsets, docs/33 §9.6) */
-.ftutils [data-tip]::after { left: auto; right: 0; transform: translateY(-3px) scale(.97); }
-.ftutils [data-tip]:hover::after { transform: translateY(0) scale(1); }
-/* narrow window: the three openers fold into one ⋯ — never a second chrome row */
-.ftutilmorewrap { position: relative; display: none; }
-.ftutilmenu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; }
-@media (max-width: 880px) {
-  .ftutils .utilkind { display: none; }
-  .ftutilmorewrap { display: inline-flex; }
-  .ftsearch { min-width: 0; }
-}
-.shell[data-navpos="top"] .frametop { display: none; } /* the top dock is its own chrome row */
+/* These controls sit at the bottom edge. Anchor toward the sheet on either side. */
+.navtools .procpop { left: 0; right: auto; }
+.navtools .dockbarproc:has(.procpop) [data-tip]::after { display: none; }
+.navtools [data-tip]::after { top: auto; bottom: calc(100% + 7px); left: 0; right: auto; transform: translateY(3px) scale(.97); }
+.navtools [data-tip]:hover::after { transform: translateY(0) scale(1); }
+.navpanel[data-pos="right"] .navtools .procpop { left: auto; right: 0; }
+.navpanel[data-pos="right"] .navtools [data-tip]::after { left: auto; right: 0; }
+.shell[data-navpos="top"] .frametop { display: none; }
 .shellbody { flex: 1; display: flex; flex-direction: row; gap: var(--shell-gap); min-width: 0; min-height: 0; position: relative; }
 .chan .lbl { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; white-space: nowrap; }
 .navpin { margin-left: auto; color: var(--dim); font-size: 13px; padding: 2px 6px; border-radius: 6px; }
@@ -1281,14 +1263,20 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
   transition: width var(--dur-enter) var(--ease), min-width var(--dur-enter) var(--ease); }
 /* drag is direct manipulation — the fold's width transition would make it lag the pointer */
 .navpanel[data-dragging="1"] { transition: none; }
-/* ── folded (v0.64, amended v0.76): the side rail collapses to NOTHING, because the spine beside
-   it is already the strip. Until now the fold left a 26px `.navfoldtab` at this edge; standing
-   the projects rail there too would have put two strips side by side, which is exactly what the
-   line above ("one fold idiom, not two") exists to prevent — so the spine absorbed it, chevron
-   and vitals alike. The panel stays MOUNTED (children hidden, not unmounted) so the width
-   animates and the channel/Recents scroll position is exactly where you left it. */
-.navpanel[data-folded="1"] { width: 0; min-width: 0; overflow: hidden; }
-.navpanel[data-folded="1"] > * { display: none; }
+/* Keep the fold and global tools reachable in a compact rail; preserve mounted nav state. */
+.navpanel[data-folded="1"] { width: 44px; min-width: 44px; }
+.navpanel[data-folded="1"] > :not(.frametop):not(.navtools) { display: none; }
+.navpanel[data-folded="1"] .frametop { justify-content: center; padding: 0; }
+.navpanel[data-folded="1"] .ftbrand { display: none; }
+.navpanel[data-folded="1"] .ftfold { margin-left: 0; }
+.navpanel[data-folded="1"] .ftfold::after { left: 0; right: auto; transform: translateY(-3px) scale(.97); }
+.navpanel[data-folded="1"] .ftfold:hover::after { transform: translateY(0) scale(1); }
+.navpanel[data-pos="right"][data-folded="1"] .ftfold::after { left: auto; right: 0; }
+.navpanel[data-folded="1"] .navtools { margin-top: auto; padding: 8px 5px 12px; align-items: center; }
+.navpanel[data-folded="1"] .ftsearch { width: 30px; height: 30px; padding: 0; justify-content: center; }
+.navpanel[data-folded="1"] .ftsearch :is(.ftslbl, kbd) { display: none; }
+.navpanel[data-folded="1"] :is(.ftutils, .dockbarstatus) { flex-direction: column; gap: 6px; margin-left: 0; }
+.navpanel[data-folded="1"] .livepill.loc { width: 26px; padding: 0; gap: 0; font-size: 0; }
 
 /* ── the nav grip (the shell round, 2026-08-10) — the split-stage grip at the nav edge.
    Rest: NOTHING (no standing hairline — the nav is naked on the frame, and a rule here would
@@ -1306,8 +1294,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    The spine (`.prail`, v0.76) spent 30px of frame standing one vertical string. The contract it
    protected — the WORKSPACE is a scope above the project, not inside it — survives by position:
    the bar sits UNDER everything it contains. The 30px went back to the sheet, `--projrail-w`
-   retired, and `.navpanel[data-folded]` still collapses to zero because the frame top's
-   `.ftfold` has always been the fold control docs/33 §2 names.
+   retired. The folded sidebar retains a compact tool rail with the `.ftfold` control.
 
    It lives inside `.navface.rooms`, not beside the faces: the second face carries its own,
    larger account block, so the bar reads as expanding into the panel rather than as two account
@@ -2481,10 +2468,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .captick { width: 16px; height: 16px; border-radius: var(--r-full); flex: none; display: grid; place-items: center;
   font-size: 9px; color: var(--green); background: color-mix(in srgb, var(--green) 18%, transparent); }
 .capacts { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
-/* right inset clears the floating utilbar (clock + burger, ~82px incl. margin) so no
-   view's topbar actions ever sit under it */
+/* Reserve the destination controls, notifications and right-panel switch. */
 /* 40px: the title's centre (21px) meets the bell's (the bare head's 27px button sits at 7px) */
-.topbar { height: 40px; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 94px 0 20px; background: transparent; font-family: var(--fdisp); font-weight: 500; font-size: 17.5px; letter-spacing: -.02em; }
+.topbar { height: 40px; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 126px 0 20px; background: transparent; font-family: var(--fdisp); font-weight: 500; font-size: 17.5px; letter-spacing: -.02em; }
 .topbar .desc { color: var(--dim); font-family: var(--fbody); font-size: 12px; font-weight: 500; letter-spacing: -.02em; border-left: 1px solid var(--border); padding-left: 10px; }
 .topbar .actions { margin-left: auto; }
 .content { flex: 1; display: grid; place-items: center; }
@@ -2945,8 +2931,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* mine-bubble tint retired with the hairline cards (2026-08-06) — alignment says mine */
 /* it WRAPS (rail-ink round 3): beside the Workbench card and the side dock a thread can be 600px
    wide, and a header that will not wrap spills under the card instead */
-/* the head sits in the sheet's first line: 6px down meets the bell's centre, 52px at the right clears it */
-.thead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 52px 0 16px; }
+/* the head sits in the sheet's first line: 6px down meets the bell's centre; 84px clears notifications and the panel switch */
+.thead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 84px 0 16px; }
 /* Breadcrumbs and actions lead; the title gets its own single line below them. */
 .thead.thread-crumb-row { flex-wrap: nowrap; min-width: 0; }
 .thread-crumb-row > :is(.scrumb, .tid, .chip, .theadact, .overview-toggle) { flex-shrink: 0; }
@@ -5474,7 +5460,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .wtcontext::-webkit-scrollbar { display: none; }
 .wtright { flex: none; margin-left: auto; display: flex; align-items: center; gap: 4px; padding-left: 6px; }
 /* ── THE BELL (2026-08-16) — Home's needs-you queue, on chrome ────────────────────────────────
-   First in the strip's rail, before the crew clusters, and unlike them NEVER gated: they stand
+   At the end of the strip's rail, before the panel toggle, and unlike crew clusters NEVER gated: they stand
    down the moment a task or thread opens, which is most of the time. The badge keeps the
    NOTIFICATION treatment Home's nav row had (--link fill, not the informational --panel3) —
    a count that means "someone is waiting on you" must not read like "how much is in there". */
@@ -5670,8 +5656,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    context), it is the room's rail alone, floating over the sheet's top-right corner rather than
    holding a row of its own: the tab strip that once filled that row lives in the side dock, and an
    empty 36px band above every title put the title a row below the bell (George, 2026-09-18). The
-   first rows under it reserve the corner: .topbar (94px, the Cabinet reservation), .thead (52px, the
-   bell alone: the crew and the views menu stand down while a session is open), and the Workbench
+   first rows under it reserve the corner: .topbar (126px, destination controls), .thead (84px, the
+   bell and panel toggle: the crew and the views menu stand down while a session is open), and the Workbench
    card keeps its top clear of the bell. Surfaces with no first LINE (Home, the room's session list)
    keep the band as padding so nothing there moves (their own rules carry the 36px). */
 .sheethd { min-height: 36px; padding-top: 4px; }
@@ -5897,7 +5883,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    panel swallowed them. Stays under the menu band (60+) so popovers still open over the dock.
    (The session it used to have to out-stack now lives INSIDE `.main` — docs/36 §2.1.) */
 /* top-dock mode ONLY since the shell round (2026-08-10) — the side docks' cluster moved to
-   .ftutils on the frame top and this band stopped mounting for them */
+   .ftutils in the sidebar and this band does not mount for them */
 .dockbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; padding: 3px 14px; background: transparent; min-height: 32px; z-index: 56; }
 .dockbarsp { flex: 1 1 auto; min-width: 0; } /* pushes Terminal · Processes · sync to the strip's right edge */
 .dockbarstatus { margin-left: 2px; display: inline-flex; align-items: center; } /* the sync/live pill anchors the cluster's far right */
@@ -9232,18 +9218,16 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
   --shell-gap: 0px; --sheet-r: 0px; --lift: none;
   --btn-primary: var(--text); --btn-primary-ink: var(--bg); --card-hover: var(--hover-bg);
 }
-:root[data-look='paper'] .shell { padding: 44px 0 0; gap: 0; }
+:root[data-look='paper'] .shell { padding: 0; gap: 0; }
 :root[data-look='paper'] .shell[data-navpos='top'] { padding: 0 0 38px; }
 :root[data-look='paper'] .navpanel[data-pos='top'] .navgroup { max-width: 100%; overflow-x: auto; }
-:root[data-look='paper'] .frametop { background: var(--win); border-bottom: 1px solid var(--border); }
+:root[data-look='paper'] .frametop { background: var(--win); }
 /* The main owns the rail boundary. A zero-width grip preserves its hit target without a gutter. */
 :root[data-look='paper'] :is(.navgrip, .wbgrip.sdgrip) { width: 10px; margin: 0 -5px; }
 :root[data-look='paper'] :is(.main, .sidedock) { border: 0; border-radius: 0; box-shadow: none; }
 :root[data-look='paper'] .sidedock { border-left: 1px solid var(--border); }
-:root[data-look='paper'] .shell[data-navpos='left']:has(.navpanel:not([data-folded='1'])) .shellbody { border-left: 1px solid var(--border); }
-:root[data-look='paper'] .shell[data-navpos='right']:has(.navpanel:not([data-folded='1'])) .shellbody { border-right: 1px solid var(--border); }
-:root[data-look='paper'] .shell:not([data-navpos='top']):has(.navpanel:not([data-folded='1'])) .frametop::after { content: ''; position: absolute; inset: 0 auto 0 var(--nm-navw, 320px); width: 1px; background: var(--border); pointer-events: none; }
-:root[data-look='paper'] .shell[data-navpos='right']:has(.navpanel:not([data-folded='1'])) .frametop::after { left: auto; right: var(--nm-navw, 320px); }
+:root[data-look='paper'] .shell[data-navpos='left'] .shellbody { border-left: 1px solid var(--border); }
+:root[data-look='paper'] .shell[data-navpos='right'] .shellbody { border-right: 1px solid var(--border); }
 :root[data-look='paper'] .wtab { border-color: transparent; border-radius: 0; }
 :root[data-look='paper'] .wtab.on { background: transparent; color: var(--text); border-bottom: 2px solid var(--text); }
 :root[data-look='paper'] :is(.attbar, .attpanel) { border: 1px solid var(--border); background: transparent; box-shadow: none; }

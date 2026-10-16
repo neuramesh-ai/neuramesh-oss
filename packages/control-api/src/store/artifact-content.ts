@@ -1,6 +1,7 @@
 import type { Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
-import { brainHash, configuredBrainObjects, type BrainObjectRef } from '../brain-objects';
+import { brainHash, type BrainObjectRef } from '../brain-objects';
+import { readBrainObject } from '../brain-object-reader';
 import { actorInWorkspace, sqlOf } from '../credits';
 import { BrainError } from '../brain-store';
 import { hashMachineToken } from '../machine-auth';
@@ -10,15 +11,14 @@ import type { Store } from './contract';
  * are excluded by those queries and are served through the owner-checked brain route instead. */
 export async function artifactContent(inline: string | null, ref: BrainObjectRef | null): Promise<string | null> {
   if (!ref) return inline;
-  const objects = configuredBrainObjects();
-  if (!objects) {
-    if (inline === null) throw new Error('Configure brain object storage to read this artifact.');
+  // Keep verified compatibility copies readable while the private reader rolls out.
+  if (inline !== null) {
     const prefix = `data:${ref.mime};base64,`;
     const bytes = inline.startsWith(prefix) ? Buffer.from(inline.slice(prefix.length), 'base64') : Buffer.from(inline);
     if (bytes.length !== ref.sizeBytes || brainHash(bytes) !== ref.sha256) throw new Error('Artifact compatibility copy failed verification.');
     return inline;
   }
-  const bytes = await objects.get(ref);
+  const bytes = await readBrainObject(ref);
   return /^(text\/|application\/(json|xml|javascript)(;|$))/.test(ref.mime)
     ? bytes.toString('utf8') : `data:${ref.mime};base64,${bytes.toString('base64')}`;
 }

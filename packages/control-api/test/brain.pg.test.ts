@@ -103,6 +103,29 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
     } finally { vi.unstubAllEnvs(); }
   });
 
+  it('uploads and retries a 16 MiB private artifact with exact authenticated downloads', async () => {
+    const { id } = await thread('coding');
+    vi.stubEnv('NM_BRAIN_CLOUD_ONLY_WORKSPACES', workspace);
+    try {
+      const bytes = Buffer.alloc(16 * 1024 * 1024, 0xfb);
+      const artifact = { workspace, threadId: id, id: randomUUID(), name: 'large-deliverable.bin', mime: 'application/octet-stream', contentBase64: bytes.toString('base64'), sha256: brainHash(bytes) };
+      const response = await request(owner, '/v1/brain/artifacts', artifact);
+      expect(response.status).toBe(200);
+      const receipt = await json(response);
+      expect(await json(await request(owner, '/v1/brain/artifacts', artifact))).toEqual(receipt);
+      const restored = await request(owner, receipt.url);
+      expect(restored.status).toBe(200);
+      expect(brainHash(Buffer.from(await restored.arrayBuffer()))).toBe(artifact.sha256);
+      expect((await request(mate, receipt.url)).status).toBe(404);
+      const rows = await sql!`select inline_content, size_bytes from artifacts where id=${artifact.id}::uuid`;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!['inline_content']).toBeNull();
+      expect(Number(rows[0]!['size_bytes'])).toBe(bytes.length);
+      expect((await request(owner, '/v1/brain/artifacts', { ...artifact, id: randomUUID(), contentBase64: Buffer.alloc(bytes.length + 1).toString('base64') })).status).toBe(413);
+      expect((await request(owner, '/v1/brain/artifacts', { ...artifact, id: randomUUID(), contentBase64: artifact.contentBase64.slice(0, -4) + '?AAA' })).status).toBe(400);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it('decodes compressed snapshots for phones while preserving the archive and access rules', async () => {
     const { id } = await thread('coding');
     const pack = (value: unknown) => ({ brainEncoding: 'neuramesh.gzip.v1', data: gzipSync(JSON.stringify(value)).toString('base64') });

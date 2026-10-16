@@ -47,12 +47,14 @@ function FileDiff({ file }: { file: ReviewFile }) {
   </></div>;
 }
 
-export function EngineeringReview({ files, selectedPath, onSelectPath, source = false, artifacts }: {
+export function EngineeringReview({ files, selectedPath, onSelectPath, source = false, artifacts, artifactRef, onOpenArtifact }: {
   files: ReviewFile[];
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   source?: boolean;
   artifacts?: ReactNode;
+  artifactRef?: (path: string) => boolean;
+  onOpenArtifact?: (path: string) => void;
 }) {
   const selected = files.find((file) => file.change.path === selectedPath) ?? files[0];
   const totals = files.reduce((sum, file) => ({ additions: sum.additions + file.additions, deletions: sum.deletions + file.deletions }), { additions: 0, deletions: 0 });
@@ -74,6 +76,7 @@ export function EngineeringReview({ files, selectedPath, onSelectPath, source = 
           <header className={styles.fileHeader}>
             <div><IconFile s={14} /><b>{selected.change.path}</b></div>
             <span className={`${styles.status} ${styles[selected.kind]}`}>{labels[selected.kind]}{selected.binary ? ' · Binary' : ''}</span>
+            {artifactRef?.(selected.change.path) && onOpenArtifact && <button onClick={() => onOpenArtifact(selected.change.path)}>Open saved artifact ↗</button>}
             {selected.previousPath && <small>From {selected.previousPath}</small>}
           </header>
           {source ? <FileContent file={selected} /> : <FileDiff file={selected} />}

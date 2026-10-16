@@ -207,3 +207,13 @@ test('bound tool callbacks retain the thread outside the request scope and the c
     await brain.close();
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('an artifact rollout gate explains the missing delivery and retains the upload', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-upload-gate-');
+  const brain = new ConversationBrain({ root, workspace, actorId: 'member-a', threadId, apiUrl: 'https://api.test', headers: async () => ({}), intervalMs: 60_000,
+    fetchImpl: async () => Response.json({ code: 'BRAIN_READER_UPGRADE_REQUIRED' }, { status: 409 }) });
+  try {
+    await assert.rejects(brain.artifact({ name: 'cover.png', inlineContent: 'data:image/png;base64,AA==' }, { kind: 'human', id: 'member-a' }), /Artifact uploads are not enabled/);
+    assert.equal(readdirSync(join(brain.path, 'uploads')).length, 1);
+  } finally { await brain.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
