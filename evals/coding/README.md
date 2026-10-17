@@ -44,7 +44,7 @@ Build TaskGarden according to README.md. First inspect the starter and propose a
 Build LedgerDesk according to README.md. Inspect the starter and propose a concrete plan before editing, including migration, money validation, accessible UI and tests. Wait for Act, then implement the complete contract and run npm test. Use file-edit tools for changes; run_commands only for npm test. No installs, servers or commits.
 ```
 
-After the initial implementation and tests finish, change the model in **the same thread** to **Claude Haiku 4.5 → Medium**, keep Act mode, and send:
+After the initial implementation and tests finish, change the model in **the same thread** to **Claude Haiku 5.5 → Medium**, keep Act mode, and send:
 
 ```text
 Continue from the implementation in this thread. Add import/export without losing the existing dashboard: export named function importExpenses(state,jsonText) from src/ledger.mjs. Accept a JSON array of v2 expense records, validate all records before changing anything, reject duplicates both within the import and against existing IDs, and return a new state. Add an Export JSON button and a textarea labelled Import JSON with an Import button; export writes the current expenses array into that textarea. Import success updates storage and clears the textarea; failure shows role=alert and leaves state/storage unchanged. Add tests and run npm test. Preserve the existing contracts, use file-edit tools, and run_commands only for npm test.
@@ -110,7 +110,7 @@ Set the URL, database and machine cache paths to **your** local stack. Only loop
 For both normal and repository-selected layouts, add `--repo 'org/repository'` using a repo visible in the picker. Layout checks cover 1440px and 1000px viewports in dark and light palettes, restore the original palette, and write `layout-checks.json` with measurements. This tests palette rendering without changing saved appearance preferences. Add `--thread-url` with an existing idle coding-thread URL to also verify its 48px writing area, control layout and screenshots.
 
 - `--case simple|medium|complex` limits a run. Use simple for a quick smoke; run all three before accepting coding-flow changes.
-- `--model 'GPT-5.6 Sol'` selects the initial model; `--handoff-model 'Claude Haiku 4.5'` selects the complex follow-up model. Both use Medium. Names must match UI labels and support reasoning controls.
+- `--model 'GPT-5.6 Sol'` selects the initial model; `--handoff-model 'Claude Haiku 5.5'` selects the complex follow-up model. Both use Medium. Names must match UI labels and support reasoning controls.
 - `--out PATH` chooses the evidence directory. Default: `.nm-evidence/coding/<unique-run-id>`.
 - `--resume PATH --case medium` uses already prepared fixtures and runs a fresh thread for that case. It does not pick up a partially running agent turn.
 - `--resume PATH --case medium --verify-only` reruns acceptance/reload/preview checks on a completed thread without sending another agent prompt. The prior assessment is retained; the report records reassessment. This is useful after fixing the runner, and does not substitute for a fresh UI run after product changes.

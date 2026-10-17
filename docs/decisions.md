@@ -2,6 +2,15 @@
 
 Per [05-engineering-philosophy.md](05-engineering-philosophy.md) §2/§7: two-way doors get a line here; one-way doors get a doc. Newest first.
 
+## 2026-10-16: A Google sign-in runs code through agy, and a coding agent may use any available tool (doc: docs/design/gemini-code-lane-2026-10/plan.md)
+
+George, on the report that a coding thread refused Gemini while agy was signed in on the same machine:
+
+- "the 716 rule no longer applies, an agent should be able to use any available tools." The rule from #716, that a sign-in lane may use only NeuraMesh's managed tools, no longer binds new work. agy uses its own read and edit tools in a coding thread.
+- "agy (and all coding threads) should be able to and have access to neuramesh tools." The agy lane reaches the NeuraMesh tools over the loopback MCP bridge: the managed shell, gated edits, the work plan, the thread title and the display tools.
+- "the model selector should always check updated connection state automatically and on open or thread creation."
+- A business Google account applies its admin controls inside agy. Its admin must allow the `nm` MCP server before agy can reach the NeuraMesh tools. A consumer Google account has no such controls.
+
 ## 2026-09-19 — A document is private until it is named: `PUBLIC_DOCS`, and no design round's evidence ships (doc: docs/43-public-repository.md §1)
 
 George, on the finding that 909 of 917 files under `docs/` shipped to the public repository, among them 448 screenshots and logs under `docs/design/<round>/evidence/` that the `docs/evidence` rule was written for but did not reach: exclude them, and make sure a new document never shows up in the public tree unless it is included on purpose. `scripts/public-tree.sh` stays the one list and gains `PUBLIC_DOCS`, the documents that ship, named one per line: every top-level file and folder of `docs/`, and every design round. Every document that shipped before stays named (nothing leaves the public tree but the evidence); a new one is private until a line is added. `public_docs_private` derives the rest from git, `public_private_paths` is what the snapshot removes, the same function feeds the scan's pathspec, and `public-tree.sh --self-test` proves the rule on a throwaway repository in the `public-scan` job. The scan prints the unnamed documents on every pull request, so a page nobody meant to publish is seen on the PR that adds it. A wildcard pathspec never takes a directory's tree, so a folder glob in the list ends in `/*` (`docs/design/*/evidence/*`), which is what the earlier `research-*.md` entry already did.

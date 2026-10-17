@@ -11,11 +11,12 @@ export function checkpointEngineering(core: ClineCore | null, conversation: Engi
   });
 }
 
+/** `keepJournal`: a model change hands the thread to another lane, which keeps writing the same journal */
 export async function shutdownEngineering(core: ClineCore | null, sessionId: string | null, conversation: EngineeringConversation | undefined,
-  metadata: Record<string, unknown>, log: (line: string) => void): Promise<void> {
+  metadata: Record<string, unknown>, log: (line: string) => void, keepJournal = false): Promise<void> {
   if (!core) return;
   if (sessionId) await core.stop(sessionId).catch(() => {});
   if (sessionId && conversation) await conversation.checkpoint(core, sessionId, metadata).catch((error: unknown) => log(`brain_checkpoint_pending: ${error instanceof Error ? error.message : 'upload failed'}`));
-  await conversation?.close().catch((error: unknown) => log(`brain_close_pending: ${error instanceof Error ? error.message : 'upload failed'}`));
+  if (!keepJournal) await conversation?.close().catch((error: unknown) => log(`brain_close_pending: ${error instanceof Error ? error.message : 'upload failed'}`));
   await core.dispose('Neuramesh relay channel closed').catch(() => {});
 }

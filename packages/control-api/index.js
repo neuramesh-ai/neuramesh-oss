@@ -4427,12 +4427,9 @@ var init_model_packs = __esm({
     init_states();
     init_rates();
     CURRENT_MODELS = {
-      // 2026-09-07 catalog pass. fable-5-1: Anthropic's most capable ($10/$50/MTok, always-on
-      // thinking, needs 30-day retention — not ZDR-compatible), successor to fable-5 at the same
-      // price. opus-5: the default recommendation for most work ($5/$25), successor to opus-4-8.
-      // sonnet-5: near-Opus coding at $2/$10 (the scheduled rise to $3/$15 was cancelled), and the
-      // 2026-09 run's developer seat in four packs — the fastest of the seven models that tied at 100%.
-      "claude-code": ["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
+      // Verified against Anthropic's model overview, 2026-10-16. Opus, Sonnet and Haiku
+      // 5.5 replace the previous generation in new picks. Existing IDs remain routable below.
+      "claude-code": ["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
       // gpt-6-astra: OpenAI's flagship (2026-09, $10/$50/MTok). It needs codex-cli >= 0.153.0 —
       // CODEX_MIN_VERSION in apps/desktop/src/main/runtime/cli.ts upgrades the CLI rather than let
       // runResilient silently downgrade the turn to the account default (the gpt-5.6-luna lesson).
@@ -4445,13 +4442,15 @@ var init_model_packs = __esm({
       // the one id in this catalog a workspace can run without connecting anything. It is catalogued
       // like any other model — the server allow-list, the packs and the pickers all derive from here —
       // and what makes it free to the user is the metered proxy, not a special case in the catalog.
-      // gemini-3.8-flash: Google's most capable Flash (GA, $0.75/$3.75 introductory through
-      // 2026-12-31), successor to 3.5 Flash, which Google now lists as legacy. There is still NO
-      // Gemini 3.5 Pro or 3.8 Pro in the API, and no Flash-Lite past 3.5, so the Pro tier remains the
-      // 3.1 preview and the house brain remains 3.5 Flash-Lite.
-      gemini: ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", STARTER_MODEL]
+      // Argon is Google's stable Gemini 4 model (October 2026). Keep the existing Gemini
+      // choices and house brain: adding a model does not change the platform's metered model.
+      gemini: ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", STARTER_MODEL]
     };
     LEGACY_MODELS = [
+      // October 2026 replacements. Saved conversations and personal picks keep their exact IDs.
+      "claude-opus-5",
+      "claude-sonnet-5",
+      "claude-haiku-4-5",
       "gemini-2.5-pro",
       "gemini-2.5-flash",
       "gpt-5",
@@ -4488,14 +4487,14 @@ var init_model_packs = __esm({
         roles: {
           orchestrator: "gpt-5.6-sol",
           architect: "gpt-6-astra",
-          developer: "claude-sonnet-5",
-          worker: "claude-sonnet-5",
+          developer: "claude-sonnet-5-5",
+          worker: "claude-sonnet-5-5",
           reviewer: "gpt-6-astra",
-          designer: "claude-opus-5",
+          designer: "claude-opus-5-5",
           shipper: "claude-fable-5-1",
-          sales: "claude-sonnet-5",
-          curator: "claude-haiku-4-5",
-          marketer: "claude-opus-5"
+          sales: "claude-sonnet-5-5",
+          curator: "claude-haiku-5-5",
+          marketer: "claude-opus-5-5"
         }
       },
       balanced: {
@@ -4503,16 +4502,16 @@ var init_model_packs = __esm({
         name: "Balanced",
         tagline: "Cost + performance across providers",
         roles: {
-          orchestrator: "claude-sonnet-5",
+          orchestrator: "claude-sonnet-5-5",
           architect: "gemini-3.8-flash",
-          developer: "claude-sonnet-5",
-          worker: "claude-sonnet-5",
+          developer: "claude-sonnet-5-5",
+          worker: "claude-sonnet-5-5",
           reviewer: "gemini-3.8-flash",
-          designer: "claude-sonnet-5",
-          shipper: "claude-sonnet-5",
-          sales: "claude-haiku-4-5",
-          curator: "claude-haiku-4-5",
-          marketer: "claude-sonnet-5"
+          designer: "claude-sonnet-5-5",
+          shipper: "claude-sonnet-5-5",
+          sales: "claude-haiku-5-5",
+          curator: "claude-haiku-5-5",
+          marketer: "claude-sonnet-5-5"
         }
       },
       fast: {
@@ -4522,20 +4521,18 @@ var init_model_packs = __esm({
         roles: {
           orchestrator: "gemini-3.8-flash",
           architect: "gemini-3.8-flash",
-          developer: "claude-sonnet-5",
-          worker: "claude-sonnet-5",
+          developer: "claude-sonnet-5-5",
+          worker: "claude-sonnet-5-5",
           reviewer: "gemini-3.8-flash",
-          designer: "claude-sonnet-5",
-          shipper: "claude-sonnet-5",
-          sales: "claude-haiku-4-5",
-          curator: "claude-haiku-4-5",
-          marketer: "claude-sonnet-5"
+          designer: "claude-sonnet-5-5",
+          shipper: "claude-sonnet-5-5",
+          sales: "claude-haiku-5-5",
+          curator: "claude-haiku-5-5",
+          marketer: "claude-sonnet-5-5"
         },
         latency: {
           orchestrator: "5.4s",
           architect: "15.0s",
-          developer: "11.8s",
-          worker: "11.8s",
           reviewer: "2.5s"
         }
       },
@@ -4544,16 +4541,16 @@ var init_model_packs = __esm({
         name: "Claude Core",
         tagline: "Best per role on Anthropic",
         roles: {
-          orchestrator: "claude-sonnet-5",
+          orchestrator: "claude-sonnet-5-5",
           architect: "claude-fable-5-1",
-          developer: "claude-sonnet-5",
-          worker: "claude-sonnet-5",
+          developer: "claude-sonnet-5-5",
+          worker: "claude-sonnet-5-5",
           reviewer: "claude-fable-5-1",
-          designer: "claude-sonnet-5",
-          shipper: "claude-opus-5",
-          sales: "claude-sonnet-5",
-          curator: "claude-haiku-4-5",
-          marketer: "claude-sonnet-5"
+          designer: "claude-sonnet-5-5",
+          shipper: "claude-opus-5-5",
+          sales: "claude-sonnet-5-5",
+          curator: "claude-haiku-5-5",
+          marketer: "claude-sonnet-5-5"
         }
       },
       "openai-core": {
@@ -5015,12 +5012,16 @@ var init_failover = __esm({
     init_states();
     PROVIDER_NAME = { anthropic: "Anthropic", openai: "OpenAI", gemini: "Gemini" };
     FALL_FORWARD = {
-      "claude-fable-5-1": ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
-      "claude-opus-5": ["claude-sonnet-5", "claude-haiku-4-5"],
-      "claude-fable-5": ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
-      "claude-opus-4-8": ["claude-sonnet-5", "claude-haiku-4-5"],
-      "claude-sonnet-5": ["claude-haiku-4-5"],
-      "claude-sonnet-4-6": ["claude-sonnet-5", "claude-haiku-4-5"],
+      "claude-opus-5": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-sonnet-5": ["claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-haiku-4-5": ["claude-haiku-5-5"],
+      "gemini-4-argon": ["gemini-3.8-flash", "gemini-3.1-flash-lite"],
+      "claude-fable-5-1": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-opus-5-5": ["claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-fable-5": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-opus-4-8": ["claude-sonnet-5-5", "claude-haiku-5-5"],
+      "claude-sonnet-5-5": ["claude-haiku-5-5"],
+      "claude-sonnet-4-6": ["claude-sonnet-5-5", "claude-haiku-5-5"],
       "gpt-6-astra": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.4-mini"],
       "gpt-5.6-sol": ["gpt-5.6-terra", "gpt-5.4-mini"],
       "gpt-5.6-terra": ["gpt-5.4-mini"],
@@ -5142,7 +5143,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.155.0", "0.154.2"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.155.1", "0.155.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version2, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version2, floor) < 0;
@@ -8171,6 +8172,9 @@ var init_model_labels = __esm({
       // leads with what it IS, the product's own brain, and keeps the tier as the version that can
       // move when the model behind it does (which is the whole reason we never name the vendor).
       [STARTER_MODEL]: "NeuraMesh brain (Starter v1)",
+      "claude-opus-5-5": "Claude Opus 5.5",
+      "claude-sonnet-5-5": "Claude Sonnet 5.5",
+      "claude-haiku-5-5": "Claude Haiku 5.5",
       "claude-fable-5-1": "Claude Fable 5.1",
       "claude-opus-5": "Claude Opus 5",
       "claude-sonnet-5": "Claude Sonnet 5",
@@ -8190,6 +8194,7 @@ var init_model_labels = __esm({
       "o4-mini": "o4-mini",
       "gpt-4o-mini": "GPT-4o mini",
       "gpt-4.1-mini": "GPT-4.1 mini",
+      "gemini-4-argon": "Gemini 4 Argon",
       "gemini-3.8-flash": "Gemini 3.8 Flash",
       "gemini-3.5-flash": "Gemini 3.5 Flash",
       "gemini-3.1-pro-preview": "Gemini 3.1 Pro (preview)",
@@ -8241,11 +8246,10 @@ function machineRuntimeList(m) {
     return [];
   }
 }
-function codeProviderStates(machine, configured2, geminiKey) {
+function codeProviderStates(machine, configured2, _geminiKey) {
   const runtimes2 = machineRuntimeList(machine);
   const state = (p2) => runtimes2.includes(RUNTIME[p2]) ? "ready" : configured2.has(p2) ? "signin" : "connect";
-  const gemini = state("gemini");
-  return { anthropic: state("anthropic"), openai: state("openai"), gemini: gemini === "ready" && geminiKey ? "ready" : "connect" };
+  return { anthropic: state("anthropic"), openai: state("openai"), gemini: state("gemini") };
 }
 function codeVendorOf(model2) {
   if (model2 === STARTER_MODEL) return null;
@@ -8274,7 +8278,7 @@ var init_code_models = __esm({
     codeModelOf = (pick) => pick || STARTER_MODEL;
     isCloudMachineRow = (m) => m?.kind === "member" || m?.kind === "runner";
     VENDOR = { anthropic: "Claude", openai: "ChatGPT", gemini: "Gemini" };
-    CODE_GEMINI_NOTE = "Code needs a Gemini API key. A Google sign-in cannot run code.";
+    CODE_GEMINI_NOTE = "A Google sign-in runs code through agy. Gemini 3.1 Flash Lite needs a Gemini API key.";
   }
 });
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan';
+import { engineeringPlanTool, engineeringProgressTool, workPlanProblem } from './engineering-plan';
 import { engineeringRuntimeInput } from './engineering-runtime-input';
 import { ENGINEERING_CLINE_TOOL_POLICIES, type EngineeringRuntimeEvent } from '@neuramesh/shared';
 const plan = { summary: 'Implement', steps: [{ action: 'edit', target: 'a.ts', description: 'Fix the issue' }] };
@@ -52,4 +52,14 @@ test('a resumed progress tool starts from durable progress when the native snaps
   const result = await tool.execute({ updates: [{ step: 1, status: 'in_progress' }] });
   assert.equal(result.planProgress.statuses[0], 'in_progress');
   assert.deepEqual(result.planProgress.statuses.slice(1), complete.statuses.slice(1));
+});
+
+test('a refused plan names the rule it broke', () => {
+  const report = { investigation: 'I read a.ts.', decisions: ['Keep it small.', 'x'.repeat(315)], nextStep: 'Select Continue in Act.' };
+  assert.throws(() => engineeringPlanTool(() => {}).execute({ ...plan, report }), /report\.decisions\[1\] must be one line of at most 300 characters/);
+  assert.match(workPlanProblem(JSON.stringify(plan)), /JSON object, not as a string/);
+  assert.match(workPlanProblem({ summary: 'Implement', steps: [] }), /steps must hold 1 to 30 items/);
+  assert.match(workPlanProblem({ ...plan, steps: [{ ...plan.steps[0]!, label: 'a\nb' }] }), /steps\[0\] needs/);
+  assert.match(workPlanProblem({ ...plan, summary: ' ' }), /summary must be text/);
+  assert.match(workPlanProblem({ ...plan, considerations: ['a', 'b', 'c', 'd'] }), /considerations must hold 0 to 3 items/);
 });
