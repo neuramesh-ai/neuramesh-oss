@@ -28,6 +28,8 @@ import { makeHire } from './hire';
 import { makeFailover } from './failover';
 
 const MODEL_LABEL: Record<string, string> = {
+  'claude-opus-5-5': 'Opus 5.5', 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-haiku-5-5': 'Haiku 5.5',
+  'gemini-4-argon': 'Gemini 4 Argon',
   'claude-fable-5-1': 'Fable 5.1', 'claude-opus-5': 'Opus 5', 'claude-sonnet-5': 'Sonnet 5',
   'claude-fable-5': 'Fable 5', 'claude-opus-4-8': 'Opus 4.8', 'claude-sonnet-4-6': 'Sonnet 4.6', 'claude-haiku-4-5': 'Haiku 4.5',
   'gpt-6-astra': 'GPT-6 Astra', 'gpt-5.6-sol': 'GPT-5.6 Sol', 'gpt-5.6-terra': 'GPT-5.6 Terra', 'gpt-5.5': 'GPT-5.5', 'gpt-5.5-pro': 'GPT-5.5 Pro', 'gpt-5.4-mini': 'GPT-5.4 mini',

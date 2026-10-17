@@ -86,7 +86,7 @@ test('Engineering provider resolution ends with an actionable error when nothing
 
 // George, 2026-10-04: model setup lives on the machine. The coding runtime reads this machine's sign-ins and keys
 // with the agents' own rule (runtime/authpolicy.ts), so a sign-in made on a cloud machine runs code with no stored
-// row, and a Google sign-in, which the coding runtime has no lane for, gets a refusal that names the fix
+// row. a Google sign-in runs code through agy (George, 2026-10-16, docs/design/gemini-code-lane-2026-10)
 test('the coding runtime reads the machine\'s own sign-ins and keys, as agents do', async () => {
   const opts = (body: Record<string, unknown>) => ({ apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: async () => new Response(JSON.stringify(body), { status: 200 }) });
   const cloud = { NM_MACHINE_KIND: 'member' };
@@ -99,11 +99,18 @@ test('the coding runtime reads the machine\'s own sign-ins and keys, as agents d
   // a stored preference for a sign-in that lapsed here: a refusal, never a silent key
   await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: false, login: true, env: 'sk-env' })),
     /^Error: The Claude sign-in on this machine expired\. Sign in again on this machine, or pick another model\.$/);
-  // Gemini: a Google sign-in never runs code, a Gemini key on the machine does
-  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true })),
-    /^Error: Code runs Gemini on an API key only\. Add a Gemini API key, or pick another model\.$/);
-  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-env' });
-  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine()), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
+  // Gemini: a Google sign-in runs code on the agy lane, with or without a key on the machine (the sign-in is preferred)
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'gemini-4-argon' }, cloud, machine({ sub: true, login: true })), { providerId: 'gemini', modelId: 'gemini-4-argon', lane: 'agy' });
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', lane: 'agy' });
+  // a stored API-key choice keeps the key lane
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
+  // a Gemini model agy does not offer runs on a key when there is one, and is refused with the fix when there is none
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-flash-lite' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-flash-lite', apiKey: 'g-env' });
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-flash-lite' }, cloud, machine({ sub: true })),
+    (error: unknown) => error instanceof EngineeringModelRefused && /does not run on a Google sign-in\. Pick Gemini 4 Argon, Gemini 3\.8 Flash or Gemini 3\.1 Pro, or add a Gemini API key\.$/.test(error.message));
+  // a lapsed Google sign-in says so, like any other sign-in
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-4-argon' }, cloud, machine({ sub: false, login: true })),
+    /^Error: The Gemini sign-in on this machine expired\. Sign in again on this machine, or pick another model\.$/);
 });
 
 test('explicit provider overrides cannot enable a subprocess that bypasses managed coding tools', async () => {

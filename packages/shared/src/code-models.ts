@@ -2,9 +2,9 @@
 // the model picked FOR IT, and with no pick it runs the NeuraMesh brain: the project's developer seat no
 // longer leaks in, so a seat on a model the machine cannot run never strands the first prompt. Model setup
 // lives on a person's machine, not on the workspace, so the providers read off the ONE machine the session
-// runs on (`machines.runtimes`, what that machine serves: its sign-ins and keys, localruntimes.ts). One caveat
-// is the coding runtime's own: it has no lane for a Google sign-in (the Cline SDK carries none), so Gemini
-// runs code only on an API key. One derivation for the web, the desktop and the phone, so the three name the
+// runs on (`machines.runtimes`, what that machine serves: its sign-ins and keys, localruntimes.ts). A Google
+// sign-in runs code through agy (George, 2026-10-16, docs/design/gemini-code-lane-2026-10), so every
+// provider follows one rule. One derivation for the web, the desktop and the phone, so the three name the
 // same model and mark the same providers. The machine stays the authority when the session opens
 // (relay/engineering-provider.ts).
 import { providerForModel } from './model-packs';
@@ -35,12 +35,11 @@ export function machineRuntimeList(m: { runtimes?: string | null } | null | unde
 
 /** each provider's state for a coding session on `machine`: ready when that machine serves the provider,
  *  sign-in when the workspace set the provider up and the machine does not serve it, connect when nothing is
- *  set up. Gemini is ready on a stored Gemini API key only (`geminiKey`), because a Google sign-in cannot run code */
-export function codeProviderStates(machine: { runtimes?: string | null } | null, configured: ReadonlySet<string>, geminiKey: boolean): Record<CodeProvider, CodeProviderState> {
+ *  set up. `_geminiKey` is read no more: a Google sign-in runs code too. Callers built before the agy lane pass it */
+export function codeProviderStates(machine: { runtimes?: string | null } | null, configured: ReadonlySet<string>, _geminiKey?: boolean): Record<CodeProvider, CodeProviderState> {
   const runtimes = machineRuntimeList(machine);
   const state = (p: CodeProvider): CodeProviderState => (runtimes.includes(RUNTIME[p]) ? 'ready' : configured.has(p) ? 'signin' : 'connect');
-  const gemini = state('gemini');
-  return { anthropic: state('anthropic'), openai: state('openai'), gemini: gemini === 'ready' && geminiKey ? 'ready' : 'connect' };
+  return { anthropic: state('anthropic'), openai: state('openai'), gemini: state('gemini') };
 }
 
 /** the provider a model needs, or null for the NeuraMesh brain (and a model no catalog knows) */
@@ -57,8 +56,8 @@ export function codeRunsHere(model: string, states: Record<CodeProvider, CodePro
 
 const VENDOR: Record<CodeProvider, string> = { anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' };
 
-/** the Gemini group's note on a coding session */
-export const CODE_GEMINI_NOTE = 'Code needs a Gemini API key. A Google sign-in cannot run code.';
+/** the Gemini group's note on a coding session: agy has no Flash Lite, so that one model needs a key */
+export const CODE_GEMINI_NOTE = 'A Google sign-in runs code through agy. Gemini 3.1 Flash Lite needs a Gemini API key.';
 
 /** the menu's foot: why the model cannot run code here, else what a pick does. `start`: before the session exists */
 export function codeFootText(model: string, states: Record<CodeProvider, CodeProviderState>, place: 'session' | 'start'): string {
