@@ -205,6 +205,23 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
     expect(Buffer.from(await download.arrayBuffer())).toEqual(bytes);
     expect(download.headers.get('content-security-policy')).toContain('sandbox');
     expect((await request(stranger, saved.url)).status).toBe(404);
+    const previewUrl = `/v1/brain/artifacts/${artifact.id}/preview?workspace=${workspace}`;
+    const preview = await request(owner, previewUrl);
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get('cache-control')).toBe('private, no-store');
+    expect(preview.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await preview.arrayBuffer())).toEqual(bytes);
+    // Warm cache still requires workspace/channel access on every request.
+    expect((await request(stranger, previewUrl)).status).toBe(404);
+    const reads = vi.spyOn(objects, 'get');
+    expect((await request(owner, previewUrl)).status).toBe(200);
+    expect(reads).not.toHaveBeenCalled();
+    reads.mockRestore();
+    expect((await request(mate, previewUrl)).status).toBe(200);
+    await sql!`update threads set kind = 'coding' where id = ${id}::uuid`;
+    expect((await request(mate, previewUrl)).status).toBe(404);
+    expect((await request(owner, previewUrl)).status).toBe(200);
+    await sql!`update threads set kind = 'chat' where id = ${id}::uuid`;
     const metadataUrl = `/v1/brain/artifacts/${artifact.id}/metadata?workspace=${workspace}`;
     const get = vi.spyOn(objects, 'get');
     get.mockClear();
@@ -269,6 +286,34 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
     const result = await offline.request(`/v1/brain/threads/${id}/commits`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(owner) }, body: JSON.stringify(commit()) });
     expect(result.status).toBe(500);
     expect((await json(await read(id))).revision).toBe(0);
+  });
+
+  it('stores original draft images through the large-body ingress with workspace and channel authorization', async () => {
+    const { id } = await thread();
+    const item = await json(await request(owner, '/v1/commands', { type: 'content.create', channel, thread: id, platform: 'x', body: 'Full quality draft' }));
+    const bytes = Buffer.concat([Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'), Buffer.alloc(9_000_000, 23)]);
+    const body = { type: 'content.attach_media', item: item.itemId, dataUrl: `data:image/gif;base64,${bytes.toString('base64')}` };
+    expect((await request(stranger, '/v1/brain/content-media', body)).status).toBe(403);
+    const [registered] = await sql!`insert into agents (workspace_id, name, role, model) values (${workspace}::uuid, 'original-image-agent', 'orchestrator', 'gpt-5.6-sol') returning id`;
+    const agent: Actor = { kind: 'agent', id: registered!['id'], role: 'orchestrator' };
+    expect((await request(agent, '/v1/brain/content-media', body)).status).toBe(403);
+    await sql!`insert into agent_channels (agent_id, channel_id) values (${agent.id}::uuid, ${channel}::uuid)`;
+    vi.stubEnv('NM_LOCAL', '1'); vi.stubEnv('NM_BRAIN_STORAGE_DIR', root); vi.stubEnv('NM_BRAIN_GCS_BUCKET', '');
+    vi.stubEnv('NM_BRAIN_CLOUD_ONLY_WORKSPACES', workspace);
+    try {
+      const result = await request(agent, '/v1/brain/content-media', body);
+      expect(result.status).toBe(200);
+      const { mediaId } = await json(result);
+      const [row] = await sql!`select bytes, object_ref, size_bytes from content_media where id = ${mediaId}::uuid`;
+      expect(row!['bytes']).toBeNull();
+      expect(row!['object_ref']).toMatchObject({ sha256: brainHash(bytes), sizeBytes: bytes.length });
+      const download = await request(owner, `/v1/content/media/${mediaId}`);
+      expect(download.status).toBe(200);
+      expect(brainHash(Buffer.from(await download.arrayBuffer()))).toBe(brainHash(bytes));
+      expect((await request(stranger, `/v1/content/media/${mediaId}`)).status).toBe(403);
+      await sql!`update agents set retired_at = now() where id = ${agent.id}::uuid`;
+      expect((await request(agent, '/v1/brain/content-media', body)).status).toBe(403);
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it('moves full generated media to objects and preserves signed publication URLs and legacy reads', async () => {

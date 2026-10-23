@@ -49,6 +49,7 @@ export interface ExportProject extends ExportRowBase {
   name: string; slug: string; description: string | null; status: string; is_default: boolean; created_at: string;
   auto_open_pr: boolean; run_ci_before_merge: boolean; website: string | null; logo_url: string | null;
   ship_gate: boolean | null; model_pack: string | null;
+  context_channel_id?: string | null; brand_profile?: unknown; settings?: unknown;
 }
 export interface ExportChannel extends ExportRowBase {
   slug: string; topic: string; settings: unknown; created_at: string; project_id: string | null;
@@ -65,6 +66,7 @@ export interface ExportAgent extends ExportRowBase {
 }
 export interface ExportAgentChannel { id: string; agent_id: string; channel_id: string; created_at: string; created_by_kind: string | null; created_by: string | null }
 export interface ExportThread extends ExportRowBase {
+  project_id?: string | null;
   channel_id: string; title: string | null; description: string | null; created_by: string | null; task_id: string | null;
   created_at: string; updated_at: string; root_message_id: string | null; mode: string; brain_override: unknown;
   archived_at: string | null; filed_at: string | null; filed_reason: string | null; schedule_id: string | null;
@@ -95,6 +97,7 @@ export interface ExportMemoryBlock extends ExportRowBase {
   channel_id: string | null; project_id: string | null; kind: string; content: string; basis_count: number; updated_at: string;
 }
 export interface ExportFact extends ExportRowBase {
+  project_id?: string | null;
   channel_id: string; content: string; basis_count: number; valid_from: string; valid_until: string | null;
   superseded_by: string | null; created_at: string; kind: string; task_id: string | null;
 }

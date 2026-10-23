@@ -211,6 +211,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   channelRename(channelId: string, slug?: string, topic?: string): Promise<{ ok: boolean; channelId: string; slug: string }>;
   channelKind(channelId: string, kind: 'build' | 'marketing'): Promise<{ ok: boolean; channelId: string }>;
   /** step 5 (release drafts §4.7) rides `releases`: the repository, a free one-shot (`now`), a daily Team routine (`watch`); the answer says whether the routine armed or the plan refused it */
+  marketingThreadIds(): Promise<string[]>;
+  startProjectMarketing(projectId: string): Promise<{ ok: boolean; channelId: string; taskId: string }>;
   marketingSetup(channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } }>;
   /** the releases step writes an object; every other step a text or a list (the server checks the shape per step) */
   setupStep(channelId: string, flow: string, step: string, value?: string | string[] | Record<string, unknown>): Promise<{ ok: boolean }>;

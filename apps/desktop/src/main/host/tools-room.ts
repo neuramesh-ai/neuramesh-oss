@@ -14,8 +14,8 @@ import { kindMarker } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
 
 export function roomTools(tc: ToolCtx): OrchTool[] {
-  const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
-          filed, roomMenu, siblings, codeDoor, namedBySchedule,
+  const { z, db, post, ch, agent, actor, convoThreadId, log,
+          filed, codeDoor, namedBySchedule,
           executeHire } = tc;
   const repoLabel = codeDoor ? (codeDoor.repo.org_name === 'local' ? codeDoor.repo.name : `${codeDoor.repo.org_name}/${codeDoor.repo.name}`) : '';
   return [
@@ -54,44 +54,6 @@ export function roomTools(tc: ToolCtx): OrchTool[] {
         return `thread renamed to “${input.title}”`;
       },
     }] : []),
-    // Auto-filing (0109). Offered ONLY on a conversation that could actually be filed, so the
-    // model never sees a tool that would refuse it: a task thread's room is bound, and one
-    // agent move per thread is the cap (a second is two triage turns disagreeing, and rex wakes
-    // on every message). The server re-checks all of it through the same pure gate.
-    ...(convoThreadId && !thread && siblings.length > 1 ? [{
-      name: 'file_conversation',
-      description: `Move THIS conversation into the room it belongs in — at most once, as your FIRST action, and only on a clear match; unsure means leave it (staying put is a correct answer, and you cannot re-file later). Any task you create afterwards files into the room you moved to. This project's rooms: ${roomMenu || `#${ch.slug}`}. You are currently in #${ch.slug}.`,
-      schema: {
-        channel: z.string().min(1).describe('the destination room\'s slug from the list in this tool\'s description — it must be in this project'),
-        reason: z.string().min(1).max(200).describe('ONE clause, for the human, saying why this room — e.g. "a bug in the channel watch, and #dev owns the sync surface". It shows next to Undo, so write something they can disagree with.'),
-      },
-      run: async (input: { channel: string; reason: string }) => {
-        const want = String(input.channel).replace(/^#/, '').trim().toLowerCase();
-        // resolve within THIS project only — every project is seeded with the same starter
-        // slugs, so a bare `dev` names two rooms across a workspace (the docs/32 collision)
-        const [target] = await db.getAll<{ id: string; slug: string }>(
-          `select c.id, c.slug from channels c
-            where c.workspace_id = ?
-              and lower(c.slug) = ?
-              and c.project_id is not distinct from (select project_id from channels where id = ?)`,
-          [ch.workspace_id, want, ch.id],
-        );
-        if (!target) return `error: no room called #${want} in this project — call list_channels and use a slug from it, or leave the conversation where it is`;
-        const res = await post('/v1/commands', actor, {
-          type: 'thread.move', workspace: ch.workspace_id, threadId: convoThreadId, channel: target.id, reason: input.reason,
-        });
-        const body = (await res.json()) as any;
-        if (!res.ok) {
-          // SAME_CHANNEL is an answer, not a failure — say so plainly so the model moves on
-          // rather than retrying a move that already holds
-          if (body.code === 'SAME_CHANNEL') return `already in #${target.slug} — nothing to file, carry on`;
-          return `error ${res.status}: ${body.message ?? body.code ?? 'thread.move failed'} — leave it where it is and carry on`;
-        }
-        filed.to = { id: target.id, slug: target.slug };   // rebinds the turn (see `here()`)
-        log?.({ kind: 'lifecycle', phase: 'triage', summary: `filed the conversation into #${target.slug} — ${input.reason}` });
-        return `filed into #${target.slug}. Any task you create now lands there too. Tell the human WHERE you filed it and why, in one clause, as part of your reply.`;
-      },
-    }] : []),
     { name: 'register_repo', description: 'Register a GitHub repo to this workspace WITHOUT proposing/offering a task in the same step (when you are, pass repoUrl to create_task/offer_task instead — it registers + binds atomically). Only register a repo the human actually named (a URL or <org>/<repo>) — never invent one. No tokens are stored — the executing machine\'s own git credentials authenticate at push.', schema: {
       url: z.string().min(1).describe('the public GitHub URL exactly as confirmed by the human, e.g. https://github.com/acme/web'),
       defaultBranch: z.string().optional().describe('default branch (defaults to main)'),
@@ -110,13 +72,11 @@ export function roomTools(tc: ToolCtx): OrchTool[] {
       const bindName = repo?.name ?? m?.[2] ?? '';
       return `registered ${label}${body.inserted ? '' : ' (already registered)'} — now bind it with repoName "${bindName}" in create_task / offer_task`;
     } },
-    { name: 'create_project', description: 'Create a project — an initiative with its own board, tasks, repos, and channels (each channel belongs to exactly one project; a new project starts with its own fresh general/dev/research/marketing rooms). ALWAYS CONFIRM FIRST: post an nmq card ("Start a new project “XYZ”?" → Create / Not now) and call this ONLY after the human approves it; if they decline, file the work in an existing project.', schema: {
+    { name: 'create_project', description: 'Create a project — an initiative holding threads, tasks, repositories and shared context. ALWAYS CONFIRM FIRST: post an nmq card ("Start a new project “XYZ”?" → Create / Not now) and call this ONLY after the human approves it; if they decline, file the work in an existing project.', schema: {
       name: z.string().min(1).describe('the project name — a big initiative, e.g. "XYZ mobile app" (not a single page)'),
-      rooms: z.array(z.string()).optional().describe('room names to create FRESH in the new project (default: general, dev, research, marketing) — each project gets its OWN rooms; nothing is moved out of other projects'),
       description: z.string().optional().describe('a short description of the initiative'),
     }, run: async (input) => {
-      const rooms = input.rooms?.length ? input.rooms : ['general', 'dev', 'research', 'marketing'];
-      const res = await post('/v1/commands', actor, { type: 'project.create', workspace: ch.workspace_id, name: input.name, ...(input.description ? { description: input.description } : {}), channels: [], newChannels: rooms });
+      const res = await post('/v1/commands', actor, { type: 'project.create', workspace: ch.workspace_id, name: input.name, ...(input.description ? { description: input.description } : {}) });
       const body = (await res.json()) as any;
       if (!res.ok) return `error ${res.status}: ${body.message ?? body.code ?? 'project.create failed'}`;
       for (let i = 0; i < 20; i++) {
@@ -124,7 +84,7 @@ export function roomTools(tc: ToolCtx): OrchTool[] {
         if (p) break;
         await new Promise((r) => setTimeout(r, 150));
       }
-      return `created project “${input.name}” (slug "${body.slug}") with fresh rooms ${rooms.map((c: string) => `#${c}`).join(', ')} — tasks in its rooms roll up to it`;
+      return `created project “${input.name}” (slug "${body.slug}") and it is ready for new threads`;
     } },
     { name: 'add_agent_to_channel', description: 'Register an existing workspace agent into THIS channel so it can see the room and be offered work (agents only see rooms they were added to). When the human EXPLICITLY NAMES who to add → call this directly, once per agent. When YOU are proactively suggesting it → do NOT call this: post an nmq card whose question is EXACTLY "Add @<name> to #<channel>?" with an "Add @<name>" option — a click registers the agent for you, no further call.', schema: {
       agent: z.string().min(1).describe('the agent NAME (or id) to add — a workspace agent not already in this channel'),

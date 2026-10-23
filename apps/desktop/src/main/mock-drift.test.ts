@@ -67,6 +67,8 @@ const UNMOCKED = new Set([
   // project + room mutations driven by the real app, not a shot
   'projectArchive', 'projectDelete', 'projectDetect', 'addPersonToChannel',
   'removeAgentFromChannel', 'removePersonFromChannel',
+  // Project marketing is exercised against the real local API and replica, not preview fixtures.
+  'startProjectMarketing', 'marketingThreadIds',
   // task/thread mutations the flow walkthrough performs through taskAction instead
   'taskSetDod', 'taskUpdateDetails', 'threadArchive', 'threadUnarchive', 'threadSettle', 'threadUnsettle', 'threadUpdate', 'threadSetBrain', 'threadBrainRole', 'threadBrain',
   'shipItem', 'shipItemAdd', 'setupStep', 'scheduleUpdate', 'contentUpdate', 'contentDelete',

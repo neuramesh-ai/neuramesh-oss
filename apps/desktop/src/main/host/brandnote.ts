@@ -1,7 +1,7 @@
 import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 // THE BRAND NOTE FOR A CONVERSATION (George, 2026-09-19, the Flowe AI room on the web app: rex ran
 // the UGC playbook and asked "what does Flowe AI do? no brand docs or prior brand research are in
-// this room's workspace yet" while business-profile.md, brand-guidelines.md, market-research.md
+// this project's workspace yet" while business-profile.md, brand-guidelines.md, market-research.md
 // and social-strategy.md sat on the room's shelf, in the Workbench beside the thread).
 //
 // A content TASK opens with the brand docs staged (staging.ts stageBrandContext writes them into
@@ -25,7 +25,7 @@ export interface BrandFacts {
   product: string | null;
   logo: boolean;
   profile: { website?: string; focus?: string[]; goal?: string };
-  /** the newest of each named brand doc on this room's shelf, by name */
+  /** the newest of each named brand doc on this project's shelf, by name */
   docs: Map<string, string>;
   /** the real app screenshots on the shelf, by name: what a video post can show (plan §6, host/frames.ts isAppShot) */
   images: string[];
@@ -37,11 +37,11 @@ const NONE: BrandFacts = { marketing: false, product: null, logo: false, profile
 /** the room's kind, product, profile, brand docs and connected accounts, in one read */
 export async function readBrand(db: AttDbLike, channelId: string): Promise<BrandFacts> {
   const [ch] = await db.getAll<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>(
-    `select c.kind as kind, c.marketing as marketing, p.website as website, p.logo_url as logo
+    `select c.kind as kind, coalesce(case when p.context_channel_id = c.id then p.brand_profile end, c.marketing) as marketing, p.website as website, p.logo_url as logo
        from channels c left join projects p on p.id = c.project_id where c.id = ?`,
     [channelId],
   ).catch(() => [] as Array<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>);
-  if (!ch || ch.kind !== 'marketing') return NONE;
+  if (!ch || (ch.kind !== 'marketing' && !ch.marketing)) return NONE;
   const rows = await db.getAll<ArtifactContentRow & { name: string; kind: string; mime?: string | null; created_by_kind: string | null; source: string | null }>(
     `select id, workspace_id, name, kind, mime, storage_path, content_hash, inline_content, created_by_kind, source from artifacts where channel_id = ? and (inline_content is not null or storage_path like 'brain:%') order by created_at desc`,
     [channelId],
@@ -71,7 +71,7 @@ export async function readBrand(db: AttDbLike, channelId: string): Promise<Brand
 
 /**
  * The note a marketing room's conversation turn carries: where the brand lives and the tools that
- * reach it. Empty outside a marketing room. In a marketing room it always says something, because
+ * reach it. Empty outside a project with marketing setup. In a marketing room it always says something, because
  * an empty shelf is a fact the agent must act on (ask, then shelve), not one it may guess at.
  */
 export async function brandNote(db: AttDbLike, channelId: string): Promise<string> {
@@ -82,13 +82,13 @@ export async function brandNote(db: AttDbLike, channelId: string): Promise<strin
   if (b.profile.goal) lines.push(`Growth goal: ${b.profile.goal}.`);
   if (b.profile.focus?.length) lines.push(`Focus: ${b.profile.focus.join(', ')}.`);
   if (b.docs.size) {
-    lines.push(`Brand docs on this room's shelf: ${[...b.docs.keys()].join(', ')}. Read them with read_library_doc (scope room) before you draft, and before you ask the human what the product does or who it is for. list_library shows the rest of the shelf.`);
+    lines.push(`Brand docs on this project's shelf: ${[...b.docs.keys()].join(', ')}. Read them with read_library_doc (scope room) before you draft, and before you ask the human what the product does or who it is for. list_library shows the rest of the shelf.`);
   } else {
     // project scope only: a project is one product, and another project's brand docs are another product's
-    lines.push(`This room has no brand docs yet (the marketing setup writes ${BRAND_DOC_NAMES.join(', ')}). Call list_library with scope project in case they live in another room of this project. If none exist, ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc.`);
+    lines.push(`This project has no brand docs yet (the marketing setup writes ${BRAND_DOC_NAMES.join(', ')}). Call list_library with scope project in case they live in historical project contexts. If none exist, ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc.`);
   }
   // the frame (plan §6): a video post names a shelf image, and the film shows that screen instead of an invented one
   if (b.images.length) lines.push(`App screenshots on the shelf: ${b.images.join(', ')}. A beat that puts the app's screen on camera names one of them (SHOW, or the post's frame), so the film shows the real screen. A beat with no screen needs none.`);
-  else lines.push('No app screenshot is on this room\'s shelf. A film shows only a real one: take one from the project\'s repository with shelve_repo_screenshot, or ask the human to upload one to this room\'s Files. A beat with no screen needs none.');
-  return `\n\n[MARKETING CONTEXT — this conversation is in a marketing room. Where its brand lives:\n- ${lines.join('\n- ')}]`;
+  else lines.push('No app screenshot is on this project\'s shelf. A film shows only a real one: take one from the project\'s repository with shelve_repo_screenshot, or ask the human to upload one to this project\'s Files. A beat with no screen needs none.');
+  return `\n\n[MARKETING CONTEXT — this conversation is in a project with marketing setup. Where its brand lives:\n- ${lines.join('\n- ')}]`;
 }

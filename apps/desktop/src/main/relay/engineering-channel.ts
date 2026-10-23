@@ -111,12 +111,12 @@ export class ClineChannelSession {
   }
 
   get busy(): boolean { return !this.closed && (this.running || this.pending.size > 0 || this.promptQueue.queued); }
-  close(): Promise<void> {
+  close(keepJournal = false): Promise<void> {
     if (this.closing) return this.closing; this.closed = true;
     for (const resolve of this.pending.values()) resolve(false); this.pending.clear();
     const attachmentsDrained = this.attachmentQueue.close(); void attachmentsDrained.finally(() => this.attachments.close());
     this.closeTools?.();
-    return this.closing = shutdownEngineering(this.core, this.sessionId, this.conversation, this.runtimeMetadata(), this.log).finally(() => { this.core = null; });
+    return this.closing = shutdownEngineering(this.core, this.sessionId, this.conversation, this.runtimeMetadata(), this.log, keepJournal).finally(() => { this.core = null; });
   }
 
   async flush(): Promise<void> {

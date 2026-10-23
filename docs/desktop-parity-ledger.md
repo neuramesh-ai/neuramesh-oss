@@ -12,17 +12,17 @@ with the next desktop tag, because the desktop's renderer copy already carries t
   version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** [v0.155.0](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.155.0)
-(published 2026-10-14, built from merged source `edff628f`, PR #732). The public source tag
-matches the signed runtime. Paper light, dark and Cream Oak now ship on desktop; see the
-[native validation and screenshots](design/paper-look-2026-10/desktop-validation.md). The previous
-published desktop is v0.154.2. v0.154.1 remains an unpublished, superseded draft.
+**Newest published desktop:** [v0.155.1](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.155.1)
+(published 2026-10-16, built from the tree merged as `6d12a09e`, PR #746). The public source tag
+matches the signed runtime. Elevated Light and Soft Dark follow system appearance by default;
+see the [validation and release evidence](design/hq-subscription-2026-10/validation.md).
+The previous published desktop is v0.155.0. v0.154.1 remains an unpublished, superseded draft.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log edff628f..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log 6d12a09e..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open

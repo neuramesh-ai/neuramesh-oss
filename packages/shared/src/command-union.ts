@@ -1,6 +1,7 @@
+import { MARKETING_COMMANDS } from './command-union-marketing';
 import { z } from 'zod';
 import { MACHINE_COMMANDS } from './command-union-machine';
-import { MARKETING_RELEASES, SCHEDULE_RUN_COMMANDS, SETUP_RELEASES_VALUE } from './command-union-schedule';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
+import { SCHEDULE_RUN_COMMANDS } from './command-union-schedule';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
 import { WORK_PLAN_LEGS,
   MODEL_ID_SET, PACKS, CUSTOM_PACK_ID, isCustomPackId, TASK_KINDS, TASK_STATES, BEAT_STATUSES, RUN_KINDS, RUN_SETTLE_STATES, THREAD_MODES,
   // Human (companion) command schemas — defined in @neuramesh/shared so mobile/web
@@ -775,7 +776,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
   // fetchable. The bytes ride in as a data: URI and become /media/<id>, HMAC-gated.
   // a video rides the same lane (the UGC film, 2026-09-18): `data:video/mp4` bytes, one media per draft
-  z.object({ type: z.literal('content.attach_media'), item: z.string().min(1), dataUrl: z.string().regex(/^data:(?:image|video)\//).max(9_000_000) }),
+  z.object({ type: z.literal('content.attach_media'), item: z.string().min(1), dataUrl: z.string().regex(/^data:(?:image|video)\//).max(23_000_000) }),
   // remove a draft/scheduled item from the calendar entirely (published stays, it's history)
   z.object({ type: z.literal('content.delete'), item: z.string().min(1) }),
   z.object({
@@ -827,43 +828,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     snapshotSvg: z.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
     clearSource: z.boolean().optional(),
   }),
-  // marketing HQ setup (marketing-channel plan §4.3): point the room at the product. Writes the
-  // profile onto channels.marketing and fans out the bootstrap task ("Build the brand foundation")
-  // through the ordinary task path, so triage/staffing take it from there. Human-only; FREE on
-  // every plan by design (round 2), and so is the daily release watch it plants (2026-10-03).
-  z.object({
-    type: z.literal('marketing.setup'),
-    channel: z.string().min(1), // channel id
-    website: z.string().trim().max(400).optional(),
-    focus: z.array(z.enum(['social', 'content', 'seo', 'email', 'ads'])).max(5).optional(),
-    goal: z.string().trim().max(300).optional(), // the human's stated aim, in their words
-    // step 5, release drafts (docs/design/release-drafts-2026-09 §4.7): the repository to watch,
-    // draft the latest release now (a free one-shot), watch daily (a Team routine)
-    releases: MARKETING_RELEASES.optional(),
-  }),
-  // flip one marketing MCP integration on the room (marketing.mcp.<provider>) — the daemon
-  // attaches the enabled servers to marketer research runs with MACHINE-LOCAL creds
-  // (integrations-and-skills-plan.md: read paths local, publish custody stays ours)
-  z.object({
-    type: z.literal('marketing.set_integration'),
-    channel: z.string().min(1), // channel id
-    provider: z.enum(['posthog', 'x', 'meta', 'tiktok']),
-    enabled: z.boolean(),
-  }),
-  // one answered SETUP-FLOW step (shared/setupflows.ts), written as it lands — what makes an
-  // abandoned wizard resumable. flow/step must name a registered flow; the value's shape is
-  // checked against the step in the handler (a website string vs a focus array). Human-only:
-  // setup is the human's checklist by construction, like the flow's completing command.
-  z.object({
-    type: z.literal('setup.step'),
-    channel: z.string().min(1), // channel id
-    flow: z.string().min(1), // the registered flow id, e.g. 'marketing.v1'
-    step: z.string().min(1), // a step id of that flow
-    value: z.union([z.string().trim().max(400), z.array(z.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional(),
-  }),
-  // release-day backfill (idempotent, daemon boot): setup tasks for flow-bearing rooms that
-  // predate setup flows and were never configured. Returns how many were created.
-  z.object({ type: z.literal('setup.backfill'), workspace: z.string().min(1) }),
+  ...MARKETING_COMMANDS,
   // add / remove an agent's membership in a channel (the agent_channels row). Agents are
   // workspace-scoped but only see a channel's context once added here — humans (the live-panel
   // "+") or the orchestrator (the "add @agent to #channel?" card). agent = id or name; channel = id or slug.

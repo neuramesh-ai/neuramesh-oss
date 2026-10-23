@@ -41,6 +41,14 @@ import { actorAddress } from './guards';
 import type { CommandOutcome } from '../handler';
 
 export async function marketingCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | undefined> {
+  if (cmd.type === 'marketing.start') {
+    if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'marketing setup is started by a human');
+    const result = await store.startProjectMarketing(cmd.project, actor.id, (workspace) => createEvent({
+      type: 'project.updated', source: actorAddress(actor), target: formatAddress({ kind: 'project', slug: cmd.project }),
+      workspace, payload: { marketingStarted: true },
+    }));
+    return { ok: true, ...result } as never;
+  }
   if (cmd.type === 'marketing.setup') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'the marketing HQ is set up by a human');
     const focus = cmd.focus?.length ? cmd.focus : ['social', 'content'];

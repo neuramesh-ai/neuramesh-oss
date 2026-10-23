@@ -1,3 +1,5 @@
+import { drawOutcomeText } from './drawdraft';
+import { deliverImages } from './deliver-images';
 // The conversation's DELIVERY tools (article round): an article as its card, images as
 // attachments the human can expand and download. Split from chattools.ts when the two tools
 // tipped it past the size gate — same ctx, same rules: the tool inventory is what makes "show
@@ -22,7 +24,7 @@ export function shareChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'age
         for (const raw of i.letters as string[]) {
           const target = byLetter.get(raw.trim().toLowerCase());
           if (!target || target.status !== 'draft') { missed.push(raw); continue; }
-          lines.push(`${target.letter}: ${await generateDraftImage(agent, ch, target.id)}`);
+          lines.push(`${target.letter}: ${drawOutcomeText(await generateDraftImage(agent, ch, target.id).catch((error) => ({ ok: false, error: error instanceof Error ? error.message : 'Image generation failed.' })))}`);
         }
         if (!lines.length) return text(`nothing to draw (${missed.join(', ') || 'no matching cards'}) — a picture can only be drawn for a draft that is still a draft`);
         log({ kind: 'tool', phase: 'call', summary: `generate_image — ${(i.letters as string[]).join('/')}` });
@@ -74,32 +76,12 @@ export function imagesChatTool(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'age
         caption: z.string().max(500).optional(),
       },
       async (i) => {
-        const wants = i.images as Array<{ brief: string; name?: string }>;
-        const made: Array<{ name: string; thumb: string }> = [];
-        const failed: string[] = [];
-        for (const im of wants) {
-          const g = await generateShareImage(agent, ch, im.brief).catch(() => ({ error: 'the generator crashed' } as { thumb?: string; error?: string }));
-          if (g.thumb) made.push({ name: im.name?.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image', thumb: g.thumb });
-          else failed.push(g.error ?? 'the image came back empty');
-        }
-        if (!made.length) return text(`no images were generated — ${failed[0] ?? 'unknown failure'}. Report this plainly; never describe an image that does not exist.`);
-        const posted = await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, threadId, body: (i.caption as string | undefined)?.trim() || `Here ${made.length === 1 ? 'is the image' : 'are the images'}.` }).catch(() => null);
-        const messageId = posted?.ok ? ((await posted.json().catch(() => null)) as { message?: { id?: string } } | null)?.message?.id : null;
-        if (!messageId) return text('the images generated but their message did not post — try once more');
-        let attached = 0;
-        for (const im of made) {
-          const mime = /^data:([^;]+);/.exec(im.thumb)?.[1] ?? 'image/png';
-          const b64 = im.thumb.split(',')[1] ?? '';
-          const ok = await post('/v1/artifacts', { kind: 'agent', id: agent.id }, {
-            id: crypto.randomUUID(), workspace: ch.workspace_id, channel: ch.id, messageId,
-            kind: 'file', name: `${im.name}.${mime.split('/')[1] === 'jpeg' ? 'jpg' : (mime.split('/')[1] ?? 'png')}`,
-            mime, inlineContent: im.thumb, sizeBytes: Math.floor(b64.length * 0.75),
-          }).catch(() => null);
-          if (ok?.ok) attached += 1;
-        }
-        log({ kind: 'tool', phase: 'call', summary: `share_images — ${attached}/${wants.length}` });
-        if (!attached) return text('the images generated but could not attach — report the failure');
-        return text(`${attached} image${attached === 1 ? ' is' : 's are'} now SHOWING in the conversation${failed.length ? ` (${failed.length} failed: ${failed[0]})` : ''}. Do not describe them — the human can see them; one short line at most.`);
+        const input = i as { images: Array<{ brief: string; name?: string }>; caption?: string };
+        const result = await deliverImages({ post, actor: { kind: 'agent', id: agent.id }, agentName: agent.name, channel: ch, anchor: { threadId },
+          generate: brief => generateShareImage(agent, ch, brief) }, input);
+        log({ kind: 'tool', phase: 'call', summary: `share_images — ${result.attached}/${input.images.length}` });
+        if (result.error) return text(result.error);
+        return text(`${result.attached} image${result.attached === 1 ? ' is' : 's are'} now SHOWING in the conversation${result.failed.length ? ` (${result.failed.length} failed: ${result.failed[0]})` : ''}. The original is saved; one short line at most.`);
       },
     );
 }

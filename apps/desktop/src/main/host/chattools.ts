@@ -1,3 +1,5 @@
+import { redrawDraftImages } from './draft-redraw';
+import type { DrawOutcome } from './drawdraft';
 // THE TOOLS A CONVERSATION GETS (docs/34).
 //
 // Everything board-shaped is absent BY CONSTRUCTION: there is no create_task here to call, so
@@ -50,14 +52,14 @@ export interface ChatToolCtx {
   loadSkillBody: (channelId: string, workspaceId: string, name: string) => Promise<string>;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
   /** the room's shelf (host/workspace.ts): the conversation had no way to read it before 2026-09-19 */
   libraryDocs: LibraryReader;
 }
 
-export function makeChatTools(t: ChatToolCtx) {
-  const { z, tool, createSdkMcpServer, text, agent, ch, threadId, log,
+export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai/claude-agent-sdk').SdkMcpToolDefinition<any>> {
+  const { z, tool, text, agent, ch, threadId, log,
           db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, libraryDocs } = t;
   // what this turn has read from the shelf: draft_posts asks it before it writes (host/grounding.ts)
   const grounding = newGrounding();
@@ -69,12 +71,10 @@ export function makeChatTools(t: ChatToolCtx) {
 // Whiteboards are NOT board-shaped (docs/38): a sketch is content, and "sol, draw the
 // pipeline" is exactly a conversation's ask — so the four board tools ride along.
 const wb = whiteboardClosures({ kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, ch, { threadId });
-const nm = createSdkMcpServer({
-  name: 'nm',
-  tools: [
+return [
     tool(
       'recall',
-      'Search this workspace\'s memory — past decisions, people, and work in this room. Use it whenever the question touches something the team has already settled, so you answer from the record instead of from guesswork.',
+      'Search this workspace\'s memory — past decisions, people, and work in this project. Use it whenever the question touches something the team has already settled, so you answer from the record instead of from guesswork.',
       { query: z.string().min(1).describe('what you are trying to remember, in plain words') },
       async (i) => text(await recallFor(ch.workspace_id, ch.id, String(i.query))),
     ),
@@ -88,7 +88,7 @@ const nm = createSdkMcpServer({
     ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t), ...webChatTools(t),
     tool(
       'list_playbooks',
-      'The marketing playbook catalog (marketing-os) joined to this room\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
+      'The marketing playbook catalog (marketing-os) joined to this project\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
       {},
       async () => text(await playbookCatalogText(db, ch.id)),
     ),
@@ -153,7 +153,7 @@ const nm = createSdkMcpServer({
     ...(agent.role === 'orchestrator' ? [
       tool(
         'list_backlog',
-        'Parked ideas on this channel\'s backlog. Check it before parking a new one — duplicates waste a human\'s promote.',
+        'Parked ideas on this project\'s backlog. Check it before parking a new one — duplicates waste a human\'s promote.',
         {},
         async () => {
           const rows = await db.getAll(`select t.number, t.title, substr(t.description, 1, 200) as description from tasks t where t.channel_id = ? and t.state = 'backlog' order by t.number desc limit 50`, [ch.id]);
@@ -162,7 +162,7 @@ const nm = createSdkMcpServer({
       ),
       tool(
         'add_backlog_item',
-        'Park an idea from this conversation on the channel backlog — ONLY when the human explicitly asks for work to be captured or created ("create the task", "put it on the board", "add it to the backlog"). Distill the conversation into the title/description; the item stays parked until promoted. Never call this on your own initiative in a conversation — an unasked capture is what the proposal card is for.',
+        'Park an idea from this conversation on the project backlog — ONLY when the human explicitly asks for work to be captured or created ("create the task", "put it on the board", "add it to the backlog"). Distill the conversation into the title/description; the item stays parked until promoted. Never call this on your own initiative in a conversation — an unasked capture is what the proposal card is for.',
         {
           title: z.string().min(1).max(200).describe('short imperative title'),
           description: z.string().max(4000).optional().describe('what/why, distilled from this conversation — enough to pick up cold'),
@@ -181,7 +181,7 @@ const nm = createSdkMcpServer({
         { taskNumber: z.number().int().describe('the backlog item\'s task number') },
         async (i) => {
           const t = (await db.getAll<{ id: string }>(`select id from tasks where channel_id = ? and number = ? and state = 'backlog' limit 1`, [ch.id, Number(i.taskNumber)]))[0];
-          if (!t) return text(`error: no parked #${i.taskNumber} in #${ch.slug} (list_backlog shows what is there)`);
+          if (!t) return text(`error: no parked #${i.taskNumber} in this project (list_backlog shows what is there)`);
           const res = await post('/v1/commands', { kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, { type: 'task.promote', taskId: t.id });
           log({ kind: 'tool', phase: 'call', summary: `promote_backlog_item #${i.taskNumber}${res.ok ? ' → todo' : ' (failed)'}`, level: res.ok ? 'info' : 'warn' });
           if (!res.ok) { const b = (await res.json().catch(() => ({}))) as { error?: string; code?: string }; return text(`error ${res.status}: ${b.error ?? b.code ?? 'task.promote failed'}`); }
@@ -214,7 +214,7 @@ const nm = createSdkMcpServer({
           body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
           imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — omit for a text-only post. For a video post: the shot direction the film follows.'),
           script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…"), written to the film\'s length. The card folds it and films its first seconds. Never inside body or imageBrief.'),
-          frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this room\'s shelf (a real screenshot, see list_library). The film shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'), seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'),
+          frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this project\'s shelf (a real screenshot, see list_library). The film shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'), seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'),
         })).min(1).max(20),
       },
       async (i) => {
@@ -255,7 +255,7 @@ const nm = createSdkMcpServer({
           body: z.string().max(10_000).optional().describe('the replacement post text, in full (a video post: its caption)'),
           imageBrief: z.string().max(2000).optional().describe('replacement art direction (a video post: its shot direction)'),
           script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full, written to the film\'s length. The next Generate video films it.'),
-          frame: z.string().max(200).optional().describe('a video post: the name of an image on this room\'s shelf the film shows as the product (a real screenshot). "none" drops the frame.'), seconds: z.number().int().min(4).max(30).optional().describe('a video post: a new film length in seconds, when the human asked for one. The film on the card stays; the next Generate video takes it.'),
+          frame: z.string().max(200).optional().describe('a video post: the name of an image on this project\'s shelf the film shows as the product (a real screenshot). "none" drops the frame.'), seconds: z.number().int().min(4).max(30).optional().describe('a video post: a new film length in seconds, when the human asked for one. The film on the card stays; the next Generate video takes it.'),
         })).min(1).max(20),
       },
       async (i) => {
@@ -283,17 +283,14 @@ const nm = createSdkMcpServer({
         }
         if (!done.length) return text(`nothing was revised (${missed.join(', ') || 'no matching cards'}) — say so rather than pasting the new copy into your reply`);
         // new art direction ⇒ a new picture, same as the orchestrator path (see there for why)
-        const redrew: string[] = [];
-        for (const letter of drew) {
-          const target = byLetter.get(letter);
-          if (target && await generateDraftImage(agent, ch, target.id).catch(() => null)) redrew.push(letter);
-        }
-        return text(`revised ${done.join(', ')} in place — the updated card${done.length === 1 ? '' : 's'} and the earlier version are in the thread.${redrew.length ? ` Redrew the image on ${redrew.join(', ')}.` : ''}${missed.length ? ` Could not revise: ${missed.join(', ')} — say why.` : ''} One short line on what you changed; do not repeat the copy.`);
+        const { redrew, failed: redrawFailed } = await redrawDraftImages(drew, byLetter, id => generateDraftImage(agent, ch, id));
+        return text(`revised ${done.join(', ')} in place — the updated card${done.length === 1 ? '' : 's'} and the earlier version are in the thread.${redrew.length ? ` Redrew the image on ${redrew.join(', ')}.` : ''}${redrawFailed.length ? ` Image redraw failed — ${redrawFailed.join('; ')}. The revised copy or brief saved, but do not claim these images changed.` : ''}${missed.length ? ` Could not revise: ${missed.join(', ')} — say why.` : ''} One short line on what you changed; do not repeat the copy.`);
       },
     ),
     ...shareChatTools(t),
-  ],
-});
+  ];
+}
 
-  return nm;
+export function makeChatTools(t: ChatToolCtx) {
+  return t.createSdkMcpServer({ name: 'nm', tools: chatToolDefinitions(t) });
 }

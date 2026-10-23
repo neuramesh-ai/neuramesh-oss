@@ -44,7 +44,7 @@ export const RETRY_CAP_MS = 30 * 60_000;
 // never starts a pass, although PowerSync runs this query again on every write to agents.
 const INPUTS_SQL = `select 'agent' as fact, id, name, role, retired_at as at from agents
   where workspace_id = ? and (role in ('orchestrator', 'marketer') or name = 'plume')
-  union all select 'room', id, null, null, created_at from channels where workspace_id = ? and kind = 'marketing'
+  union all select 'room', id, null, null, created_at from channels where workspace_id = ? and (kind = 'marketing' or exists (select 1 from tasks t where t.channel_id = channels.id and t.kind = 'setup'))
   order by 1, 2`;
 
 export function startRunnerSeeds(deps: RunnerSeedDeps): void {
@@ -78,7 +78,7 @@ export function startRunnerSeeds(deps: RunnerSeedDeps): void {
   const pass = async (): Promise<boolean> => {
     const [orchestrator, rooms, marketer, plume] = await Promise.all([
       db.getAll(`select 1 from agents where workspace_id = ? and role = 'orchestrator' and retired_at is null limit 1`, [ws]),
-      db.getAll<{ id: string }>(`select id from channels where workspace_id = ? and kind = 'marketing' order by created_at, id`, [ws]),
+      db.getAll<{ id: string }>(`select id from channels where workspace_id = ? and (kind = 'marketing' or exists (select 1 from tasks t where t.channel_id = channels.id and t.kind = 'setup')) order by created_at, id`, [ws]),
       // retired included, as on the Mac: a register would undo a person's retirement
       db.getAll(`select 1 from agents where workspace_id = ? and role = 'marketer' limit 1`, [ws]),
       db.getAll<{ role: string }>(`select role from agents where workspace_id = ? and name = 'plume' limit 1`, [ws]),

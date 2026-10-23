@@ -8,6 +8,7 @@ import { column, Table } from '@powersync/common';
 // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive —
 // the daemon minute-tick claims due rows by run_count CAS; the HQ rail + calendar read them
 export const schedules = new Table({
+  project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
   title: column.text,
@@ -30,6 +31,7 @@ export const schedules = new Table({
 // content items (marketing-channel plan §4.7): the calendar's atoms — agents draft,
 // humans publish; external_url is the receipt once the server publishes via connectors
 export const content_items = new Table({
+  project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
   schedule_id: column.text,
@@ -87,6 +89,7 @@ export const connectors = new Table({
 });
 
 export const skills = new Table({
+  project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
   name: column.text,
@@ -104,6 +107,7 @@ export const skills = new Table({
 });
 
 export const skill_packs = new Table({
+  project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
   name: column.text,
@@ -126,6 +130,7 @@ export const skill_packs = new Table({
 // and tile renders; rev is the optimistic-concurrency guard a save carries (snapshot_rev says
 // which rev the still pictures, so a renderer knows when it is stale and re-exports).
 export const whiteboards = new Table({
+  project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
   thread_id: column.text,

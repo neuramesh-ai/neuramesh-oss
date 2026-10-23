@@ -26,7 +26,7 @@ const SITE = 'flowe.app';
 describe('the opening line', () => {
   it('promises the site and the web only to a runtime that reads them', () => {
     expect(bootstrapOpening({ site: SITE, research: true, repo: false })).toBe(
-      'First I read flowe.app and its key pages. I also search the web for the product\'s market. Then I write four brand docs here: the business profile, the brand guidelines, the market research and the social strategy. Each doc goes to the room\'s **Library** tab when it is done. Each doc takes a few minutes.',
+      'First I read flowe.app and its key pages. I also search the web for the product\'s market. Then I write four brand docs here: the business profile, the brand guidelines, the market research and the social strategy. Each doc goes to the project\'s **Files** when it is done. Each doc takes a few minutes.',
     );
     expect(bootstrapOpening({ site: SITE, research: true, repo: true })).toMatch(/^First I read flowe\.app, its key pages and the project code\. /);
     expect(bootstrapOpening({ site: null, research: true, repo: false })).toMatch(/^First I search the web for the product and its market\. Then I write/);
@@ -35,7 +35,7 @@ describe('the opening line', () => {
 
   it('on the NeuraMesh brain says the docs come from the answers, and the site gives only its colors and fonts', () => {
     expect(bootstrapOpening({ site: SITE, research: false, repo: true })).toBe(
-      'I write four brand docs here: the business profile, the brand guidelines, the market research and the social strategy. I write them from your answers. I also try to read the colors and fonts from flowe.app. Each doc goes to the room\'s **Library** tab when it is done.',
+      'I write four brand docs here: the business profile, the brand guidelines, the market research and the social strategy. I write them from your answers. I also try to read the colors and fonts from flowe.app. Each doc goes to the project\'s **Files** when it is done.',
     );
     expect(bootstrapOpening({ site: null, research: false, repo: false })).not.toMatch(/colors/);
     for (const site of [SITE, null]) {
@@ -60,14 +60,14 @@ describe('the lines while the docs land', () => {
     expect(BOOTSTRAP_ERROR).toBe('⚠️ An error stopped the brand docs. Reply here, and I continue.');
     expect(bootstrapResume(['social-strategy.md'])).toBe('I write `social-strategy.md` now.');
     expect(bootstrapResume(['market-research.md', 'social-strategy.md'])).toBe('I write the last 2 docs now.');
-    expect(bootstrapNudgeDone(['social-strategy.md'])).toBe('`social-strategy.md` is in the room\'s **Library** tab. The brand docs are complete.');
-    expect(bootstrapNudgeDone(['a.md', 'b.md', 'c.md'])).toBe('`a.md`, `b.md` and `c.md` are in the room\'s **Library** tab. The brand docs are complete.');
+    expect(bootstrapNudgeDone(['social-strategy.md'])).toBe('`social-strategy.md` is in the project\'s **Files**. The brand docs are complete.');
+    expect(bootstrapNudgeDone(['a.md', 'b.md', 'c.md'])).toBe('`a.md`, `b.md` and `c.md` are in the project\'s **Files**. The brand docs are complete.');
   });
 
   it('closes with the cadence card and the first playbooks, each under its own line', () => {
     const close = bootstrapClosing('```nmsched\n{}\n```', '```nmplays\n{}\n```');
     expect(close.split('\n\n')).toEqual([
-      'The brand docs are done. They are in the room\'s **Library** tab, and later drafts use them. Here is a first cadence. Arm the rows that you want. Nothing posts until you approve it.',
+      'The brand docs are done. They are in the project\'s **Files**, and later drafts use them. Here is a first cadence. Arm the rows that you want. Nothing posts until you approve it.',
       '```nmsched\n{}\n```',
       'The next step is a baseline. Run the audit once to get a score. Run it again later to see what changed.',
       '```nmplays\n{}\n```',

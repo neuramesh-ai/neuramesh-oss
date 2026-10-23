@@ -69,6 +69,21 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
     expect(localReplicaRow('messages', { id: 'id', pinned: true, body: 'text' })).toMatchObject({ id: 'id', pinned: 1, body: 'text' });
   });
 
+  it('streams project team additions and removals after the initial snapshot', async () => {
+    const sql = store!.sql;
+    const [project] = await sql`select id from projects where workspace_id = ${ws}::uuid limit 1`;
+    const [agent] = await sql`insert into agents(workspace_id, name, role, runtime, model)
+      values (${ws}::uuid, ${`replica-${randomUUID().slice(0,8)}`}, 'worker', 'claude-code', 'test') returning id`;
+    const before = await localBootstrap(sql, actor);
+    const [member] = await sql`insert into project_agents(workspace_id, project_id, agent_id)
+      values (${ws}::uuid, ${project!['id']}::uuid, ${agent!['id']}::uuid) returning id`;
+    const added = await localChanges(sql, actor, decodeLocalCursor(before.cursor)!);
+    expect(added!.changes.find(c => c.table === 'project_agents' && c.id === member!['id'])?.row?.['project_id']).toBe(project!['id']);
+    await sql`delete from project_agents where id = ${member!['id']}::uuid`;
+    const removed = await localChanges(sql, actor, decodeLocalCursor(added!.cursor)!);
+    expect(removed!.changes.find(c => c.table === 'project_agents' && c.id === member!['id'])?.row).toBeNull();
+  });
+
   it('binds a repeatable snapshot to its cursor and never skips an uncommitted earlier revision', async () => {
     const sql = store!.sql;
     const initial = await localBootstrap(sql, actor);

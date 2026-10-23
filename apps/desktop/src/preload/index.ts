@@ -52,8 +52,8 @@ contextBridge.exposeInMainWorld('nm', {
   worktreesGet: () => ipcRenderer.invoke('nm:worktrees-get'),
   worktreeRemove: (input: unknown) => ipcRenderer.invoke('nm:worktree-remove', input),
   sandboxSet: (enabled: boolean) => ipcRenderer.invoke('nm:sandbox-set', { enabled }),
-  send: (channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) =>
-    ipcRenderer.invoke('nm:send', { channelId, body, id: opts?.id, attachments: opts?.attachments, threadId: opts?.threadId, rootMessageId: opts?.rootMessageId, threadMode: opts?.threadMode, brainOverride: opts?.brainOverride, threadMachineId: opts?.threadMachineId, threadOrigin: opts?.threadOrigin, threadKind: opts?.threadKind }),
+  send: (channelId: string, body: string, opts?: { projectId?: string; id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) =>
+    ipcRenderer.invoke('nm:send', { channelId, body, projectId: opts?.projectId, id: opts?.id, attachments: opts?.attachments, threadId: opts?.threadId, rootMessageId: opts?.rootMessageId, threadMode: opts?.threadMode, brainOverride: opts?.brainOverride, threadMachineId: opts?.threadMachineId, threadOrigin: opts?.threadOrigin, threadKind: opts?.threadKind }),
   // docs/34 — flip an OPEN conversation's Tasks toggle. Chat → tasks escalates in place (the
   // next message triages); tasks → chat stops the routing without touching an existing task.
   // Archiving a conversation (0108): it leaves Recents, the room's session list and search, and
@@ -288,6 +288,8 @@ contextBridge.exposeInMainWorld('nm', {
     ipcRenderer.invoke('nm:channel-delete', { channelId }),
   channelKind: (channelId: string, kind: 'build' | 'marketing'): Promise<{ ok: boolean; channelId: string }> =>
     ipcRenderer.invoke('nm:channel-kind', { channelId, kind }),
+  marketingThreadIds: (): Promise<string[]> => ipcRenderer.invoke('nm:marketing-thread-ids'),
+  startProjectMarketing: (projectId: string): Promise<{ ok: boolean; channelId: string; taskId: string }> => ipcRenderer.invoke('nm:marketing-start', { projectId }),
   marketingSetup: (channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } }> =>
     ipcRenderer.invoke('nm:marketing-setup', { channelId, website, focus, goal, releases }),
   // one answered setup-flow step, persisted AS IT LANDS (setupflows.ts) — abandoning the
@@ -697,7 +699,7 @@ contextBridge.exposeInMainWorld('nm', {
     };
   },
   // live token stream from local agents (host broadcasts to all windows; no subId)
-  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string }) => void): (() => void) => {
+  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string; imageGeneration?: import('@neuramesh/shared').ImageGenerationProgress | null }) => void): (() => void) => {
     const listener = (_e: unknown, p: { key: string; agent: string; text: string; done: boolean }) => cb(p);
     ipcRenderer.on('nm:agent-stream', listener);
     return () => ipcRenderer.removeListener('nm:agent-stream', listener);

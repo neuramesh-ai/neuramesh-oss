@@ -18,6 +18,13 @@
 // how this pass first got them wrong: 3.1 Flash-Lite is $0.25/$1.50 and 3.5 Flash-Lite is
 // $0.30/$2.50. The NEWER lite model is the DEARER one. Read the row label, not the neighbour.
 export const PRICING: Record<string, { inPer1M: number; outPer1M: number }> = {
+  // October 16, 2026: verified on the same official pricing pages above. These are
+  // standard short-prompt rates. Haiku 5.5 rises to $0.50/$2.50 above 100K prompt tokens;
+  // our bench fixtures remain below that threshold. Argon doubles on December 1, 2026.
+  'claude-opus-5-5': { inPer1M: 4, outPer1M: 20 },
+  'claude-sonnet-5-5': { inPer1M: 2, outPer1M: 10 },
+  'claude-haiku-5-5': { inPer1M: 0.1, outPer1M: 0.5 },
+  'gemini-4-argon': { inPer1M: 2, outPer1M: 10 },
   'claude-fable-5-1': { inPer1M: 10, outPer1M: 50 },
   'claude-fable-5': { inPer1M: 10, outPer1M: 50 },
   'claude-opus-5': { inPer1M: 5, outPer1M: 25 },

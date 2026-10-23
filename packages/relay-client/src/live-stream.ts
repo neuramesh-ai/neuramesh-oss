@@ -23,12 +23,12 @@
 //     shows its synced replies, which is the behaviour without the lane exactly.
 import {
   LIVE_SILENCE_MS, LIVE_STREAM_LANE, applyLiveFrame, liveFrameOf, liveKeySurface,
-  type LiveFrame, type LiveKeyState,
+  type LiveFrame, type LiveKeyState, type ImageGenerationProgress,
 } from '@neuramesh/shared';
 import { openRelayJsonChannel, type RelayConfig } from './relay-client';
 
 /** `thinking`: the turn's thoughts so far, when the runtime shows them (the repo-connect round's Option A) */
-export type StreamEvent = { key: string; agent: string; text: string; done: boolean; thinking?: string };
+export type StreamEvent = { key: string; agent: string; text: string; done: boolean; thinking?: string; imageGeneration?: ImageGenerationProgress | null };
 
 /** how long a finished stream holds its text waiting for the synced reply */
 export const LAND_MAX_MS = 15_000;
@@ -114,6 +114,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
   const land = (key: string): void => {
     const entry = keys.get(key);
     if (!entry || entry.landing) return;
+    if (entry.st.imageGeneration) { entry.st = { ...entry.st, imageGeneration: null }; emit({ key, agent: entry.st.a, text: entry.st.text, done: false, thinking: entry.st.th, imageGeneration: null }); }
     // presence with no words: nothing to hold, the ghost simply goes
     if (!entry.st.text.trim()) { close(key); return; }
     entry.landing = { timer: setTimer(() => { if (keys.get(key) === entry) close(key); }, LAND_MAX_MS), landed: false };
@@ -151,7 +152,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
       ? { machine, st: step.state, baseline: deps.latestReply(f.k).catch(() => null), landing: null, resyncing: false }
       : { ...cur!, st: step.state, resyncing: false };
     keys.set(f.k, entry);
-    emit({ key: f.k, agent: step.state.a, text: step.state.text, done: false, ...(step.state.th ? { thinking: step.state.th } : {}) });
+    emit({ key: f.k, agent: step.state.a, text: step.state.text, done: false, ...(step.state.th ? { thinking: step.state.th } : {}), ...(step.state.imageGeneration !== undefined ? { imageGeneration: step.state.imageGeneration } : {}) });
   };
 
   const dial = (machine: string): void => {
@@ -192,7 +193,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
       watchers.add(cb);
       // a surface mounting mid-reply gets the reply so far, the way the IPC stream would have, and the
       // thoughts so far: without them a turn still in its thoughts reads as the ghost until its next frame
-      for (const [key, entry] of keys) cb({ key, agent: entry.st.a, text: entry.st.text, done: false, ...(entry.st.th ? { thinking: entry.st.th } : {}) });
+      for (const [key, entry] of keys) cb({ key, agent: entry.st.a, text: entry.st.text, done: false, ...(entry.st.th ? { thinking: entry.st.th } : {}), ...(entry.st.imageGeneration !== undefined ? { imageGeneration: entry.st.imageGeneration } : {}) });
       return () => { watchers.delete(cb); };
     },
     /** the machines this tab should hear. The list gates DIALLING only: a subscription that is

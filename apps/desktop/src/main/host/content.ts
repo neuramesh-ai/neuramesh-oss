@@ -1,3 +1,4 @@
+import { originalImage } from '../image-original';
 import { shareImage } from './share-image';
 // DRAFTED CONTENT — the image an agent draws for a card, the in-place revision by card
 // letter, and the transcript a turn is built from. Drafts only: publishing is a human's click.
@@ -79,27 +80,8 @@ const { agents, apiUrl, db, ownerActorId, post } = ctx;
  * ACL boundary, it is where the designer and the brand tokens are resolved from, and it is the
  * same guarantee the task filter was actually providing.
  */
-async function generateDraftImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string): Promise<string> {
-  const [d] = await db.getAll<{ platform: string; media: string | null }>(
-    `select platform, media from content_items where id = ? and channel_id = ? and status = 'draft'`,
-    [itemId, ch.id],
-  ).catch(() => [] as Array<{ platform: string; media: string | null }>);
-  if (!d) return `That draft isn't available to re-image (already scheduled or gone).`;
-  let media: { brief?: string; image_error?: string } = {};
-  try { media = (JSON.parse(d.media ?? 'null') as typeof media | null) ?? {}; } catch { /* none */ }
-  if (!media.brief) return `That draft has no image brief to draw from. Ask me for a visual and I'll add one.`;
-
-  const out = await drawBriefed(agent, ch, itemId, d.platform, media.brief, !!media.image_error);
-  if (!out.ok) {
-    return /no image key/.test(out.error ?? '')
-      ? `I can't draw it — there's no image key connected. Add an OpenAI or Gemini key under Image generation and hit Try again.`
-      : `Couldn't generate that image — ${out.error}. The reason is on the card; Try again when it's sorted.`;
-  }
-  return `Drew the image${out.model ? ` on ${out.model}` : ''} — it's on the card now. Nothing publishes until you approve.`;
-}
-
 // the button's draw and the marker's answer (host/drawdraft.ts): one draw, whoever pressed Generate
-const { drawBriefed, draftImageFor, drawOnAsk } = makeDraw({
+const { draftImageFor, drawOnAsk, generateDraftImage } = makeDraw({
   agents, db, post, paint: generateBrandImage, complete: textComplete, brandOf: (channelId) => brandTokensFor(db, channelId),
   imageCred: async (ch) => (await designerImageCred(apiUrl, ch.workspace_id, [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id)), ownerActorId)).cred,
 });
@@ -111,7 +93,7 @@ const { drawBriefed, draftImageFor, drawOnAsk } = makeDraw({
  * it had nowhere to put. This is the draft-free seam share_images rides — same credential ladder,
  * same brand tokens, the bytes come back to the caller instead of onto a card.
  */
-async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string): Promise<{ thumb?: string; bytes?: Buffer; error?: string }> {
+async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string): Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }> {
   return shareImage({ apiUrl, ownerActorId, db, designer: [...agents.values()].find(a => a.role === 'designer' && a.channels.has(ch.id)) }, agent, ch, brief);
 }
 async function reviseContentDrafts(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, t: ThreadTask, m: { id: string; body: string }, mode: string, token: string, onDelta: DeltaFn): Promise<string | null> {
@@ -196,7 +178,8 @@ async function reviseContentDrafts(agent: HostedAgent, ch: { id: string; slug: s
       else {
         thumb = g.thumb;
         if (g.reviewNote) notes.push(g.reviewNote);
-        if (g.publish) await postCmd({ type: 'content.attach_media', item: d.id, dataUrl: g.publish });
+        const saved = await Promise.resolve().then(() => postCmd({ type: 'content.attach_media', item: d.id, dataUrl: originalImage(g).dataUrl })).catch(() => false);
+        if (!saved) { thumb = undefined; notes.push(`the ${d.platform} original image could not be saved`); }
       }
     } else if (rev.imageBrief && !cred) {
       notes.push('no image key on this workspace, so the copy changed but the image brief stayed a brief');

@@ -465,7 +465,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
               if (g.error) return { error: g.error };
               if (g.model) drewOn.add(g.model);
               if (g.reviewNote) reviewNotes.push(g.reviewNote);
-              return { bytes: g.bytes, mime: g.mime, thumb: g.thumb, publish: g.publish };
+              return { bytes: g.bytes, mime: g.mime, thumb: g.thumb };
             }
           : undefined;
         const out = await draftPostsFromWorkspace(scratch, { taskId: t.id, channelId: t.channel_id }, async (cmd) => {

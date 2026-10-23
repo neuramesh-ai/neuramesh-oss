@@ -1,6 +1,6 @@
 import { publishConversationArtifact, withConversationBrain } from '../harness/brain-sync';
 import { z, type ZodRawShape } from 'zod';
-import { DEFAULT_ENGINEERING_AGENT, type EngineeringAgent } from '@neuramesh/shared';
+import { brainApiBaseUrl, DEFAULT_ENGINEERING_AGENT, type EngineeringAgent } from '@neuramesh/shared';
 import { allToolDefs } from '../harness/toolbus';
 import { jsonSchemaFor } from '../harness/toolschema';
 import { articleChatTool, imagesChatTool } from '../host/chattools-share';
@@ -15,7 +15,7 @@ export interface EngineeringDisplayTool {
 }
 export interface EngineeringDisplayContext {
   id: string; slug: string; workspace_id: string;
-  shareImage?: (agent: EngineeringAgent, brief: string) => Promise<{ thumb?: string; error?: string }>;
+  shareImage?: (agent: EngineeringAgent, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
 }
 
 /** Adapter only: existing NeuraMesh display definitions keep their schemas and execution. The
@@ -42,7 +42,7 @@ export function engineeringDisplayTools(o: {
   });
   if (!o.context) return tools;
   const actor = { kind: 'agent', id: agent.id, role: agent.role };
-  const request = async (path: string, body?: unknown) => (o.fetchImpl ?? fetch)(`${o.apiUrl}${path}`, {
+  const request = async (path: string, body?: unknown) => (o.fetchImpl ?? fetch)(`${path.startsWith('/v1/brain/') ? brainApiBaseUrl(o.apiUrl) : o.apiUrl}${path}`, {
     headers: { ...await o.headers(), 'x-nm-actor': JSON.stringify(actor), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
     ...(body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000),
   });

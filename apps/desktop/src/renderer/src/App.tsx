@@ -3282,9 +3282,6 @@ export function App() {
             inside the thing it reveals. Out here it is the HINGE: the face opens above it and it
             stays put, which is also why the face no longer draws an account row of its own.
             The top dock is a row with no column to put a foot in, so it keeps its popover. */}
-        {/* the setup tracker docks HERE, right above the workspace bar — see SetupCards for why
-            it left the bottom-right corner. Folded nav and the top dock keep the floating card. */}
-        {navPos !== 'top' && !navIsFolded && <SetupCards variant="dock" connection={boot?.connection?.kind} />}
         {navPos !== 'top' && (
           <div className="navtools" role="group" aria-label="Workspace tools">
             <button className="ftsearch" onClick={() => setCmdkOpen(true)} aria-label="Search (⌘K)" aria-keyshortcuts="Meta+K Control+K">
@@ -3299,6 +3296,7 @@ export function App() {
         )}
         {navPos !== 'top' && (
           <NavWorkspaceFoot
+            setup={!navIsFolded ? <SetupCards variant="dock" connection={boot?.connection?.kind} /> : null}
             workspace={boot?.workspace.name || ''}
             initial={(boot?.workspace.name?.[0] ?? 'N').toUpperCase()}
             unread={anyRoomUnread}

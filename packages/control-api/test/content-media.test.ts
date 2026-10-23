@@ -8,6 +8,8 @@ import { createApp } from '../src/app';
 import { publicApiBase, XReauthRequired, publishDueItems, xPoster, type Poster, type TokenBundle } from '../src/connectors';
 import { mediaSig, seal } from '../src/connector-crypto';
 import { MemoryStore } from '../src/store';
+import { resvgModule } from '../src/releasecard';
+import { imageSize } from '../src/film-compose';
 
 const george: Actor = { kind: 'human', id: 'george' };
 const plume: Actor = { kind: 'agent', id: 'plume', role: 'marketer' };
@@ -67,12 +69,12 @@ describe('content.attach_media', () => {
     expect(due?.mediaId).toBeTruthy();
   });
 
-  it('refuses anything that is not a decodable image, and anything over 8MB', async () => {
+  it('refuses anything that is not a decodable image, and originals over 16 MiB', async () => {
     const item = await makeDraft();
     // a non-image mime never gets past the schema; an empty or oversize payload dies in the handler
     expect((await send(plume, { type: 'content.attach_media', item, dataUrl: 'data:text/plain;base64,aGk=' })).status).toBe(400);
     expect((await send(plume, { type: 'content.attach_media', item, dataUrl: 'data:image/png;base64,' })).status).toBe(422);
-    const huge = `data:image/png;base64,${'A'.repeat(11_000_000)}`;
+    const huge = `data:image/png;base64,${'A'.repeat(23_000_001)}`;
     expect((await send(plume, { type: 'content.attach_media', item, dataUrl: huge })).status).toBe(400);
   });
 
@@ -107,6 +109,25 @@ describe('content.attach_media', () => {
 });
 
 describe('GET /media/:id', () => {
+  it('derives the publishing JPEG from the original and leaves the original download unchanged', async () => {
+    const { Resvg } = await resvgModule(true);
+    const renderer = new Resvg('<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024"><rect width="100%" height="100%" fill="#276f83"/></svg>');
+    const rendered = renderer.render();
+    let bytes: Buffer;
+    try { bytes = Buffer.from(rendered.asPng()); } finally { rendered.free(); renderer.free(); }
+    const item = await makeDraft();
+    const { mediaId } = await j(await send(plume, { type: 'content.attach_media', item, dataUrl: `data:image/png;base64,${bytes.toString('base64')}` }));
+    const url = `/media/${mediaId}?s=${mediaSig(mediaId)}`;
+    const published = await app.request(`${url}&platform=instagram`);
+    expect(published.status).toBe(200);
+    expect(published.headers.get('content-type')).toBe('image/jpeg');
+    const jpeg = Buffer.from(await published.arrayBuffer());
+    expect(imageSize(`data:image/jpeg;base64,${jpeg.toString('base64')}`)).toEqual({ w: 1536, h: 1024 });
+    expect(Buffer.from(await (await app.request(url)).arrayBuffer())).toEqual(bytes);
+    expect((await store.contentMediaBytes(mediaId))?.bytes).toEqual(bytes);
+    expect((await app.request(`/media/${mediaId}?s=wrong&platform=instagram`)).status).toBe(403);
+  });
+
   it('serves the bytes to anyone holding the signature — Meta fetches this URL itself', async () => {
     const item = await makeDraft();
     const { mediaId } = await j(await send(plume, { type: 'content.attach_media', item, dataUrl: DATA_URL }));
@@ -140,7 +161,7 @@ describe('the publish pass', () => {
     const spy: Poster = { async post(_t, _b, opts) { seenUrl = opts?.mediaUrl; return { url: 'https://instagram.com/p/1' }; } };
     const out = await publishDueItems(store, { instagram: spy }, new Date(at.getTime() + 60e3), 'https://api.neuramesh.app');
     expect(out.published).toBe(1);
-    expect(seenUrl).toBe(`https://api.neuramesh.app/media/${mediaId}?s=${mediaSig(mediaId)}`);
+    expect(seenUrl).toBe(`https://api.neuramesh.app/media/${mediaId}?s=${mediaSig(mediaId)}&platform=instagram`);
   });
 });
 
@@ -358,5 +379,25 @@ describe('content image outcome (surface + retry)', () => {
     // post stays scheduled (only a real body/brief revision unschedules for re-approval)
     expect((await send(plume, { type: 'content.revise', item, imageError: 'a card note' })).status).toBe(200);
     expect((await store.dueContentItems(new Date(Date.now() + 7200e3).toISOString(), 10)).some((d) => d.id === item)).toBe(true);
+  });
+});
+
+
+describe('original image ingress', () => {
+  it('stores and serves an original over the old request limit with exact bytes and member access', async () => {
+    (store as unknown as { wsMembers: Map<string, Set<string>> }).wsMembers.set('ws_acme', new Set(['george']));
+    const item = await makeDraft();
+    const original = Buffer.concat([Buffer.from(GIF_B64, 'base64'), Buffer.alloc(9_000_000, 37)]);
+    const body = { type: 'content.attach_media', item, dataUrl: `data:image/gif;base64,${original.toString('base64')}` };
+    const upload = (actor: Actor, command: unknown) => app.request('/v1/brain/content-media', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(actor) }, body: JSON.stringify(command) });
+    expect((await upload({ kind: 'human', id: 'outsider' }, body)).status).toBe(403);
+    const saved = await upload(george, body);
+    expect(saved.status).toBe(200);
+    const { mediaId } = await saved.json() as { mediaId: string };
+    const download = await app.request(`/v1/content/media/${mediaId}`, { headers: { 'x-nm-actor': JSON.stringify(george) } });
+    expect(download.status).toBe(200);
+    expect(Buffer.from(await download.arrayBuffer()).equals(original)).toBe(true);
+    expect((await upload(george, { type: 'content.approve', item })).status).toBe(400);
+    expect((await upload(george, { ...body, dataUrl: `data:video/mp4;base64,${original.toString('base64')}` })).status).toBe(422);
   });
 });

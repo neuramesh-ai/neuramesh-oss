@@ -9,6 +9,7 @@ import { styled } from '../housestyle';
 import type { LogFn } from '../agentlog';
 import { xResearchNote } from '../agents';
 import { brandNote } from './brandnote';
+import { projectNote } from './projectnote';
 import { isRoutineThread } from './routinerule';
 import { previousRunNote, scheduleOfThread } from './runwindow';
 import type { HostedAgent, SkillRef } from '../agents';
@@ -81,14 +82,7 @@ export function makeOrchTurn(ctx: {
       spawn: orchSpawnFor(agent, ch, convoThreadId ?? thread?.id ?? null, run, log, thread ? 'own' : 'triage'),
     });
 
-    // the room's project is ambient context, not a lookup: channels → projects is 1:N
-    // (channels.project_id), and a task's project is derived from its channel — so the
-    // orchestrator must never guess "the default project" for a scoped room.
-    const [chProj] = await db.getAll<{ name: string; slug: string }>(
-      `select p.name, p.slug from projects p join channels c on c.project_id = p.id where c.id = ?`,
-      [ch.id],
-    );
-    const projLine = chProj ? ` This room belongs to the project “${chProj.name}” (slug: ${chProj.slug}) — tasks created here file under it.` : '';
+    const projLine = await projectNote(db, ch.id, { taskId: thread?.id, threadId: convoThreadId });
 
     // CONTENT IS ANSWERED, NOT FILED (founder, 2026-08-08).
     //
@@ -103,7 +97,8 @@ export function makeOrchTurn(ctx: {
     // channel's PROJECT owns (0106), so the room's type was never what made this possible — it
     // only decided who got told they could. What a marketing room still adds is CONTEXT (brand
     // docs, calendar, crew), which is the paragraph below, not the capability.
-    const [chMeta] = await db.getAll<{ kind: string }>('select kind from channels where id = ?', [ch.id]);
+    const [chMeta] = await db.getAll<{ kind: string; brand_profile: string | null }>('select c.kind, p.brand_profile from channels c join projects p on p.id = c.project_id where c.id = ?', [ch.id]);
+    const hasBrand = chMeta?.kind === 'marketing' || !!chMeta?.brand_profile;
     // The room's publish connectors + this anchor's drafts, resolved ONCE — they decide whether
     // the content context below is injected at all, and feed the scheduling block that follows.
     // (0106: connectors belong to the PROJECT; channel_id only records where OAuth happened.)
@@ -121,7 +116,7 @@ export function makeOrchTurn(ctx: {
     // no marketing kind, restating what draft_posts' own description already carries at the point
     // of use. It now rides only where content work is live, exactly like its scheduling sibling
     // below. The capability itself is ungated as ever — the tools exist in every room.
-    const contentLive = chMeta?.kind === 'marketing' || conns.length > 0 || draftsNow.length > 0;
+    const contentLive = hasBrand || conns.length > 0 || draftsNow.length > 0;
     const marketingNote = !contentLive ? '' : `
 
   CONTENT ASKS ARE ANSWERED HERE, NOT FILED. "Draft me three posts for X", "write captions for this", "a LinkedIn version of that" — these are DELIVERABLES you produce in this thread, not board work. Do NOT create_task for them, in any room. The flow is:
@@ -132,7 +127,7 @@ export function makeOrchTurn(ctx: {
   - When the human asks to change a draft ("↩ Re draft b: …"), read_drafts then revise_posts, never draft_posts — a second card beside the old one is the wrong answer to "change this", and a rewrite from memory drops what they kept. Scheduling is schedule_posts, whose card is the human's approval gate; you can never publish.
   - YOU CAN DRAW. A picture is **generate_image** (re-runs the brief already on the card) or **revise_posts** with a new imageBrief (different art direction, redraws on its own). Never tell the human to press a button — if they asked for an image, make it. Give a post an imageBrief when it should carry a visual; Instagram and TikTok always need one.
   - A content ask becomes a TASK only on the normal bar: they asked for tracked work, or it is a campaign that must outlive this conversation across sessions and owners. Then create_task with kind:'content' (a lean plan — legs [build] with the drafting approach; born in plan review) and offerTo the marketer — never request_design or request_plan (drafting posts has no mockup gate and no plan step), and its Definition of Done is publish-readiness, never a pull request.${
-      chMeta?.kind === 'marketing'
+      hasBrand
         ? `
   THIS IS A MARKETING ROOM — the work here is CONTENT by default (social posts, captions, threads, campaigns for X / LinkedIn / Instagram / TikTok), and it carries the brand docs, calendar, library and crew for it. A genuinely non-content request here (e.g. a bug in the website's own code) still triages normally.
   MARKETING FLOWS HAVE PLAYBOOKS. An audit / GEO / teardown / positioning / launch / ads / ASO / release shaped ask routes through **list_playbooks** first, then **run_playbook** — the run STARTS immediately from the registry's templated plan (the ask is the consent; no plan-review stop), and in a task thread it lands as that task's subtask so the flow keeps one session. Hooks, copy variants, email sequences and UGC scripts are chat playbooks: load their skill and answer here (a "make UGC" ask loads the ugc-strategy skill and hands over creator-style scripts as draft cards). Never improvise a flow the catalog already carries. A session that opens with a release digest (a ‹release:owner/repo@tag› marker) is a release drafts ask: call **run_playbook('release')** at once with the tag as the release input, and write nothing else until the run lands.`
@@ -142,7 +137,7 @@ export function makeOrchTurn(ctx: {
       // goal, the brand docs by name and read_library_doc, or the ask and propose_library_doc when
       // the shelf is empty. The turn ran the UGC playbook and asked the human what the product
       // does while the docs sat beside the thread (George, 2026-09-19)
-      chMeta?.kind === 'marketing' ? await brandNote(db, ch.id).catch(() => '') : ''
+      hasBrand ? await brandNote(db, ch.id).catch(() => '') : ''
     }`;
 
     // Scheduling context — WHY rex kept telling people it needed Buffer / Hootsuite: it had no

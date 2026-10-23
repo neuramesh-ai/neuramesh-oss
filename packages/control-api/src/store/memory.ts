@@ -1,3 +1,4 @@
+import { startProjectMarketingMem, backfillSetupTasksMem } from './project-marketing-memory';
 // The in-memory Store — extracted from store.ts (track C-store).
 //
 // What apps/desktop and most of the suite run against, so it is not a mock: it must
@@ -1287,13 +1288,11 @@ export class MemoryStore implements Store {
     return { id: channelId, workspace: c.workspace };
   }
   async backfillSetupTasks(workspace: string): Promise<number> {
-    let made = 0;
-    for (const c of this.channels) {
-      if (c.workspace !== workspace) continue;
-      if (await this.ensureSetupTaskMem(c)) made += 1;
-    }
-    return made;
+    return backfillSetupTasksMem(this.channels.filter((c) => c.workspace === workspace), (c) => this.ensureSetupTaskMem(c));
   }
+  startProjectMarketing = (projectId: string, userId: string, makeEvent: (workspace: string) => NMEvent) =>
+    startProjectMarketingMem(this, this.projects, this.channels, this.tasks, this.events, projectId, userId, makeEvent);
+
   async setChannelMarketing(channelId: string, profile: { website: string | null; focus: string[]; goal?: string; bootstrap_thread_id?: string; setup_by: string; setup_at: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string; workspace: string }> {
     const c = this.channels.find((x) => x.id === channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');

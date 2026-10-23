@@ -32,7 +32,8 @@ import {
   type PowerSyncBackendConnector,
 } from '@powersync/node';
 import { executing, startAgentHost } from './agents';
-import { machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
+import { localRuntimes, machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
+import { watchRuntimeAvailability } from './runtime/availability';
 import { initAgentLog } from './agentlog';
 import { AppSchema } from '@neuramesh/client-core/schema';
 import { uploadCrudEntry, type UploadIdentity } from '@neuramesh/client-core/crud-upload';
@@ -166,33 +167,38 @@ export async function main(): Promise<void> {
   // WHAT THIS MACHINE CAN SERVE rides the beat (member-machines plan §4). A cloud machine never
   // registers, so without this its `runtimes` stays [] and the ladder can never choose it while
   // it sleeps — a login made in the browser terminal would be invisible to every peer. Detected
-  // at boot, again when a terminal session ends (a login may just have happened), and every ten
-  // minutes; sent when it changed, and on every tenth beat regardless so a lost beat heals.
+  // at boot and every five seconds, even while a sign-in terminal stays open. Login changes
+  // publish immediately; the normal beat also carries the current report to heal lost writes.
   // and the runtimes the workspace's stored API keys unlock: a key typed in the Keys step is what
   // makes this machine serve that provider (runtime/localruntimes.ts)
-  const probe = () => machineRuntimes({ cloud: true, hasKey: workspaceKeyProbe(cfg.apiUrl, cfg.workspaceId, async () => ({ authorization: `Bearer ${cfg.machineToken}` })) });
-  let runtimes = await probe().catch(() => [] as string[]);
-  let publishRuntimes = true;
-  const redetect = async (): Promise<void> => {
-    const r = await probe().catch(() => runtimes);
-    if (r.join(',') !== runtimes.join(',')) { runtimes = r; publishRuntimes = true; console.log(`[machined] runtimes ${r.join(',') || 'none'}`); }
-  };
-  const redetectTimer = setInterval(() => void redetect(), 10 * 60_000);
-  let beats = 0;
-  console.log(`[machined] runtimes ${runtimes.join(',') || 'none'}`);
+  // Workspace keys keep their existing network cadence. Frequent detection reads local
+  // credential stores only, so an open sign-in terminal never polls the credentials API.
+  const probeKeys = () => machineRuntimes({ cloud: true, local: async () => [], hasKey: workspaceKeyProbe(cfg.apiUrl, cfg.workspaceId, async () => ({ authorization: `Bearer ${cfg.machineToken}` })) });
+  let keyed = await probeKeys();
+  const probe = async () => [...new Set([...await localRuntimes(), ...keyed])];
+  const initialRuntimes = await probe().catch(() => keyed);
+  let posting = Promise.resolve(false);
+  const postBeat = (runtimes: string[], activity = 0): Promise<boolean> => posting = posting.catch(() => false).then(async () => {
+    const response = await fetch(`${cfg.apiUrl}/v1/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.machineToken}` },
+      body: JSON.stringify(heartbeatBody(cfg.machineId, { activeSeconds: activity, busy: busyNow(), runtimes, imageSha })),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return response.ok;
+  });
+  const availability = watchRuntimeAvailability({ initial: initialRuntimes, probe, publish: (r) => postBeat(r) });
+  const redetectTimer = setInterval(() => {
+    void probeKeys().then((r) => { keyed = r; return availability.refresh(); }).catch(() => {});
+  }, 10 * 60_000);
+  console.log(`[machined] runtimes ${initialRuntimes.join(',') || 'none'}`);
 
   // the ladder treats a silent machine as unwaitable — same 30s beat the desktop sends
   // (sync.ts registration path), over the same command lane
   const beat = setInterval(() => {
     const report = Math.round(activeSeconds);
     activeSeconds = 0; // reset optimistically: a lost beat under-charges, never double-charges
-    const withRuntimes = publishRuntimes || beats++ % 10 === 0;
-    publishRuntimes = false;
-    fetch(`${cfg.apiUrl}/v1/commands`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.machineToken}` },
-      body: JSON.stringify(heartbeatBody(cfg.machineId, { activeSeconds: report, busy: busyNow(), ...(withRuntimes ? { runtimes } : {}), imageSha })),
-    }).catch(() => {});
+    void postBeat(availability.current(), report).catch(() => {});
   }, 30_000);
 
   // The browser Engineering harness needs the machine's replica, relay edge, workspace manager,
@@ -227,7 +233,7 @@ export async function main(): Promise<void> {
     // the `stream` lane: a browser's live bubble for the replies this machine writes (livestreams.ts)
     streams: liveStreams,
     ...(browser ? { browser } : {}),
-    onSessionEnd: () => void redetect(),
+    onSessionEnd: () => void availability.refresh(),
   }) : null;
   console.log(relayUrl ? `[machined] relay edge dialling ${relayUrl}` : '[machined] NM_RELAY_URL unset — no browser terminal on this machine');
 
@@ -267,6 +273,7 @@ export async function main(): Promise<void> {
     clearInterval(beat);
     clearInterval(sampler);
     clearInterval(redetectTimer);
+    availability.stop();
     relay?.close();
     await browser?.close().catch(() => {});
     await db.disconnect();

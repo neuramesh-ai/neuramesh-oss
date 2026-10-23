@@ -65,13 +65,14 @@ test('display calls pass through the real workspace approval gate without bypass
 test('coding image display uses the existing generator and attaches its actual result', async () => {
   const calls: any[] = [];
   const tools = engineeringDisplayTools({ apiUrl: 'https://api.test', threadId: 'thread-1', cwd: '/repo',
-    context: { id: 'room-1', slug: 'general', workspace_id: 'workspace-1', shareImage: async (agent, brief) => { assert.equal(agent.id, 'rex'); assert.equal(brief, 'A blue test cover'); return { thumb: 'data:image/png;base64,AA==' }; } },
+    context: { id: 'room-1', slug: 'general', workspace_id: 'workspace-1', shareImage: async (agent, brief) => { assert.equal(agent.id, 'rex'); assert.equal(brief, 'A blue test cover'); return { bytes: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'), mime: 'image/png', thumb: 'data:image/jpeg;base64,PREVIEW' }; } },
     headers: async () => ({ authorization: 'Bearer machine' }),
     fetchImpl: async (_url, init) => { calls.push(JSON.parse(String(init?.body))); return Response.json({ message: { id: 'image-message' } }); },
   }, { id: 'rex', name: 'Rex', role: 'orchestrator' });
   const output = await tools.find(tool => tool.name === 'share_images')!.execute({ images: [{ brief: 'A blue test cover', name: 'cover' }] });
   assert.equal(calls[0].threadId, 'thread-1');
   assert.equal(calls[1].messageId, 'image-message');
-  assert.equal(calls[1].inlineContent, 'data:image/png;base64,AA==');
+  assert.deepEqual(Buffer.from(calls[1].contentBase64, 'base64'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'));
+  assert.equal(calls[1].threadId, 'thread-1');
   assert.match(JSON.stringify(output), /now SHOWING/);
 });

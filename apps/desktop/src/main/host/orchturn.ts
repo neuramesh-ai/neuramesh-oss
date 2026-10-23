@@ -233,9 +233,11 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
 export function orchToolsToBridge(tools: OrchTransportArgs['tools']) {
   const jsonType = (t: any): any => {
     const tn = t?._def?.typeName;
+    if (['ZodOptional', 'ZodNullable', 'ZodDefault'].includes(tn)) return jsonType(t._def.innerType);
     if (tn === 'ZodNumber') return { type: 'number' };
     if (tn === 'ZodBoolean') return { type: 'boolean' };
     if (tn === 'ZodArray') return { type: 'array', items: jsonType(t._def.type) };
+    if (tn === 'ZodObject') return inputSchemaOf(typeof t._def.shape === 'function' ? t._def.shape() : t.shape);
     if (tn === 'ZodEnum') return { type: 'string', enum: t._def.values };
     return { type: 'string' };
   };
@@ -323,7 +325,7 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const { userDataDir } = await import('../harness/turntools'); // not electron: see agyOrchestratorTurn
   const orchmcp = await import('../runtime/orchmcp');
   const { ensureCli } = await import('../runtime/cli');
-  const { runResilient } = await import('../runtime/codexsdk');
+  const { runResilient, codexInput } = await import('../runtime/codexsdk');
   const { Codex } = (await import('@openai/codex-sdk')) as unknown as { Codex: CodexCtor };
 
   const port = await orchmcp.ensureBridge();
@@ -337,14 +339,20 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   for (const [k, v] of Object.entries(raw)) if (typeof v === 'string') env[k] = v;
   const dir = mkdtempSync(join(os.tmpdir(), 'nm-codexorch-'));
   // model_reasoning_summary: the reasoning sections are the live bubble's Thoughts (the repo-connect round's Option A)
-  const config = { model_reasoning_summary: 'detailed', mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
+  // Codex's native image tool renders into its own client, which this text-event transport
+  // cannot deliver. Keep image generation on the tool that saves a NeuraMesh attachment.
+  const imageDelivery = args.tools.some((tool) => tool.name === 'share_images') ? {
+    features: { image_generation: false },
+    developer_instructions: 'This turn runs inside NeuraMesh. Generate and deliver images with the nm share_images tool. It saves the image as an attachment in the current conversation. Host image-generation skills and files rendered in another client do not deliver images here. Only report an image as delivered after share_images confirms attachment success.',
+  } : {};
+  const config = { model_reasoning_summary: 'detailed', ...imageDelivery, mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
   const codex = new Codex({ codexPathOverride: bin, apiKey: args.token || undefined, env, config });
   const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' as const };
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
     // STREAMED, like every other codex turn: `.run()` gave the bubble nothing until the whole reply
     // landed. runResilient falls back to the account default when the plan lacks the model.
-    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, prompt, {}, args.log, args.onDelta);
+    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, codexInput(prompt, args.attachments), {}, args.log, args.onDelta);
     if (!turn.text && turn.failure) throw new Error(`codex: ${turn.failure.slice(0, 200)}`);
     args.log?.({ kind: 'result', phase: 'success', summary: 'replied · codex (ChatGPT login)' });
     return turn.text.trim() || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder

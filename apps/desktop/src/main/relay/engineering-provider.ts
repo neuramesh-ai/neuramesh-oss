@@ -1,4 +1,5 @@
-import { STARTER_MODEL, providerForModel, type Provider } from '@neuramesh/shared';
+import { STARTER_MODEL, modelLabel, providerForModel, type Provider } from '@neuramesh/shared';
+import { agyModelFor } from './engineering-agy-args';
 import type { EngineeringBrainResolution } from './engineering-brain';
 import { readFile } from 'node:fs/promises';
 import { keyEnvFor, onCloudMachine } from '../runtime/adapter';
@@ -15,6 +16,8 @@ export interface EngineeringProviderResolution {
   baseUrl?: string;
   /** Final transport hop for platform metering or machine-local subscription credentials. */
   runtimeFetch?: typeof fetch;
+  /** 'agy': a Google sign-in on this machine runs the turn through agy (engineering-agy.ts), not the Cline SDK */
+  lane?: 'agy';
 }
 
 export interface EngineeringProviderOptions {
@@ -72,7 +75,6 @@ export const machineAuthProbe: MachineAuthProbe = {
 /** the refusal a person reads when this machine holds nothing that runs the brain (STE) */
 function refusal(provider: Provider, auth: AuthResolution): string {
   const label = LABEL[provider];
-  if (provider === 'gemini') return 'Code runs Gemini on an API key only. Add a Gemini API key, or pick another model.';
   if (auth.blocked?.reason === 'expired') return `The ${label} sign-in on this machine expired. Sign in again on this machine, or pick another model.`;
   return `This machine has no ${label} sign-in or API key. Sign in on this machine, add a ${label} API key, or pick another model.`;
 }
@@ -186,9 +188,12 @@ export async function resolveEngineeringProvider(
     };
     // the claude-code adapter runs its own tools outside NeuraMesh approvals, so a Claude sign-in never runs code
     if (credential === 'anthropic') throw new EngineeringModelRefused('Coding with a Claude subscription is off. Pick another model, or add a Claude API key.');
-    // the coding runtime has no lane for a Google sign-in: a Gemini key on this machine still runs it
+    // a Google sign-in runs code through agy (George, 2026-10-16). a Gemini model agy does not offer
+    // runs on a key when this machine has one, and otherwise the refusal names the models that run
+    if (agyModelFor(brain.modelId, null)) return { providerId: API_PROVIDER[credential], modelId: brain.modelId, lane: 'agy' };
     const key = token ?? envKey;
     if (key) return { apiKey: key, providerId: API_PROVIDER[credential], modelId: brain.modelId };
+    throw new EngineeringModelRefused(`${modelLabel(brain.modelId)} does not run on a Google sign-in. Pick Gemini 4 Argon, Gemini 3.8 Flash or Gemini 3.1 Pro, or add a Gemini API key.`);
   }
   throw new EngineeringModelRefused(refusal(credential, auth));
 }

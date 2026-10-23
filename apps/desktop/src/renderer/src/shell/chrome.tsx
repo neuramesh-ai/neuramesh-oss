@@ -7,7 +7,7 @@ import { type AgentRow } from '../bridge/rows-crew';
 import { type ProcList } from '../bridge/rows-infra';
 import { type TaskAllRow } from '../bridge/rows-board';
 import { type WTabKind } from '../wtabs';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 // ── Subtasks fold on a board card (docs/24): companion work never gets its own
 // card — the parent grows this strip: count · quiet progress · status rows. ──
@@ -74,7 +74,8 @@ export function SubStrip({ subs, agents, onOpen }: { subs: TaskAllRow[]; agents:
  * (`.ftfold`, present in every view). Folded, that pin wears the unread dot so the fold still
  * costs no information.
  */
-export function NavWorkspaceFoot({ workspace, initial, unread, faceOpen, onToggleFace, onHover, onUpgrade, connection, connectionHost }: {
+export function NavWorkspaceFoot({ setup, workspace, initial, unread, faceOpen, onToggleFace, onHover, onUpgrade, connection, connectionHost }: {
+  setup?: ReactNode;
   /** the WORKSPACE name — the bar's whole subject */
   workspace: string;
   /** its tile letter (the workspace's initial, never the signed-in person's) */
@@ -96,16 +97,16 @@ export function NavWorkspaceFoot({ workspace, initial, unread, faceOpen, onToggl
   return (
     <div
       className={`navwsfoot${faceOpen ? ' open' : ''}`}
-      onMouseEnter={() => onHover(true)}
-      onMouseLeave={() => onHover(false)}
     >
       <button
         type="button"
         className="navwsmain"
         onClick={onToggleFace}
+        onMouseEnter={() => onHover(true)}
+        onMouseLeave={() => onHover(false)}
         aria-expanded={faceOpen}
-        title={`${workspace} — workspace menu · ⌘⇧P${unread ? ' · a channel has moved' : ''}`}
-        aria-label={`${workspace} workspace menu${unread ? ', unread channels' : ''}`}
+        title={`${workspace} — workspace menu · ⌘⇧P${unread ? ' · unread activity' : ''}`}
+        aria-label={`${workspace} workspace menu${unread ? ', unread activity' : ''}`}
       >
         <span className="navwstile" aria-hidden>
           {/* no live pulse here (George, 2026-09-19: "the weird border blinking on the workspace icon"):
@@ -122,6 +123,7 @@ export function NavWorkspaceFoot({ workspace, initial, unread, faceOpen, onToggl
       {/* no account avatar here. The bar IS the account trigger — clicking it opens the face,
           which carries the account block — so a second avatar beside the ring was a duplicate
           control for a door already open, sitting where the ring's reading should end. */}
+      {setup}
       <CreditRing workspace={workspace} onUpgrade={onUpgrade} />
     </div>
   );

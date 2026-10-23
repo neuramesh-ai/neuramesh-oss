@@ -13,7 +13,7 @@ import {
   parseBrainOverride,
   seatModel,
   serializeBrainOverride,
-  CURRENT_MODELS,
+  MODEL_IDS,
   type BrainOverride,
 } from '../src/model-packs';
 import { AGENT_ROLES } from '../src/states';
@@ -137,7 +137,7 @@ describe('seatModel — the thread layer', () => {
     const dirty = parseBrainOverride({ developer: 'claude-not-real' });
     expect(seatModel({ ...base, threadOverride: dirty })).toBe(SONNET);
     const model = seatModel({ ...base, threadOverride: parseBrainOverride({ developer: OPUS }) });
-    expect([...CURRENT_MODELS['claude-code'], ...CURRENT_MODELS.codex, ...CURRENT_MODELS.gemini]).toContain(model);
+    expect(MODEL_IDS).toContain(model);
   });
 });
 

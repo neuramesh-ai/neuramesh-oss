@@ -12,7 +12,7 @@ test('the platform shelves the file: the answer names the shelf name, the reposi
   const calls: Array<{ path: string; body: unknown }> = [];
   const t = { ch, log: () => {}, post: async (path: string, _a: unknown, body: unknown) => { calls.push({ path, body }); return answer(201, { ok: true, name: 'home.png', path: 'docs/screens/home.png', sha: 's1' }); } };
   const out = await shelveRepoScreenshot(t as never, actor, { path: 'docs/screens/home.png' });
-  assert.match(out, /^home\.png is on this room's shelf, the repository's own docs\/screens\/home\.png\. Write `SHOW: home\.png` on the beat that puts the app's screen on camera/);
+  assert.match(out, /^home\.png is on the project's Files, the repository's own docs\/screens\/home\.png\. Write `SHOW: home\.png` on the beat that puts the app's screen on camera/);
   // the route reads the room from the query and the file from the body; the agent never sends bytes
   assert.deepEqual(calls, [{ path: '/v1/repo/shelve?channel=c1', body: { path: 'docs/screens/home.png' } }]);
   await shelveRepoScreenshot(t as never, actor, { path: 'store/pricing.jpg', name: 'pricing' });

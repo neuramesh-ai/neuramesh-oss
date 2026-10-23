@@ -1,5 +1,44 @@
 import { createEngineeringPlanProgress, recoverEngineeringPlanProgress, updateEngineeringPlanProgress, isEngineeringWorkPlan, type EngineeringPlanProgress, type EngineeringRuntimeEvent } from '@neuramesh/shared';
 
+const oneLine = (text: unknown, max: number): boolean => typeof text === 'string' && !!text.trim() && text.length <= max && !/[\r\n]/.test(text);
+const filled = (text: unknown, max: number): boolean => typeof text === 'string' && !!text.trim() && text.length <= max;
+const lineProblem = (text: unknown, max: number, name: string): string | null => (oneLine(text, max) ? null : `${name} must be one line of at most ${max} characters.`);
+function listProblem(items: unknown, min: number, max: number, chars: number, name: string): string | null {
+  if (!Array.isArray(items) || items.length < min || items.length > max) return `${name} must hold ${min} to ${max} items.`;
+  const bad = items.findIndex((item) => !oneLine(item, chars));
+  return bad < 0 ? null : `${name}[${bad}] must be one line of at most ${chars} characters.`;
+}
+function isPlanStep(value: unknown): boolean {
+  const step = (value ?? {}) as Record<string, unknown>;
+  return !!value && (step['action'] === 'edit' || step['action'] === 'command') && (step['label'] === undefined || oneLine(step['label'], 100))
+    && filled(step['target'], 2000) && filled(step['description'], 2000);
+}
+
+/** the first rule a refused plan breaks, in words a model can act on: a generic refusal made Gemini guess at the
+ *  argument format (live, 2026-10-16) when one decision was 315 characters. isEngineeringWorkPlan still decides */
+export function workPlanProblem(input: unknown): string {
+  if (typeof input === 'string') return 'Send the arguments as a JSON object, not as a string.';
+  const plan = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const report = plan['report'] as Record<string, unknown> | undefined;
+  const steps = Array.isArray(plan['steps']) ? plan['steps'] as unknown[] : [];
+  const step = steps.findIndex((s) => !isPlanStep(s));
+  const checks: Array<() => string | null> = [
+    () => (report === undefined ? null : lineProblem(report['investigation'], 600, 'report.investigation')),
+    () => (report === undefined ? null : listProblem(report['decisions'], 1, 4, 300, 'report.decisions')),
+    () => (report === undefined ? null : lineProblem(report['nextStep'], 300, 'report.nextStep')),
+    () => (plan['keyPoints'] === undefined ? null : listProblem(plan['keyPoints'], 1, 5, 600, 'keyPoints')),
+    () => (plan['considerations'] === undefined ? null : listProblem(plan['considerations'], 0, 3, 600, 'considerations')),
+    () => (filled(plan['summary'], 8000) ? null : 'summary must be text of at most 8000 characters.'),
+    () => (steps.length >= 1 && steps.length <= 30 ? null : 'steps must hold 1 to 30 items.'),
+    () => (step < 0 ? null : `steps[${step}] needs the action edit or command, a target, a description and a one-line label of at most 100 characters.`),
+  ];
+  for (const check of checks) {
+    const problem = check();
+    if (problem) return problem;
+  }
+  return 'A work plan needs a summary and at least one concrete edit or command.';
+}
+
 /** A proposal records intent only. File and command execution still uses the normal gates. */
 export function engineeringPlanTool(emit: (event: EngineeringRuntimeEvent) => void) {
   return {
@@ -22,7 +61,7 @@ export function engineeringPlanTool(emit: (event: EngineeringRuntimeEvent) => vo
       },
     },
     execute: (input: unknown) => {
-      if (!isEngineeringWorkPlan(input)) throw new Error('A work plan needs a summary and at least one concrete edit or command.');
+      if (!isEngineeringWorkPlan(input)) throw new Error(`The work plan was not recorded. ${workPlanProblem(input)} Fix it and propose the plan again.`);
       const planProgress = createEngineeringPlanProgress(input, crypto.randomUUID());
       emit({ type: 'work_plan', planId: planProgress.id, plan: input });
       return { recorded: true, planProgress, message: 'The UI now shows your investigation, key decisions and next step above the plan card. The formal plan is in the pane. Your final response must be one short readiness sentence only. Do not repeat the report or plan already rendered for the user. No changes have been applied.' };

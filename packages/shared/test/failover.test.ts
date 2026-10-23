@@ -22,9 +22,9 @@ const avail = (a: Partial<Record<'anthropic' | 'openai' | 'gemini', boolean>>): 
 
 describe('nextFallForward', () => {
   it('walks the family chain, skipping already-exhausted models', () => {
-    expect(nextFallForward('claude-fable-5-1', new Set())).toBe('claude-opus-5');
-    expect(nextFallForward('claude-fable-5-1', new Set(['claude-opus-5']))).toBe('claude-sonnet-5');
-    expect(nextFallForward('claude-fable-5-1', new Set(['claude-opus-5', 'claude-sonnet-5']))).toBe('claude-haiku-4-5');
+    expect(nextFallForward('claude-fable-5-1', new Set())).toBe('claude-opus-5-5');
+    expect(nextFallForward('claude-fable-5-1', new Set(['claude-opus-5-5']))).toBe('claude-sonnet-5-5');
+    expect(nextFallForward('claude-fable-5-1', new Set(['claude-opus-5-5', 'claude-sonnet-5-5']))).toBe('claude-haiku-5-5');
   });
   it('walks the OpenAI chain from the 2026-09 flagship', () => {
     expect(nextFallForward('gpt-6-astra', new Set())).toBe('gpt-5.6-sol');
@@ -32,8 +32,8 @@ describe('nextFallForward', () => {
   });
   it('lands a superseded model on the CURRENT generation, never back onto its own', () => {
     // an agent still seated on a retired id must fall forward, not sideways into another retirement
-    expect(nextFallForward('claude-fable-5', new Set())).toBe('claude-opus-5');
-    expect(nextFallForward('claude-opus-4-8', new Set())).toBe('claude-sonnet-5');
+    expect(nextFallForward('claude-fable-5', new Set())).toBe('claude-opus-5-5');
+    expect(nextFallForward('claude-opus-4-8', new Set())).toBe('claude-sonnet-5-5');
     expect(nextFallForward('gemini-3.5-flash', new Set())).toBe('gemini-3.8-flash');
   });
   it('returns null when the whole chain is exhausted or the model has none', () => {
@@ -59,16 +59,16 @@ describe('composeFailover — single-model exhaustion (Case 1: fall forward)', (
   // the model whose exhaustion moves seats in this pack. A fixture naming a model the pack does not
   // seat would return no_fallback and quietly test nothing.
   it('Sonnet 5 out → reseat ONLY the roles on it, same provider', () => {
-    const r = composeFailover({ exhaustedModel: 'claude-sonnet-5', activeRoles: ULTRACODE, exhausted: [], avail: avail({ anthropic: true }) });
+    const r = composeFailover({ exhaustedModel: 'claude-sonnet-5-5', activeRoles: ULTRACODE, exhausted: [], avail: avail({ anthropic: true }) });
     expect(r.kind).toBe('fall_forward');
     if (r.kind !== 'fall_forward') throw new Error('kind');
-    expect(r.from).toBe('claude-sonnet-5');
-    expect(r.to).toBe('claude-haiku-4-5');
+    expect(r.from).toBe('claude-sonnet-5-5');
+    expect(r.to).toBe('claude-haiku-5-5');
     expect(r.provider).toBe('anthropic');
     expect([...r.roles].sort()).toEqual(['developer', 'sales', 'worker']);
   });
   it('does not disturb roles that were not on the dead model', () => {
-    const r = composeFailover({ exhaustedModel: 'claude-sonnet-5', activeRoles: ULTRACODE, exhausted: [], avail: avail({ anthropic: true }) });
+    const r = composeFailover({ exhaustedModel: 'claude-sonnet-5-5', activeRoles: ULTRACODE, exhausted: [], avail: avail({ anthropic: true }) });
     if (r.kind !== 'fall_forward') throw new Error('kind');
     // ultracode's orchestrator and reviewer are OpenAI seats — a Claude cap must not touch them
     expect(r.roles).not.toContain('orchestrator');
@@ -92,7 +92,7 @@ describe('composeFailover — convergence on repeated exhaustion', () => {
     const r = composeFailover({ exhaustedModel: 'claude-opus-4-8', activeRoles: rolesNow, exhausted: ['claude-fable-5'], avail: avail({ anthropic: true }) });
     expect(r.kind).toBe('fall_forward');
     if (r.kind !== 'fall_forward') throw new Error('kind');
-    expect(r.to).toBe('claude-sonnet-5');
+    expect(r.to).toBe('claude-sonnet-5-5');
   });
   it('whole Anthropic chain exhausted + OpenAI live → switch to OpenAI Core (Case 2)', () => {
     const chain = ['claude-fable-5', ...FALL_FORWARD['claude-fable-5']!]; // fable + opus + sonnet-5 + sonnet-4.6 + haiku

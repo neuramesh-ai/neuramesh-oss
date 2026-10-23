@@ -85,3 +85,18 @@ describe('liveKeySurface', () => {
     expect(liveKeySurface(':t9')).toBeNull();
   });
 });
+
+
+describe('image-generation wire state', () => {
+  it('rejects malformed progress and does not carry progress into a new epoch', () => {
+    for (const imageGeneration of [{ count: -1, stage: 'generating' }, { count: 1000, stage: 'saving' }, { count: 1, stage: 'done' }]) {
+      expect(liveFrameOf({ ...d(1, 0, ''), imageGeneration })).toBeNull();
+    }
+    const first = applyLiveFrame(undefined, { ...d(1, 0, ''), imageGeneration: { count: 1, stage: 'generating' } });
+    expect(first.kind).toBe('state');
+    if (first.kind !== 'state') return;
+    const next = applyLiveFrame(first.state, { ...d(1, 0, ''), e: 'next-turn' });
+    expect(next.kind).toBe('state');
+    if (next.kind === 'state') expect(next.state.imageGeneration).toBeUndefined();
+  });
+});

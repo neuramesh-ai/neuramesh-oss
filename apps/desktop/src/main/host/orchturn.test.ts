@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import { z } from 'zod';
-import { geminiDispatch, geminiOrchestratorTurn, zodShapeToGemini } from './orchturn';
+import { geminiDispatch, geminiOrchestratorTurn, orchToolsToBridge, zodShapeToGemini } from './orchturn';
 import { isNoCreditsError } from '../computenotice';
 import type { OrchTool } from './orchtools';
 
@@ -25,6 +25,23 @@ const BASE = {
   tools: [] as OrchTool[],
 };
 const CTX = { apiUrl: 'https://api.test', workspace: 'ws-1', actorId: 'u-1' };
+
+test('CLI image tools advertise structured image briefs, including optional names', async () => {
+  const shape = {
+    images: z.array(z.object({ brief: z.string().min(8), name: z.string().optional() })),
+    caption: z.string().optional(),
+  };
+  let received: unknown;
+  const [tool] = orchToolsToBridge([{ name: 'share_images', description: 'Generate images', schema: shape,
+    run: async (input: unknown) => { received = z.object(shape).parse(input); return 'attached'; } }]);
+  assert.deepEqual(tool!.inputSchema.properties.images, {
+    type: 'array', items: { type: 'object', properties: { brief: { type: 'string' }, name: { type: 'string' } },
+      required: ['brief'], additionalProperties: false },
+  });
+  const input = { images: [{ brief: 'A beautiful sunset sky', name: 'sunset-sky' }], caption: 'Sunset' };
+  assert.equal(await tool!.run(input), 'attached');
+  assert.deepEqual(received, input);
+});
 
 /** replaces fetch with a scripted queue and records every call for assertion */
 function stubFetch(replies: Array<{ status?: number; body?: unknown }>) {
