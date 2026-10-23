@@ -345,6 +345,13 @@ Rules of use:
 
 ## 5. Type
 
+**Current update, 2026-10-21:** NeuraMesh Sans is the interface face across HQ, desktop,
+mobile and the public site, including navigation, labels, buttons, prose, headings, brand
+text and checkout fields. The legacy `--fmono` / `F.mono` label roles now resolve to Sans.
+Source code, diffs, commands and terminals retain Geist Mono through `--fcode` / `F.code`
+or the terminal renderer. HQ preloads Sans Latin; other subsets load on demand.
+Sizes, weights and tracking stay unchanged. This supersedes the family choices below.
+
 **Web and desktop update, 2026-10-14:** George requested Geist Mono across both apps after the Paper review.
 The web and desktop tokens `--fbody`, `--fdisp`, `--fital`, `--fbrand`, and `--font` now resolve to `--fmono`.
 Headings, navigation, messages, the composer, menus, settings, whiteboard controls, and checkout fields use the same bundled face.
@@ -546,6 +553,15 @@ real work — if it is decoration, drop it and keep the pill.
   docked) · lockup hover. Home's caught-up peek fires only when the needs-you queue *drains*.
 
 ## 8. Component idioms
+
+**Setup progress update, 2026-10-21:** The sidebar shows a 38px progress circle with
+`done/total`. It always starts collapsed; the old expanded preference no longer opens it.
+Hover or keyboard focus previews the checklist. Click/tap pins it; leaving an unpinned
+preview, clicking outside, moving keyboard focus away or pressing Escape closes it.
+Arrow Down enters the checklist and Escape restores focus to the circle. The portal is
+clamped to the viewport and repositions when QR details expand. The existing dismissal,
+completion, unknown-state handling and setup actions remain. A folded or top nav uses the
+same compact control at the bottom right. This replaces the expanded card/pill behavior below.
 
 - **Cards** — elevated stratum, hover lift (§3). Board cards, Home attention cards, provider
   cards, crew cards: one recipe.

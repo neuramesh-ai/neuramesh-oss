@@ -1,16 +1,17 @@
+import { originalImage } from './image-original';
 import { parseDraftedPosts, type DraftedPost } from '@neuramesh/shared';
 
 export type ContentDraftCmd = { type: 'content.create'; channel: string; task: string; platform: string; body: string; mediaUrl?: string; imageBrief?: string; thumb?: string; imageError?: string };
 
 /**
  * Produces the actual pixels for one drafted post's image brief (imagegen.ts, injected).
- * `thumb` is the small inline preview that rides the draft; `publish` is the full-size JPEG that
+ * `thumb` is the small inline preview that rides the draft; `bytes` and `mime` are the original image that
  * gets HOSTED so a network can fetch it — without that copy the picture can never leave the machine.
  */
-export type ImageMaker = (post: DraftedPost) => Promise<{ bytes?: Buffer; mime?: string; thumb?: string; publish?: string; error?: string }>;
+export type ImageMaker = (post: DraftedPost) => Promise<{ bytes?: Buffer; mime?: string; thumb?: string; error?: string }>;
 /** Creates the draft and returns its new content item id (null = the create was rejected). */
 export type EmitDraft = (cmd: ContentDraftCmd) => Promise<string | null>;
-/** Hosts the publish-size image against that item (content.attach_media). */
+/** Hosts the original image against that item (content.attach_media). */
 export type AttachMedia = (itemId: string, dataUrl: string) => Promise<boolean>;
 
 export type DraftOutcome = { made: number; images: number; hosted: number; notes: string[] };
@@ -18,8 +19,6 @@ export type DraftOutcome = { made: number; images: number; hosted: number; notes
 // Cost guard: a runaway draft set must not mint twenty paid generations. Anything past the cap
 // keeps its brief and renders as "needs image" — and we say so rather than dropping it silently.
 const IMAGE_CAP = 4;
-
-const extFor = (mime: string): string => (mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png');
 
 /**
  * The marketer content producer (marketing-workflow §4.5). Reads the marketer's `posts.json`
@@ -64,19 +63,20 @@ export async function draftPostsFromWorkspace(
         if (asked === IMAGE_CAP + 1) out.notes.push(`image cap ${IMAGE_CAP} reached — later drafts keep their brief instead`);
       } else {
         const got: Awaited<ReturnType<ImageMaker>> = await makeImage(p).catch((e: Error) => ({ error: e.message }));
-        if (got.bytes?.length && got.mime) {
+        try {
+          const original = originalImage(got);
           const { mkdir, writeFile } = await import('node:fs/promises');
           const { join } = await import('node:path');
           try {
             await mkdir(join(dir, 'media'), { recursive: true });
-            await writeFile(join(dir, 'media', `${p.platform}-${asked}.${extFor(got.mime)}`), got.bytes);
-          } catch { /* the thumbnail still ships — the full file is a convenience */ }
+            await writeFile(join(dir, 'media', `${p.platform}-${asked}.${original.extension}`), original.bytes);
+          } catch { /* Hosting below remains authoritative; this local copy is optional. */ }
           thumb = got.thumb;
-          publish = got.publish;
+          publish = original.dataUrl;
           out.images++;
-        } else if (got.error) {
-          imageError = got.error;
-          out.notes.push(`image for the ${p.platform} draft: ${got.error}`);
+        } catch (error) {
+          imageError = error instanceof Error ? error.message : 'The original image is unavailable.';
+          out.notes.push(`image for the ${p.platform} draft: ${imageError}`);
         }
       }
     }

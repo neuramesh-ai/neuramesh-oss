@@ -30,12 +30,16 @@ export type AvailSnapshot = Record<Provider, ProviderAvail>;
 // be able to fall forward, and nothing may fall onto a model the catalog no longer offers. A test
 // enforces both halves.
 export const FALL_FORWARD: Record<string, readonly string[]> = {
-  'claude-fable-5-1': ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
-  'claude-opus-5': ['claude-sonnet-5', 'claude-haiku-4-5'],
-  'claude-fable-5': ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
-  'claude-opus-4-8': ['claude-sonnet-5', 'claude-haiku-4-5'],
-  'claude-sonnet-5': ['claude-haiku-4-5'],
-  'claude-sonnet-4-6': ['claude-sonnet-5', 'claude-haiku-4-5'],
+  'claude-opus-5': ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-sonnet-5': ['claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-haiku-4-5': ['claude-haiku-5-5'],
+  'gemini-4-argon': ['gemini-3.8-flash', 'gemini-3.1-flash-lite'],
+  'claude-fable-5-1': ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-opus-5-5': ['claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-fable-5': ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-opus-4-8': ['claude-sonnet-5-5', 'claude-haiku-5-5'],
+  'claude-sonnet-5-5': ['claude-haiku-5-5'],
+  'claude-sonnet-4-6': ['claude-sonnet-5-5', 'claude-haiku-5-5'],
   'gpt-6-astra': ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.4-mini'],
   'gpt-5.6-sol': ['gpt-5.6-terra', 'gpt-5.4-mini'],
   'gpt-5.6-terra': ['gpt-5.4-mini'],

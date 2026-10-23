@@ -57,6 +57,7 @@ export const tasks = new Table({
 });
 
 export const artifacts = new Table({
+  project_id: column.text,
   // Immutable brain object reference. Bytes are fetched through the authorized artifact route.
   storage_path: column.text,
   content_hash: column.text,

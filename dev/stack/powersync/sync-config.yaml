@@ -27,6 +27,7 @@ streams:
     queries:
       - select * from channels where workspace_id in (select workspace_id from my_workspaces)
       - select * from projects where workspace_id in (select workspace_id from my_workspaces)
+      - select * from project_agents where workspace_id in (select workspace_id from my_workspaces)
       - select id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at, pinned, schedule_id from messages where workspace_id in (select workspace_id from my_workspaces)
       - select * from threads where workspace_id in (select workspace_id from my_workspaces)
       - select * from tasks where workspace_id in (select workspace_id from my_workspaces)

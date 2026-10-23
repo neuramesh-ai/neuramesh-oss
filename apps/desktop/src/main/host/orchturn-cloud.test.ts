@@ -114,6 +114,25 @@ test('a codex rex whose model the ChatGPT plan lacks answers on the account defa
   assert.doesNotMatch(asked[1]!, /--model/);
 });
 
+test('image-capable NeuraMesh turns use the attachment tool instead of Codex client-only images', async () => {
+  standIn('codex', [
+    'if [ "$1" = "--version" ]; then echo "codex-cli 0.153.4"; exit 0; fi',
+    'cat > /dev/null',
+    `echo '{"type":"item.completed","item":{"id":"reply","type":"agent_message","text":"attached"}}'`,
+    `echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'`,
+  ].join('\n'));
+  const tools = [{ name: 'share_images', description: 'Generate and attach an image', schema: {}, run: async () => 'attached' }];
+  await codexSdkOrchestratorTurn({ ...ARGS, tools });
+  const argv = readFileSync(join(root, 'codex.argv'), 'utf8');
+  assert.match(argv, /features\.image_generation=false/);
+  assert.match(argv, /developer_instructions=.*nm share_images/);
+  assert.match(argv, /mcp_servers\.nm\./, 'the delivery tool remains available over the bridge');
+
+  await codexSdkOrchestratorTurn(ARGS);
+  assert.doesNotMatch(readFileSync(join(root, 'codex.argv'), 'utf8'), /features\.image_generation|developer_instructions=/,
+    'turns without the NeuraMesh image tool keep their existing configuration');
+});
+
 test('the agy transport answers outside electron, and its shim lands in NM_USERDATA', async () => {
   standIn('agy', 'printf "step one\\nNMREPLYSTART\\nhello from agy\\nNMREPLYEND\\n"');
 

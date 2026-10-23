@@ -25,6 +25,7 @@ describe('ImportBatchSchema', () => {
     expect(ImportBatchSchema.safeParse(good).success).toBe(true);
     expect(ImportBatchSchema.safeParse({ importId: IMPORT, seq: 0, table: 'projects', rows: [], first: { manifest, totalBytes: 1234 } }).success).toBe(true);
     expect(ImportBatchSchema.safeParse({ ...good, table: 'threads', links: true }).success).toBe(true);
+    expect(ImportBatchSchema.safeParse({ ...good, table: 'projects', links: true }).success).toBe(true);
     expect(ImportBatchSchema.safeParse({ ...good, idMap: { '55555555-5555-4555-8555-555555555555': '66666666-6666-4666-8666-666666666666' } }).success).toBe(true);
     expect(ImportBatchSchema.safeParse({ ...good, last: true }).success).toBe(true);
   });
@@ -44,7 +45,7 @@ describe('ImportBatchSchema', () => {
     expect(ImportBatchSchema.safeParse({ ...good, seq: 0, first: { manifest, totalBytes: 1 } }).success).toBe(false);
     expect(ImportBatchSchema.safeParse({ importId: IMPORT, seq: 1, table: 'projects', rows: [], first: { manifest, totalBytes: 1 } }).success).toBe(false);
     expect(ImportBatchSchema.safeParse({ importId: IMPORT, seq: 0, table: 'projects', rows: [], first: { manifest: { ...manifest, format: 'zip' }, totalBytes: 1 } }).success).toBe(false);
-    expect(ImportBatchSchema.safeParse({ ...good, table: 'projects', links: true }).success).toBe(false);
+    expect(ImportBatchSchema.safeParse({ ...good, table: 'artifacts', links: true }).success).toBe(false);
     expect(ImportBatchSchema.safeParse({ ...good, idMap: { rex: 'iris' } }).success).toBe(false);
   });
 });

@@ -78,6 +78,7 @@ export async function uploadCrudEntry(ident: UploadIdentity, op: CrudEntry): Pro
     const res = await send(ident, 'messages', op.id, `${ident.apiUrl}/v1/messages`, 'POST', actor, {
       id: op.id,
       workspace: d['workspace_id'] ?? ident.workspaceFallback,
+      project: d['birth_project'] ?? undefined,
       channel: d['channel_id'], // post by channel id — slugs repeat across projects
       body: d['body'] ?? '',
       taskId: d['task_id'] ?? undefined,

@@ -10,7 +10,7 @@
 import type { OrchTool, ToolCtx } from './orchtools';
 import type { ChatToolCtx } from './chattools';
 
-const DESC = 'Take a real screenshot of the app from the project\'s repository and put it on this room\'s shelf, so a video beat can say `SHOW: <name>` and the film cuts to it. Find the image first with list_repo_files (screenshots, store or docs images: .png, .jpg, .webp). A film shows only a screenshot from the repository or an image a person put in Files: never a web capture or a drawn picture.';
+const DESC = 'Take a real screenshot of the app from the project\'s repository and put it on the project\'s Files, so a video beat can say `SHOW: <name>` and the film cuts to it. Find the image first with list_repo_files (screenshots, store or docs images: .png, .jpg, .webp). A film shows only a screenshot from the repository or an image a person put in Files: never a web capture or a drawn picture.';
 const shape = (z: ToolCtx['z']) => ({
   path: z.string().min(1).max(400).describe('the image file\'s path in the repository, as list_repo_files names it, e.g. docs/screens/home.png'),
   name: z.string().min(1).max(120).optional().describe('the shelf name the script will use in its SHOW line; the file\'s own name when left out'),
@@ -22,7 +22,7 @@ export async function shelveRepoScreenshot(t: Pick<ChatToolCtx, 'ch' | 'post' | 
   const body = (await res?.json().catch(() => null)) as { name?: string; path?: string; error?: string } | null;
   if (!res?.ok || !body?.name) return `The screenshot did not reach the shelf: ${body?.error ?? `the server answered ${res?.status ?? 'nothing'}`}. Say so plainly, and do not claim an image exists.`;
   t.log({ kind: 'tool', phase: 'call', summary: `shelve_repo_screenshot ${input.path}` });
-  return `${body.name} is on this room's shelf, the repository's own ${body.path ?? input.path}. Write \`SHOW: ${body.name}\` on the beat that puts the app's screen on camera; the film cuts to this screenshot there.`;
+  return `${body.name} is on the project's Files, the repository's own ${body.path ?? input.path}. Write \`SHOW: ${body.name}\` on the beat that puts the app's screen on camera; the film cuts to this screenshot there.`;
 }
 
 /** the conversation registry's tool (host/chattools.ts spreads it) */

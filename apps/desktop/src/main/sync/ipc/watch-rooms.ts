@@ -8,7 +8,7 @@ import type { WatchDeps } from './watchdeps';
 
 /** every session in a workspace — the rail's row-set. Named so the rail's union (watch-rail.ts) runs the
  *  SAME query for a background connection that this handler runs for the foreground, and the two cannot drift. */
-export const HISTORY_ALL_SQL = `select t.id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id, t.settled_at, t.kind,
+export const HISTORY_ALL_SQL = `select t.id, coalesce(t.project_id, c.project_id) as project_id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id, t.settled_at, t.kind,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
               -- the status inputs (shared/threadstatus.ts): who spoke last, and when. a routine's opener carries its
               -- schedule and is posted as its owner: it opens a run, and it is never the person's word

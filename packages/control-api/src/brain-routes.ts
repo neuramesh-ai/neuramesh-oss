@@ -112,4 +112,15 @@ export function brainRoutes<E extends Env & { Variables: { actor: Actor } }>(app
     c.header('cache-control', 'no-store');
     return c.json(await service().artifactMetadata(c.get('actor'), scope.data.workspace, scope.data.id));
   });
+  app.get('/v1/brain/artifacts/:id/preview', async (c) => {
+    const scope = ScopeSchema.safeParse({ workspace: c.req.query('workspace'), id: c.req.param('id') });
+    if (!scope.success) return c.json({ error: 'Supply a valid workspace and artifact ID.', code: 'INVALID_INPUT' }, 400);
+    await machineScope(c.req.header('authorization'), scope.data.workspace);
+    const result = await service().download(c.get('actor'), scope.data.workspace, scope.data.id, true);
+    return new Response(new Uint8Array(result.bytes), { headers: {
+      'content-type': result.ref.mime, 'content-length': String(result.bytes.length),
+      'content-security-policy': "default-src 'none'; sandbox", 'x-content-type-options': 'nosniff',
+      'cache-control': 'private, no-store', 'etag': `"${result.ref.sha256}"`,
+    } });
+  });
 }

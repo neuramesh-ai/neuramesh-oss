@@ -1,3 +1,4 @@
+import type { DrawOutcome } from './drawdraft';
 // THE ORCHESTRATOR'S TOOL REGISTRY — extracted from agents.ts (track B2).
 //
 // One definition per tool, consumed by BOTH brains: the Anthropic transport wraps each in the
@@ -87,8 +88,8 @@ export interface ToolCtx {
   buildScheduleCard: (action: 'schedule' | 'unschedule', items: Array<{ item: string; letter: string; platform: string; slot?: string; preview: string }>, question: string) => string;
   ensureChatWorkspace: (threadId: string) => string;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
   libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
@@ -142,8 +143,8 @@ export function makeOrchTools(ctx: HostCtx & {
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
   ensureChatWorkspace: (threadId: string) => string;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
   libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;

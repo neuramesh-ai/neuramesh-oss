@@ -246,7 +246,7 @@ export async function publishDueItems(store: Store, posters: Record<string, Post
       if (!poster) throw new Error(`publishing for ${item.platform} isn't wired yet`);
       // a hosted image (0090) wins over a pasted URL — it is the one we know is fetchable
       const mediaUrl = item.mediaId && publicBase
-        ? `${publicBase}/media/${item.mediaId}?s=${mediaSig(item.mediaId)}`
+        ? `${publicBase}/media/${item.mediaId}?s=${mediaSig(item.mediaId)}&platform=${encodeURIComponent(item.platform)}`
         : item.mediaUrl ?? null;
       // SAFETY (2026-07-24): a post that was MEANT to carry an image must never go out text-only
       // just because its slot arrived before the picture finished generating — a scheduled X post

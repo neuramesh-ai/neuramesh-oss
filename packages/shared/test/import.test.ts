@@ -84,7 +84,8 @@ describe('the two maps agree with each other and with the tables', () => {
       expect(write).toContain('id');
       expect(write.includes('workspace_id')).toBe(hasWorkspaceId(t));
     }
-    expect(LINK_TABLES).toEqual(['threads', 'facts']);
+    expect(LINK_TABLES).toEqual(['projects', 'threads', 'facts']);
+    expect(lateKeys('projects')).toEqual(['context_channel_id']);
     expect(lateKeys('threads')).toEqual(['task_id', 'root_message_id']);
     expect(lateKeys('facts')).toEqual(['superseded_by']);
   });

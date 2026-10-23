@@ -47,7 +47,7 @@ export const ARTIFACTS_FOR_TASK =
 // that forgot its `workspace_id = ?` would quietly mix two workspaces together. These exist so
 // mobile's screens stop hand-rolling unscoped SQL. params: [workspaceId]
 export const PROJECTS_FOR_WORKSPACE =
-  `select id, name, is_default, model_pack from projects where workspace_id = ? order by is_default desc, name`;
+  `select id, name, is_default, model_pack, context_channel_id from projects where workspace_id = ? order by is_default desc, name`;
 // the repos a phone may attach to a project: REMOTE ones only. A `local` repo is a folder on one
 // person's machine, and re-registering it from a phone would mint a GitHub repo that never existed
 // (the server assumes github for a bare org/name). The card says so in words as well.

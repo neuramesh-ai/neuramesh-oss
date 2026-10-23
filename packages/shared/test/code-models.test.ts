@@ -1,5 +1,5 @@
 // The code model rules (code-models.ts): a coding conversation runs its own pick, else the NeuraMesh brain,
-// and its menu reads the one machine the session runs on, where a Google sign-in never runs code.
+// and its menu reads the one machine the session runs on, where a Google sign-in runs code through agy.
 import { describe, expect, it } from 'vitest';
 import { CODE_GEMINI_NOTE, codeFootText, codeMachineOf, codeModelOf, codeProviderStates, codeRunsHere, codeVendorOf, machineRuntimeList } from '../src/code-models';
 import { STARTER_MODEL } from '../src/rates';
@@ -28,11 +28,12 @@ describe('codeMachineOf', () => {
 
 describe('codeProviderStates', () => {
   const configured = new Set(['anthropic', 'openai', 'gemini']);
-  it('reads the session\'s one machine, and Gemini runs code only on an API key', () => {
-    expect(codeProviderStates(cloud, configured, false)).toEqual({ anthropic: 'ready', openai: 'signin', gemini: 'connect' });
-    expect(codeProviderStates(cloud, configured, true)).toEqual({ anthropic: 'ready', openai: 'signin', gemini: 'ready' });
+  it('reads the session\'s one machine, and a Google sign-in there runs code like any provider', () => {
+    expect(codeProviderStates(cloud, configured)).toEqual({ anthropic: 'ready', openai: 'signin', gemini: 'ready' });
+    // a caller built before the agy lane still passes the key flag, and it no longer changes the answer
+    expect(codeProviderStates(cloud, configured, false)).toEqual(codeProviderStates(cloud, configured, true));
     // the laptop beside it does not make the cloud session's ChatGPT ready: only the session's machine counts
-    expect(codeProviderStates(laptop, configured, true)).toEqual({ anthropic: 'signin', openai: 'ready', gemini: 'connect' });
+    expect(codeProviderStates(laptop, configured)).toEqual({ anthropic: 'signin', openai: 'ready', gemini: 'signin' });
   });
   it('with no machine nothing runs, and a provider set up asks for a sign-in', () => {
     expect(codeProviderStates(null, new Set(['anthropic']), false)).toEqual({ anthropic: 'signin', openai: 'connect', gemini: 'connect' });
@@ -44,16 +45,17 @@ describe('codeProviderStates', () => {
 });
 
 describe('codeRunsHere and the foot', () => {
-  const states = codeProviderStates(cloud, new Set(['gemini']), false);
+  const states = codeProviderStates(laptop, new Set(['gemini']));
   it('the NeuraMesh brain always runs, a provider runs when the machine serves it', () => {
     expect(codeVendorOf(STARTER_MODEL)).toBeNull();
     expect(codeRunsHere(STARTER_MODEL, states)).toBe(true);
-    expect(codeRunsHere('claude-opus-5', states)).toBe(true);
-    expect(codeRunsHere('gemini-3.1-pro-preview', states)).toBe(false);
+    expect(codeRunsHere('gpt-5.6-terra', states)).toBe(true);
+    expect(codeRunsHere('claude-opus-5', states)).toBe(false);
+    expect(codeRunsHere('gemini-3.1-pro-preview', codeProviderStates(cloud, new Set()))).toBe(true);
   });
   it('says why a model cannot run code here, else what a pick does', () => {
     expect(codeFootText('gemini-3.1-pro-preview', states, 'session')).toBe('Gemini cannot run code on this machine. Pick another model.');
-    expect(codeFootText('claude-opus-5', states, 'session')).toBe('This session runs on this model. A pick here changes it.');
+    expect(codeFootText('gpt-5.6-terra', states, 'session')).toBe('This session runs on this model. A pick here changes it.');
     expect(codeFootText(STARTER_MODEL, states, 'start')).toBe('The session starts on this model. With no pick, it runs on the NeuraMesh brain.');
     expect(CODE_GEMINI_NOTE).not.toMatch(/[—;]/);
   });

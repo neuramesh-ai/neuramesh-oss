@@ -220,7 +220,7 @@ export function makeWakeRouting(ctx: {
         if (isCodingThread((await db.getAll<{ kind: string | null }>(`select kind from threads where id = ? limit 1`, [m.thread_id]).catch(() => [] as Array<{ kind: string | null }>))[0]?.kind)) return;
         try {
           const [mkch] = await db.getAll<{ workspace_id: string; marketing: string | null }>(
-            `select workspace_id, marketing from channels where id = ? and kind = 'marketing' limit 1`, [m.channel_id],
+            `select workspace_id, marketing from channels where id = ? and marketing is not null limit 1`, [m.channel_id],
           ).catch(() => [] as Array<{ workspace_id: string; marketing: string | null }>);
           const btid = ((): string | null => { try { return (JSON.parse(mkch?.marketing ?? '{}') as { bootstrap_thread_id?: string }).bootstrap_thread_id ?? null; } catch { return null; } })();
           if (mkch && btid === m.thread_id) {
@@ -294,7 +294,7 @@ export function makeWakeRouting(ctx: {
     if (!target && t.kind === 'setup' && liveThread) {
       try {
         const [mkch] = await db.getAll<{ workspace_id: string; marketing: string | null }>(
-          `select workspace_id, marketing from channels where id = ? and kind = 'marketing' limit 1`, [t.channel_id],
+          `select workspace_id, marketing from channels where id = ? and marketing is not null limit 1`, [t.channel_id],
         ).catch(() => [] as Array<{ workspace_id: string; marketing: string | null }>);
         const prof = ((): { setup_at?: string } => { try { return JSON.parse(mkch?.marketing ?? '{}') as { setup_at?: string }; } catch { return {}; } })();
         if (mkch && prof.setup_at) {
