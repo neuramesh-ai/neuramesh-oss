@@ -6,7 +6,7 @@ A person installs a desktop build and keeps it for weeks. The backend ships on e
 
 ## The rules
 
-1. The supported desktops are the newest published desktop and the one before it. Today they are v0.150.0 and v0.149.0. A desktop that is bumped but not published is a candidate: the server keeps what it uses too, because it becomes the newest supported desktop when it is published.
+1. The supported desktops are the newest published desktop and the one before it. Today they are v0.155.1 and v0.155.0. A desktop that is bumped but not published is a candidate: the server keeps what it uses too, because it becomes the newest supported desktop when it is published.
 2. A contract change adds. It never removes or renames something that a supported desktop uses.
 3. A removal waits for a floor. The API announces `minDesktopVersion`, and an older desktop shows its update card. The floor is soft: it never blocks.
 4. CI replays the command shapes and the client schema of the supported desktops against the new server and sync rules.

@@ -14,6 +14,8 @@
 // because the alternative — the shape this replaced — was a terminal that renders empty
 // and reads as a hung shell. See webnm-local.ts for why that rule exists.
 import { closeReason, encodeB64, makeDecoder, notice } from './relay-frames';
+import { waitForRelayCapacity } from './relay-capacity';
+export { waitForRelayCapacity } from './relay-capacity';
 
 export interface RelayConfig {
   /** wss origin of the relay, e.g. wss://relay.neuramesh.app */
@@ -28,7 +30,7 @@ export interface RelayConfig {
   machineId(): Promise<string | null>;
 }
 
-type Handler = { onData(d: string): void; onExit(): void; onError?(message: string): void };
+type Handler = { onData(d: string): void; onExit(): void; onError?(message: string): void; onDisconnect?(message: string): void };
 
 interface Conn {
   sock: WebSocket;
@@ -59,11 +61,19 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
   const sock = new WebSocket(cfg.relayUrl);
   const channels = new Map<string, Handler>();
   const decoders = new Map<string, (b64: string) => string>();
+  let attached = false;
 
   // every open channel hears about a socket-level failure — silence here is the exact
   // ambiguity this lane exists to remove
-  const failAll = (text: string): void => {
-    for (const h of channels.values()) { if (h.onError) h.onError(text); else h.onData(notice(text)); h.onExit(); }
+  const failAll = (text: string, code: number): void => {
+    for (const h of channels.values()) {
+      // Normal/network closes can also arrive during an idle reconnect, before attached.
+      // A refused attach still uses onError (4401/4403), not this lifecycle notification.
+      if (h.onDisconnect && (attached || [1000, 1001, 1005, 1006].includes(code))) h.onDisconnect(text);
+      else if (h.onError) h.onError(text);
+      else h.onData(notice(text));
+      h.onExit();
+    }
     channels.clear();
     decoders.clear();
   };
@@ -81,6 +91,7 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
       let m: Record<string, unknown>;
       try { m = JSON.parse(ev.data) as Record<string, unknown>; } catch { return; }
       if (m['t'] === 'attached') {
+        attached = true;
         conn.lanes = new Set(Array.isArray(m['lanes']) ? m['lanes'].filter((l): l is string => typeof l === 'string') : []);
         return resolve();
       }
@@ -101,7 +112,7 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
     sock.addEventListener('close', (ev: CloseEvent) => {
       if (conns.get(machineId)?.sock === sock) conns.delete(machineId);
       reject(new Error(closeReason(ev.code)));
-      failAll(closeReason(ev.code));
+      failAll(closeReason(ev.code), ev.code);
     });
     sock.addEventListener('error', () => { /* close always follows; it carries the code */ });
   });
@@ -127,18 +138,6 @@ export interface RelayJsonHandle {
   subId: string;
   send(message: unknown): Promise<void>;
   close(): void;
-}
-
-const RELAY_HIGH_WATER_BYTES = 512 * 1024;
-export async function waitForRelayCapacity(
-  sock: Pick<WebSocket, 'bufferedAmount' | 'readyState'>,
-  highWater = RELAY_HIGH_WATER_BYTES,
-  wait: () => Promise<void> = () => new Promise((resolve) => setTimeout(resolve, 8)),
-): Promise<void> {
-  while (sock.bufferedAmount > highWater) {
-    if (sock.readyState !== WebSocket.OPEN) throw new Error('The relay connection closed during upload.');
-    await wait();
-  }
 }
 
 const ENGINEERING_RELAY_BYTES_PER_SECOND = 4 * 1024 * 1024;
@@ -174,6 +173,9 @@ export function openRelayJsonChannel(
     onMessage(message: unknown): void;
     onExit(): void;
     onError(message: string): void;
+    /** A socket went away, including an ordinary/network close during reconnect.
+     * Refused authentication and malformed messages still use onError. */
+    onDisconnect?(message: string): void;
   },
 ): RelayJsonHandle {
   const ch = mintCh();
@@ -189,10 +191,12 @@ export function openRelayJsonChannel(
     for (const item of queued.splice(0)) item.reject(new Error('The Engineering relay channel is closed.'));
     opts.onExit();
   };
-  const fail = (message: string): void => {
+  const fail = (message: string, disconnected = false): void => {
     if (closed) return;
     for (const item of queued.splice(0)) item.reject(new Error(message));
-    opts.onError(message); exit();
+    if (disconnected && opts.onDisconnect) opts.onDisconnect(message);
+    else opts.onError(message);
+    exit();
   };
   void (async () => {
     let machineId: string | null = null;
@@ -218,7 +222,7 @@ export function openRelayJsonChannel(
             newline = incoming.indexOf('\n');
           }
         },
-        onExit: exit, onError: fail,
+        onExit: exit, onError: fail, onDisconnect: (message) => fail(message, true),
       });
       await c.ready;
     } catch (error: unknown) {

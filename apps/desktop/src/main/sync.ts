@@ -13,13 +13,6 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
-import { createBaseLogger, LogLevel } from '@powersync/node';
-
-if (process.env['NM_SYNC_DEBUG']) {
-  const logger = createBaseLogger();
-  logger.useDefaults();
-  logger.setLevel(LogLevel.DEBUG);
-}
 import { launcherIdeas } from './agents';
 
 import { emitProcChange } from './procbus';

@@ -28,7 +28,7 @@ type CodexInput = string | Array<{ type: 'text'; text: string } | { type: 'local
 interface CodexThread { id: string | null; run(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ finalResponse: string; usage: CodexUsage | null }>; runStreamed(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ events: AsyncIterable<CodexEvent> }> }
 // Codex takes images by LOCAL FILE PATH (we already store the attachment bytes on disk) — build a
 // structured input when images are present, else the plain string (the cheaper path).
-function codexInput(text: string, attachments?: AgentAttachment[]): CodexInput {
+export function codexInput(text: string, attachments?: AgentAttachment[]): CodexInput {
   const imgs = (attachments ?? []).filter((a) => a.kind === 'image' && a.path);
   if (!imgs.length) return text;
   return [{ type: 'text', text }, ...imgs.map((a) => ({ type: 'local_image' as const, path: a.path! }))];

@@ -10,8 +10,8 @@ export function libraryChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'c
   return [
     tool(
       'list_library',
-      'The documents in a room\'s library — brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about the product, its market or its voice, and before you draft.',
-      { scope: z.enum(['room', 'project', 'workspace']).optional().describe("'room' (default) = this room's shelf. 'project' = every room in this project. 'workspace' = everything the team keeps.") },
+      'The documents in a project\'s Files — brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about the product, its market or its voice, and before you draft.',
+      { scope: z.enum(['room', 'project', 'workspace']).optional().describe("'room' (default) = this project's shelf. 'project' = every room in this project. 'workspace' = everything the team keeps.") },
       async (i) => {
         const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
         log({ kind: 'tool', phase: 'call', summary: `list_library ${scope}` });
@@ -20,7 +20,7 @@ export function libraryChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'c
     ),
     tool(
       'read_library_doc',
-      'Read a document from a room\'s library by name (the names come from list_library). The team\'s own record: it outranks anything on the open web about this product. Read the brand docs before you draft.',
+      'Read a document from a project\'s Files by name (the names come from list_library). The team\'s own record: it outranks anything on the open web about this product. Read the brand docs before you draft.',
       { name: z.string().min(1).describe('the exact document name from list_library, e.g. business-profile.md'), scope: z.enum(['room', 'project', 'workspace']).optional().describe('the scope you found the name in') },
       async (i) => {
         const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';

@@ -5,7 +5,7 @@
 //
 // Color contract: the mark rides --brand/--brand-ink (constant oak/cream in ALL
 // themes, like status hues) — never --accent, which is achromatic in the dark
-// themes. The wordmark is always lowercase `neuramesh`, Geist Mono 600, ink --text.
+// themes. The wordmark is always lowercase `neuramesh`, NeuraMesh Sans 600, ink --text.
 import { useEffect, useId, useRef, useState } from 'react';
 
 // Geometry verbatim from the handoff SVGs (48-unit grid).

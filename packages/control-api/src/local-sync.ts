@@ -6,8 +6,10 @@ import type { Hono } from 'hono';
 import type postgres from 'postgres';
 import type { Store } from './store';
 import { localMode } from './localmode';
+import { hashMachineToken } from './machine-auth';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
+export type ReplicaPrincipal = Actor | { kind: 'machine'; tokenHash: string };
 type Cursor = { revision: string; scope: string; schema: string };
 const schema = createHash('sha256').update(JSON.stringify(TABLE_COLUMNS)).digest('hex');
 let nextPruneAt = 0;
@@ -31,7 +33,17 @@ export function localReplicaRow(table: string, source: Record<string, unknown>):
   return row;
 }
 
-async function authorization(sql: Sql, actor: Actor): Promise<{ workspaces: string[]; scope: string }> {
+async function authorization(sql: Sql, actor: ReplicaPrincipal): Promise<{ workspaces: string[]; scope: string }> {
+  if (actor.kind === 'machine') {
+    // A machine reads ONLY its own workspace, even when its owner belongs to several. Resolve
+    // the bearer again in the snapshot transaction so revocation also invalidates its cursor.
+    const members = await sql<{ workspace_id: string; id: string; created_at: string; machine_id: string }[]>`
+      select w.workspace_id, w.id, w.created_at::text, m.id as machine_id
+      from machines m join workspace_members w on w.workspace_id=m.workspace_id and w.user_id=m.owner_user_id
+      where m.token_hash=${actor.tokenHash}`;
+    return { workspaces: members.map(m => m.workspace_id), scope: createHash('sha256').update(JSON.stringify([actor, members])).digest('hex') };
+  }
+  if (actor.kind !== 'human') throw new Error('A replica requires a member or machine identity');
   const members = await sql<{ workspace_id: string; id: string; created_at: string }[]>`
     select workspace_id, id, created_at::text from workspace_members where user_id = ${actor.id} order by workspace_id`;
   return { workspaces: members.map((m) => m.workspace_id), scope: createHash('sha256').update(JSON.stringify([actor.id, members])).digest('hex') };
@@ -61,7 +73,7 @@ export async function pruneLocalChanges(sql: postgres.Sql): Promise<void> {
   });
 }
 
-export async function localBootstrap(sql: postgres.Sql, actor: Actor): Promise<ReplicaBatch> {
+export async function localBootstrap(sql: postgres.Sql, actor: ReplicaPrincipal): Promise<ReplicaBatch> {
   const [current] = await sql<{ enabled: boolean }[]>`select enabled from local_sync_state where singleton`;
   if (!current?.enabled) {
     // A writer that already observed enabled=false must finish before the first snapshot.
@@ -86,7 +98,7 @@ export async function localBootstrap(sql: postgres.Sql, actor: Actor): Promise<R
   });
 }
 
-export async function localChanges(sql: postgres.Sql, actor: Actor, cursor: Cursor, limit = 1000): Promise<ReplicaBatch | null> {
+export async function localChanges(sql: postgres.Sql, actor: ReplicaPrincipal, cursor: Cursor, limit = 1000): Promise<ReplicaBatch | null> {
   return sql.begin('isolation level repeatable read read only', async (tx) => {
     const auth = await authorization(tx, actor);
     const [state] = await tx<{ revision: string; retained_after: string }[]>`
@@ -111,14 +123,15 @@ export async function localChanges(sql: postgres.Sql, actor: Actor, cursor: Curs
   });
 }
 
-/** Mount after the normal /v1 bearer middleware. Local sync is opt-in on a development stack,
- * always available on the authenticated Local stack, and unavailable on the hosted service. */
+/** Mount after the normal /v1 bearer middleware. All clients use the same authenticated feed;
+ * a machine bearer narrows the read scope rather than impersonating its owner's other teams. */
 export function localSyncRoutes(app: Hono<{ Variables: { actor: Actor } }>, store: Store): void {
-  app.get('/v1/sync/:operation', async (c) => {
-    if (!localMode() && process.env['NM_LOCAL_SYNC'] !== '1') return c.json({ error: 'Local sync is disabled', code: 'NOT_FOUND' }, 404);
-    const actor = c.get('actor');
-    if (localMode() && !/^Bearer nmh_/i.test(c.req.header('authorization') ?? '')) return c.json({ error: 'Local sync requires the local human credential', code: 'NOT_PERMITTED' }, 403);
-    if (actor.kind !== 'human') return c.json({ error: 'Local sync requires a human identity', code: 'NOT_PERMITTED' }, 403);
+  app.on('GET', ['/v1/sync/:operation', '/v1/brain/replica/:operation'], async (c) => {
+    c.header('cache-control', 'private, no-store');
+    const bearer = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '')?.[1];
+    const actor: ReplicaPrincipal = bearer?.startsWith('nmm_') ? { kind: 'machine', tokenHash: hashMachineToken(bearer) } : c.get('actor');
+    if (localMode() && !bearer?.startsWith('nmh_') && actor.kind !== 'machine') return c.json({ error: 'Sync requires a local credential', code: 'NOT_PERMITTED' }, 403);
+    if (actor.kind !== 'human' && actor.kind !== 'machine') return c.json({ error: 'Sync requires a member or machine identity', code: 'NOT_PERMITTED' }, 403);
     const sql = (store as Store & { sql?: postgres.Sql }).sql;
     if (!sql) return c.json({ error: 'Local sync requires Postgres', code: 'UNAVAILABLE' }, 503);
     if (Date.now() >= nextPruneAt) {

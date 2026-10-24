@@ -16,6 +16,7 @@ export * from './remote';
 export * from './checkpoints';
 export * from './transport-state';
 export * from './activity';
+export { toolDisplayOutput } from './tool-receipts';
 export { engineeringWorkPlanMessages, engineeringWorkPlanText } from './work-plan';
 
 export * from './review-history';

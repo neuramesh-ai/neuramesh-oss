@@ -75,14 +75,14 @@ const LOCAL_STATES: Record<string, any> = {
   'no-engine': { phase: 'no-engine', picked: 'colima' },
   installing: { phase: 'installing', runtime: 'colima', items: [pi('Colima', 16, 16, true), pi('Lima', 24, 38), pi('Docker CLI', 0, 20), pi('Compose', 0, null)], vm: 'pending' },
   'engine-starting': { phase: 'engine-starting', engine: 'colima' },
-  downloading: { phase: 'downloading', items: [pi('Postgres', 412, 412, true), pi('PowerSync', 166, 286), pi('NeuraMesh API', 0, 198)] },
+  downloading: { phase: 'downloading', items: [pi('Postgres', 412, 412, true), pi('NeuraMesh API', 0, 198)] },
   // the chain (B1 to B6): boot order, one node per container; `stalled` is the moment a node fails
-  starting: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'starting', restarts: 0 }, { name: 'PowerSync', status: 'queued', restarts: 0 }] },
-  stalled: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'ready', restarts: 0 }, { name: 'PowerSync', status: 'stopped', restarts: 3 }] },
+  starting: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'starting', restarts: 0 }] },
+  stalled: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'stopped', restarts: 3 }] },
   updating: { phase: 'updating', version: '0.133.0', items: [pi('NeuraMesh API 0.133.0', 80, 201)] },
   // the failure card: a container stopped (B3), a port in use (B4), and an error with no diagnosis
-  error: { phase: 'error', message: 'PowerSync stopped 3 times.', detail: 'Fatal startup error - exiting with code 150. postgres query failed', remedy: 'Try again starts a fresh PowerSync container.', from: 'starting' },
-  'error-port': { phase: 'error', message: 'Port 58081 is in use by another program.', detail: '127.0.0.1:58081 · held by stack-powersync-1 (Docker)', remedy: 'Stop that program, then try again.', from: 'starting' },
+  error: { phase: 'error', message: 'NeuraMesh API stopped 3 times.', detail: 'Fatal startup error - exiting with code 150. postgres query failed', remedy: 'Try again starts a fresh NeuraMesh API container.', from: 'starting' },
+  'error-port': { phase: 'error', message: 'Port 8788 is in use by another program.', detail: '127.0.0.1:8788 · held by stack-control-api-1 (Docker)', remedy: 'Stop that program, then try again.', from: 'starting' },
   'error-plain': { phase: 'error', message: 'Colima did not start.', from: 'engine-starting' },
   ready: { phase: 'ready', version: '0.132.0', engine: 'docker-desktop' },
 };
@@ -173,15 +173,15 @@ const explicit: Record<string, any> = {
   connectionsList: async () => {
     const cloud = typeof localStorage !== 'undefined' && localStorage.getItem('nm:plan') === 'cloud';
     const acme = { id: MOCK_WS_ID, name: 'Acme Robotics', slug: 'acme', plan: cloud ? 'cloud' : 'free', seats: cloud ? 3 : 1, subscriptionStatus: cloud ? 'active' : null, currentPeriodEnd: cloud ? '2026-10-25T00:00:00.000Z' : null };
-    const local = { id: 'local', kind: 'local', authMode: 'local', foreground: !cloudConn, apiUrl: 'http://127.0.0.1:8788', powersyncUrl: 'http://127.0.0.1:58081', webUrl: 'https://neuramesh.app', account: { email: 'you@this-mac' }, workspaceId: MOCK_WS_ID, workspaces: [{ ...acme, plan: 'free', seats: null, subscriptionStatus: null, currentPeriodEnd: null }], ...(movedSeed ? { moved: MOVED_MARKER } : {}) };
-    const cloudCard = { id: 'cloud', kind: 'cloud', authMode: 'clerk', foreground: cloudConn, apiUrl: 'https://api.neuramesh.app', powersyncUrl: 'https://ps.neuramesh.app', webUrl: 'https://neuramesh.app', account: { email: 'dana@vertex.dev' }, workspaceId: 'ws-flowe', workspaces: [{ ...acme, id: 'ws-flowe', name: 'Flowe', slug: 'flowe' }] };
+    const local = { id: 'local', kind: 'local', authMode: 'local', foreground: !cloudConn, apiUrl: 'http://127.0.0.1:8788', webUrl: 'https://neuramesh.app', account: { email: 'you@this-mac' }, workspaceId: MOCK_WS_ID, workspaces: [{ ...acme, plan: 'free', seats: null, subscriptionStatus: null, currentPeriodEnd: null }], ...(movedSeed ? { moved: MOVED_MARKER } : {}) };
+    const cloudCard = { id: 'cloud', kind: 'cloud', authMode: 'clerk', foreground: cloudConn, apiUrl: 'https://api.neuramesh.app', webUrl: 'https://neuramesh.app', account: { email: 'dana@vertex.dev' }, workspaceId: 'ws-flowe', workspaces: [{ ...acme, id: 'ws-flowe', name: 'Flowe', slug: 'flowe' }] };
     return connSeed === 'none' ? [local] : [local, cloudCard];
   },
   connectionAddCustom: async (input: { apiUrl: string }) => (/^https?:\/\//.test(input.apiUrl) ? { ok: true, id: 'custom:preview' } : { ok: false, code: 'ADDRESS', message: 'The API address must start with http:// or https://.' }),
   connectionRemove: async () => ({ ok: true }),
   connectionBillingPortal: async () => ({ ok: true }),
   showInFolder: async () => {},
-  localStackInfo: async () => ({ dir: '/home/dana/.neuramesh/local', ports: { api: 8788, powersync: 58081 }, engine: 'colima', engineVersion: '0.8.1', stackVersion: '0.132.0', appVersion: '0.132.0' }),
+  localStackInfo: async () => ({ dir: '/home/dana/.neuramesh/local', ports: { api: 8788 }, engine: 'colima', engineVersion: '0.8.1', stackVersion: '0.132.0', appVersion: '0.132.0' }),
   localStackRestart: async () => localStackFixture(),
   // the export route lands with U1b: the harness answers the honest "not available yet"
   workspaceExport: async () => ({ ok: false, code: 'NOT_AVAILABLE' }),

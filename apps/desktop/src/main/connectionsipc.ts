@@ -28,7 +28,7 @@ import { actorId, addConnection, apiOn, cur, pushForeground } from './sync';
 export interface ConnectionWorkspace { id: string; name: string; slug: string; plan: string | null; seats: number | null; subscriptionStatus: string | null; currentPeriodEnd: string | null }
 export interface ConnectionCard {
   id: string; kind: ConnectionKind; authMode: AuthMode; foreground: boolean;
-  apiUrl: string; powersyncUrl: string; webUrl: string;
+  apiUrl: string; webUrl: string;
   account: { email: string } | null;
   /** the workspace this connection stands in */
   workspaceId: string;
@@ -62,7 +62,7 @@ export function registerConnectionsIpc(): void {
     const fg = connections.current().id;
     return Promise.all(connections.all().map(async (c) => ({
       id: c.id, kind: c.kind, authMode: c.authMode, foreground: c.id === fg,
-      apiUrl: c.apiUrl, powersyncUrl: c.powersyncUrl, webUrl: c.webUrl || BAKED.webUrl,
+      apiUrl: c.apiUrl, webUrl: c.webUrl || BAKED.webUrl,
       account: accountOf(c), workspaceId: c.ws, workspaces: await workspacesOf(c),
       ...(movedOf(c) ? { moved: movedOf(c)! } : {}),
     })));
@@ -77,7 +77,7 @@ export function registerConnectionsIpc(): void {
     await systemKeychain().set(customBearerAccount(sid), input.bearer.trim());
     const userData = app.getPath('userData');
     const store = readConnectionsStore(userData);
-    const rec: CustomServer = { id: sid, apiUrl: v.apiUrl, powersyncUrl: v.powersyncUrl, authMode: 'local' };
+    const rec: CustomServer = { id: sid, apiUrl: v.apiUrl, authMode: 'local' };
     writeConnectionsStore(userData, { ...store, custom: [...store.custom.filter((x) => x.id !== sid), rec] });
     const conn = await addConnection({ id: `custom:${sid}`, kind: 'custom', authMode: 'local', ...resolveUrls('custom', process.env, rec, BAKED) });
     console.log(`connection_added id=${conn.id} mode=${v.mode} version=${v.version ?? 'unknown'} workspaces=${v.workspaces.length}`);

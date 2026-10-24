@@ -11,9 +11,18 @@
 // review checks the claim: a desktop that still uses a retired item breaks in silence two
 // releases later.
 import type { ContractSnapshot } from './compat';
+import { TABLE_COLUMNS } from '@neuramesh/client-core/schema';
 
 /** items no desktop uses from the next snapshot on: `command task.offer field checklist`, `route GET /v1/x`, … */
-export const RETIRED: readonly string[] = [];
+// PR #762: replacement clients use the authenticated API replica. Keep the legacy
+// service contract until the supported installed versions have both migrated.
+export const RETIRED: readonly string[] = [
+  ...Object.keys(TABLE_COLUMNS).map(table => `sync rule for ${table}`),
+  'route POST /auth/clerk/token',
+  'route POST /auth/local/token',
+  'route POST /v1/machines/sync-token',
+  'route GET /v1/sync-jwks',
+];
 
 type Apply = (s: ContractSnapshot, m: RegExpExecArray) => void;
 

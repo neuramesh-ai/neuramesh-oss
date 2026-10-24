@@ -1,4 +1,5 @@
 import type { CoreSessionEvent } from '@cline/sdk';
+import { toolDisplayOutput } from '@neuramesh/shared';
 
 const MAX_EVENT_TEXT = 256 * 1024;
 const MAX_EVENT_ERROR = 16 * 1024;
@@ -67,6 +68,7 @@ const projectAgentEvent = (event: Record<string, unknown>): Record<string, unkno
       ...(typeof event['toolCallId'] === 'string' ? { toolCallId: text(event['toolCallId'], 200) } : {}),
       ...(number(event['durationMs']) !== undefined ? { durationMs: number(event['durationMs']) } : {}),
       ...('error' in event ? { error: boundedValue(event['error'], MAX_EVENT_ERROR) } : {}),
+      ...(toolDisplayOutput(event['output']) !== undefined ? { output: toolDisplayOutput(event['output']) } : {}),
     };
     const field = event['contentType'] === 'reasoning' ? 'reasoning' : 'text';
     return { ...base, contentType: event['contentType'], [field]: text(event[field], MAX_EVENT_TEXT) };
@@ -95,7 +97,7 @@ const projectAgentEvent = (event: Record<string, unknown>): Record<string, unkno
   return { type: typeof type === 'string' ? text(type, 100) : 'unknown' };
 };
 
-/** Allowlist and bound events before serialization. Full snapshots, tool output and provider
+/** Allowlist and bound events before serialization. Full snapshots, binary tool output and provider
  * metadata never enter the relay projection, avoiding both disclosure and memory spikes. */
 export function projectEngineeringCoreEvent(event: CoreSessionEvent): Record<string, unknown> {
   const source = event as unknown as Record<string, unknown>;

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostCtx } from './ctx';
 import { makeLookups } from './lookups';
 
@@ -21,7 +21,7 @@ sqlite?.exec(`
     ('t-sub', null, 't-web'), ('t-board', null, null), ('t-sub-of-board', null, 't-board');
 `);
 
-function replica(): PowerSyncDatabase {
+function replica(): ReplicaDatabase {
   return {
     get: async (sql: string, params: unknown[] = []) => {
       const row = sqlite!.prepare(sql).get(...(params as never[]));
@@ -29,7 +29,7 @@ function replica(): PowerSyncDatabase {
       return row;
     },
     getAll: async (sql: string, params: unknown[] = []) => sqlite!.prepare(sql).all(...(params as never[])),
-  } as unknown as PowerSyncDatabase;
+  } as unknown as ReplicaDatabase;
 }
 
 const lookups = () => makeLookups({ guards: { taskRunIds: new Map() } } as unknown as HostCtx, { db: replica(), machineId: 'm-self' });

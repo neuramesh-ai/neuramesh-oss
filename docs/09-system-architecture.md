@@ -1,5 +1,7 @@
 # 09 — System Architecture: how NeuraMesh runs, end to end
 
+> **October 23 sync migration:** the PowerSync sections below describe the previous implementation. Current clients use the shared SQLite replica and authenticated API change feed. See [the retirement plan](design/powersync-retirement-2026-10/plan.md) for the current architecture, validation and staged rollout; hosted retirement is not complete until its recorded gates pass.
+
 > **What this doc is.** A ground-truth map of the *running* system — desktop → PowerSync → Supabase/Postgres → control-api on Vercel → GitHub (repos + releases) — and the flows and invariants that tie them together. It is the "how it actually works" companion to [02-architecture-options.md](02-architecture-options.md) (which records *why* we chose Option A) and [03-protocol-and-memory.md](03-protocol-and-memory.md) (the event/FSM/memory contract). Read this before touching the sync path, the command handler, the agent daemon, or the release pipeline.
 >
 > **Amended 2026-08-30 — read [§14](#14-amended-2026-08-30--the-cloud-plane) with this doc.** Compute is no longer only the user's Mac: a workspace can run on a **cloud machine** in our GKE fleet, and a **browser** can drive it. The planes below are still correct; there are now more of them.

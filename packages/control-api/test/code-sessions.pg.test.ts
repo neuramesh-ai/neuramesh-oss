@@ -14,6 +14,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { PostgresStore } from '../src/pgstore';
+import { TABLE_COLUMNS } from '@neuramesh/client-core/schema';
 
 const DB = process.env['DATABASE_URL'];
 const store = DB ? new PostgresStore(DB) : null;
@@ -64,9 +65,8 @@ afterAll(async () => {
 });
 
 describe.skipIf(!DB)('code_sessions (0135) — who writes a Code session\'s row', () => {
-  it('is published for PowerSync', async () => {
-    const rows = await sql!`select 1 from pg_publication_tables where pubname = 'powersync' and tablename = 'code_sessions'`;
-    expect(rows).toHaveLength(1);
+  it('is included in the API replica contract', () => {
+    expect(TABLE_COLUMNS['code_sessions']).toHaveProperty('workspace_id');
   });
 
   it('a member creates their own row as themselves, with the event', async () => {

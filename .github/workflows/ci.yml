@@ -129,10 +129,6 @@ jobs:
           NM_ALLOW_ACTOR_HEADER: "1"
 
       - name: Build (bundles)
-        # hq's production build refuses to bake no PowerSync endpoint (apps/hq/vite.config.mts), which
-        # guards a real deploy. This build only proves hq compiles: nothing connects to the endpoint.
-        env:
-          VITE_NM_POWERSYNC_URL: http://127.0.0.1:58081
         run: pnpm -r ${{ steps.scope.outputs.filter }} build
 
   # The public-repo gate (U4, docs/design/oss-release-2026-09/implementation-plan.md): gitleaks on

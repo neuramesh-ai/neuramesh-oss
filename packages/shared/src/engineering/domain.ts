@@ -39,7 +39,16 @@ export interface EngineeringProject {
 
 export interface EngineeringAttachment { name: string; mime: string }
 
-export interface EngineeringMessage { agent?: EngineeringAgent; id: string; role: 'user' | 'assistant' | 'tool' | 'reasoning'; body: string; createdAt: string; kind?: 'work_plan' | 'change_review'; planReport?: EngineeringPlanReport; review?: EngineeringChangeReview; tone?: 'plain' | 'plan' | 'success' | 'warning'; streaming?: boolean; collapsed?: boolean; redacted?: boolean; attachments?: EngineeringAttachment[] }
+export interface EngineeringToolReceipt {
+  callId?: string;
+  name: string;
+  input?: unknown;
+  output?: string;
+  error?: string;
+  durationMs?: number;
+  state: 'running' | 'succeeded' | 'failed' | 'interrupted';
+}
+export interface EngineeringMessage { agent?: EngineeringAgent; id: string; role: 'user' | 'assistant' | 'tool' | 'reasoning'; body: string; createdAt: string; tool?: EngineeringToolReceipt; kind?: 'work_plan' | 'change_review'; planReport?: EngineeringPlanReport; review?: EngineeringChangeReview; tone?: 'plain' | 'plan' | 'success' | 'warning'; streaming?: boolean; collapsed?: boolean; redacted?: boolean; attachments?: EngineeringAttachment[] }
 
 export interface EngineeringActiveActivity { phase: 'thinking' | 'tool' | 'composing' | 'restoring'; toolName?: string; startedAt: string }
 

@@ -1,32 +1,9 @@
-// THE SETUP TRACKER — what is left to do after the wizard ends (cloud-first round, item 15).
-// Visual contract: mockups/starter-brain-and-credits.html:310-328, "A · floating, bottom-right".
-//
-// PLACEMENT A, by George's call (2026-08-28), overriding the round's own §8 recommendation of the
-// in-room card. The recommendation's reasoning still stands and is worth keeping visible, because
-// it is the cost being accepted: the shell has no universal bottom-right slot (the bottom dock
-// retired with the shell round; only top-dock nav mode keeps `.dockbarproc`), so this MINTS a
-// floating idiom — and docs/33 is deliberately careful about floating layers. It is recorded
-// there in this round, as §11 requires, rather than inherited by a checklist.
-//
-// What placement A buys is the thing B could not: it FOLLOWS YOU. The in-room card sat on the
-// Home stage and scrolled away, so a user who ignored it once might never see it again — which
-// is precisely the failure a tracker exists to prevent. This one is a frame tenant: mounted once
-// beside the workbench, portalled to <body>, and present on every surface until it is finished
-// or waved off.
-//
-// It disappears four ways, and only two are clicks: every item done (the checklist retired
-// itself), nothing knowable, dismissed, or collapsed to its pill. A setup tracker that outlives
-// setup is clutter, so completion is the intended exit.
-//
-// The row form is the mockup's, and it drops the cards' detail sentences: 290px of corner has
-// room for a label and a verb, not for "Sign into Claude on your machine — the terminal opens
-// right here." The details survive as tooltips rather than being deleted.
 import { onboardingComplete, onboardingKnowable, type OnboardingItem, type OnboardingSignals } from '@neuramesh/shared';
-import { createPortal } from 'react-dom';
 import { useEffect, useState } from 'react';
 import { nm as nmBridge, type ConnectionKind } from '../bridge/nm';
 import { downloadsUrl } from '../weburl';
 import { setupItemsFor } from './setup-items';
+import { SetupPreview } from './SetupPreview';
 import { openLink } from '../lib/links';
 import { openProviderSettings, openWorkspaceMembers } from '../lib/toast';
 import type { MachineRow, MemberRow } from '../bridge/rows-crew';
@@ -35,11 +12,8 @@ import type { CredRow } from '../bridge/rows-infra';
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
 
-// Machine-local, like the attention bar's watermarks (AlertsBar.tsx): this is a personal surface,
-// and there is no row to dismiss — the items are derived, so "I have seen this" has nowhere on
-// the server to live. Two keys: waving it off is forever, folding it to the pill is not.
+// Dismissal is personal and persistent. Expanded state is deliberately transient.
 const DISMISS_KEY = 'nm:setupdismissed';
-const FOLD_KEY = 'nm:setupfolded';
 const readFlag = (k: string): boolean => {
   try { return localStorage.getItem(k) === '1'; } catch { return false; }
 };
@@ -116,34 +90,18 @@ function QrPanel({ onCopy, copied }: { onCopy: () => void; copied: boolean }) {
   );
 }
 
-/**
- * `dock` puts the tracker IN the nav column, directly above the workspace bar; `float` is the
- * fixed card at the bottom-right corner.
- *
- * Float was the only mode, and it sat on top of whatever was in that corner — the marketing
- * rail's CONNECTIONS list, most visibly (George, 2026-08-29). A checklist you have not finished
- * yet is not worth covering the thing you came to read. Docked, it occupies the one column that
- * is already the app's own chrome, so it can never overlap content.
- *
- * Float survives for the two shapes that have no column to dock into: the TOP nav dock, and a
- * FOLDED nav — `.navpanel[data-folded="1"]` collapses to zero width and hides its children, so a
- * docked card would vanish with the sidebar rather than degrade. Both flags persist in
- * localStorage, so switching between the two variants keeps the tracker's folded/dismissed state.
- */
 export function SetupCards({ variant = 'float', connection }: {
   variant?: 'dock' | 'float';
   /** the connection this workspace lives on (main/connections.ts): a local one has no cloud-machine row and no phone row (setup-items.ts) */
   connection?: ConnectionKind;
 } = {}) {
   const [dismissed, setDismissed] = useState(() => readFlag(DISMISS_KEY));
-  const [folded, setFolded] = useState(() => readFlag(FOLD_KEY));
   const [qr, setQr] = useState(false);
   const [copied, setCopied] = useState(false);
   const items = setupItemsFor(useOnboardingSignals(), connection);
   if (dismissed || !onboardingKnowable(items) || onboardingComplete(items)) return null;
 
   const done = items.filter((i) => i.done === true).length;
-  const fold = (v: boolean) => { writeFlag(FOLD_KEY, v); setFolded(v); };
   const dismiss = () => { writeFlag(DISMISS_KEY, true); setDismissed(true); };
   const act = (item: OnboardingItem) => {
     if (item.action === 'connect-brain') openProviderSettings('anthropic');
@@ -158,20 +116,16 @@ export function SetupCards({ variant = 'float', connection }: {
   // items, so there is nothing between two states to tween
   const ring = <span className="setupring" style={{ ['--p' as string]: `${Math.round((done / items.length) * 100)}%` }} aria-hidden />;
 
-  const body = folded ? (
-    <button className="setuppill" onClick={() => fold(false)} aria-label={`Finish setting up — ${done} of ${items.length} done`}>
-      {ring}<span>Finish setting up</span><span className="ct">{done}/{items.length}</span>
-    </button>
-  ) : (
+  return <SetupPreview done={done} total={items.length} variant={variant}>{close => (
     <div className="setupcard" role="group" aria-label="Finish setting up">
       <div className="setuphd">
         {ring}
         <b>Finish setting up</b>
         <span className="ct">{done}/{items.length}</span>
-        <button className="setupfold" onClick={() => fold(true)} data-tip="Collapse" aria-label="Collapse">
+        <button className="setupfold" onClick={close} data-tip="Collapse" aria-label="Collapse">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M1 1h8" strokeLinecap="round" /></svg>
         </button>
-        <button className="setupfold" onClick={dismiss} data-tip="Hide this — everything here stays in Settings" aria-label="Hide setup">
+        <button className="setupfold" onClick={dismiss} data-tip="Hide setup" aria-label="Hide setup">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M1 1l8 8M9 1 1 9" strokeLinecap="round" /></svg>
         </button>
       </div>
@@ -195,14 +149,5 @@ export function SetupCards({ variant = 'float', connection }: {
         </div>
       ))}
     </div>
-  );
-
-  // DOCKED: an ordinary block in the nav's flow, so it tracks the column's width and its fold
-  // without measuring anything. No portal — the reason to portal is to escape a clipping
-  // ancestor for a FIXED card, and a docked one wants exactly the opposite.
-  if (variant === 'dock') return <div className="setupdocked">{body}</div>;
-
-  // FLOATING: portalled to <body> so no masked or transformed ancestor can clip a fixed-position
-  // card — the same rule the nav's popovers follow (docs/33 §9.6)
-  return createPortal(<div className="setupdock">{body}</div>, document.body);
+  )}</SetupPreview>;
 }

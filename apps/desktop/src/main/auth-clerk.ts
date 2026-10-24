@@ -141,13 +141,12 @@ export async function loginWithClerk(apiUrl: string): Promise<ClerkSession> {
   return loginViaHostedWeb(apiUrl);
 }
 
-// A fresh PowerSync token for the current Clerk session (the control-api re-mints
-// it from the session via Clerk's Backend API). PowerSync validates it against
-// Clerk's JWKS; its sub is the Clerk id, which the sync rule maps to our uuid.
-export async function clerkPowerSyncToken(apiUrl: string): Promise<string> {
+// A normal Clerk session JWT for the API and replica feed. The API verifies it
+// against Clerk JWKS and resolves the signed-in member before applying workspace scope.
+export async function mintClerkApiToken(apiUrl: string): Promise<string> {
   if (!session) loadClerkSession();
   if (!session?.sessionId) throw new Error('not signed in (no Clerk session)');
-  const res = await fetch(`${apiUrl}/auth/clerk/token`, {
+  const res = await fetch(`${apiUrl}/auth/clerk/api-token`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sessionId: session.sessionId }),
@@ -156,10 +155,10 @@ export async function clerkPowerSyncToken(apiUrl: string): Promise<string> {
   if (!res.ok || !data.token) {
     // 401 = the control-api verified the session is dead (SESSION_EXPIRED) — drop it
     // so the app lands on sign-in. Anything else (503 AUTH_UNAVAILABLE, network, 5xx)
-    // is transient: throw and let the PowerSync SDK retry fetchCredentials — a Clerk
+    // is transient: throw and let the replica retry the session mint — a Clerk
     // or control-api blip must never sign the user out.
     if (res.status === 401) { save(null); app.relaunch(); app.exit(0); }
-    throw new Error(data.error ?? `could not refresh sync token (${res.status}${data.code ? ` ${data.code}` : ''})`);
+    throw new Error(data.error ?? `could not refresh API token (${res.status}${data.code ? ` ${data.code}` : ''})`);
   }
   return data.token;
 }
@@ -192,7 +191,7 @@ function jwtExpMs(token: string): number {
 export async function clerkApiToken(apiUrl: string): Promise<string> {
   const REFRESH_MARGIN_MS = 60_000;
   if (apiToken && Date.now() < apiToken.expMs - REFRESH_MARGIN_MS) return apiToken.token;
-  const token = await clerkPowerSyncToken(apiUrl);
+  const token = await mintClerkApiToken(apiUrl);
   apiToken = { token, expMs: jwtExpMs(token) };
   return token;
 }

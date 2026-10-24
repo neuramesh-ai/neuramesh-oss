@@ -24,7 +24,7 @@ export type LibraryReader = (channelId: string, limit?: number, scope?: Scope) =
 /** the shelf as a list: names, kinds, and where a widened scope found them */
 export async function listLibrary(libraryDocs: LibraryReader, channelId: string, scope: Scope): Promise<string> {
   const docs = await libraryDocs(channelId, 60, scope);
-  if (!docs.length) return scope === 'room' ? 'this room\'s library is empty — try scope:\'project\' or scope:\'workspace\'' : `no documents in this ${scope}`;
+  if (!docs.length) return scope === 'room' ? 'this project\'s library is empty — try scope:\'project\' or scope:\'workspace\'' : `no documents in this ${scope}`;
   return JSON.stringify(docs.map((d) => ({
     name: d.name, kind: d.kind, promoted: !!d.promoted,
     ...(scope === 'room' ? {} : { room: d.room, project: d.project }),
@@ -63,5 +63,5 @@ export async function ungrounded(db: AttDbLike, channelId: string, grounding: Gr
   if (names.some((n) => grounding.read.has(n))) return null;
   const first = names.includes('business-profile.md') ? 'business-profile.md' : names[0]!;
   const rest = names.filter((n) => n !== first);
-  return `Not yet: read this room's brand docs before you draft. Call read_library_doc with name "${first}" (scope room)${rest.length ? `, and ${rest.join(', ')} for the voice and the market` : ''}. Then call draft_posts again with copy grounded in what they say.`;
+  return `Not yet: read this project's brand docs before you draft. Call read_library_doc with name "${first}" (scope room)${rest.length ? `, and ${rest.join(', ')} for the voice and the market` : ''}. Then call draft_posts again with copy grounded in what they say.`;
 }

@@ -3,15 +3,17 @@ import assert from 'node:assert/strict';
 import type { CoreSessionEvent } from '@cline/sdk';
 import { projectEngineeringCoreEvent } from './engineering-events';
 
-test('tool completion projection drops unrestricted output before it crosses the relay', () => {
+test('tool completion projection bounds text output before it crosses the relay', () => {
   const projected = projectEngineeringCoreEvent({
     type: 'agent_event',
     payload: { sessionId: 's1', event: { type: 'content_end', contentType: 'tool', toolName: 'read_files', toolCallId: 'read-1', output: 'x'.repeat(10 * 1024 * 1024) } },
   } as unknown as CoreSessionEvent);
   const payload = projected['payload'] as Record<string, unknown>;
   const event = payload['event'] as Record<string, unknown>;
-  assert.equal(event['output'], undefined);
-  assert.deepEqual(event, { type: 'content_end', contentType: 'tool', toolName: 'read_files', toolCallId: 'read-1' });
+  assert.equal(typeof event['output'], 'string');
+  assert.ok(String(event['output']).endsWith('[truncated]'));
+  assert.ok(String(event['output']).length < 17_000);
+  assert.equal(event['toolCallId'], 'read-1');
   assert.equal(Buffer.byteLength(JSON.stringify(projected)) < 1024 * 1024, true);
 });
 

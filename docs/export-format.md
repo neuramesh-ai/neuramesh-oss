@@ -220,3 +220,7 @@ refuses a second move, and the This Mac card reads it. Local rows are never dele
   register.
 - `artifacts.storage_path` names a path on the machine that staged the bytes. Only
   `inline_content` travels.
+
+### Project context compatibility (2026-10)
+
+Version 1 exports retain the existing table set. Project rows additionally carry `context_channel_id`, `settings`, and `brand_profile`; thread and fact rows carry `project_id`. The project context reference uses a late link pass because channels follow projects in the archive. Older exports omit these fields and remain readable. The server gives projects without a context one after the final batch. Project team membership is rebuilt from the selected context's exported `agent_channels` rows, so historical grants remain separate.

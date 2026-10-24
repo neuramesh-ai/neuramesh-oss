@@ -16,18 +16,18 @@ import {
 
 /** Every column of every exported row, per table. Checked both ways against the row types below. */
 export const IMPORT_COLUMNS = {
-  projects: ['id', 'workspace_id', 'name', 'slug', 'description', 'status', 'is_default', 'created_at', 'auto_open_pr', 'run_ci_before_merge', 'website', 'logo_url', 'ship_gate', 'model_pack'],
+  projects: ['id', 'workspace_id', 'name', 'slug', 'description', 'status', 'is_default', 'created_at', 'auto_open_pr', 'run_ci_before_merge', 'website', 'logo_url', 'ship_gate', 'model_pack', 'context_channel_id', 'brand_profile', 'settings'],
   channels: ['id', 'workspace_id', 'slug', 'topic', 'settings', 'created_at', 'project_id', 'thread_mode', 'kind', 'marketing', 'created_by_kind', 'created_by'],
   repos: ['id', 'workspace_id', 'provider', 'org_name', 'name', 'default_branch', 'clone_url', 'created_at'],
   project_repos: ['id', 'project_id', 'repo_id', 'is_primary'],
   agents: ['id', 'workspace_id', 'name', 'role', 'runtime', 'model', 'card', 'status', 'created_at', 'kind', 'endpoint_url', 'emoji', 'model_source', 'retired_at', 'brief', 'description'],
   agent_channels: ['id', 'agent_id', 'channel_id', 'created_at', 'created_by_kind', 'created_by'],
-  threads: ['id', 'workspace_id', 'channel_id', 'title', 'description', 'created_by', 'task_id', 'created_at', 'updated_at', 'root_message_id', 'mode', 'brain_override', 'archived_at', 'filed_at', 'filed_reason', 'schedule_id', 'titled_at', 'origin', 'settled_at'],
+  threads: ['id', 'workspace_id', 'project_id', 'channel_id', 'title', 'description', 'created_by', 'task_id', 'created_at', 'updated_at', 'root_message_id', 'mode', 'brain_override', 'archived_at', 'filed_at', 'filed_reason', 'schedule_id', 'titled_at', 'origin', 'settled_at'],
   tasks: ['id', 'workspace_id', 'channel_id', 'project_id', 'number', 'title', 'description', 'state', 'creator_kind', 'creator_id', 'assignee_kind', 'assignee_id', 'repo_id', 'base_ref', 'branch', 'submitted_sha', 'requirements', 'requirements_confirmed', 'artifact_count', 'version', 'created_at', 'updated_at', 'claimed_at', 'submitted_at', 'accepted_at', 'closed_at', 'offered_agent_id', 'definition_of_done', 'pr_url', 'pr_number', 'approved_at', 'blocked_from', 'kind', 'ship_plan', 'parent_task_id', 'plan_approved_at', 'work_plan', 'origin_thread_id'],
   messages: ['id', 'workspace_id', 'channel_id', 'task_id', 'author_kind', 'author_id', 'body', 'created_at', 'edited_at', 'pinned', 'reply_to', 'thread_id'],
   artifacts: ['id', 'workspace_id', 'channel_id', 'project_id', 'task_id', 'kind', 'name', 'tags', 'version', 'content_hash', 'storage_path', 'size_bytes', 'promoted', 'promoted_by', 'created_by_kind', 'created_by', 'created_at', 'inline_content', 'message_id', 'mime', 'width', 'height'],
   memory_blocks: ['id', 'workspace_id', 'channel_id', 'project_id', 'kind', 'content', 'basis_count', 'updated_at'],
-  facts: ['id', 'workspace_id', 'channel_id', 'content', 'basis_count', 'valid_from', 'valid_until', 'superseded_by', 'created_at', 'kind', 'task_id'],
+  facts: ['id', 'workspace_id', 'project_id', 'channel_id', 'content', 'basis_count', 'valid_from', 'valid_until', 'superseded_by', 'created_at', 'kind', 'task_id'],
 } as const satisfies { [T in ExportTable]: ReadonlyArray<keyof ExportRows[T] & string> };
 
 // the other direction: a column on a row type that the list above forgot fails to compile here
@@ -44,13 +44,14 @@ export const IMPORT_UNWRITTEN: Partial<Record<ExportTable, readonly string[]>> =
 export interface ExportRef { column: string; to: ExportTable | 'actor'; late?: true; address?: true }
 
 export const EXPORT_REFS: Record<ExportTable, readonly ExportRef[]> = {
-  projects: [],
+  projects: [{ column: 'context_channel_id', to: 'channels', late: true }],
   channels: [{ column: 'project_id', to: 'projects' }, { column: 'created_by', to: 'actor' }],
   repos: [],
   project_repos: [{ column: 'project_id', to: 'projects' }, { column: 'repo_id', to: 'repos' }],
   agents: [],
   agent_channels: [{ column: 'agent_id', to: 'agents' }, { column: 'channel_id', to: 'channels' }, { column: 'created_by', to: 'actor' }],
   threads: [
+    { column: 'project_id', to: 'projects' },
     { column: 'channel_id', to: 'channels' }, { column: 'created_by', to: 'actor', address: true },
     { column: 'task_id', to: 'tasks', late: true }, { column: 'root_message_id', to: 'messages', late: true },
   ],
@@ -68,7 +69,7 @@ export const EXPORT_REFS: Record<ExportTable, readonly ExportRef[]> = {
     { column: 'message_id', to: 'messages' }, { column: 'promoted_by', to: 'agents' }, { column: 'created_by', to: 'actor' },
   ],
   memory_blocks: [{ column: 'channel_id', to: 'channels' }, { column: 'project_id', to: 'projects' }],
-  facts: [{ column: 'channel_id', to: 'channels' }, { column: 'task_id', to: 'tasks' }, { column: 'superseded_by', to: 'facts', late: true }],
+  facts: [{ column: 'project_id', to: 'projects' }, { column: 'channel_id', to: 'channels' }, { column: 'task_id', to: 'tasks' }, { column: 'superseded_by', to: 'facts', late: true }],
 };
 
 export const lateKeys = (table: ExportTable): string[] => EXPORT_REFS[table].filter((r) => r.late).map((r) => r.column);

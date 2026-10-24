@@ -2,8 +2,7 @@
 # Runs the control-api postgres integration tests against the REAL schema on ephemeral postgres.
 # Applies EVERY migration (glob, mirroring scripts/ci-db-bootstrap.sh) so new migrations are picked
 # up automatically — fixtures load at the 0001 schema, later migrations transform that data, and the
-# powersync publication is created wholesale at the end (the incremental publish migrations are
-# skipped, matching the dev-stack init order).
+# historical publication-only migrations are skipped; the API replica uses revision triggers.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,7 +27,6 @@ for f in supabase/migrations/*.sql; do
   case "$b" in 0001_*) continue ;; *publication*|*publish*) continue ;; esac
   q "$f"
 done
-q dev/stack/init/99-publication.sql    # the powersync publication, all tables at once
 
 # every *.pg.test.ts, discovered — the hand-typed list this replaced silently omitted any new
 # file, so a suite could be green while its newest tests had never run. ".pg.test" is a vitest

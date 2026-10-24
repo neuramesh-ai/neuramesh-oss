@@ -1,3 +1,4 @@
+import { marketingThreadIds } from '@neuramesh/client-core';
 // Projects, channels, threads, the marketing setup flow and the MCP keys — extracted
 // from sync.ts. Structure commands, all server-authoritative.
 import { app } from 'electron';
@@ -79,6 +80,9 @@ ipcMain.handle('nm:channel-kind', async (_e, { channelId, kind }: { channelId: s
 });
 // step 5 (release drafts, docs/design/release-drafts-2026-09 §4.7) rides the same command: the
 // server plants the one-shot, and the daily routine where the plan allows it, and answers which
+ipcMain.handle('nm:marketing-thread-ids', () => marketingThreadIds(db(), ws()));
+ipcMain.handle('nm:marketing-start', async (_e, { projectId }: { projectId: string }) =>
+  api('/v1/commands', { type: 'marketing.start', project: projectId }));
 ipcMain.handle('nm:marketing-setup', async (_e, { channelId, website, focus, goal, releases }: { channelId: string; website: string; focus: string[]; goal?: string; releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string } }) =>
   api('/v1/commands', { type: 'marketing.setup', channel: channelId, website: website || undefined, focus: focus.length ? focus : undefined, goal: goal || undefined, ...(releases ? { releases } : {}) }));
 // one answered setup-flow step (setupflows.ts) — persisted as it lands so the wizard resumes.

@@ -1,3 +1,6 @@
+import { redrawDraftImages } from './draft-redraw';
+import { drawOutcomeText } from './drawdraft';
+import { deliverImages } from './deliver-images';
 // The CONTENT tools — drafting, revising and scheduling posts, and drawing for them (docs/harness/04).
 //
 // Drafts only. Publishing is a human's click, and nothing here can bypass that.
@@ -50,32 +53,10 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     }, run: async (input: { images: Array<{ brief: string; name?: string }>; caption?: string }) => {
       const anchor = msgAnchor();
       if (!anchor) return 'share_images needs a conversation to deliver into.';
-      const made: Array<{ name: string; thumb: string }> = [];
-      const failed: string[] = [];
-      for (const im of input.images) {
-        const g = await generateShareImage(agent, ch, im.brief).catch(() => ({ error: 'the generator crashed' }));
-        if ('thumb' in g && g.thumb) made.push({ name: im.name?.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image', thumb: g.thumb });
-        else failed.push(('error' in g ? g.error : null) ?? 'the image came back empty');
-      }
-      if (!made.length) return `No images were generated — ${failed[0] ?? 'unknown failure'}. Report this plainly; never describe an image that does not exist.`;
-      const posted = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: input.caption?.trim() || `Here ${made.length === 1 ? 'is the image' : 'are the images'}.` }).catch(() => null);
-      const messageId = posted?.ok ? ((await posted.json().catch(() => null)) as { message?: { id?: string } } | null)?.message?.id : null;
-      if (!messageId) return 'The images generated but their message did not post — try once more.';
-      let attached = 0;
-      for (const im of made) {
-        const mime = /^data:([^;]+);/.exec(im.thumb)?.[1] ?? 'image/png';
-        const b64 = im.thumb.split(',')[1] ?? '';
-        const ok = await post('/v1/artifacts', actor, {
-          id: crypto.randomUUID(), workspace: ch.workspace_id, channel: ch.id, messageId,
-          ...(thread ? { taskId: thread.id } : {}),
-          kind: 'file', name: `${im.name}.${mime.split('/')[1] === 'jpeg' ? 'jpg' : (mime.split('/')[1] ?? 'png')}`,
-          mime, inlineContent: im.thumb, sizeBytes: Math.floor(b64.length * 0.75),
-        }).catch(() => null);
-        if (ok?.ok) attached += 1;
-      }
-      log?.({ kind: 'tool', phase: 'call', summary: `share_images — ${attached}/${input.images.length}` });
-      if (!attached) return 'The images generated but could not attach — report the failure.';
-      return `${attached} image${attached === 1 ? ' is' : 's are'} now SHOWING in the thread${failed.length ? ` (${failed.length} failed: ${failed[0]})` : ''}. Do not describe them — the human can see them; one short line at most.`;
+      const result = await deliverImages({ post, actor, agentName: agent.name, channel: ch, anchor, generate: brief => generateShareImage(agent, ch, brief) }, input);
+      log?.({ kind: 'tool', phase: 'call', summary: `share_images — ${result.attached}/${input.images.length}` });
+      if (result.error) return result.error;
+      return `${result.attached} image${result.attached === 1 ? ' is' : 's are'} now SHOWING in the thread${result.failed.length ? ` (${result.failed.length} failed: ${result.failed[0]})` : ''}. The original is saved; one short line at most.`;
     } },
   ];
   return [...shareTools,
@@ -192,15 +173,9 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       // drew on the very same field — so an agent that revised a brief here reported a change the
       // card never showed. Drawing is best-effort: a failed redraw records itself ON the card
       // (image_error) and never un-does the copy revision that already landed.
-      const redrew: string[] = [];
-      for (const letter of drew) {
-        const target = byLetter.get(letter);
-        if (!target) continue;
-        const outcome = await generateDraftImage(agent, ch, target.id).catch(() => null);
-        if (outcome) redrew.push(letter);
-      }
+      const { redrew, failed: redrawFailed } = await redrawDraftImages(drew, byLetter, id => generateDraftImage(agent, ch, id));
       if (redrew.length) log?.({ kind: 'tool', phase: 'call', summary: `revise_posts — redrew ${redrew.join('/')}` });
-      return `Revised ${done.join(', ')} in place — the updated card${done.length === 1 ? '' : 's'} and the earlier version are in the thread.${redrew.length ? ` Redrew the image on ${redrew.join(', ')}.` : ''}${missed.length ? ` Could not revise: ${missed.join(', ')} — say why.` : ''} Do NOT repeat the new copy in your reply: one short line on what you changed.`;
+      return `Revised ${done.join(', ')} in place — the updated card${done.length === 1 ? '' : 's'} and the earlier version are in the thread.${redrew.length ? ` Redrew the image on ${redrew.join(', ')}.` : ''}${redrawFailed.length ? ` Image redraw failed — ${redrawFailed.join('; ')}. The revised copy or brief saved, but do not claim these images changed.` : ''}${missed.length ? ` Could not revise: ${missed.join(', ')} — say why.` : ''} Do NOT repeat the new copy in your reply: one short line on what you changed.`;
     } },
     // The hand that matches the eye. `generateDraftImage` has existed since the marketing round
     // and needs no model turn — but its ONLY caller was the ‹gen-image:id› marker the card's own
@@ -220,7 +195,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         // only a DRAFT can be redrawn — generateDraftImage enforces it too, but naming the
         // letter here is what lets the reply be honest about which card was left alone
         if (!target || target.status !== 'draft') { missed.push(raw); continue; }
-        lines.push(`${target.letter}: ${await generateDraftImage(agent, ch, target.id)}`);
+        lines.push(`${target.letter}: ${drawOutcomeText(await generateDraftImage(agent, ch, target.id).catch((error) => ({ ok: false, error: error instanceof Error ? error.message : 'Image generation failed.' })))}`);
       }
       if (!lines.length) return `Nothing to draw (${missed.join(', ') || 'no matching cards'}) — a picture can only be drawn for a draft that is still a draft.`;
       log?.({ kind: 'tool', phase: 'call', summary: `generate_image — ${input.letters.join('/')}` });

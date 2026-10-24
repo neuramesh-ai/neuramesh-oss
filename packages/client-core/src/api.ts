@@ -2,8 +2,8 @@ import { controlApiRequestUrl } from '@neuramesh/shared';
 import type { HumanCommandInput } from '@neuramesh/shared';
 
 // The typed control-api client shared by every non-desktop surface. Commands and
-// messages go here (POST /v1/*), authenticated by a Clerk Bearer token (the same
-// token the mobile app mints for PowerSync). Reads come from the local replica,
+// messages go here (POST /v1/*), authenticated by a Clerk Bearer token (the normal
+// signed-in session token). Reads come from the local replica,
 // not this client. Errors surface the server's JSON envelope so the UI can show a
 // real reason rather than a status code.
 
@@ -32,10 +32,10 @@ export class ControlApiError extends Error {
   }
 }
 
-// Upload-queue poison guard: PowerSync retries a failed uploadData forever, in order —
+// Upload-queue poison guard: the replica retries transient failures in order —
 // so ONE permanently-rejected op (a message to a since-deleted channel, a malformed row)
 // wedges the queue and every later write never publishes. A definitive 4xx will never
-// succeed on retry: drop the op. Everything else (network, 5xx) is worth retrying, and
+// succeed on retry: archive the rejected op and continue. Everything else (network, 5xx) is worth retrying, and
 // so are the 4xx codes that are really transient: 401 (token mid-rotation), 408/425
 // (timing), 429 (rate limit).
 const RETRYABLE_4XX = new Set([401, 408, 425, 429]);
@@ -49,7 +49,7 @@ export interface ControlApiOptions {
   baseUrl: string;
   /** Desktop local/machine authentication includes scoped authorship as well as a bearer. */
   getAuthHeaders?: (force: boolean) => Promise<Record<string, string>>;
-  // Resolves the current Bearer token (the Clerk-signed PowerSync JWT), or null
+  // Resolves the current Bearer token (the Clerk session JWT), or null
   // when signed out. Called per request so token rotation is transparent.
   //
   // `force` asks for a FRESH one. It is passed on exactly one occasion: the server answered 401,
@@ -245,7 +245,7 @@ export class ControlApiClient {
   // threadMachineId/threadOrigin) apply ONLY when this send births the thread — the same
   // birth-time contract the desktop's uploader honours (./crud-upload.ts).
   postMessage(input: {
-    workspace: string; channel: string; body: string; taskId?: string; id?: string;
+    workspace: string; channel: string; project?: string; body: string; taskId?: string; id?: string;
     threadId?: string; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
     threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine';
     // 0144: `coding` when the repo chip was set — birth-only, like the rest
@@ -288,7 +288,7 @@ export class ControlApiClient {
     return this.post('/auth/desktop/poll', { nonce, pollSecret }, false) as Promise<DesktopAuthPoll>;
   }
 
-  // Mint a fresh PowerSync/API token from the Clerk session id (~10 min TTL).
+  // Mint a fresh API session token from the Clerk session id (~10 min TTL).
   // ── the cloud plane's polled reads (the mobile-cloud round, S1.4) — the same routes the
   // desktop's useCompute / CreditRing / setup tracker read; deliberately outside the replica
   // (desired_replicas is the fleet's own bookkeeping; credits are a ledger). ──
@@ -321,7 +321,7 @@ export class ControlApiClient {
     return this.get('/v1/devices') as Promise<{ devices: Array<{ platform: string }> }>;
   }
 
-  mintPowerSyncToken(sessionId: string): Promise<{ token: string }> {
-    return this.post('/auth/clerk/token', { sessionId }, false) as Promise<{ token: string }>;
+  mintApiToken(sessionId: string): Promise<{ token: string }> {
+    return this.post('/auth/clerk/api-token', { sessionId }, false) as Promise<{ token: string }>;
   }
 }

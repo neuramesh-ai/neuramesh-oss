@@ -61,7 +61,7 @@ test('draftPostsFromWorkspace: an image brief becomes real pixels — thumb on t
     const briefs: string[] = [];
     const out = await draftPostsFromWorkspace(dir, { taskId: 't', channelId: 'c' }, async (c) => { cmds.push(c); return `ci-${cmds.length}`; }, async (p) => {
       briefs.push(p.imageBrief ?? '');
-      return { bytes: Buffer.from('PNGBYTES'), mime: 'image/png', thumb: 'data:image/jpeg;base64,AAAA' };
+      return { bytes: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'), mime: 'image/png', thumb: 'data:image/jpeg;base64,AAAA' };
     });
     assert.equal(out.made, 2);
     assert.equal(out.images, 1, 'only the post with a brief is generated');
@@ -70,13 +70,13 @@ test('draftPostsFromWorkspace: an image brief becomes real pixels — thumb on t
     assert.equal(cmds[0]!.imageBrief, 'a warm gold lamp', 'the brief is kept beside the image');
     assert.equal(cmds[1]!.thumb, undefined);
     assert.deepEqual(await readdir(join(dir, 'media')), ['x-1.png']);
-    assert.equal(await readFile(join(dir, 'media', 'x-1.png'), 'utf8'), 'PNGBYTES');
+    assert.deepEqual(await readFile(join(dir, 'media', 'x-1.png')), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
 
-test('draftPostsFromWorkspace: the publish-size copy is hosted against the draft it belongs to', async () => {
+test('draftPostsFromWorkspace: the original is hosted against the draft it belongs to', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'nm-cp-'));
   try {
     await writeFile(join(dir, 'posts.json'), JSON.stringify([
@@ -89,11 +89,11 @@ test('draftPostsFromWorkspace: the publish-size copy is hosted against the draft
       dir,
       { taskId: 't', channelId: 'c' },
       async (c) => { cmds.push(c); return `ci-${cmds.length}`; },
-      async () => ({ bytes: Buffer.from('X'), mime: 'image/png', thumb: 'data:image/jpeg;base64,TH', publish: 'data:image/jpeg;base64,PUB' }),
+      async () => ({ bytes: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'), mime: 'image/png', thumb: 'data:image/jpeg;base64,TH', publish: 'data:image/jpeg;base64,PUB' }),
       async (itemId, dataUrl) => { attached.push({ itemId, dataUrl }); return true; },
     );
     assert.equal(out.hosted, 1);
-    assert.deepEqual(attached, [{ itemId: 'ci-1', dataUrl: 'data:image/jpeg;base64,PUB' }], 'hosted against the item the create returned');
+    assert.deepEqual(attached, [{ itemId: 'ci-1', dataUrl: `data:image/png;base64,${Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64').toString('base64')}` }], 'hosted against the item the create returned');
     assert.equal(cmds[0]!.thumb, 'data:image/jpeg;base64,TH', 'the small copy still rides the draft for the card');
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -108,7 +108,7 @@ test('draftPostsFromWorkspace: a draft whose image could not be hosted says so �
       dir,
       { taskId: 't', channelId: 'c' },
       async () => 'ci-1',
-      async () => ({ bytes: Buffer.from('X'), mime: 'image/png', thumb: 'data:image/jpeg;base64,TH', publish: 'data:image/jpeg;base64,PUB' }),
+      async () => ({ bytes: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'), mime: 'image/png', thumb: 'data:image/jpeg;base64,TH', publish: 'data:image/jpeg;base64,PUB' }),
       async () => false,
     );
     assert.equal(out.made, 1);
@@ -163,7 +163,7 @@ test('draftPostsFromWorkspace: generation is capped, and the cap is announced ra
     const cmds: ContentDraftCmd[] = [];
     const out = await draftPostsFromWorkspace(dir, { taskId: 't', channelId: 'c' }, async (c) => { cmds.push(c); return `ci-${cmds.length}`; }, async () => {
       calls++;
-      return { bytes: Buffer.from('X'), mime: 'image/png', thumb: 'data:image/jpeg;base64,AA' };
+      return { bytes: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64'), mime: 'image/png', thumb: 'data:image/jpeg;base64,AA' };
     });
     assert.equal(calls, 4, 'at most four paid generations per task');
     assert.equal(out.made, 6, 'every draft is still created');
@@ -175,4 +175,29 @@ test('draftPostsFromWorkspace: generation is capped, and the cap is announced ra
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('invalid or oversized originals leave recoverable drafts and do not abort the batch', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'nm-cp-'));
+  try {
+    await writeFile(join(dir, 'posts.json'), JSON.stringify([
+      { platform: 'x', body: 'first', imageBrief: 'invalid image' },
+      { platform: 'instagram', body: 'second', imageBrief: 'oversized image' },
+      { platform: 'linkedin', body: 'third', imageBrief: 'missing original' },
+    ]));
+    const results = [{ bytes: Buffer.from('invalid'), mime: 'image/png' },
+      { bytes: Buffer.alloc(16 * 1024 * 1024 + 1), mime: 'image/png' }, { thumb: 'data:image/jpeg;base64,AA' }];
+    const commands: ContentDraftCmd[] = [];
+    let uploads = 0;
+    const out = await draftPostsFromWorkspace(dir, { taskId: 't', channelId: 'c' }, async command => {
+      commands.push(command); return `draft-${commands.length}`;
+    }, async () => results.shift()!, async () => { uploads++; return true; });
+    assert.equal(out.made, 3);
+    assert.equal(out.images, 0);
+    assert.equal(uploads, 0);
+    assert.match(commands[0]!.imageError!, /unsupported image/);
+    assert.match(commands[1]!.imageError!, /storage limit/);
+    assert.match(commands[2]!.imageError!, /original image/);
+    assert.ok(commands.every(command => !command.thumb));
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

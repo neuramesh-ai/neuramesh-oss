@@ -21,7 +21,6 @@ export type AuthMode = 'local' | 'clerk' | 'dev' | 'supabase';
 
 export interface ConnectionUrls {
   apiUrl: string;
-  powersyncUrl: string;
   webUrl: string;
 }
 
@@ -62,7 +61,7 @@ export interface Connection extends ConnectionUrls {
 export const DEV_WS = 'a0000000-0000-0000-0000-00000000000a';
 export const DEV_USER_DEFAULT = '00000000-0000-0000-0000-000000000001';
 
-export const LOCAL_PORTS = { api: 8788, powersync: 58081 } as const;
+export const LOCAL_PORTS = { api: 8788 } as const;
 
 /** what a connection needs before it boots — the registry mints the runtime fields */
 export interface ConnectionSpec extends ConnectionUrls {
@@ -87,7 +86,6 @@ export function resolveUrls(kind: ConnectionKind, env: NodeJS.ProcessEnv, own: P
   };
   return {
     apiUrl: pick('NM_API', own?.apiUrl, baked.apiUrl),
-    powersyncUrl: pick('NM_POWERSYNC', own?.powersyncUrl, baked.powersyncUrl),
     webUrl: pick('NM_WEB', own?.webUrl, baked.webUrl),
   };
 }
@@ -96,26 +94,26 @@ export function resolveUrls(kind: ConnectionKind, env: NodeJS.ProcessEnv, own: P
  *  move them, so Local mode can boot beside a dev stack that already holds 8788 and 58081 on the
  *  same Mac (a recording, a second install). The stack's compose env and the connection's URLs read
  *  this one function, so they cannot drift. Unset or not a port number means the defaults. */
-export function localPortsFor(env: NodeJS.ProcessEnv): { api: number; powersync: number } {
+export function localPortsFor(env: NodeJS.ProcessEnv): { api: number } {
   const port = (v: string | undefined, fallback: number): number => {
     const n = Number(v?.trim());
     return Number.isInteger(n) && n > 0 && n < 65536 ? n : fallback;
   };
-  return { api: port(env['NM_LOCAL_API_PORT'], LOCAL_PORTS.api), powersync: port(env['NM_LOCAL_POWERSYNC_PORT'], LOCAL_PORTS.powersync) };
+  return { api: port(env['NM_LOCAL_API_PORT'], LOCAL_PORTS.api) };
 }
 
-export const localUrls = (ports: { api: number; powersync: number } = LOCAL_PORTS): ConnectionUrls => ({
+export const localUrls = (ports: { api: number } = LOCAL_PORTS): ConnectionUrls => ({
   apiUrl: `http://127.0.0.1:${ports.api}`,
-  powersyncUrl: '', // Local sync uses the control API.
+  // Local sync uses the control API.
   webUrl: '',
 });
 
 /** the dev lane's fallback addresses — `NM_AUTH=dev` with nothing else set means the dev stack */
-const DEV_URLS: ConnectionUrls = { apiUrl: `http://127.0.0.1:${LOCAL_PORTS.api}`, powersyncUrl: `http://127.0.0.1:${LOCAL_PORTS.powersync}`, webUrl: 'http://localhost:5173' };
+const DEV_URLS: ConnectionUrls = { apiUrl: `http://127.0.0.1:${LOCAL_PORTS.api}`, webUrl: 'http://localhost:5173' };
 
 /** a server someone runs themselves — Settings › Connections writes these (customserver.ts). `authMode`
  *  'local' means an `nmh_` bearer in the keychain under `custom-bearer:<id>`; absent means Clerk. */
-export interface CustomServer { id: string; apiUrl: string; powersyncUrl?: string; webUrl?: string; authMode?: 'local' | 'clerk' }
+export interface CustomServer { id: string; apiUrl: string; webUrl?: string; authMode?: 'local' | 'clerk' }
 
 /**
  * Which connections exist for this launch.

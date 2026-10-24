@@ -91,8 +91,9 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     if (!m) throw new DomainError('INVALID_INPUT', 'media must be a base64 data: URI');
     const bytes = Buffer.from(m[2]!, 'base64');
     if (!bytes.length) throw new DomainError('INVALID_INPUT', 'media decoded to nothing');
-    // Instagram's own ceiling is 8MB; anything past it could never publish anyway (a film is capped the same)
-    if (bytes.length > 8_000_000) throw new DomainError('INVALID_INPUT', `media too large (${bytes.length} bytes, max 8MB)`);
+    // Originals are kept losslessly. Network image limits apply to a derivative at publication.
+    const limit = m[1]!.toLowerCase().startsWith('image/') ? 16 * 1024 * 1024 : 8_000_000;
+    if (bytes.length > limit) throw new DomainError('INVALID_INPUT', `media too large (${bytes.length} bytes, max ${limit})`);
     const { id } = await store.attachContentMedia(cmd.item, m[1]!.toLowerCase(), bytes, { kind: actor.kind, id: actor.id }, (ws) => createEvent({
       type: 'content.updated',
       source: actorAddress(actor),

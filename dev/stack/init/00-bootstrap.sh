@@ -31,6 +31,4 @@ for f in "$B"/supabase/migrations/*.sql; do
 done
 
 psql -f "$B/init/97-dev-plan.sql"                # dev sandbox = Cloud plan (multi-machine smoke sections)
-psql -f "$B/init/98-storage.sql"                 # powersync_storage role + database
-psql -f "$B/init/99-publication.sql"             # the powersync publication, all tables at once
-echo "dev bootstrap: applied $(ls "$B"/supabase/migrations/*.sql | wc -l | tr -d ' ') migrations + storage + publication (tracked in schema_migrations)"
+echo "dev bootstrap: applied $(ls "$B"/supabase/migrations/*.sql | wc -l | tr -d ' ') migrations (tracked in schema_migrations)"

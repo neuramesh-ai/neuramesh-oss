@@ -1,13 +1,13 @@
 // Ship-stage diff scanner (docs/23) — DETECTION is code; what a finding means for
 // the release is the shipper's judgment (stall.ts / logoscan.ts idiom: pure, no
 // electron imports, unit-testable). Findings map 1:1 onto the PR template's
-// `## Deploy notes` rows — PowerSync / Vercel env / Migration / Desktop / Other —
+// `## Deploy notes` rows — Replica / Vercel env / Migration / Desktop / Other —
 // so the shipper's checklist starts from the same taxonomy the operator reads.
 
 export type ShipFindingKind =
   | 'migration'        // a new supabase/migrations/*.sql (auto-applies on deploy — but data/backfill needs judgment)
   | 'env'              // a NEW env var referenced by added code (its prod value is a human step)
-  | 'powersync'        // sync-rule/publication config touched (dashboard deploy is manual)
+  | 'replica'          // replica schema/feed changes require API-first client compatibility
   | 'dependency'       // package.json deps changed (CI lockfile + native-module implications)
   | 'workflow'         // .github/workflows touched (CI/release behavior changes)
   | 'desktop_version'; // a desktop version bump rides this PR (tag/publish ritual follows)
@@ -24,7 +24,7 @@ export interface ShipScan {
 }
 
 const MIGRATION_RE = /^\+\+\+ b\/(supabase\/migrations\/[\w.-]+\.sql)$/;
-const POWERSYNC_RE = /^\+\+\+ b\/((?:dev\/stack\/)?powersync\/[\w./-]+|dev\/stack\/powersync\/[\w./-]+)$/;
+const REPLICA_RE = /^\+\+\+ b\/((?:packages\/client-core\/src\/(?:schema|replica|sqlite-replica|sqlite-store|table)\.ts|packages\/client-core\/src\/tables\/[\w.-]+\.ts|packages\/control-api\/src\/local-sync\.ts))$/;
 const WORKFLOW_RE = /^\+\+\+ b\/(\.github\/workflows\/[\w.-]+)$/;
 const PKG_RE = /^\+\+\+ b\/((?:[\w./-]+\/)?package\.json)$/;
 const DESKTOP_PKG = 'apps/desktop/package.json';
@@ -61,10 +61,10 @@ export function scanDiff(diff: string): ShipScan {
       add('migration', `${inNewFile ? 'new migration' : 'migration touched'}: ${mig[1]}`);
       continue;
     }
-    const ps = POWERSYNC_RE.exec(line);
-    if (ps) {
-      currentFile = ps[1]!;
-      add('powersync', `sync-rule config touched: ${ps[1]} — the cloud dashboard mirror needs a manual Deploy`);
+    const replica = REPLICA_RE.exec(line);
+    if (replica) {
+      currentFile = replica[1]!;
+      add('replica', `replica contract touched: ${replica[1]} — verify supported clients and deploy the API before clients`);
       continue;
     }
     const wf = WORKFLOW_RE.exec(line);
@@ -98,7 +98,7 @@ export function scanDiff(diff: string): ShipScan {
   }
 
   const kinds = new Set(findings.map((f) => f.kind));
-  const manualEdges = ['env', 'powersync'].filter((k) => kinds.has(k as ShipFindingKind)).length;
+  const manualEdges = ['env', 'replica'].filter((k) => kinds.has(k as ShipFindingKind)).length;
   const riskHint: ShipScan['riskHint'] =
     manualEdges >= 2 || (manualEdges >= 1 && kinds.has('migration'))
       ? 'high'
@@ -110,6 +110,6 @@ export function scanDiff(diff: string): ShipScan {
 
 /** The scan as prompt-ready lines (empty string when clean). */
 export function scanNote(scan: ShipScan): string {
-  if (!scan.findings.length) return 'shipscan: clean — no migrations, env vars, sync-rule, dependency, or workflow changes detected in the diff.';
+  if (!scan.findings.length) return 'shipscan: clean — no migrations, env vars, replica, dependency, or workflow changes detected in the diff.';
   return `shipscan findings (deterministic; judge what each means for the release):\n${scan.findings.map((f) => `- [${f.kind}] ${f.detail}`).join('\n')}`;
 }

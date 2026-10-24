@@ -1,3 +1,4 @@
+import { publicationImage } from './publication-image';
 import { createHash, randomBytes } from 'node:crypto';
 import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, repairCardFences, RETRO_RANGES, routineCardGuard, routineDecisionQuestion, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';   import { needDecision } from './need-cards';
 import { Hono } from 'hono';
@@ -15,7 +16,7 @@ import { billingEnabled, constructWebhookEvent, createCheckoutSession, createCre
 import { linkedinCallback, linkedinStartUrl, providerConfigured, xCallback, xSearchOnConnector, xStartUrl } from './connectors';
 import { instagramCallback, instagramStartUrl, tiktokCallback, tiktokStartUrl } from './connectors-meta';
 import { seal, verifyMediaSig } from './connector-crypto';
-import { clerkCreateUser, clerkFindUserByEmail, clerkPrimaryEmail, clerkVerifyPassword, createClerkSession, mintPowerSyncToken, verifyClerkToken } from './clerk';
+import { clerkCreateUser, clerkFindUserByEmail, clerkPrimaryEmail, clerkVerifyPassword, createClerkSession, mintApiToken, mintPowerSyncToken, verifyClerkToken } from './clerk';
 import { unsubscribePage, verifyUnsubscribeToken } from './mail';
 import { fireWakeBump, lifecycleRoutes } from './fleet-lifecycle';
 import { applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
@@ -43,7 +44,8 @@ const MessageInputSchema = z.object({
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
   id: z.string().uuid().optional(),
   workspace: z.string().min(1),
-  channel: z.string().min(1),
+  channel: z.string().min(1).optional(),
+  project: z.string().uuid().optional(),
   // may be empty when the message carries only attachments (no caption)
   body: z.string(),
   taskId: z.string().min(1).optional(),
@@ -79,7 +81,7 @@ const MessageInputSchema = z.object({
   // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
   // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
   routineCard: z.literal(true).optional(), needCard: z.literal(true).optional(),
-});
+}).refine(v => !!v.channel || !!v.project, { message: 'A project is required.' });
 
 // Chat attachment forwarded by the desktop's PowerSync uploadData. The full bytes stay on the
 // host; only metadata + a small thumbnail (inlineContent) are persisted here and synced.
@@ -269,11 +271,11 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // Mint a fresh PowerSync token from the Clerk session (sub stays the Clerk id;
   // the workspace sync rule maps it → our uuid via nm_users). PowerSync validates
   // it against Clerk's JWKS — no client holds a signing key.
-  app.post('/auth/clerk/token', async (c) => {
+  app.on('POST', ['/auth/clerk/token', '/auth/clerk/api-token'], async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { sessionId?: string };
     if (!body.sessionId) return c.json({ error: 'missing sessionId', code: 'INVALID_INPUT' }, 400);
     try {
-      const jwt = await mintPowerSyncToken(body.sessionId);
+      const jwt = await (c.req.path.endsWith('/api-token') ? mintApiToken : mintPowerSyncToken)(body.sessionId);
       return c.json({ token: jwt });
     } catch (e) {
       // 401 is reserved for a VERIFIED-dead session (SESSION_EXPIRED) — the desktop
@@ -443,7 +445,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     if (media.mediaId) {
       const own = await store.contentMediaBytes(media.mediaId);
       if (!own) return c.text('no media on this item', 404);
-      return new Response(new Uint8Array(own.bytes), { headers: { 'content-type': own.mime, 'cache-control': 'private, max-age=300' } });
+      const output = await publicationImage(own, 'tiktok');
+      return new Response(new Uint8Array(output.bytes), { headers: { 'content-type': output.mime, 'cache-control': 'private, max-age=300' } });
     }
     if (!media.mediaUrl) return c.text('no media on this item', 404);
     let u: URL;
@@ -631,7 +634,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const msg = {
       id: parsed.data.id ?? crypto.randomUUID(),
       workspace: parsed.data.workspace,
-      channel: parsed.data.channel,
+      channel: parsed.data.channel ?? '',
+      projectId: parsed.data.project,
       taskId: parsed.data.taskId ?? null,
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
@@ -658,7 +662,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const event = createEvent({
       type: 'message.posted',
       source: formatAddress({ kind: actor.kind, id: actor.id }),
-      target: parsed.data.taskId ? `task:${parsed.data.taskId}` : `channel/${parsed.data.channel}`,
+      target: parsed.data.taskId ? `task:${parsed.data.taskId}` : `channel/${parsed.data.channel ?? parsed.data.project}`,
       workspace: parsed.data.workspace,
       payload: { preview: styledBody.slice(0, 120) },
     });
@@ -983,6 +987,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   app.get('/v1/memory', async (c) => {
     const { workspace, channel } = c.req.query();
     if (!workspace || !channel) return c.json({ error: 'workspace and channel required' }, 400);
+    if (channel.startsWith('project:') && c.get('actor').kind !== 'human') return c.json({ error: 'Project memory requires workspace membership.', code: 'NOT_PERMITTED' }, 403);
     try {
       return c.json(await store.channelMemory(workspace, channel));
     } catch (err) {

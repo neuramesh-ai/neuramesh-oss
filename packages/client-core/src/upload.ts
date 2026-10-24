@@ -25,6 +25,7 @@ export function messageUploadInput(id: string, d: Record<string, unknown>): Mess
     id,
     workspace: s('workspace_id') ?? '',
     channel: s('channel_id') ?? '',
+    project: s('birth_project'),
     body: String(d['body'] ?? ''),
     taskId: s('task_id'),
     threadId: s('thread_id'),

@@ -13,8 +13,6 @@
 !packages/control-api/**
 !supabase/migrations/**
 !supabase/validate/auth-shim.sql
-!dev/stack/init/98-storage.sql
-!dev/stack/init/99-publication.sql
 # never the installed trees, the bundles, or the tests
 **/node_modules
 **/dist

@@ -173,6 +173,12 @@ describe.skipIf(!DB)('POST /v1/workspaces/:id/import/batches', () => {
     expect(plan.tooLarge).toEqual([]);
     const before = await countOf(TGT, 'tasks');
     run = await stream(TGT, alice, plan.batches);
+    const [source] = await sql!`select project_id from channels where id = ${srcGeneral}::uuid`;
+    const importedProject = nid(source!['project_id'] as string);
+    const [context] = await sql!`select context_channel_id from projects where id = ${importedProject}::uuid`;
+    expect(context!['context_channel_id']).toBe(nid(srcGeneral));
+    expect(await sql!`select 1 from project_agents where project_id = ${importedProject}::uuid and agent_id = ${run.idMap[nid(srcRex)] ?? nid(srcRex)}::uuid`).toHaveLength(1);
+
 
     // the opening batch: nothing written, the storage numbers said out loud
     expect(run.results[0]).toMatchObject({ ok: true, seq: 0, written: 0, skipped: 0, storage: { allocationBytes: 50 * GIB, totalBytes: plan.totalBytes } });

@@ -9,6 +9,5 @@ import type { ConnectionUrls } from './connections';
 
 export const BAKED: ConnectionUrls = {
   apiUrl: process.env.NM_API ?? '',
-  powersyncUrl: process.env.NM_POWERSYNC ?? '',
   webUrl: process.env.NM_WEB ?? 'https://neuramesh.app',
 };
