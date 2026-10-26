@@ -45,7 +45,10 @@ test('auto-approved edits still surface diffs and failed tools never look applie
   } } } });
   assert.equal(session.changes.length, 0);
   assert.equal(session.proposedChanges.length, 0);
-  assert.match(session.messages.at(-1)?.body ?? '', /failed/);
+  const receipt = session.messages.find(m => m.tool?.callId === 'a1');
+  assert.match(receipt?.body ?? '', /failed/);
+  assert.equal(receipt?.tool?.error, 'disk full');
+  assert.equal(receipt?.tool?.state, 'failed');
 });
 
 test('web approval shows the destination URL before consent', () => {

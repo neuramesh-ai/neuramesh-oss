@@ -4,9 +4,8 @@ import { App } from './App';
 import { LaunchPeek } from './brand';
 import { nm, setBridgeReady } from './bridge/nm';
 import { attachDesktopRelay } from './bridge/desktop-relay';
-// Self-hosted Geist (display + UI) + Geist Mono (terminal, code, kickers), the Foundry pair
-// (italic flourish) + Bricolage Grotesque (the `neuramesh` wordmark) — bundled by
-// Vite, served from 'self' (local-first: no font CDN, works offline, strict CSP).
+// Self-hosted NeuraMesh Sans for UI and display; Geist Mono for terminal and code.
+// Bundled by Vite and served from 'self' (no font CDN; works offline).
 import '@neuramesh/fonts/neuramesh-sans.css';
 import '@fontsource-variable/geist-mono/wght.css';
 import '@fontsource-variable/bricolage-grotesque/wght.css';

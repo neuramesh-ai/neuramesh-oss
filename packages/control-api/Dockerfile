@@ -57,10 +57,9 @@ COPY --from=build /app/packages/control-api/dist ./packages/control-api/dist
 COPY packages/control-api/scripts/migrate.mjs ./packages/control-api/scripts/migrate.mjs
 COPY packages/control-api/docker-entrypoint.sh ./packages/control-api/docker-entrypoint.sh
 # the schema the runner applies from empty, the auth shim a plain Postgres needs, and the
-# legacy hosted-test role + publication (only explicit NM_LEGACY_POWERSYNC=1 uses these)
+# Historical migrations remain intact; no sync-service storage or role is provisioned.
 COPY supabase/migrations ./supabase/migrations
 COPY supabase/validate/auth-shim.sql ./supabase/validate/auth-shim.sql
-COPY dev/stack/init/98-storage.sql dev/stack/init/99-publication.sql ./dev/stack/init/
 # Every one of these is a fact about the local stack, not a preference: no fleet, no push, mail
 # never leaves the machine, the bare actor header stays shut, the port binds inside the
 # container (compose publishes it on loopback).

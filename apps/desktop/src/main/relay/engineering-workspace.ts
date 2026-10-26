@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import type { AbstractPowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { EngineeringMachineOpenMeta } from '../../engineering-protocol';
 import { withRepoLock } from '../agents';
 import { cachePath } from '../harness/brain';
@@ -30,7 +30,7 @@ export class EngineeringNeedsGitHub extends Error {
 // reopens the session into the same refusal, and the person never reads its cause.
 const GRANT_FIXES = new Set(['NOT_CONNECTED', 'NO_REPO', 'RECONNECT_REQUIRED']);
 
-type Db = Pick<AbstractPowerSyncDatabase, 'get'>;
+type Db = Pick<ReplicaDatabase, 'get'>;
 /** `base`: the branch a new worktree starts from */
 interface CloneTarget { id: string; url: string; slug: string | null; base: string | null }
 const targetOf = (id: string, url: string, base: string | null): CloneTarget => ({ id, url, slug: repoSlug(url) || null, base });

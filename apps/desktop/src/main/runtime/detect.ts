@@ -12,6 +12,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { which } from './cli';
 import type { ProviderName } from './adapter';
+import { geminiAuth } from './gemini-auth';
+export { geminiLogin } from './gemini-auth';
 
 export interface ProviderStatus {
   installed: boolean; // the provider's CLI is on PATH (Anthropic is always available via the SDK)
@@ -81,21 +83,12 @@ async function codexAuth(): Promise<{ authed: boolean; method: 'subscription' | 
   return { authed: false, method: null };
 }
 
-// Google's consumer `gemini` CLI was deprecated 2026-06-18; its successor is Antigravity's `agy`,
-// which signs in with a Google account (OS keyring, NO API key). There's no cheap "is signed in"
-// probe, so we treat the deliberate install (the `agy` binary on disk — `which` also looks in
-// ~/.local/bin where it lands) as the Google/OAuth signal; an un-signed-in `agy` surfaces an
-// actionable "run `agy` to sign in" error on first use.
-function geminiAuthed(): Promise<boolean> {
-  return which('agy').then((p) => !!p);
-}
-
 // Per-provider subscription check used by the daemon's token resolution to prefer a
 // subscription over an API key.
 export async function hasSubscription(provider: ProviderName): Promise<boolean> {
   if (provider === 'anthropic') return claudeAuthed();
   if (provider === 'openai') return (await codexAuth()).method === 'subscription';
-  return geminiAuthed();
+  return (await geminiAuth()).usable;
 }
 
 // Does a subscription LOGIN exist for this provider AT ALL — present on disk/keychain — even if
@@ -110,9 +103,9 @@ export async function hasProviderLogin(provider: ProviderName): Promise<boolean>
     if (process.platform === 'darwin') return claudeKeychainExists();
     return false;
   }
-  // codex/gemini logins don't expose an expiry we can read, so "present" == "subscription".
+  // Codex's profile does not expose an expiry we can read.
   if (provider === 'openai') return (await codexAuth()).method === 'subscription';
-  return geminiAuthed();
+  return (await geminiAuth()).present;
 }
 
 // Full snapshot for the UI — installed + authed + method per provider, probed concurrently.
@@ -122,12 +115,12 @@ export async function detectProviders(): Promise<Record<ProviderName, ProviderSt
     which('agy'), // Google's runtime is the Antigravity CLI now (was the deprecated `gemini` CLI)
     claudeAuthed(),
     codexAuth(),
-    geminiAuthed(),
+    geminiAuth(),
   ]);
   return {
     // Anthropic runs through the bundled Agent SDK, so it's always "installed".
     anthropic: { installed: true, authed: claudeOk, method: claudeOk ? 'subscription' : null },
     openai: { installed: !!codexBin, authed: codex.authed, method: codex.method },
-    gemini: { installed: !!agyBin, authed: geminiOk, method: geminiOk ? 'subscription' : null },
+    gemini: { installed: !!agyBin, authed: !!agyBin && geminiOk.usable, method: agyBin && geminiOk.usable ? 'subscription' : null },
   };
 }

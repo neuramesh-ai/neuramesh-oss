@@ -7,7 +7,6 @@ const full = {
   NM_MACHINE_ID: 'm1',
   NM_WORKSPACE_ID: 'ws1',
   NM_OWNER_USER_ID: 'u1',
-  NM_POWERSYNC_URL: 'https://ps.example',
 };
 
 test('readConfig fills defaults and passes through identity', () => {
@@ -20,7 +19,7 @@ test('readConfig fills defaults and passes through identity', () => {
 
 test('readConfig refuses a half-identity, loudly', () => {
   assert.throws(() => readConfig({ ...full, NM_MACHINE_TOKEN: undefined }), /NM_MACHINE_TOKEN/);
-  assert.throws(() => readConfig({ ...full, NM_POWERSYNC_URL: undefined }), /NM_POWERSYNC_URL/);
+  assert.throws(() => readConfig({ ...full, NM_WORKSPACE_ID: undefined }), /NM_WORKSPACE_ID/);
 });
 
 test('readConfig refuses the unprovisioned placeholder and non-machine tokens', () => {

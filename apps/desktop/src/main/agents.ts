@@ -1,3 +1,4 @@
+import { brainApiBaseUrl } from '@neuramesh/shared';
 // AgentHost slice 1: channel-scoped @mention wake → reply, posted through the
 // control-api as a real agent actor. `runAgentTurn` is the seam where the
 // Claude Agent SDK lands (W3 slice 2); without ANTHROPIC_API_KEY it echoes.
@@ -6,7 +7,6 @@
 // because they run headless too.
 import { apiAuthHeaders, apiBearerHeader } from './apiauth';
 import { electron } from './electronlazy';
-import { liveStreams } from './livestreams';
 import { startPlanRouteWatch, startRoutineBuildWatch } from './host/planroute';
 import { makeRoutineResume, sweepMessages } from './host/routineresume';
 import { configureStarterFallback, setStarterLane } from './runtime/starter';
@@ -20,26 +20,11 @@ export function notifyDesktop(title: string, body: string): void {
   } catch { /* headless / unsupported */ }
 }
 
-// live token streaming to the local renderer — key = `${channelId}:${taskId??''}`
-// THE choke point for every live bubble — so the machine-fence filter belongs here rather than
-// at each of the dozen call sites. onDelta hands us the GROWING text, which means a fence the
-// daemon is going to strip from the posted message would otherwise type itself out in front of
-// the human first (live #1048: a JSON array of post bodies, under "plume is typing"). While a
-// fence is open we say what is being written instead, in the renderer's own forming-hint idiom.
-export function emitStream(key: string, agent: string, text: string, done: boolean, thinking?: string): void {
-  const { text: visible, forming } = visibleStream(text);
-  const body = forming ? `${visible}${visible ? '\n\n' : ''}› *${forming === 'drafts' ? 'updating the drafts' : 'question card forming'}…*` : visible;
-  for (const w of electron()?.BrowserWindow.getAllWindows() ?? []) {
-    if (!w.webContents.isDestroyed()) w.webContents.send('nm:agent-stream', { key, agent, text: body, done, ...(thinking ? { thinking } : {}) });
-  }
-  // …and to the relay's `stream` lane (livestreams.ts): a headless machine has no windows, so
-  // this is the only way a browser sees the reply while it is written. Same filtered text.
-  liveStreams.publish(key, agent, body, done, thinking);
-}
+export { emitStream } from './agent-stream';
 
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { AgentLog, LogFn } from './agentlog';
-import { buildDesignPrompt, designSystemPrompt, claudeDesignPromptBlock, designProviderFromEvents, mentionRe, bareAddressRe, defaultBaselineRules, visibleStream, STARTER_MODEL, TURN_BUDGETS, type Actor, type DesignProvider, type NMEvent, type SessionOrigin } from '@neuramesh/shared';
+import { buildDesignPrompt, designSystemPrompt, claudeDesignPromptBlock, designProviderFromEvents, mentionRe, bareAddressRe, defaultBaselineRules, STARTER_MODEL, TURN_BUDGETS, type Actor, type DesignProvider, type NMEvent, type SessionOrigin } from '@neuramesh/shared';
 
 import { HostQueue, durableStore } from './harness/hostqueue';
 // shared compute (0114): one origin-affinity rule, shared with every other client
@@ -77,7 +62,7 @@ import { ParkBook } from './harness/park';
 
 import { readAnswers } from '@neuramesh/shared';
 
-import { pickImageProvider, generateImage, reviewImage, thumbDataUrl, publishDataUrl, type ImageCred } from './imagegen';
+import { pickImageProvider, generateImage, reviewImage, thumbDataUrl, type ImageCred } from './imagegen';
 import { buildImagePrompt, type BrandTokens } from '@neuramesh/shared';
 import type { RuntimeAdapter, ProviderName, PromptOverride } from './runtime/adapter';
 import { providerFor, keyEnvFor, setAgentProxy, sandboxFsEnabled, setSandboxFsCache, onCloudMachine, codexSandboxMode } from './runtime/adapter';
@@ -328,14 +313,15 @@ export function authBlockedCard(agent: HostedAgent, blocked: { provider: Provide
 export async function xPublishConnectedFor(
   db: { getAll<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> },
   ch: { id: string; workspace_id: string },
+  at: import('./host/project-context').ProjectAnchor = {},
 ): Promise<boolean> {
   const rows = await db.getAll<{ provider: string }>(
     `select k.provider from connectors k
       where k.workspace_id = ? and k.status = 'connected' and k.provider = 'x'
         and (k.project_id is null
-             or k.project_id = (select project_id from channels where id = ?))
+             or k.project_id = (select coalesce(t.project_id, c.project_id) from channels c left join threads t on t.id = ? and t.channel_id = c.id and t.workspace_id = c.workspace_id where c.id = ?))
       limit 1`,
-    [ch.workspace_id, ch.id],
+    [ch.workspace_id, at.threadId ?? null, ch.id],
   ).catch(() => [] as Array<{ provider: string }>);
   return rows.length > 0;
 }
@@ -709,9 +695,9 @@ export async function designerImageCred(
 }
 
 // Generate ONE on-brand image and package it for a draft: the inline `thumb` the card shows and
-// the publish-size `publish` that gets hosted. Shared by the create path and the revise path so
+// the byte-identical original bytes that get hosted. Shared by the create path and the revise path so
 // both draw the same way (palette-bound prompt · marketer sign-off · one redraw). Never throws.
-type BrandImageOut = { bytes?: Buffer; mime?: string; thumb?: string; publish?: string; model?: string; reviewNote?: string; error?: string };
+type BrandImageOut = { bytes?: Buffer; mime?: string; thumb?: string; model?: string; reviewNote?: string; error?: string };
 export async function generateBrandImage(cred: ImageCred, reviewSeat: string, brand: { tokens: BrandTokens; product?: string }, brief: string, platform: string, agentName: string): Promise<BrandImageOut> {
   const spec = buildImagePrompt(brief, brand.tokens, platform, brand.product);
   if (!spec) return {};
@@ -724,8 +710,8 @@ export async function generateBrandImage(cred: ImageCred, reviewSeat: string, br
     const redraw = await generateImage({ ...spec, prompt: `${spec.prompt}\n\nRevision — fix exactly this and change nothing else: ${verdict.fix}` }, cred);
     if (redraw.image) { img = redraw.image; reviewNote = `${agentName} sent the ${platform} image back once — ${verdict.fix}`; }
   }
-  const [thumb, publish] = await Promise.all([thumbDataUrl(img.bytes), publishDataUrl(img.bytes)]);
-  return { bytes: img.bytes, mime: img.mime, thumb: thumb ?? undefined, publish: publish ?? undefined, model: first.model, reviewNote };
+  const thumb = await thumbDataUrl(img.bytes);
+  return { bytes: img.bytes, mime: img.mime, thumb: thumb ?? undefined, model: first.model, reviewNote };
 }
 
 // ONE agent host per (backend, workspace). Both boot paths can otherwise race (normal boot +
@@ -1000,7 +986,10 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   async function post(path: string, actor: { kind: string; id: string; role?: string }, body: unknown) {
     const artifact = publishConversationArtifact(path, body, actor);
     if (artifact) return artifact;
-    const res = await fetch(`${apiUrl}${path}`, {
+    const upload = path === '/v1/commands' && (body as { type?: string } | null)?.type === 'content.attach_media';
+    const target = upload ? '/v1/brain/content-media' : path;
+    const base = target.startsWith('/v1/brain/') ? brainApiBaseUrl(apiUrl) : apiUrl;
+    const res = await fetch(`${base}${target}`, {
       method: 'POST',
       headers: await apiAuthHeaders(apiUrl, actor as Actor),
       body: JSON.stringify(body),
@@ -1163,6 +1152,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     workspaceListing, workspaceRead,
   });
   const { chatTurn, defaultResponder, threadModeFor } = makeChatTurn({
+    apiUrl, ownerActorId,
     post, machineId, guards, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace,
     generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures,
   });

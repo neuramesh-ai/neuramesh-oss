@@ -41,6 +41,20 @@ function replay(frames: LiveFrame[]): Map<string, LiveKeyState> {
   return held;
 }
 
+test('image progress travels without text changes, survives reconnect and clears explicitly', () => {
+  const { streams, advance, sub } = rig();
+  const first = sub('image-first');
+  streams.publish('c:img', 'rex', '', false, undefined, { count: 2, stage: 'generating' });
+  assert.deepEqual(replay(first.frames).get('c:img')?.imageGeneration, { count: 2, stage: 'generating' });
+  const late = sub('image-late');
+  assert.deepEqual(replay(late.frames).get('c:img')?.imageGeneration, { count: 2, stage: 'generating' });
+  streams.publish('c:img', 'rex', '', false, undefined, { count: 2, stage: 'saving' }); advance(40);
+  assert.equal(replay(late.frames).get('c:img')?.imageGeneration?.stage, 'saving');
+  streams.publish('c:img', 'rex', '', false, undefined, null); advance(40);
+  assert.equal(replay(late.frames).get('c:img')?.imageGeneration, null);
+  first.stop(); late.stop();
+});
+
 test('presence goes out at once, and a growing reply goes out as deltas that rebuild it exactly', () => {
   const { streams, advance, sub } = rig();
   const tab = sub('t1');

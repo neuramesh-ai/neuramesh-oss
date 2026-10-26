@@ -60,7 +60,7 @@ test('an X connector on the room’s project counts; the query is project-scoped
   assert.match(cap.sql!, /provider = 'x'/);
   assert.match(cap.sql!, /project_id/); // NOT channel-keyed — that reported "none" in every
   assert.match(cap.sql!, /status = 'connected'/); // room but the one where OAuth happened
-  assert.deepEqual(cap.params, ['w1', 'c1']);
+  assert.deepEqual(cap.params, ['w1', null, 'c1']);
 });
 
 test('no rows → false, and a replica read that throws degrades to false rather than the turn', async () => {

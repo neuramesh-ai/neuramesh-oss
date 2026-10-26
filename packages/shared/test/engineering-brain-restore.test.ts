@@ -38,6 +38,18 @@ it('keeps interrupted edits as unknown receipts and never offers a stale permiss
   expect(out.pendingApproval).toBeNull();
   expect(out.messages.find(m => m.review)?.review?.status).toBe('interrupted');
 });
+it('restores detailed tool history and marks a missing completion as interrupted', () => {
+  const events = [event('user.message', { text: 'Inspect the app' }, 'u'),
+    core({ type: 'content_start', contentType: 'tool', toolCallId: 'read', toolName: 'read_file', input: { path: 'README.md' } }, 'read'),
+    core({ type: 'content_end', contentType: 'tool', toolCallId: 'read', toolName: 'read_file', output: '# App', durationMs: 20 }, 'read-end'),
+    core({ type: 'content_start', contentType: 'tool', toolCallId: 'command', toolName: 'run_commands', input: { commands: ['npm test'] } }, 'cmd')];
+  const restored = restoreEngineeringBrain(shell(), snapshot(events));
+  expect(restored.messages.filter(m => m.tool).map(m => m.tool)).toMatchObject([
+    { input: { path: 'README.md' }, output: '# App', state: 'succeeded', durationMs: 20 },
+    { input: { commands: ['npm test'] }, state: 'interrupted' },
+  ]);
+  expect(restored.pendingApproval).toBeNull();
+});
 it('rejects a snapshot for another thread', () => {
   expect(() => restoreEngineeringBrain(shell(), { ...snapshot([]), threadId: 'other' })).toThrow('another thread');
 });

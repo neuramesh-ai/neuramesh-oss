@@ -1,21 +1,13 @@
-// the ONE ps_crud uploader — shared by the desktop Connector (apps/desktop/src/main/sync/connector.ts),
-// the machine connector (machined.ts) and the web client, so table coverage can never drift between them again (the W1
-// interim mirror covered messages only and loud-threw on everything else; the first full
-// agent turn on the cloud runner would have wedged its upload queue on a runs row).
-//
-// three tables are client-written today; each keeps its established error policy exactly:
-//   messages     PUT — non-409 failure throws (PowerSync retries; downloads hold behind it)
-//   artifacts    PUT — chat attachments only (message_id-gated; agent artifacts are
-//                server-created + download-only), same throw policy
-//   whiteboards  PUT/PATCH — LWW autosave: 409 fine, other 4xx = contract bug → log + skip
-//                (one poisoned board must not wedge every later write), 5xx/network throws
-// anything else is 'unhandled' — the CALLER chooses the policy (desktop: log-and-drop, its
-// historical behavior; machined: loud throw, better a visible wedge than a silent drop).
-
-// type-only import, from @powersync/common (the peer every client SDK brings): @powersync/node's
-// export map breaks the node:test loader (the machined-config split learned this), and UpdateType
-// is a string-identity enum (PUT/PATCH/DELETE) — so runtime comparisons use the literals.
-import type { CrudEntry } from '@powersync/common';
+import { failure } from './api';
+// The shared uploader for the SQLite outbox. Messages and attachments retry transient failures;
+// whiteboards converge using server revisions and retain their established refusal policy.
+// Unsupported operations remain queued for recovery rather than disappearing during upgrade.
+export interface CrudEntry {
+  id: string;
+  table: string;
+  op: 'PUT' | 'PATCH' | 'DELETE';
+  opData?: Record<string, unknown>;
+}
 
 export interface UploadIdentity {
   apiUrl: string;
@@ -64,11 +56,11 @@ async function throwUnless409(ident: UploadIdentity, table: string, opId: string
   if (!res.ok && res.status !== 409) {
     const detail = await res.text();
     console.error(`${ident.logPrefix ?? ''}upload_failed table=${table} id=${opId} status=${res.status} ${detail.slice(0, 160)}`);
-    throw new Error(`upload failed ${res.status}: ${detail}`);
+    throw failure(`/v1/${table}`, res.status, detail);
   }
 }
 
-/** upload one crud op. throws to make PowerSync retry; 'unhandled' leaves policy to the caller. */
+/** upload one crud op. throws to retry without acknowledging the queued write; 'unhandled' leaves policy to the caller. */
 export async function uploadCrudEntry(ident: UploadIdentity, op: CrudEntry): Promise<UploadOutcome> {
   const d = op.opData ?? {};
   const kind = op.op as unknown as string;
@@ -78,6 +70,7 @@ export async function uploadCrudEntry(ident: UploadIdentity, op: CrudEntry): Pro
     const res = await send(ident, 'messages', op.id, `${ident.apiUrl}/v1/messages`, 'POST', actor, {
       id: op.id,
       workspace: d['workspace_id'] ?? ident.workspaceFallback,
+      project: d['birth_project'] ?? undefined,
       channel: d['channel_id'], // post by channel id — slugs repeat across projects
       body: d['body'] ?? '',
       taskId: d['task_id'] ?? undefined,

@@ -352,7 +352,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
         if (mode === 'claude') {
           // a human-stopped run falls through with whatever changed in the worktree —
           // worktreeRun commits/pushes it; an untouched tree still fails
-          const attNote = (await stageTaskAttachments(db, t.id, dir, true)) + (await stageApprovedDesigns(db, t.id, dir, true)) + (await stageBrandContext(db, t.channel_id, dir)) + planNote;
+          const attNote = (await stageTaskAttachments(db, t.id, dir, true)) + (await stageApprovedDesigns(db, t.id, dir, true)) + (await stageBrandContext(db, t.channel_id, dir, { taskId: t.id })) + planNote;
           // Fan-out for this execution (docs/harness/04): ONE closure, so every spawn in the turn
           // draws from a single remaining budget and lands in one subtree. `work` is the root budget;
           // each child takes a slice, and the slices are what terminate depth.
@@ -417,7 +417,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       const scratch = deliverablePath(t.number);
       const priorNote = await prepareScratchWorkspace(db, t.id, scratch);
       if (priorNote) log({ kind: 'exec', phase: 'started', summary: 'rework: prior deliverables restored to the workspace — editing, not redoing' });
-      const attNote = (await stageTaskAttachments(db, t.id, scratch, false)) + (await stageApprovedDesigns(db, t.id, scratch, false)) + (await stageBrandContext(db, t.channel_id, scratch)) + (await stageConnections(db, t.channel_id)) + (t.kind === 'content' ? CONTENT_OUTPUT_CONTRACT : t.kind === 'research' ? RESEARCH_OUTPUT_CONTRACT : '') + planNote + priorNote;
+      const attNote = (await stageTaskAttachments(db, t.id, scratch, false)) + (await stageApprovedDesigns(db, t.id, scratch, false)) + (await stageBrandContext(db, t.channel_id, scratch, { taskId: t.id })) + (await stageConnections(db, t.channel_id, { taskId: t.id })) + (t.kind === 'content' ? CONTENT_OUTPUT_CONTRACT : t.kind === 'research' ? RESEARCH_OUTPUT_CONTRACT : '') + planNote + priorNote;
       // the scratch branch is its own scope, so it builds its own fan-out closure over the
       // deliverable dir — same budget root, same ownership rules, different working directory
       const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, scratch, t, TURN_BUDGETS.work, log, 0);
@@ -465,7 +465,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
               if (g.error) return { error: g.error };
               if (g.model) drewOn.add(g.model);
               if (g.reviewNote) reviewNotes.push(g.reviewNote);
-              return { bytes: g.bytes, mime: g.mime, thumb: g.thumb, publish: g.publish };
+              return { bytes: g.bytes, mime: g.mime, thumb: g.thumb };
             }
           : undefined;
         const out = await draftPostsFromWorkspace(scratch, { taskId: t.id, channelId: t.channel_id }, async (cmd) => {

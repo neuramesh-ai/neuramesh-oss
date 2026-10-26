@@ -217,6 +217,7 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
         },
         onExit: () => { acknowledgements.rejectAll(new Error('The Engineering relay closed during upload.')); onExit(); },
         onError: (message) => onEvent({ type: 'error', message }),
+        onDisconnect: (message) => onEvent({ type: 'disconnected', message }),
       });
       const acknowledgementKey = (command: EngineeringCommand): string | null => command.type === 'attachment_start'
         ? `${command.id}:-1` : command.type === 'attachment_chunk' ? `${command.id}:${command.index}` : command.type === 'attachment_end' ? `${command.id}:-2` : null;

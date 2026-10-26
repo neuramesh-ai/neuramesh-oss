@@ -31,12 +31,14 @@ export const isLiveStreamOpenMeta = (m: unknown): m is LiveStreamOpenMeta =>
  *   at  the machine's wall clock when the frame was cut (ms). Diagnostic only: it measures lag
  *       where the clocks agree, and means nothing where they do not
  */
+export type ImageGenerationProgress = { count: number; stage: 'generating' | 'saving' };
+
 export type LiveFrame =
   /** `th`: the turn's thoughts so far, when the runtime shows them (the repo-connect round's Option A) */
-  | { t: 'snap'; k: string; a: string; e: string; s: number; text: string; th?: string; at: number }
+  | { t: 'snap'; k: string; a: string; e: string; s: number; text: string; th?: string; imageGeneration?: ImageGenerationProgress | null; at: number }
   /** `tk`/`ta`: the thoughts' own delta (keep, add), present only when they changed. A client of an
    *  earlier version ignores both, and still types the reply */
-  | { t: 'd'; k: string; a: string; e: string; s: number; keep: number; add: string; tk?: number; ta?: string; at: number }
+  | { t: 'd'; k: string; a: string; e: string; s: number; keep: number; add: string; tk?: number; ta?: string; imageGeneration?: ImageGenerationProgress | null; at: number }
   | { t: 'end'; k: string; a: string; e: string; s: number; at: number }
   /** after the attach snapshots and after every resync: the keys live on this machine NOW. A
    *  subscriber drops (lands) any key it holds from this machine that is not in the list — the
@@ -70,7 +72,7 @@ export function liveDelta(prev: string, next: string): { keep: number; add: stri
 }
 
 /** what a subscriber holds for one key: the reply so far, and the thoughts so far (`th`, absent when none) */
-export interface LiveKeyState { a: string; e: string; s: number; text: string; th?: string }
+export interface LiveKeyState { a: string; e: string; s: number; text: string; th?: string; imageGeneration?: ImageGenerationProgress | null }
 
 /** the thoughts after a delta frame: kept as held when the frame carries none, else the delta applied.
  *  null = the frame keeps more than is held (the subscriber lost its place) */
@@ -92,17 +94,17 @@ export type LiveStep =
 
 /** one keyed frame against what is held for its key. Pure; the caller owns the map. */
 export function applyLiveFrame(cur: LiveKeyState | undefined, f: Extract<LiveFrame, { k: string }>): LiveStep {
-  if (f.t === 'snap') return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: f.text, ...(f.th ? { th: f.th } : {}) } };
+  if (f.t === 'snap') return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: f.text, ...(f.th ? { th: f.th } : {}), ...(f.imageGeneration !== undefined ? { imageGeneration: f.imageGeneration } : {}) } };
   if (f.t === 'end') return cur && cur.e === f.e ? { kind: 'end' } : { kind: 'none' };
   // a new epoch may start from nothing: its first delta keeps nothing
   if (!cur || cur.e !== f.e) {
     const th = thoughtsAfter('', f);
-    return f.s === 1 && f.keep === 0 && th !== null ? { kind: 'state', state: { a: f.a, e: f.e, s: 1, text: f.add, ...(th ? { th } : {}) } } : { kind: 'resync' };
+    return f.s === 1 && f.keep === 0 && th !== null ? { kind: 'state', state: { a: f.a, e: f.e, s: 1, text: f.add, ...(th ? { th } : {}), ...(f.imageGeneration !== undefined ? { imageGeneration: f.imageGeneration } : {}) } } : { kind: 'resync' };
   }
   if (f.s <= cur.s) return { kind: 'none' }; // a duplicate after a resync
   const th = thoughtsAfter(cur.th ?? '', f);
   if (f.s !== cur.s + 1 || f.keep > cur.text.length || th === null) return { kind: 'resync' };
-  return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: cur.text.slice(0, f.keep) + f.add, ...(th ? { th } : {}) } };
+  return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: cur.text.slice(0, f.keep) + f.add, ...(th ? { th } : {}), ...(f.imageGeneration !== undefined ? { imageGeneration: f.imageGeneration } : cur?.imageGeneration ? { imageGeneration: cur.imageGeneration } : {}) } };
 }
 
 /** parse one line from the wire; null = not a frame this version speaks */
@@ -116,6 +118,8 @@ export function parseLiveFrame(line: string): LiveFrame | null {
 export function liveFrameOf(v: unknown): LiveFrame | null {
   if (typeof v !== 'object' || v === null) return null;
   const f = v as Record<string, unknown>;
+  const image = f['imageGeneration'];
+  if (image != null && (typeof image !== 'object' || !Number.isInteger((image as ImageGenerationProgress).count) || (image as ImageGenerationProgress).count < 1 || (image as ImageGenerationProgress).count > 16 || !['generating', 'saving'].includes((image as ImageGenerationProgress).stage))) return null;
   const keyed = typeof f['k'] === 'string' && typeof f['a'] === 'string' && typeof f['e'] === 'string' && typeof f['s'] === 'number';
   switch (f['t']) {
     case 'snap': return keyed && typeof f['text'] === 'string' && (f['th'] === undefined || typeof f['th'] === 'string') ? (f as unknown as LiveFrame) : null;

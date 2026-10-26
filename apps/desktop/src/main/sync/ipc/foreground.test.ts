@@ -26,7 +26,7 @@ const fakeDb = (rows: unknown[] = []): FakeDb => {
   const queries: FakeDb['queries'] = [];
   return { queries, getAll: async <T>(sql: string, args: unknown[] = []) => { queries.push({ sql, args }); return rows as T[]; } };
 };
-const spec = (id: string): ConnectionSpec => ({ id, kind: 'custom', authMode: 'dev', apiUrl: `https://${id}.example`, powersyncUrl: '', webUrl: '' });
+const spec = (id: string): ConnectionSpec => ({ id, kind: 'custom', authMode: 'dev', apiUrl: `https://${id}.example`, webUrl: '' });
 const paths = (id: string) => ({ replicaPath: `/p/replica-${id}.db`, markerPath: `/p/workspaces-${id}.json` });
 const addConn = (id: string, ws: string, db: FakeDb): Connection => {
   const c = connections.add(makeConnection(spec(id), paths(id), `u-${id}`));

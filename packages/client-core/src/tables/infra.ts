@@ -3,9 +3,9 @@
 // Grouped the same way the renderer groups its row TYPES (bridge/rows-*), so a domain
 // reads the same on both sides of the IPC boundary. A column added here needs the
 // matching sync rule (dev/stack/powersync/sync-config.yaml), because every client reads this file.
-import { column, Table } from '@powersync/common';
+import { column, Table } from '../table';
 
-export const projects = new Table({ workspace_id: column.text, channel_id: column.text, slug: column.text, name: column.text, description: column.text, status: column.text, is_default: column.integer, auto_open_pr: column.integer, run_ci_before_merge: column.integer, ship_gate: column.integer, website: column.text, logo_url: column.text, model_pack: column.text });
+export const projects = new Table({ context_channel_id: column.text, brand_profile: column.text, settings: column.text, workspace_id: column.text, channel_id: column.text, slug: column.text, name: column.text, description: column.text, status: column.text, is_default: column.integer, auto_open_pr: column.integer, run_ci_before_merge: column.integer, ship_gate: column.integer, website: column.text, logo_url: column.text, model_pack: column.text });
 
 export const repos = new Table({
   workspace_id: column.text,
@@ -34,3 +34,5 @@ export const memory_blocks = new Table({
   basis_count: column.integer,
   updated_at: column.text,
 });
+
+export const project_agents = new Table({ workspace_id: column.text, project_id: column.text, agent_id: column.text, created_at: column.text }, { indexes: { by_project: ['project_id'] } });

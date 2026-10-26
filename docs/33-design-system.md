@@ -345,6 +345,13 @@ Rules of use:
 
 ## 5. Type
 
+**Current update, 2026-10-21:** NeuraMesh Sans is the interface face across HQ, desktop,
+mobile and the public site, including navigation, labels, buttons, prose, headings, brand
+text and checkout fields. The legacy `--fmono` / `F.mono` label roles now resolve to Sans.
+Source code, diffs, commands and terminals retain Geist Mono through `--fcode` / `F.code`
+or the terminal renderer. HQ preloads Sans Latin; other subsets load on demand.
+Sizes, weights and tracking stay unchanged. This supersedes the family choices below.
+
 **Web and desktop update, 2026-10-14:** George requested Geist Mono across both apps after the Paper review.
 The web and desktop tokens `--fbody`, `--fdisp`, `--fital`, `--fbrand`, and `--font` now resolve to `--fmono`.
 Headings, navigation, messages, the composer, menus, settings, whiteboard controls, and checkout fields use the same bundled face.
@@ -494,6 +501,11 @@ real work — if it is decoration, drop it and keep the pill.
   reduced-motion never strands an overlay.
 - **Constant motion is rationed:** typing dots (`nm-dot`), the step ring's orbiting halo — one
   heartbeat per surface, always stilled by `prefers-reduced-motion`.
+- **Active thread titles share the glassy text sweep** (George, 2026-10-24). In the web project
+  rail, automation list and history search, `in_progress` titles use the same 2.3-second gradient
+  as agent status text. Selection does not control the effect. Needs-you and settled titles stay
+  still. The title keeps its size, weight, ellipsis and hover scroll. Reduced motion removes the
+  gradient and restores solid text. Project names, timestamps and controls do not animate.
 - **Agent liveness is a thinking orb — the standing ruling (2026-08-06).** Any surface that
   shows an agent *thinking or working* uses a [`thinking-orbs`](https://github.com/Jakubantalik/thinking-orbs)
   dotted orb, never a generic spinner: the state IS the animation, so "what is it doing" reads
@@ -546,6 +558,15 @@ real work — if it is decoration, drop it and keep the pill.
   docked) · lockup hover. Home's caught-up peek fires only when the needs-you queue *drains*.
 
 ## 8. Component idioms
+
+**Setup progress update, 2026-10-21:** The sidebar shows a 38px progress circle with
+`done/total`. It always starts collapsed; the old expanded preference no longer opens it.
+Hover or keyboard focus previews the checklist. Click/tap pins it; leaving an unpinned
+preview, clicking outside, moving keyboard focus away or pressing Escape closes it.
+Arrow Down enters the checklist and Escape restores focus to the circle. The portal is
+clamped to the viewport and repositions when QR details expand. The existing dismissal,
+completion, unknown-state handling and setup actions remain. A folded or top nav uses the
+same compact control at the bottom right. This replaces the expanded card/pill behavior below.
 
 - **Cards** — elevated stratum, hover lift (§3). Board cards, Home attention cards, provider
   cards, crew cards: one recipe.
@@ -2023,6 +2044,21 @@ real work — if it is decoration, drop it and keep the pill.
   browser and the phone reduce the same events through the same code. A Code session's id is a bare
   uuid — it IS the synced row's id (0135) — and a lane stays open across screen navigation, because a
   pending approval belongs to the channel that asked it.
+
+  **Coding activity receipts** (October 23): reads, image views, commands and other tools live on
+  the transcript ground as muted single-line disclosures. A receipt keeps its position while
+  running and expands to its recorded input, available text output, duration and outcome. Failed
+  and interrupted actions never acquire success styling. Large display payloads are bounded,
+  binary output is omitted, and details survive conversation restore. Image disclosures load a
+  small visual only when opened and identify it as the current repository image.
+  Repository links open a read-only file tab in the right panel. The authenticated thread host
+  resolves the path inside its own checkout, including symlink checks, and returns a bounded
+  preview without invoking the model or recording file bytes as a new turn. Artifact links keep
+  their durable artifact resolver. Web URLs remain external links. Missing files, an old host or
+  a disconnected machine show a retryable message instead of opening another browser tab.
+  Ordinary connection closures while a thread is idle, including during reconnect, leave
+  the transcript, settled state and recency unchanged. A closure during work or approval shows
+  one retryable interruption. Failed sign-in, permission checks and runtime errors remain visible.
 
   **Onboarding on the phone** (S6, D15–D20): the wizard is the browser wizard one screen per step —
   the step ring (an oak arc on the panel3 track, the count in mono inside) and the step's name as a

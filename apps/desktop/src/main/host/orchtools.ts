@@ -1,3 +1,4 @@
+import type { DrawOutcome } from './drawdraft';
 // THE ORCHESTRATOR'S TOOL REGISTRY — extracted from agents.ts (track B2).
 //
 // One definition per tool, consumed by BOTH brains: the Anthropic transport wraps each in the
@@ -87,9 +88,9 @@ export interface ToolCtx {
   buildScheduleCard: (action: 'schedule' | 'unschedule', items: Array<{ item: string; letter: string; platform: string; slot?: string; preview: string }>, question: string) => string;
   ensureChatWorkspace: (threadId: string) => string;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
-  libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
+  libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace', at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => Promise<LibDoc[]>;
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
   workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }>;
@@ -142,9 +143,9 @@ export function makeOrchTools(ctx: HostCtx & {
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
   ensureChatWorkspace: (threadId: string) => string;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
-  libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
+  libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace', at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => Promise<LibDoc[]>;
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
@@ -344,7 +345,7 @@ async function buildOrchestratorTools(ctx: {
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
   const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
     draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, namedBySchedule, wbReads, wbWrites,
-    agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs,
+    agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs: (id, limit, scope, _at, name, offset) => libraryDocs(id, limit, scope, { threadId: convoThreadId, taskId: thread?.id }, name, offset),
     startDeepWork, subjectFor, workspaceListing, workspaceRead };
   // Whiteboards ride kind-gated from the shared catalogue — the #272 domain split dropped this
   // spread and the orchestrator spent five days commanded to draw with no drawing tool

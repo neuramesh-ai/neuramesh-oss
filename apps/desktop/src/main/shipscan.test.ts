@@ -38,20 +38,20 @@ diff --git a/packages/control-api/src/app.ts b/packages/control-api/src/app.ts
   assert.match(s.findings[0]!.detail, /NM_UPDATE_FEED/);
 });
 
-test('powersync config + a second manual edge raises the risk hint to high', () => {
+test('replica contract + a second release edge raises the risk hint to high', () => {
   const s = scanDiff(diff(`
-diff --git a/dev/stack/powersync/sync-config.yaml b/dev/stack/powersync/sync-config.yaml
---- a/dev/stack/powersync/sync-config.yaml
-+++ b/dev/stack/powersync/sync-config.yaml
+diff --git a/packages/control-api/src/local-sync.ts b/packages/control-api/src/local-sync.ts
+--- a/packages/control-api/src/local-sync.ts
++++ b/packages/control-api/src/local-sync.ts
 @@ -1,2 +1,3 @@
-+      - select * from widgets where workspace_id in (select workspace_id from my_workspaces)
++const columns = { widgets: ['id', 'workspace_id'] };
 diff --git a/packages/control-api/src/app.ts b/packages/control-api/src/app.ts
 --- a/packages/control-api/src/app.ts
 +++ b/packages/control-api/src/app.ts
 @@ -1,1 +1,2 @@
 +const key = process.env.STRIPE_WEBHOOK_SECRET;
 `));
-  assert.deepEqual(s.findings.map((f) => f.kind).sort(), ['env', 'powersync']);
+  assert.deepEqual(s.findings.map((f) => f.kind).sort(), ['env', 'replica']);
   assert.equal(s.riskHint, 'high');
 });
 

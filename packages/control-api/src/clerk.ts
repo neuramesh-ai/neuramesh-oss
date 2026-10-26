@@ -110,15 +110,19 @@ async function clerkSessionDead(key: string, sessionId: string): Promise<boolean
   }
 }
 
-export async function mintPowerSyncToken(sessionId: string): Promise<string> {
+/** Ordinary Clerk session JWT: no template or sync-service audience dependency. */
+export function mintApiToken(sessionId: string): Promise<string> { return mintSessionToken(sessionId, false); }
+/** Compatibility for installed clients, removed after their rollout gate. */
+export function mintPowerSyncToken(sessionId: string): Promise<string> { return mintSessionToken(sessionId, true); }
+async function mintSessionToken(sessionId: string, legacy: boolean): Promise<string> {
   const key = process.env['CLERK_SECRET_KEY'];
   if (!key) throw new DomainError('AUTH_UNAVAILABLE', 'CLERK_SECRET_KEY is not set');
   let res: Response;
   try {
-    res = await fetch(`https://api.clerk.com/v1/sessions/${sessionId}/tokens/powersync`, {
+    res = await fetch(`https://api.clerk.com/v1/sessions/${encodeURIComponent(sessionId)}/tokens${legacy ? "/powersync" : ""}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json', 'user-agent': CLERK_UA },
-      body: '{}',
+      body: JSON.stringify({ expires_in_seconds: 600 }),
       signal: AbortSignal.timeout(8000),
     });
   } catch (e) {
@@ -133,7 +137,7 @@ export async function mintPowerSyncToken(sessionId: string): Promise<string> {
   if (res.status >= 400 && res.status < 500 && (await clerkSessionDead(key, sessionId))) {
     throw new DomainError('SESSION_EXPIRED', 'Clerk session expired or revoked — sign in again');
   }
-  throw new DomainError('AUTH_UNAVAILABLE', body.errors?.[0]?.message ?? `could not mint a PowerSync token (${res.status}) — is the Clerk "powersync" JWT template configured?`);
+  throw new DomainError('AUTH_UNAVAILABLE', body.errors?.[0]?.message ?? `could not mint a session token (${res.status})`);
 }
 
 // The session token doesn't carry the email — fetch the primary one from the

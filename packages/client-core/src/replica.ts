@@ -1,7 +1,7 @@
-/** The client read model and durable message outbox. Hosted PowerSync and the local SQLite
- * implementation satisfy this interface. Consumers cannot depend on either engine's internals. */
+/** The shared SQLite read model and durable outbox on web, desktop, machines and iOS. */
 export interface ReplicaStatus {
   connected: boolean;
+  error?: string;
   lastSyncedAt?: Date;
   dataFlowStatus?: { downloading?: boolean; uploading?: boolean };
 }

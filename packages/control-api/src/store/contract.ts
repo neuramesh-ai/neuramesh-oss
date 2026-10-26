@@ -1,3 +1,4 @@
+import type { MarketingStore } from './marketing-contract';
 // THE STORE CONTRACT — extracted from store.ts (track C-store).
 //
 // 162 methods across ~23 domains, implemented twice (MemoryStore, PostgresStore). It is
@@ -10,7 +11,7 @@ import type { LifecycleRow } from '../lifecycle';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
 
 
-export interface Store {
+export interface Store extends MarketingStore {
   nextTaskNumber(workspace: string): Promise<number>;
   // Agent Retro (docs/13) — optional: only the postgres store aggregates it
   // (events/facts are server-side); callers 501 when absent.
@@ -387,14 +388,6 @@ export interface Store {
   // set a room's threads view mode ('on' | 'off') — a per-channel lens, not a reroute.
   setChannelThreadMode(channelId: string, mode: 'on' | 'off', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   setChannelKind(channelId: string, kind: 'build' | 'marketing', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
-  setChannelMarketing(channelId: string, profile: { website: string | null; focus: string[]; goal?: string; bootstrap_thread_id?: string; setup_by: string; setup_at: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string; workspace: string }>;
-  // one answered setup-flow step (setupflows.ts), merged into the profile as it lands — the
-  // per-step write that makes an abandoned wizard a pause instead of a loss
-  setChannelSetupStep(channelId: string, input: { flowId: string; stepId: string; patch: Record<string, unknown> }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string; workspace: string }>;
-  // release-day backfill: a setup task for every existing flow-bearing room left untouched
-  backfillSetupTasks(workspace: string): Promise<number>;
-  // flip one MCP integration toggle on the room's marketing profile (marketing.mcp.<provider>)
-  setMarketingIntegration(channelId: string, provider: string, enabled: boolean, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   channelWorkspace(channelId: string): Promise<{ workspace: string }>;
   // schedules (marketing-channel plan §4.6) — the generic "run X at time T" primitive
   createSchedule(input: ScheduleInput, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;

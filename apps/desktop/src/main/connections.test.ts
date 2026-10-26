@@ -12,9 +12,9 @@ import {
   connections, makeConnection, parseConnectionsStore, planConnections, readConnectionsStore, resolveUrls,
   statePathsFor, writeConnectionsStore, DEV_WS, LOCAL_PORTS, type ConnectionSpec, localPortsFor } from './connections';
 
-const BAKED = { apiUrl: 'https://api.neuramesh.app', powersyncUrl: 'https://ps.neuramesh.app', webUrl: 'https://neuramesh.app' };
+const BAKED = { apiUrl: 'https://api.neuramesh.app', webUrl: 'https://neuramesh.app' };
 const spec = (id: string, over: Partial<ConnectionSpec> = {}): ConnectionSpec =>
-  ({ id, kind: 'custom', authMode: 'clerk', apiUrl: `https://${id}.example`, powersyncUrl: `https://ps-${id}.example`, webUrl: '', ...over });
+  ({ id, kind: 'custom', authMode: 'clerk', apiUrl: `https://${id}.example`, webUrl: '', ...over });
 const paths = (id: string) => ({ replicaPath: `/p/state/replica-${id}.db`, markerPath: `/p/identity/workspaces-${id}.json` });
 
 beforeEach(() => connections.reset());
@@ -23,7 +23,7 @@ beforeEach(() => connections.reset());
 test('resolveUrls: env wins for a cloud connection, then its own values, then baked', () => {
   const env = { NM_API: 'http://127.0.0.1:8788', NM_POWERSYNC: 'http://127.0.0.1:58081' };
   assert.deepEqual(resolveUrls('cloud', env, { apiUrl: 'https://own.example', webUrl: 'https://own-web.example' }, BAKED), {
-    apiUrl: 'http://127.0.0.1:8788', powersyncUrl: 'http://127.0.0.1:58081', webUrl: 'https://own-web.example',
+    apiUrl: 'http://127.0.0.1:8788', webUrl: 'https://own-web.example',
   });
   assert.deepEqual(resolveUrls('cloud', {}, { apiUrl: 'https://own.example' }, BAKED), { ...BAKED, apiUrl: 'https://own.example' });
   assert.deepEqual(resolveUrls('cloud', {}, null, BAKED), BAKED);
@@ -34,7 +34,7 @@ test('resolveUrls: a blank env value does not shadow the rungs below it', () => 
 });
 
 test('resolveUrls: the local stack ignores NM_API — its address is its ports', () => {
-  const local = { apiUrl: `http://127.0.0.1:${LOCAL_PORTS.api}`, powersyncUrl: `http://127.0.0.1:${LOCAL_PORTS.powersync}`, webUrl: '' };
+  const local = { apiUrl: `http://127.0.0.1:${LOCAL_PORTS.api}`, webUrl: '' };
   assert.deepEqual(resolveUrls('local', { NM_API: 'https://elsewhere.example' }, null, local), local);
 });
 
@@ -45,7 +45,6 @@ test('planConnections: NM_AUTH=dev is one dev connection at the dev stack, env U
   assert.equal(plan[0]!.id, 'dev');
   assert.equal(plan[0]!.authMode, 'dev');
   assert.equal(plan[0]!.apiUrl, 'http://127.0.0.1:9999');
-  assert.equal(plan[0]!.powersyncUrl, `http://127.0.0.1:${LOCAL_PORTS.powersync}`);
 });
 
 test('planConnections: NM_AUTH=clerk is the cloud alone (sign-in first, exactly as before)', () => {
@@ -63,7 +62,6 @@ test('planConnections: the shipped app is Local mode, plus the cloud once a Cler
   assert.deepEqual(signedIn.map((c) => c.id), ['local', 'cloud', 'custom:hq']);
   assert.equal(signedIn[1]!.apiUrl, BAKED.apiUrl);
   assert.equal(signedIn[2]!.apiUrl, 'https://hq.example');
-  assert.equal(signedIn[2]!.powersyncUrl, BAKED.powersyncUrl, 'a custom server without its own PowerSync falls to baked');
 });
 
 // ── where the state lives ──
@@ -180,10 +178,9 @@ test('localIsDormant: Local boots when it is the foreground or when this Mac ran
 });
 
 test('the local stack\'s two ports move with NM_LOCAL_API_PORT and NM_LOCAL_POWERSYNC_PORT, and the local connection follows them', () => {
-  assert.deepEqual(localPortsFor({}), { api: 8788, powersync: 58081 });
-  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }), { api: 8795, powersync: 58095 });
-  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: 'nope', NM_LOCAL_POWERSYNC_PORT: '0' }), { api: 8788, powersync: 58081 });
-  const [local] = planConnections({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }, { clerkSignedIn: false, custom: [], baked: { apiUrl: 'https://api.example', powersyncUrl: 'https://ps.example', webUrl: 'https://web.example' } });
+  assert.deepEqual(localPortsFor({}), { api: 8788 });
+  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }), { api: 8795 });
+  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: 'nope', NM_LOCAL_POWERSYNC_PORT: '0' }), { api: 8788 });
+  const [local] = planConnections({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }, { clerkSignedIn: false, custom: [], baked: { apiUrl: 'https://api.example', webUrl: 'https://web.example' } });
   assert.equal(local!.apiUrl, 'http://127.0.0.1:8795');
-  assert.equal(local!.powersyncUrl, '', 'Local sync uses only the API port');
 });

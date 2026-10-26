@@ -21,7 +21,7 @@ const RUNTIMES: Array<{ id: LocalRuntime; fact: string; tag?: string }> = [
   { id: 'docker-desktop', fact: 'Free under 250 people. Asks for your password.' },
 ];
 /** one phrase per container, the way the picker's rows carry one fact each */
-const SERVICE_FACT: Record<string, string> = { Postgres: 'The workspace database', 'NeuraMesh API': 'The NeuraMesh server', PowerSync: 'The sync engine' };
+const SERVICE_FACT: Record<string, string> = { Postgres: 'The workspace database', 'NeuraMesh API': 'The NeuraMesh server' };
 
 const mb = (bytes: number | null): string => (bytes === null ? '' : `${Math.round(bytes / 1e6)} MB`);
 
@@ -165,7 +165,7 @@ export function LocalStackGate({ payload, onPick, onInstall, onRescan, onQuit }:
       break;
     case 'starting':
       card = (
-        <Card kicker="First run" title="NeuraMesh is starting up…" p="Your workspace runs in three containers. This usually takes under a minute.">
+        <Card kicker="First run" title="NeuraMesh is starting up…" p="Your workspace is starting on this Mac. This usually takes under a minute.">
           <Chain services={s.services} />
         </Card>
       );

@@ -190,7 +190,7 @@ test('the orchestrator is introduced as itself, not as the board', () => {
   const p = chatSystemPrompt(REX, 'product', { canUseTools: true });
   assert.match(p, /simply talking with the human/i);
   const dev = chatSystemPrompt(PATCH, 'product', { canUseTools: true });
-  assert.match(dev, /the developer in #product/i);
+  assert.match(dev, /the developer in a NeuraMesh project/i);
 });
 
 test('a hired agent brings its brief', () => {
@@ -207,4 +207,12 @@ test('a mode marker round-trips and nothing else parses as one', () => {
   assert.equal(parseModeMarker('mode:chat'), null);
   assert.equal(parseModeMarker('‹mode:board›'), null, 'only the two real modes');
   assert.equal(parseModeMarker('Who else is building this?'), null);
+});
+
+
+test('GPT chat advertises draft tools without promising local file writes', () => {
+  const prompt = chatSystemPrompt(REX, 'general', { canUseTools: true, canWriteFiles: false });
+  assert.match(prompt, /draft_posts/);
+  assert.match(prompt, /Files and commands are read-only/);
+  assert.doesNotMatch(prompt, /\*\*Write files\.\*\*/);
 });

@@ -20,7 +20,6 @@ const ipcMessage = (e: unknown, fallback: string): string => (e instanceof Error
 function ManualSetup({ onAdded }: { onAdded: () => void }) {
   const c = CONNECTIONS_COPY.manual;
   const [apiUrl, setApiUrl] = useState('');
-  const [powersyncUrl, setPowersyncUrl] = useState('');
   const [bearer, setBearer] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -28,9 +27,9 @@ function ManualSetup({ onAdded }: { onAdded: () => void }) {
     if (busy || !nm?.connectionAddCustom) return;
     setBusy(true); setErr(null);
     try {
-      const r = await nm.connectionAddCustom({ apiUrl, powersyncUrl: powersyncUrl || undefined, bearer });
+      const r = await nm.connectionAddCustom({ apiUrl, bearer });
       if (!r.ok) { setErr(r.message); return; }
-      setApiUrl(''); setPowersyncUrl(''); setBearer('');
+      setApiUrl(''); setBearer('');
       onAdded();
     } catch (e) { setErr(ipcMessage(e, 'The server did not connect.')); }
     finally { setBusy(false); }
@@ -41,7 +40,6 @@ function ManualSetup({ onAdded }: { onAdded: () => void }) {
       <p className="cxp dim">{c.sub}</p>
       <div className="cxfields">
         <label className="cxfield"><span>{c.api}</span><input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="https://" spellCheck={false} autoCapitalize="off" /></label>
-        <label className="cxfield"><span>{c.powersync}</span><input value={powersyncUrl} onChange={(e) => setPowersyncUrl(e.target.value)} placeholder="https://" spellCheck={false} autoCapitalize="off" /></label>
         <label className="cxfield"><span>{c.bearer}</span><input type="password" value={bearer} onChange={(e) => setBearer(e.target.value)} placeholder="nmh_…" spellCheck={false} autoCapitalize="off" /></label>
         <div className="cxfieldacts">
           <button type="button" className="btn" disabled={busy || !apiUrl.trim() || !bearer.trim()} onClick={() => void connect()}>{busy ? c.busy : c.connect}</button>

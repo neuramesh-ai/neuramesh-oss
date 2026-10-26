@@ -47,33 +47,19 @@ On the production deploy ([`vercel.json`](../packages/control-api/vercel.json) `
 curl -s https://api.neuramesh.app/.well-known/a2a/agent-card.json | head
 ```
 
-### PowerSync — automated on merge, but VERIFY THE STEP
+### SQLite replica deployment
 
-Sync rules live once, in [`dev/stack/powersync/sync-config.yaml`](../dev/stack/powersync/sync-config.yaml).
-**[`powersync-sync-rules.yml`](../.github/workflows/powersync-sync-rules.yml) deploys them to the prod
-Cloud instance on merge to `main`** (migrations first, then deploy — that ordering is load-bearing, see
-#196). It is path-filtered, so it only runs when the rules file actually changes.
+Current clients consume the authenticated `/v1/brain/replica/bootstrap` and `changes` API feed.
+Deploy the API and its additive Postgres migrations before releasing clients. No separate sync
+service, JWT audience, publication or rule deployment is required. New read-model fields belong
+in `packages/client-core/src/schema.ts`; the server uses that allowlist and forces a fresh snapshot
+when its hash changes. A new table also needs the change-capture trigger and a workspace scope.
 
-Two ways this still bites, so **read the job's steps, never just its ✓**:
-
-- **The job no-ops green** when `PS_ADMIN_TOKEN` / `POWERSYNC_INSTANCE_ID` aren't set — by design, so it
-  never goes red on a fork. A skipped deploy and a successful deploy look identical from the checks list.
-- **On a pull request `validate` is advisory** (`continue-on-error`): the prod DB has no table your
-  branch's migration is about to add, so a legitimately-new table would otherwise wedge the PR. The
-  push-to-`main` run is the authoritative gate.
-
-Confirm with: `gh run view <id> --json jobs --jq '.jobs[].steps[] | "\(.name) → \(.conclusion)"'` and
-look for **`Deploy sync rules to the prod Cloud instance → success`**, not `skipped`.
-
-Rules of thumb for what needs a rule change at all:
-
-- A table synced with `select *` (e.g. `agents`) **picks up new columns automatically** — no rule edit.
-- An **explicit-column** rule (e.g. `messages`) needs the new column added to the rule.
-- A **new column's existing rows** aren't re-replicated by a metadata-only `add column` — hit **Deploy** in the dashboard to force a re-snapshot if you need them backfilled.
-- A **new synced table** needs three things: a primary key `id`, membership in the `powersync` publication, and a sync rule.
-- `workspaces` is **not** synced — its fields ride `GET /v1/workspaces` over REST.
-
-**A re-snapshot to backfill existing rows is still a dashboard action, and MUST be called out in the PR — see §4.**
+During the retirement rollout, the frozen legacy sync-rule file remains a compatibility contract
+for installed clients only. The local stack and CI no longer deploy it. Follow the
+[retirement plan](design/powersync-retirement-2026-10/plan.md) for client releases, the supported
+version gate, credential cleanup and hosted-service shutdown. Do not advance the desktop floor
+before publishing its replacement.
 
 ---
 
@@ -85,17 +71,17 @@ Rules of thumb for what needs a rule change at all:
    - [`apps/desktop/package.json`](../apps/desktop/package.json)
    - SemVer. There is no bump script; edit both. Land the bump through a PR like any change.
    - **Write the contract of the new desktop** ([docs/46](46-client-contracts.md#when-each-part-moves)). Run `node scripts/contract-snapshot.mjs` after the last rebase onto `main`, and commit `contracts/desktop/<new version>.json`. A test fails the PR without it. Leave `SUPPORTED_DESKTOP_VERSIONS` as it is: it moves after the publish (step 6).
-2. **Tag and push:**
+2. **Release the public Local API image first** ([docs/43 §5](43-public-repository.md#5-two-release-lanes)). Merge the scrubbed public publish PR with a merge commit. From a separate clone of `neuramesh-ai/neuramesh-oss`, tag its public commit `vX.Y.Z`; wait for `control-api-image.yml` and verify `ghcr.io/neuramesh-ai/neuramesh-control-api:X.Y.Z` is anonymously pullable for `linux/arm64` and `linux/amd64`. Never push a private repository's tag or history to the public repository. Smoke-test that published image with the desktop's compose file on an isolated empty local stack. Then **tag and push in the private repository:**
    ```bash
    git tag v0.6.0 && git push origin v0.6.0
    ```
    (or run **Release Desktop** via `workflow_dispatch` with a tag/SHA.)
 3. **The desktop tag does not roll the fleet** (since 2026-09-26). From 2026-09-19 it did, so a daemon fix waited for a desktop release. The cloud machines now roll on their own tag (§2a).
 4. **[`release.yml`](../.github/workflows/release.yml) builds both Mac architectures on one `macos-15` runner.** The release install includes optional native dependencies for both arm64 and x64. The job signs, notarizes and staples each app, then uploads a **draft** to the public releases repo. The macOS 14 image retires on November 2, 2026 and has reduced capacity during its deprecation period ([runner notice](https://github.com/actions/runner-images/issues/13518)).
-   - **Bake guard:** the build *fails* unless `NM_POWERSYNC` and `CLERK_PUBLISHABLE_KEY` are set (repo `vars`) — a release can never ship pointing at localhost or keyless. `NM_API` defaults to `https://api.neuramesh.app`.
-   - **Native CLI guard:** both packaged apps must pass `--smoke-cli`. The runner tests the Intel app through Rosetta. A pass on arm64 does not prove that the Intel app contains its CLI. Keep the draft unpublished if either check fails.
+   - **Bake guard:** the build *fails* unless `CLERK_PUBLISHABLE_KEY` are set (repo `vars`) — a release can never ship pointing at localhost or keyless. `NM_API` defaults to `https://api.neuramesh.app`.
+   - **Native CLI and SQLite guard:** both packaged apps must pass `--smoke-cli`, including a native database write, reopen and read-only check. The runner tests the Intel app through Rosetta. A pass on arm64 does not prove the Intel payload works. Keep the draft unpublished if either check fails.
    - **Native Intel check:** dispatch `release.yml` with `ref=main` and `verify_tag=vX.Y.Z` to check an existing draft on `macos-15-intel`. This mode skips the build. It checks the signed app, CLI, fresh-profile startup budget and both first-run themes. Review the uploaded screenshots. Rosetta timing does not prove native Intel performance.
-5. **Review the draft, then publish it** — run the **[Publish Desktop Release](../.github/workflows/publish-release.yml)** workflow (Actions tab → Run workflow; blank `tag` = newest draft, or name one; `dry_run` to validate first). It refuses to publish a draft that's missing `latest-mac.yml` or a `.dmg`, then flips it to published + latest. (Equivalent by hand: `gh release edit vX.Y.Z --repo alonge-dev/neuramesh-desktop-releases --draft=false --latest`, or the GitHub UI.) Assets: `NeuraMesh-X.Y.Z-arm64.dmg`/`.dmg` + `.zip`s + `latest-mac.yml` + blockmaps. Publishing (un-drafting) is what flips the switch: `electron-updater` reads `latest-mac.yml` from the **latest** release to auto-update installed apps, and the marketing site's Download screen reads the assets via the GitHub API. **Don't publish until the backend it needs is live (§0).**
+5. **Review the draft, then publish it** — run the **[Publish Desktop Release](../.github/workflows/publish-release.yml)** workflow (Actions tab → Run workflow; blank `tag` = newest draft, or name one; `dry_run` to validate first). It refuses to publish a draft that's missing `latest-mac.yml`, a `.dmg`, or the anonymously accessible public Local API image for either architecture, then flips it to published + latest. Use this workflow so the image gate runs for both dry runs and publication. Assets: `NeuraMesh-X.Y.Z-arm64.dmg`/`.dmg` + `.zip`s + `latest-mac.yml` + blockmaps. Publishing (un-drafting) is what flips the switch: `electron-updater` reads `latest-mac.yml` from the **latest** release to auto-update installed apps, and the marketing site's Download screen reads the assets via the GitHub API. **Don't publish until the backend it needs is live (§0).**
 6. **After the publish, the ledger-header PR.** It names the new version as the newest published desktop in the ledger header. In the same PR, set `SUPPORTED_DESKTOP_VERSIONS` in `packages/shared/src/desktop-floor.ts` to the new version and the one before it ([docs/46](46-client-contracts.md#when-each-part-moves)). `MIN_DESKTOP_VERSION` follows, so the floor moves up when this PR deploys. Never move the list in the bump PR. If you do, the check no longer holds the tree to the older supported desktop, and the floor rises before the new desktop is published.
 
 ## 2a · Cloud machine release (the fleet)
@@ -105,7 +91,7 @@ The cloud machines run the daemon from the machine image (`infra/images/machine/
 **What a fleet tag does** ([`fleet-roll.yml`](../.github/workflows/fleet-roll.yml)):
 
 1. It builds and pushes the machine image for the tagged commit (`machine-image.yml`, called). The image carries the commit's sha as `NM_IMAGE_SHA`.
-2. It boots the new image once as a Job on the production cluster, on the gVisor nodes and the runtime class that the machines use. The Job imports `machined`, loads the shipped agent contract of every role, and reaches the relay's `/healthz`. Any other result stops the roll, and the fleet stays on its pin. The Job deletes itself.
+2. It boots the new image once as a Job on the production cluster, on the gVisor nodes and the runtime class that the machines use. The Job imports `machined`, initializes/writes/reopens the real native SQLite replica, loads the shipped agent contract of every role, and reaches the relay's `/healthz`. Any other result stops the roll, and the fleet stays on its pin. The Job deletes itself.
 3. It pins `infra/k8s/cluster/overlays/gke/fleet-deployment.yaml` to the full sha and commits the pin to `main` as the bot. Only a commit on `main` rolls.
 4. It dispatches `fleet-deploy.yml`, which applies the operator, pre-pulls the image and lets the operator roll every workspace machine.
 
@@ -144,7 +130,7 @@ Provider model lineups move fast. Before a release, re-check the newest **Anthro
 Automation enforces what it can (migrations on deploy, bundle regen), but a human-operated step **cannot** be enforced in code — so the PR description is the contract between the author and the operator. A silent manual requirement is exactly the failure that stranded v0.5.0 (§5).
 
 **Triggers that demand a note** (non-exhaustive):
-- **PowerSync** — a re-snapshot to backfill existing rows (dashboard) · a rules deploy that the workflow could NOT do (secrets unset, or the run's deploy step came back `skipped`). A routine rules change now ships itself on merge (§1) — say so, and say who verified the step.
+- **Replica rollout** — deploy the API before clients; record upgrade, offline-queue and membership-revocation checks. During retirement, include the installed-client and service-shutdown gates.
 - **Vercel env / secrets** — a new or changed variable (e.g. `MIGRATE_DATABASE_URL`, a new Stripe/Clerk key).
 - **Migrations** — anything beyond "auto-applies on deploy": a manual backfill, a data migration, a destructive change.
 - **Desktop** — publishing the draft, or a required backend-before-desktop ordering.
@@ -155,7 +141,7 @@ Automation enforces what it can (migrations on deploy, bundle regen), but a huma
 ```markdown
 ## Deploy notes
 <!-- Manual steps the operator must take on/after merge. Write "none" if fully automated. -->
-- [ ] PowerSync: <deploy rules / re-snapshot to backfill / none>
+- [ ] Replica: <API/schema deployment / client migration / retirement gate / none>
 - [ ] Vercel env/secrets: <add VAR=… / none>
 - [ ] Migration: <auto-applies on deploy / manual backfill needed / none>
 - [ ] Desktop: <publish vX.Y.Z draft after backend is live / n/a>
@@ -180,7 +166,7 @@ A coupled feature (backend + desktop):
 
 - [ ] Model lineup reviewed (§3); packs/routing updated if needed
 - [ ] Backend PR merged → Vercel prod deploy green → migration applied (verify with the curl in §1)
-- [ ] PowerSync: the main run's **`Deploy sync rules … → success`** step confirmed (not `skipped`); re-snapshotted if the Deploy notes said so
+- [ ] Replica: API feed deployed before clients; restored data and queued writes verified
 - [ ] Prod smoke: public route returns the new code
 - [ ] Ledger rows closed, header updated ([desktop-parity-ledger.md](desktop-parity-ledger.md))
 - [ ] Version bumped in **both** `package.json`s

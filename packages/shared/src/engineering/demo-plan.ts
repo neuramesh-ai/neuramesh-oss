@@ -14,4 +14,4 @@ export const SAMPLE_CHANGES: EngineeringChange[] = [
   },
 ];
 
-export const WORK_PLAN = `## Work Plan\n\n1. Trace the callback lifecycle and reproduce the duplicate exchange.\n2. Make the in-flight request cancellable when the route unmounts.\n3. Add regression coverage for unmount and a successful callback.\n4. Run the focused test, typecheck, and the application build.\n\n**Guardrails:** no auth protocol changes; no token material leaves the machine.`;
+export const WORK_PLAN = `## Work Plan\n\n1. Trace the callback lifecycle and reproduce the duplicate exchange.\n2. Make the in-flight request cancellable when the route unmounts.\n3. Add regression coverage for unmount and a successful callback.\n4. Run the focused test, typecheck, and the application build.\n\n**Guardrails:** no change to the auth protocol, and no token material leaves the machine.`;

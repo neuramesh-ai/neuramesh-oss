@@ -12,23 +12,38 @@ with the next desktop tag, because the desktop's renderer copy already carries t
   version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** [v0.155.0](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.155.0)
-(published 2026-10-14, built from merged source `edff628f`, PR #732). The public source tag
-matches the signed runtime. Paper light, dark and Cream Oak now ship on desktop; see the
-[native validation and screenshots](design/paper-look-2026-10/desktop-validation.md). The previous
-published desktop is v0.154.2. v0.154.1 remains an unpublished, superseded draft.
+**Newest published desktop:** [v0.156.1](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.156.1)
+(published 2026-10-24 at 18:14 UTC, built from `e4705f66`, merged as `4e0327d1`, PR #764).
+It carries the shared SQLite replica, original file previews, coding activity/history recovery and
+the corrected native SQLite driver. Both packaged architectures passed database write/reopen
+and read-only checks. Native Intel validation passed with an 801 ms cold start; dark and
+cream-oak screenshots were inspected. See the [rollout evidence](design/powersync-retirement-2026-10/validation.md).
+
+The previous supported published desktop is v0.155.1. v0.156.0 was briefly published and then
+withdrawn after the native SQLite constructor failure. It remains a draft. v0.154.1 is also an
+unpublished, superseded draft. The legacy service remains a compatibility dependency of
+v0.155.1 until the explicit retirement cutover.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log edff628f..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log 4e0327d1..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
 
+The v0.156.2 candidate is the second desktop release with the API replica. It adds
+shared project document/repository access across thread types and streams Gemini tool
+activity in conversational threads. These runtime changes require fresh coding and native
+validation before release. After publication, a separate support update
+will name v0.156.2 and v0.156.1 and remove v0.155.1 from the supported pair. The hosted
+PowerSync service stays active until the public iOS upgrade and final consumer checks pass.
+
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
+| 2026-10-24 | Shared project library and all attached repositories in normal, marketing and coding threads; live Gemini reasoning summaries and tool steps. | #767 | Project context parity | after rollout | Shared context resolution, bounded repository reads, Gemini conversation streaming. | v0.156.2 candidate |
+| 2026-10-23 | Shared SQLite replica replaces PowerSync; preserves queued edits and cached reads across upgrades. File previews, expandable coding activity, and connection/history recovery. | #762 | [Retirement](design/powersync-retirement-2026-10/plan.md) | web, phone, cloud, desktop after rollout | Shared replica, normal API credentials, legacy cache import, native SQLite packaging. | v0.156.1 |
 | 2026-10-15 | **Elevated default themes.** Fresh profiles follow the OS with Light or Soft Dark. Saved fixed palettes remain unchanged. | this PR | [Validation](design/hq-subscription-2026-10/validation.md) | web, desktop | Theme resolution, first-paint boot and Appearance copy. | v0.155.1 |
 | 2026-10-13 | Saved-model refusals retain an open thread so a new model can be selected. A reload waits for the host recording revision before it restores history. | #722, #723 | [Coding rollout](design/mobile-brain-coding-2026-10/rollout.md) | web, cloud, desktop | Includes the host recovery and renderer restore fixes. The v0.154.1 draft remains unpublished. The replacement also defers the coding runtime probe until Code is requested and includes both native CLI packages. | v0.154.2 |
 | 2026-10-13 | **Paper appearance.** Paper Light, Paper Dark, Paper Cream Oak and Paper system beside the elevated themes | #726 design, #727 web, #732 desktop | [paper look](design/paper-look-2026-10/implementation.md) | web, desktop | Includes Paper defaults, all three palettes, Geist Mono, distinct outlined agent marks, muted state colors, Home destination controls, repository footer and thread overview alignment. Native phone themes stay unchanged. | v0.155.0 |

@@ -2,7 +2,7 @@
 // per-table error policy preserved exactly, unknown tables left to the caller.
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import type { CrudEntry } from '@powersync/common';
+import type { CrudEntry } from '../src/crud-upload';
 import { uploadCrudEntry, type UploadIdentity } from '../src/crud-upload';
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: Record<string, unknown> };
@@ -48,9 +48,9 @@ test('machine identity rides the bearer + default actor on every call', async ()
   assert.deepEqual(JSON.parse(calls[0]!.headers['x-nm-actor']!), { kind: 'agent', id: 'owner-1' });
 });
 
-test('messages non-409 failure throws (PowerSync must retry); 409 is converged', async () => {
+test('messages expose typed failures for retry policy; 409 is converged', async () => {
   const bad = harness(500, 'boom');
-  await assert.rejects(() => uploadCrudEntry(bad.ident, op('messages', 'PUT', { channel_id: 'c1' })), /upload failed 500/);
+  await assert.rejects(() => uploadCrudEntry(bad.ident, op('messages', 'PUT', { channel_id: 'c1' })), { name: 'ControlApiError', status: 500 });
   const dupe = harness(409);
   assert.equal(await uploadCrudEntry(dupe.ident, op('messages', 'PUT', { channel_id: 'c1' })), 'uploaded');
 });
@@ -90,12 +90,12 @@ test('unknown tables are unhandled — the caller owns the policy', async () => 
 // hosted write gate that sent it was deleted on 2026-10-03 (the Pro trial writes), and the rule
 // stays for any server that still answers it. A 402 (the commands lane's shape) would throw here,
 // and a throw holds every download behind it.
-test('the hosted write gate: 409 PLAN_LIMIT is dropped on every lane, a 402 is retried', async () => {
+test('the hosted write gate: 409 PLAN_LIMIT is dropped on every lane, a 402 exposes its refusal code', async () => {
   const gated = () => harness(409, JSON.stringify({ error: 'This workspace needs Pro. Your threads stay readable. Get Pro to write again.', code: 'PLAN_LIMIT' }));
   assert.equal(await uploadCrudEntry(gated().ident, op('messages', 'PUT', { channel_id: 'c1', body: 'typed into a gated room' })), 'uploaded');
   assert.equal(await uploadCrudEntry(gated().ident, op('artifacts', 'PUT', { message_id: 'm1', name: 'x.png' })), 'uploaded');
   assert.equal(await uploadCrudEntry(gated().ident, op('whiteboards', 'PUT', { channel_id: 'c1', rev: 1 })), 'uploaded');
   assert.equal(await uploadCrudEntry(gated().ident, op('whiteboards', 'PATCH', { rev: 2, title: 't' })), 'uploaded');
   const paywall = harness(402, JSON.stringify({ code: 'PLAN_LIMIT' }));
-  await assert.rejects(() => uploadCrudEntry(paywall.ident, op('messages', 'PUT', { channel_id: 'c1' })), /upload failed 402/);
+  await assert.rejects(() => uploadCrudEntry(paywall.ident, op('messages', 'PUT', { channel_id: 'c1' })), { name: 'ControlApiError', status: 402, code: 'PLAN_LIMIT' });
 });

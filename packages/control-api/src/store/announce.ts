@@ -65,7 +65,7 @@ export interface AnnounceStore {
    *  use, and the reconnect words name it too), then the one with a GitHub address (a folder attached
    *  from a desktop is `local`, unreadable by the App), the primary among those, with the workspace
    *  the row belongs to. A revoked row names nothing. Null when the room has none. */
-  repoForChannel(channelId: string): Promise<PrimaryRepo | null>;
+  repoForChannel(channelId: string, repoId?: string): Promise<PrimaryRepo | null>;
   /** the open GitHub cards in the rooms of this room's project, oldest first: what the grant resumes
    *  (github-resume.ts, docs/design/repo-connect-2026-10). A card is a row whose message holds the
    *  nmneed block, so an agent's own question with the same prefix never resumes. The card's message
@@ -117,8 +117,8 @@ export class MemAnnounceStore implements AnnounceStore {
   seedRepo(link: { channelId: string } & PrimaryRepo): void { this.repoLinks.push(link); }
   /** the memory store's linkRepo lands here, once per room and repo */
   linkRoom(link: { channelId: string } & PrimaryRepo): void { if (!this.repoLinks.some((l) => l.channelId === link.channelId && l.repoId === link.repoId)) this.repoLinks.push(link); }
-  async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
-    const links = this.repoLinks.filter((r) => r.channelId === channelId);
+  async repoForChannel(channelId: string, repoId?: string): Promise<PrimaryRepo | null> {
+    const links = this.repoLinks.filter((r) => r.channelId === channelId && (!repoId || r.repoId === repoId));
     const w = this.world();
     const room = w.channels.find((c) => c.id === channelId);
     const named = room && w.connectors.find((k) => k.workspace === room.workspace && k.projectId === room.projectId && k.provider === 'github' && (k.status === 'connected' || k.status === 'reauth_required'))?.handle.toLowerCase();
@@ -262,12 +262,12 @@ export class PgAnnounceStore implements AnnounceStore {
     const rows = await this.sql`select installation_id, account, repos, selection from github_installations where workspace_id = ${workspaceId}::uuid order by updated_at desc`;
     return rows.map((r) => ({ installationId: Number(r['installation_id']), account: r['account'] as string, repos: (r['repos'] as string[] | null) ?? [], selection: r['selection'] === 'all' ? 'all' as const : 'selected' as const }));
   }
-  async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
+  async repoForChannel(channelId: string, repoId?: string): Promise<PrimaryRepo | null> {
     // one connectors row per (workspace, project, provider): the join never doubles a repository
     const [row] = await this.sql`select c.workspace_id, c.project_id, r.id as repo_id, r.org_name, r.name, r.clone_url, r.provider
-      from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id
+      from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id and r.workspace_id = c.workspace_id
       left join connectors k on k.workspace_id = c.workspace_id and k.project_id = c.project_id and k.provider = 'github' and k.status in ('connected', 'reauth_required')
-      where c.id = ${channelId}::uuid
+      where c.id = ${channelId}::uuid and (${repoId ?? null}::uuid is null or r.id = ${repoId ?? null}::uuid)
       order by (lower(r.org_name || '/' || r.name) = lower(k.handle)) is true desc,
         (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
     return row ? { workspaceId: row['workspace_id'] as string, projectId: (row['project_id'] as string | null) ?? null, repoId: row['repo_id'] as string, orgName: row['org_name'] as string, name: row['name'] as string, cloneUrl: (row['clone_url'] as string | null) || null, provider: (row['provider'] as string | null) ?? null } : null;

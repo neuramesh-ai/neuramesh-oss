@@ -1,3 +1,4 @@
+import { TABLE_COLUMNS } from '@neuramesh/client-core/schema';
 // The enforced loop against the REAL schema (migration 0001 + DB triggers).
 // Run via scripts/test-pg.sh — skipped without DATABASE_URL.
 import type { Actor } from '@neuramesh/shared';
@@ -267,23 +268,15 @@ describe.skipIf(!DB)('the loop on postgres (real schema + triggers)', () => {
     }
   });
 
-  it('every published table carries a single-column id (PowerSync row identity)', async () => {
-    // Composite-PK tables replicate with row_id='' and collapse to one row on
-    // clients — silently. The publication is the contract; enforce id on it.
+  it('every API replica table carries a single-column id', async () => {
     const sql = postgres(DB!);
     try {
-      const published = await sql`select tablename from pg_publication_tables where pubname = 'powersync'`;
-      expect(published.length).toBeGreaterThanOrEqual(8);
-      expect(published.map((row) => row['tablename'])).toContain('project_repos');
-      const missing = await sql`
-        select pt.tablename from pg_publication_tables pt
-        where pt.pubname = 'powersync' and not exists (
-          select 1 from information_schema.columns c
-          where c.table_schema = pt.schemaname and c.table_name = pt.tablename and c.column_name = 'id')`;
-      expect(missing.map((r) => r['tablename'])).toEqual([]);
-    } finally {
-      await sql.end();
-    }
+      const tables = Object.keys(TABLE_COLUMNS);
+      expect(tables).toContain('project_repos');
+      const columns = await sql`select table_name from information_schema.columns
+        where table_schema='public' and table_name=any(${tables}) and column_name='id'`;
+      expect(columns.map(row => row['table_name']).sort()).toEqual(tables.sort());
+    } finally { await sql.end(); }
   });
 
   it('invites members: owner-gated, human-only, pending until the invitee accepts', async () => {

@@ -23,6 +23,7 @@ const quiet = () => {};
 const SCHEMA = `
   create table channels (id text primary key, workspace_id text, slug text, kind text, created_at text);
   create table agents (id text primary key, workspace_id text, name text, role text, status text, retired_at text);
+  create table tasks (id text primary key, channel_id text, kind text);
 `;
 const ROOMS = `insert into channels values
   ('c-general', 'ws1', 'general', 'build', '2026-10-01T00:00:00Z'),
@@ -104,6 +105,19 @@ test('the runner speaks as its owner', { skip }, async () => {
   const reg = sent[3]!.body;
   assert.equal(reg['machineId'], 'runner-1');
   assert.deepEqual(reg['channels'], ['c-old', 'c-new']);
+});
+
+test('an explicit setup opts a general project context into marketing seeds', { skip }, async () => {
+  const r = replica(ROOMS + REX + agent('plume', 'marketer'));
+  const { post, sent } = poster();
+  const clock = fakeClock();
+  startRunnerSeeds({ db: r.db, cfg, synced, post, packRoles: starter, log: quiet, timer: clock.timer });
+  await settle();
+  const before = sent.length;
+  r.write("insert into tasks values ('setup', 'c-general', 'setup')");
+  clock.advance(SEED_DELAY_MS); await settle();
+  assert.ok(sent.slice(before).some((s) => s.body['type'] === 'skillpack.seed_defaults' && s.body['channel'] === 'c-general'));
+  assert.equal(registersIn(sent).length, 0, 'existing marketers are not registered again or added to more projects');
 });
 
 test('a replica reopened after a sleep seeds only after this process syncs', { skip }, async () => {

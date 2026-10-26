@@ -7,19 +7,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeDraw, NO_IMAGE_KEY } from './drawdraft';
 
+const ORIGINAL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64');
 const CH = { id: 'ch-1', slug: 'marketing', workspace_id: 'ws-1' };
 const agentOf = (role: string, id: string) => ({ id, name: id, role, runtime: 'claude-code', model: 'claude-opus-5-5', channels: new Set([CH.id]) });
 
-function rig(opts: { media?: Record<string, unknown> | null; cred?: boolean; paint?: Record<string, unknown>; brief?: string; rewrite?: string } = {}) {
+function rig(opts: { media?: Record<string, unknown> | null; cred?: boolean; paint?: Record<string, unknown>; brief?: string; rewrite?: string; failUpload?: boolean; missingReceipt?: boolean; missingDraft?: boolean } = {}) {
   const sent: Array<{ actor: string; cmd: Record<string, unknown> }> = [];
   const row = { platform: 'x', media: opts.media === undefined ? null : JSON.stringify(opts.media), body: 'Tired but wired. flowe fixes the gap.', channel_id: CH.id, slug: CH.slug, workspace_id: CH.workspace_id };
   const draw = makeDraw({
     agents: new Map([['m', agentOf('marketer', 'plume')], ['o', agentOf('orchestrator', 'rex')]]) as never,
-    db: { getAll: async <T,>(sql: string) => (sql.includes('from content_items') ? [row] : []) as T[] },
-    post: (async (_path: string, actor: { id: string }, cmd: unknown) => { sent.push({ actor: actor.id, cmd: cmd as Record<string, unknown> }); return { ok: true } as Response; }),
+    db: { getAll: async <T,>(sql: string) => (sql.includes('from content_items') && !opts.missingDraft ? [row] : []) as T[] },
+    post: (async (_path: string, actor: { id: string }, cmd: unknown) => { sent.push({ actor: actor.id, cmd: cmd as Record<string, unknown> }); return Response.json(opts.missingReceipt ? {} : { mediaId: 'original-media' }, { status: opts.failUpload && (cmd as { type: string }).type === 'content.attach_media' ? 503 : 200 }); }),
     imageCred: async () => (opts.cred === false ? null : { provider: 'openai' as const, key: 'k' }),
     brandOf: async () => ({ tokens: { palette: [{ hex: '#f5d64a' }], fonts: ['Geist'] }, product: 'flowe' }) as never,
-    paint: (async () => opts.paint ?? { thumb: 'data:image/png;base64,T', publish: 'data:image/png;base64,P', model: 'gpt-image-2' }) as never,
+    paint: (async () => opts.paint ?? { thumb: 'data:image/png;base64,T', bytes: ORIGINAL, mime: 'image/png', model: 'gpt-image-2' }) as never,
     complete: (async (_c: unknown, _m: string, system: string) => (/STRICT JSON/.test(system) ? (opts.rewrite ?? '') : (opts.brief ?? '"a tired founder at a dark desk, one warm lamp"'))) as never,
   });
   return { draw, sent, types: () => sent.map((s) => `${s.cmd['type']}${s.cmd['imageBrief'] ? '+brief' : ''}${s.cmd['thumb'] ? '+thumb' : ''}${s.cmd['imageError'] === '' ? '+clear' : s.cmd['imageError'] ? '+error' : ''}${s.cmd['body'] ? '+body' : ''}`) };
@@ -77,4 +78,34 @@ test('a rewrite that comes back unusable puts the reason on the card', async () 
   const out = await draw.draftImageFor('item-1', { rewrite: true });
   assert.equal(out.ok, false);
   assert.deepEqual(types(), ['content.revise+error']);
+});
+
+
+test('draft generation hosts the original before showing the thumbnail', async () => {
+  const { draw, sent } = rig();
+  assert.equal((await draw.draftImageFor('item-1')).ok, true);
+  const upload = sent.find(s => s.cmd.type === 'content.attach_media')!;
+  assert.equal(upload.cmd.dataUrl, `data:image/png;base64,${ORIGINAL.toString('base64')}`);
+});
+
+test('a rejected original upload leaves a visible failure and never claims success', async () => {
+  const { draw, types } = rig({ failUpload: true });
+  const out = await draw.draftImageFor('item-1');
+  assert.equal(out.ok, false);
+  assert.match(out.error!, /original image could not be saved/);
+  assert.deepEqual(types(), ['content.revise+brief', 'content.attach_media', 'content.revise+error']);
+});
+
+for (const scenario of ['missingDraft', 'failUpload', 'missingReceipt'] as const) test(`typed draft result rejects ${scenario} without claiming redraw`, async () => {
+  const { draw } = rig({ [scenario]: true, media: { brief: 'A sunset' } });
+  const out = await draw.generateDraftImage(agentOf('marketer', 'plume') as never, CH, 'item-1');
+  assert.equal(out.ok, false);
+  assert.ok(out.error);
+});
+
+test('typed draft success carries the acknowledged original media ID', async () => {
+  const { draw } = rig({ media: { brief: 'A sunset' } });
+  const out = await draw.generateDraftImage(agentOf('marketer', 'plume') as never, CH, 'item-1');
+  assert.equal(out.ok, true);
+  if (out.ok) assert.equal(out.mediaId, 'original-media');
 });

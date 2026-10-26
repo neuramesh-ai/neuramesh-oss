@@ -3,6 +3,7 @@ import { MODEL_ID_SET } from '../model-packs';
 import type { EngineeringSession } from './domain';
 import { engineeringReviewMessages, interruptReviews } from './review-history';
 import { engineeringWorkPlanMessages } from './work-plan';
+import { interruptToolReceipts } from './tool-receipts';
 
 /** The coding harness is an implementation detail. Product-owned status, error, and persisted
  * session copy crosses this boundary before it reaches the Engineering UI. Repository content,
@@ -65,9 +66,8 @@ export function persistableEngineeringSession(session: EngineeringSession): Engi
     proposedChanges: [],
     changes: [],
     checkpoints: session.checkpoints.map(({ changes: _changes, ...checkpoint }) => ({ ...checkpoint, changes: [] })),
-    // Tool receipts can contain unrestricted command output. User and model-authored transcript
-    // remains available for the recent-thread experience described by the product contract.
-    messages: interruptReviews(engineeringReviewMessages(session).filter((message) => message.role !== 'tool')),
+    // Typed receipts contain bounded display data. Legacy raw receipts stay in the journal.
+    messages: interruptToolReceipts(interruptReviews(engineeringReviewMessages(session).filter((message) => message.role !== 'tool' || message.tool))),
   };
 }
 

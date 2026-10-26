@@ -2,7 +2,7 @@
   "name": "neuramesh",
   "private": true,
   "license": "Elastic-2.0",
-  "version": "0.155.1",
+  "version": "0.156.2",
   "engines": {
     "node": ">=22"
   },
@@ -24,8 +24,6 @@
     "eval:coding:test": "node --test scripts/coding-evals/*.test.mjs",
     "db:dev-migrate": "bash scripts/dev-migrate.sh",
     "db:cloud-migrate": "bash scripts/cloud-migrate.sh",
-    "sync:dev-validate": "bash scripts/dev-sync-validate.sh",
-    "sync:dev-reload": "bash scripts/dev-sync-reload.sh",
     "prepare": "husky",
     "mail:preview": "pnpm --filter @neuramesh/shared mail:preview"
   },
@@ -37,7 +35,6 @@
   },
   "pnpm": {
     "overrides": {
-      "@powersync/common": "1.57.3",
       "ai-sdk-provider-claude-code>@anthropic-ai/claude-agent-sdk": "0.3.263"
     }
   }

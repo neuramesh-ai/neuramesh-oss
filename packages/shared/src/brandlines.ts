@@ -25,7 +25,7 @@ export function docInFlight(summary: string | null | undefined): string | null {
 }
 
 const DOCS = 'four brand docs here: the business profile, the brand guidelines, the market research and the social strategy';
-const SHELF = "the room's **Library** tab";
+const SHELF = "the project's **Files**";
 
 /** the opening line. `research`: the runtime reads the site and searches the web (claude-code). the
  *  others write each doc in one completion from the answers, and the machine reads only the site's
@@ -75,7 +75,7 @@ export function bootstrapClosing(schedBlock: string, playsBlock: string): string
 export const BOOTSTRAP_SCHED_FALLBACK: ReadonlyArray<{ title: string; cadence: 'weekdays' | 'weekly'; weekday?: number; atTime: string; prompt: string }> = [
   { title: 'Weekday post drafts', cadence: 'weekdays', atTime: '09:00', prompt: 'Draft one X post from the narrative pillars in social-strategy.md, in the brand voice.' },
   { title: 'Weekly thread', cadence: 'weekly', weekday: 2, atTime: '10:00', prompt: 'Draft a thread on the strongest narrative pillar of the week. Use the brand docs.' },
-  { title: 'Weekly competitor scan', cadence: 'weekly', weekday: 1, atTime: '08:00', prompt: 'Run the competitor scan again with the competitor-scan skill. Write the changes since market-research.md as a room note.' },
+  { title: 'Weekly competitor scan', cadence: 'weekly', weekday: 1, atTime: '08:00', prompt: 'Run the competitor scan again with the competitor-scan skill. Write the changes since market-research.md as a project note.' },
 ];
 
 /** the first playbooks the close recommends: a baseline first, and never run on its own */

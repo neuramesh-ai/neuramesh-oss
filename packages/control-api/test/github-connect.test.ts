@@ -65,6 +65,7 @@ const github: typeof fetch = async (input, init) => {
   if (path.startsWith('/repos/acme/site/releases')) return installed ? json([RELEASE]) : json({ message: 'Not Found' }, 404);
   if (path.startsWith('/repos/acme/site/pulls')) return json([PULL]);
   if (path.startsWith('/repos/acme/site/commits')) return json([{ sha: 'abc1234', html_url: 'https://github.com/acme/site/commit/abc1234', commit: { message: 'Ship the inbox\n\nlong body', author: { date: '2026-09-16T09:00:00Z', name: 'Maya' } }, author: { login: 'maya' } }]);
+  if (path === '/repos/acme/docs/contents/README.md') return installed && repos555.includes('acme/docs') ? json({ type: 'file', size: 21, sha: 'docs1', encoding: 'base64', content: Buffer.from('Second repo facts').toString('base64') }) : json({}, 404);
   if (path === '/repos/acme/site/contents/README.md') return json({ type: 'file', size: 30, sha: 'r1', encoding: 'base64', content: README });
   if (path === '/repos/acme/site/contents/logo.png') return json({ type: 'file', size: 4, sha: 'p1', encoding: 'base64', content: Buffer.from([0x89, 0, 0x4e, 0x47]).toString('base64') });
   if (path === '/repos/acme/site/contents/screens/home.png') return json({ type: 'file', size: 70, sha: 'shot1', encoding: 'base64', content: HOME_PNG });
@@ -368,6 +369,20 @@ describe('the reads', () => {
     const r = await j(await read('changes?since=2026-09-10T00:00:00Z', channel));
     expect(r).toMatchObject({ slug: 'acme/site', releases: [{ tag: 'v0.1.0' }], prs: [{ number: 7 }], commits: [{ sha: 'abc1234', message: 'Ship the inbox', author: 'maya' }], repo: { defaultBranch: 'main', private: true } });
     expect(calls.some((c) => c.startsWith('GET /repos/acme/site/releases') && c.endsWith('installation'))).toBe(true);
+  });
+  it('reads a named secondary project repository and refuses ids outside the project before touching GitHub', async () => {
+    await resolve(channel);
+    const secondary = '11111111-1111-4111-8111-111111111111';
+    const foreign = '22222222-2222-4222-8222-222222222222';
+    repos555.push('acme/docs');
+    await store.announcements.upsertInstallation({ installationId: 555, account: 'acme', repos: repos555, selection: 'selected', workspaceId: 'ws_acme' });
+    store.announcements.seedRepo({ channelId: channel, workspaceId: 'ws_acme', projectId: 'p1', repoId: secondary, orgName: 'acme', name: 'docs', cloneUrl: 'https://github.com/acme/docs.git', provider: 'github' });
+    store.announcements.seedRepo({ channelId: other, workspaceId: 'ws_acme', projectId: 'p2', repoId: foreign, orgName: 'acme', name: 'site', cloneUrl: 'https://github.com/acme/site.git', provider: 'github' });
+    expect(await j(await read(`file?path=README.md&repo=${secondary}`, channel))).toMatchObject({ slug: 'acme/docs', content: 'Second repo facts' });
+    const before = calls.length;
+    expect(await j(await read(`file?path=README.md&repo=${foreign}`, channel))).toMatchObject({ code: 'NO_REPO' });
+    expect((await read(`file?path=README.md&repo=${secondary}`, channel, stranger)).status).toBe(403);
+    expect(calls.length).toBe(before);
   });
   it('file: text comes back, a binary and a directory are refused by name, a missing path is 404', async () => {
     await resolve(channel);

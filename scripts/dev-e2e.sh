@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Full W2 chat path inside Electron main: dev stack (real schema) → PowerSync
+# Full W2 chat path inside Electron main: dev stack (real schema) → API replica
 # → optimistic send → control-api upload → server echo persists.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE="docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml"
+COMPOSE="docker compose -f dev/stack/docker-compose.yaml"
 API_PID=""
 # A hermetic state root for the gate (see the NM_USERDATA note at the smoke step below).
 E2E_PROFILE="$(mktemp -d "${TMPDIR:-/tmp}/nm-e2e-XXXXXX")"
@@ -17,7 +17,7 @@ cleanup() {
 trap cleanup EXIT
 
 $COMPOSE down -v >/dev/null 2>&1 || true
-echo "starting dev stack (postgres + powersync, real schema)…"
+echo "starting dev stack (postgres + API replica, real schema)…"
 $COMPOSE up -d --wait
 
 echo "starting control-api on :8788…"
@@ -64,14 +64,14 @@ echo "running electron --smoke-sync…"
 # (ps_crud) in that file and drains it IN ORDER — so a single upload left pointing at a
 # channel from a torn-down stack wedges the queue permanently, and every later run dies
 # as "round trip timed out" with a 404 that names a channel nobody can find.
-(cd apps/desktop && NM_USERDATA="$E2E_PROFILE/smoke" NM_AUTH=dev NM_AGENT_MODE=echo NM_GH_FAKE=1 NM_API=http://127.0.0.1:8788 NM_POWERSYNC=http://127.0.0.1:58081 pnpm exec electron . --smoke-sync) | grep -E "SYNC_E2E"
+(cd apps/desktop && NM_USERDATA="$E2E_PROFILE/smoke" NM_AUTH=dev NM_AGENT_MODE=echo NM_GH_FAKE=1 NM_API=http://127.0.0.1:8788 pnpm exec electron . --smoke-sync) | grep -E "SYNC_E2E"
 
 echo "probing full app (renderer + IPC) for 12s against the same stack…"
 # (this used to `rm -rf` the developer's REAL app profile — destructive, and it never
 # cleared ~/.neuramesh where the replica actually lives, so it fixed nothing)
 # --exit-after: the electron child must self-terminate — SIGTERM to the pnpm
 # wrapper never reaches it, leaving a zombie app hosting agents forever
-(cd apps/desktop && NM_USERDATA="$E2E_PROFILE/probe" NM_AUTH=dev NM_AGENT_MODE=echo NM_API=http://127.0.0.1:8788 NM_POWERSYNC=http://127.0.0.1:58081 pnpm exec electron . --sync --exit-after=12000 >/tmp/nm-app.log 2>&1) &
+(cd apps/desktop && NM_USERDATA="$E2E_PROFILE/probe" NM_AUTH=dev NM_AGENT_MODE=echo NM_API=http://127.0.0.1:8788 pnpm exec electron . --sync --exit-after=12000 >/tmp/nm-app.log 2>&1) &
 APP_PID=$!
 sleep 13
 kill "$APP_PID" >/dev/null 2>&1 || true
@@ -80,4 +80,3 @@ sort /tmp/nm-app.log | uniq -c | sort -rn | grep -E "ipc_probe|sync_status|colds
 grep -q "ipc_probe=watch-messages" /tmp/nm-app.log && echo "APP_PROBE=PASS" || { echo "APP_PROBE=FAIL"; exit 1; }
 
 echo "isolation: a non-member identity must sync zero rows…"
-bash packages/sync-spike/erun.sh src/isolation-test.ts

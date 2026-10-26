@@ -1,40 +1,12 @@
 #!/usr/bin/env bash
-# Runs the real app against YOUR CLOUD (Supabase truth + PowerSync Cloud) with
-# CLERK auth — the default. Sign in for real through Clerk (Google / GitHub /
-# email) in your browser; sync against the cloud Postgres + cloud PowerSync.
-# (The old Supabase-auth cloud launcher lives in git history if ever needed.)
-#
-# How the secure cloud path works (no client holds a signing key):
-#   1. Clerk verifies you → the control-api maps your Clerk id → our internal uuid
-#      (nm_users) and hands back your Clerk session id.
-#   2. Each sync cycle the control-api re-mints a short-lived PowerSync token from
-#      that session (Clerk's "powersync" JWT template; aud = your instance URL).
-#   3. Cloud PowerSync validates that token against CLERK's JWKS, and the workspace
-#      sync rule maps the Clerk sub → our uuid via an nm_users join.
-#
-# PREREQ — one-time cloud dashboard config (see scripts/cloud-clerk-setup.md):
-#   • PowerSync Cloud → Client Auth: Clerk's JWKS URI + audience = your instance URL.
-#   • PowerSync Cloud → Sync rules: the nm_users-join workspace query.
-#   • Cloud DB: nm_users in the powersync publication (already applied, migration 0033).
+# Runs the app against the cloud Postgres API with Clerk session authentication.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; source .env; set +a
 
-[ -n "${POWERSYNC_URL:-}" ] || { echo "POWERSYNC_URL missing in .env"; exit 1; }
 [ -n "${SUPABASE_DB_POOLER_URL:-}" ] || { echo "SUPABASE_DB_POOLER_URL missing in .env"; exit 1; }
 if [ -z "${CLERK_PUBLISHABLE_KEY:-}" ] || [ -z "${CLERK_SECRET_KEY:-}" ]; then
   echo "ERROR: CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY missing from .env"; exit 1
-fi
-
-# Preflight: the desktop resolves POWERSYNC_URL through the OS resolver. A stale negative-DNS cache
-# (the instance was recently down / renamed → an NXDOMAIN got cached) makes sync silently show
-# connected=false with no obvious cause. Catch it here with an actionable hint instead of a mystery.
-# getaddrinfo goes through the same OS cache Electron uses, so this reflects what the app will see.
-PS_HOST=$(printf '%s' "$POWERSYNC_URL" | awk -F/ '{print $3}')
-if [ -n "$PS_HOST" ] && ! python3 -c "import socket,sys; socket.getaddrinfo(sys.argv[1], 443)" "$PS_HOST" >/dev/null 2>&1; then
-  echo "⚠  PowerSync host '$PS_HOST' is NOT resolving on this machine — sync will show connected=false."
-  echo "   If the instance is up, flush your DNS cache and relaunch:"
-  echo "     sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder"
 fi
 
 # The dev cloud has no deploy of its own, so keep its schema current on every launch with the SAME
@@ -77,7 +49,7 @@ pnpm --filter @neuramesh/desktop build
 export NM_USERDATA="${NM_USERDATA:-$HOME/.neuramesh-clerk-cloud}"
 echo "launching CLERK mode against CLOUD (profile: $NM_USERDATA) — watch for 'auth_mode=clerk'"
 
-cd apps/desktop && NM_AUTH=clerk NM_API=http://127.0.0.1:8788 NM_POWERSYNC="$POWERSYNC_URL" \
+cd apps/desktop && NM_AUTH=clerk NM_API=http://127.0.0.1:8788 \
   NM_WEB=http://localhost:5173 \
   CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY" CLERK_SECRET_KEY="$CLERK_SECRET_KEY" \
   pnpm exec electron . --sync

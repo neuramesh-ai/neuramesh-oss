@@ -1,3 +1,4 @@
+import { projectLibrary } from './project-context';
 // THE CONVERSATION WORKSPACE — where a chat or task thread keeps the files it produces, what
 // the agent may read back out of it, and the deep-work fan-out that outlives a wake.
 //
@@ -16,7 +17,6 @@ import { existsSync as existsSync_, mkdirSync, readFileSync, readdirSync, rmSync
 import { join } from 'node:path';
 import * as os_ from 'node:os';
 import { resolveInWorkspace, type SubjectRef } from '../harness/brain';
-import { type LibDoc } from './orchtools';
 import { type LogFn } from '../agentlog';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
@@ -26,7 +26,7 @@ import type { makeRuns } from './runs';
 import type { HostCtx } from './ctx';
 import { makeDeepWork } from './deepwork';
 import { apiAuthHeaders } from '../apiauth';
-import { readArtifactText, registerArtifactReader } from './artifact-content';
+import { registerArtifactReader } from './artifact-content';
 
 export function makeWorkspace(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
@@ -59,34 +59,11 @@ if (ctx.apiUrl && ctx.ownerActorId) registerArtifactReader(db, { workspace: ctx.
 /**
  * The documents an agent may read, by scope.
  *
- * `room` is the default and the ACL: an agent registered to a channel reads that channel's
- * shelf. `project` and `workspace` widen it — the same door whiteboards opened — for the case
- * an agent genuinely needs the team's wider record (brand voice written in #marketing while it
- * works in #build). Widening is opt-in per call rather than a standing grant, and the returned
- * rows always say WHICH room a document came from so the agent can cite it.
+ * Every thread reads its active project's shelf. The legacy `room` spelling aliases that
+ * project scope. Workspace-wide discovery remains explicit, and every row stays within the
+ * authenticated workspace and carries its source so the agent can cite it.
  */
-async function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'project' | 'workspace' = 'room'): Promise<LibDoc[]> {
-  const cols = `a.id, a.workspace_id, a.storage_path, a.content_hash, a.name, a.kind, a.created_at, a.promoted, a.inline_content, a.mime, a.created_by_kind, a.source, c.slug as room, p.name as project`;
-  const from = `from artifacts a join channels c on c.id = a.channel_id left join projects p on p.id = c.project_id`;
-  const [where, args]: [string, unknown[]] =
-    scope === 'room' ? [`a.channel_id = ?`, [channelId]]
-      : scope === 'project' ? [`c.project_id = (select project_id from channels where id = ?)`, [channelId]]
-        : [`a.workspace_id = (select workspace_id from channels where id = ?)`, [channelId]];
-  const rows = await db.getAll<LibDoc & { id: string; storage_path?: string | null; content_hash?: string | null }>(
-    `select ${cols} ${from} where ${where} and (a.inline_content is not null or a.storage_path like 'brain:%')
-      order by a.created_at desc limit ?`,
-    [...args, limit * 3],
-  ).catch(() => [] as Array<LibDoc & { id: string; storage_path?: string | null; content_hash?: string | null }>);
-  // Supersede by name only WITHIN a room. Two projects may each keep a `brand-guidelines.md`,
-  // and collapsing those to one would hand the agent another team's document under the name it
-  // asked for, so the dedupe key carries the room. (latestByName keys on `name` alone, which is
-  // right for its single-room callers; a wider scope needs the wider key.)
-  const seen = new Set<string>();
-  return rows
-    .filter((r) => { const k = `${r.room ?? ''}\u0000${r.name}`; return seen.has(k) ? false : (seen.add(k), true); })
-    .slice(0, limit)
-    .map((row) => ({ ...row, ...(row.storage_path?.startsWith('brain:') ? { readContent: () => readArtifactText(db, row) } : {}) }));
-}
+function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'project' | 'workspace' = 'project', at: import('./project-context').ProjectAnchor = {}, name?: string, offset = 0) { return projectLibrary(db, channelId, limit, scope, at, name, offset); }
 
 // ── A subject's brain, as something an agent can actually reach ────────────────────────────
 // docs/harness/01 keys the brain on the SUBJECT precisely so every agent that touches a thread

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { floorAbove } from './floor';
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-const CFG = { mode: 'cloud', powersyncUrl: 'https://sync.example', version: '0.151.0', schemaVersion: '0140', minDesktopVersion: '0.149.0' };
+const CFG = { mode: 'cloud', version: '0.151.0', schemaVersion: '0140', minDesktopVersion: '0.149.0' };
 
 /** a fake API that answers nm-config, and records the address it was asked */
 function api(res: () => Response | Promise<Response>): { fetch: typeof fetch; asked: string[] } {

@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { localRepoRead } from './repo-local-read';
+import { projectContext, type ProjectAnchor } from './project-context';
 // ONE repository read for the agents (docs/design/github-connector-2026-09 §3.3): the agent-facing
 // rendering of /v1/repo/* (the connector door: the App reads server-side, the machine sees content
 // and never a credential) with the machine's own gh as the second door, so the local app reads its
@@ -18,9 +21,9 @@ interface FileOut { slug: string; path: string; ref: string | null; size: number
 interface TreeOut { slug: string; ref: string; path: string; entries: Array<{ path: string; type: 'blob' | 'tree'; size: number | null }>; truncated: boolean }
 
 export interface RepoReader {
-  changes(i: { since?: string }): Promise<string>;
-  file(i: { path: string; ref?: string }): Promise<string>;
-  tree(i: { path?: string; ref?: string }): Promise<string>;
+  changes(i: { since?: string; repo?: string }): Promise<string>;
+  file(i: { path: string; ref?: string; repo?: string }): Promise<string>;
+  tree(i: { path?: string; ref?: string; repo?: string }): Promise<string>;
 }
 
 const FILE_TEXT_CAP = 60_000;
@@ -32,11 +35,11 @@ const RECONNECT = 'GitHub no longer lets neuramesh read this repository: the gra
 export const CARD_UP = 'Nothing here can read this room\'s repository yet, so a Connect GitHub card is in this conversation now. Stop the work that needs the code. Say in one short line that you wait for GitHub, then end the turn. The conversation continues by itself when the person connects. Never guess what the repository contains.';
 
 /** the room's primary repository from the replica (the release preflight's own order) */
-export async function primaryRepoRow(db: ReplicaDb, channelId: string): Promise<{ id: string; org_name: string; name: string; clone_url: string | null; local_path: string | null; provider: string | null } | null> {
+export async function primaryRepoRow(db: ReplicaDb, channelId: string, repoId?: string): Promise<{ id: string; org_name: string; name: string; clone_url: string | null; local_path: string | null; provider: string | null } | null> {
   const rows = await db.getAll<{ id: string; org_name: string; name: string; clone_url: string | null; local_path: string | null; provider: string | null }>(
     `select r.id, r.org_name, r.name, r.clone_url, r.local_path, r.provider from repos r
        join project_repos pr on pr.repo_id = r.id join channels c on c.project_id = pr.project_id
-      where c.id = ? order by coalesce(pr.is_primary, 0) desc, r.org_name, r.name limit 1`, [channelId]).catch(() => []);
+      where c.id = ? and (? is null or r.id = ?) and r.workspace_id = c.workspace_id order by coalesce(pr.is_primary, 0) desc, r.org_name, r.name limit 1`, [channelId, repoId ?? null, repoId ?? null]).catch(() => []);
   return rows[0] ?? null;
 }
 
@@ -150,16 +153,26 @@ export function renderTree(t: TreeOut): string {
 }
 
 /** the reader for one room: the connector first, the machine's gh second, the honest refusal third */
-export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; capable?: () => Promise<boolean>; onNeed?: () => Promise<boolean> }): RepoReader {
+export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; at?: ProjectAnchor; capable?: () => Promise<boolean>; onNeed?: () => Promise<boolean> }): RepoReader {
+  if (deps.at) {
+    const reader = async () => {
+      const project = await projectContext(deps.db, deps.channelId, deps.at);
+      if (!project?.context_channel_id) throw new Error('The active project context is unavailable. Retry after sync.');
+      return makeRepoReader({ ...deps, channelId: project.context_channel_id, at: undefined });
+    };
+    return { changes: async i => (await reader()).changes(i), file: async i => (await reader()).file(i), tree: async i => (await reader()).tree(i) };
+  }
   const { apiGet, actor, db, channelId } = deps;
   const capable = deps.capable ?? ghLive;
   // a surface that can post the GitHub card (the orchestrator, the conversation) passes onNeed: every
   // refusal that a grant fixes then puts the card up, and the model reads one instruction to stop
   const needed = async (text: string): Promise<string> => (deps.onNeed && (await deps.onNeed().catch(() => false)) ? CARD_UP : text);
   // which door, decided per call: the row can flip between two reads (a human just connected)
-  const door = async (): Promise<{ kind: 'api' } | { kind: 'gh'; slug: string } | { kind: 'none'; text: string }> => {
+  const door = async (repoId?: string): Promise<{ kind: 'api' } | { kind: 'local'; path: string } | { kind: 'gh'; slug: string } | { kind: 'none'; text: string }> => {
+    if (repoId && !await primaryRepoRow(db, channelId, repoId)) return { kind: 'none', text: 'That repository is not attached to the active project.' };
+    const repo = await primaryRepoRow(db, channelId, repoId);
+    if (repo?.local_path && existsSync(repo.local_path)) return { kind: 'local', path: repo.local_path };
     if (await githubConnected(db, channelId)) return { kind: 'api' };
-    const repo = await primaryRepoRow(db, channelId);
     if (!repo) return { kind: 'none', text: NO_REPO };
     const slug = await repoSlugFor(repo);
     if (!slug || slug.startsWith('local/')) return { kind: 'none', text: `${repo.name} has no GitHub remote to read. Say so plainly.` };
@@ -170,24 +183,27 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
   return {
     async changes(i) {
       const since = i.since && !Number.isNaN(Date.parse(i.since)) ? new Date(i.since).toISOString() : new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const d = await door();
+      const d = await door(i.repo);
       if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'local') return localRepoRead(d.path, 'changes', '', undefined, since);
       if (d.kind === 'gh') return renderChanges(await ghChanges(d.slug, since));
-      const r = await viaApi<Changes>(apiGet, actor, 'changes', { channel: channelId, since });
+      const r = await viaApi<Changes>(apiGet, actor, 'changes', { channel: channelId, since, repo: i.repo });
       return r.ok ? renderChanges(r.body) : refusal(r);
     },
     async file(i) {
-      const d = await door();
+      const d = await door(i.repo);
       if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'local') return localRepoRead(d.path, 'file', i.path, i.ref);
       if (d.kind === 'gh') { const f = await ghFile(d.slug, i.path, i.ref); return typeof f === 'string' ? f : renderFile(f); }
-      const r = await viaApi<FileOut>(apiGet, actor, 'file', { channel: channelId, path: i.path, ref: i.ref });
+      const r = await viaApi<FileOut>(apiGet, actor, 'file', { channel: channelId, path: i.path, ref: i.ref, repo: i.repo });
       return r.ok ? renderFile(r.body) : r.status === 400 ? r.error : refusal(r);
     },
     async tree(i) {
-      const d = await door();
+      const d = await door(i.repo);
       if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'local') return localRepoRead(d.path, 'tree', i.path, i.ref);
       if (d.kind === 'gh') { const t = await ghTree(d.slug, i.path, i.ref); return typeof t === 'string' ? t : renderTree(t); }
-      const r = await viaApi<TreeOut>(apiGet, actor, 'tree', { channel: channelId, path: i.path, ref: i.ref });
+      const r = await viaApi<TreeOut>(apiGet, actor, 'tree', { channel: channelId, path: i.path, ref: i.ref, repo: i.repo });
       return r.ok ? renderTree(r.body) : r.status === 400 ? r.error : refusal(r);
     },
   };

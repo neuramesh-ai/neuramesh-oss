@@ -11,7 +11,7 @@ const args=process.argv.slice(2).filter(a=>a!=='--');
 const arg=(name,fallback)=>{const i=args.indexOf('--'+name);return i<0?fallback:args[i+1];};
 if(args.includes('--list')||args.includes('--help')||!args.length) {
   console.log('NeuraMesh coding UI evals v1\n'+suite.cases.map(c=>`${c.id}: ${c.title} (${c.timeoutSeconds}s per turn)`).join('\n'));
-  console.log('\nRun: pnpm eval:coding --run --url http://127.0.0.1:5302/acme?db=brain-device-a --database-url postgresql://postgres:nm@127.0.0.1:56435/nm --cache /tmp/nm-brain-gcs-e2e/device-a/brain/cache\nOptions: --case simple|medium|complex --model "GPT-5.6 Sol" --handoff-model "Claude Haiku 4.5" --out PATH --resume PATH --space ID\nLayout only: --layout --url URL [--repo org/repo] (no model calls).\nRegrade completed thread: --run --resume PATH --case NAME --verify-only.\nRebuild report: --report --resume PATH. Optional brain root: --brain PATH.\nRequires a running local real-provider stack; uses model credits. Reports go to .nm-evidence/coding/. See evals/coding/README.md.');
+  console.log('\nRun: pnpm eval:coding --run --url http://127.0.0.1:5302/acme?db=brain-device-a --database-url postgresql://postgres:nm@127.0.0.1:56435/nm --cache /tmp/nm-brain-gcs-e2e/device-a/brain/cache\nOptions: --case simple|medium|complex --model "GPT-5.6 Sol" --handoff-model "Claude Haiku 5.5" --out PATH --resume PATH --space ID\nLayout only: --layout --url URL [--repo org/repo] (no model calls).\nRegrade completed thread: --run --resume PATH --case NAME --verify-only.\nRebuild report: --report --resume PATH. Optional brain root: --brain PATH.\nRequires a running local real-provider stack; uses model credits. Reports go to .nm-evidence/coding/. See evals/coding/README.md.');
   process.exit(0);
 }
 if(!args.includes('--run')&&!args.includes('--report')&&!args.includes('--layout')&&!args.includes('--cancel')) throw new Error('Use --run, --layout, or --report --resume PATH.');
@@ -30,7 +30,7 @@ if(args.includes('--verify-only')&&(!arg('resume')||!arg('case'))) throw new Err
 if(arg('feedback-file')&&(!arg('resume')||!arg('case')||args.includes('--verify-only'))) throw new Error('--feedback-file requires --resume and --case; it cannot be combined with --verify-only.');
 if(!arg('resume')) {
   if(!arg('url')||!arg('database-url')||!arg('cache')) throw new Error('Set --url, --database-url and --cache for the local stack.');
-  await prepare({id,out,url:localUrl(arg('url')).href,databaseUrl:arg('database-url'),cache:resolve(arg('cache')),brain:arg('brain')?resolve(arg('brain')):undefined,fixtures:join('/tmp/nm-coding-evals',id),workspace:arg('workspace','a0000000-0000-0000-0000-00000000000a'),actor:arg('actor','00000000-0000-0000-0000-000000000001'),model:arg('model','GPT-5.6 Sol'),handoffModel:arg('handoff-model','Claude Haiku 4.5')});
+  await prepare({id,out,url:localUrl(arg('url')).href,databaseUrl:arg('database-url'),cache:resolve(arg('cache')),brain:arg('brain')?resolve(arg('brain')):undefined,fixtures:join('/tmp/nm-coding-evals',id),workspace:arg('workspace','a0000000-0000-0000-0000-00000000000a'),actor:arg('actor','00000000-0000-0000-0000-000000000001'),model:arg('model','GPT-5.6 Sol'),handoffModel:arg('handoff-model','Claude Haiku 5.5')});
 }
 console.log(`EVAL_OUTPUT=${out}`);
 if(await access(join(out,'active-run.json')).then(()=>true,()=>false)) throw new Error('An eval is already active in this directory; cancel it and wait before retrying.');

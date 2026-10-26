@@ -105,18 +105,18 @@ export class ClineChannelSession {
     }
     if (value.type === 'restore') { void this.restore(value.checkpointRunCount).catch((error: unknown) => this.fail(error)); return; }
     if (value.type === 'abort') { void this.abort(); return; }
-    if (this.closed || !this.core) return;
+    if (value.type !== 'prompt' || this.closed || !this.core) return;
     if (this.running || this.pending.size > 0 || this.promptQueue.queued) return this.emit({ type: 'error', code: 'TURN_RUNNING', recoverable: true, message: 'A turn is already running in this thread.' });
     void this.promptQueue.run(() => this.runPrompt(value)).catch((error: unknown) => this.fail(error));
   }
 
   get busy(): boolean { return !this.closed && (this.running || this.pending.size > 0 || this.promptQueue.queued); }
-  close(): Promise<void> {
+  close(keepJournal = false): Promise<void> {
     if (this.closing) return this.closing; this.closed = true;
     for (const resolve of this.pending.values()) resolve(false); this.pending.clear();
     const attachmentsDrained = this.attachmentQueue.close(); void attachmentsDrained.finally(() => this.attachments.close());
     this.closeTools?.();
-    return this.closing = shutdownEngineering(this.core, this.sessionId, this.conversation, this.runtimeMetadata(), this.log).finally(() => { this.core = null; });
+    return this.closing = shutdownEngineering(this.core, this.sessionId, this.conversation, this.runtimeMetadata(), this.log, keepJournal).finally(() => { this.core = null; });
   }
 
   async flush(): Promise<void> {

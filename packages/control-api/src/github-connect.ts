@@ -164,7 +164,9 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
     const channel = c.req.query('channel');
     if (!channel) return { status: 400, body: { error: 'channel is required', code: 'INVALID_INPUT' } };
     if (!githubAppConfigured() || !ann()) return { status: 501, body: { error: 'GitHub connecting is not configured on this server', code: 'NOT_CONFIGURED' } };
-    const repo = await ann()!.repoForChannel(channel);
+    const repoId = c.req.query('repo');
+    if (repoId && !z.string().uuid().safeParse(repoId).success) return { status: 400, body: { error: 'invalid repository id', code: 'INVALID_INPUT' } };
+    const repo = await ann()!.repoForChannel(channel, repoId);
     const slug = repo ? slugOf(repo) : null;
     if (!repo || !slug) return { status: 409, body: { error: 'this room\'s project has no GitHub repository', code: 'NO_REPO' } };
     if (!(await actorInWorkspace(store, c.get('actor'), repo.workspaceId))) return { status: 403, body: { error: 'not your workspace', code: 'NOT_PERMITTED' } };

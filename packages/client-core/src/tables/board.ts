@@ -3,7 +3,7 @@
 // Grouped the same way the renderer groups its row TYPES (bridge/rows-*), so a domain
 // reads the same on both sides of the IPC boundary. A column added here needs the
 // matching sync rule (dev/stack/powersync/sync-config.yaml), because every client reads this file.
-import { column, Table } from '@powersync/common';
+import { column, Table } from '../table';
 
 export const tasks = new Table({
   workspace_id: column.text,
@@ -57,6 +57,7 @@ export const tasks = new Table({
 });
 
 export const artifacts = new Table({
+  project_id: column.text,
   // Immutable brain object reference. Bytes are fetched through the authorized artifact route.
   storage_path: column.text,
   content_hash: column.text,

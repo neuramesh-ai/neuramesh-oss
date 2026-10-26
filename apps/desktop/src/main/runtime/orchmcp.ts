@@ -39,7 +39,7 @@ export async function ensureBridge(): Promise<number> {
           try {
             const { name, args } = JSON.parse(body || '{}') as { name?: string; args?: unknown };
             const t = name ? reg.tools.get(name) : undefined;
-            result = t ? await t.run(args ?? {}) : `error: unknown tool ${name}`;
+            result = t ? await t.run(objectArgs(args)) : `error: unknown tool ${name}`;
           } catch (e) { result = `error: ${e instanceof Error ? e.message : 'tool failed'}`; }
           res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ result }));
         })(); });
@@ -51,6 +51,16 @@ export async function ensureBridge(): Promise<number> {
     s.listen(0, '127.0.0.1', () => { server = s; port = (s.address() as { port: number }).port; resolve(); });
   });
   return port;
+}
+
+/** agy's call_mcp_tool forwards a model's Arguments as it was written, and Gemini sometimes writes a JSON
+ *  string (seen live 2026-10-16). every tool here takes an object */
+export function objectArgs(args: unknown): unknown {
+  if (typeof args !== 'string') return args ?? {};
+  try {
+    const parsed: unknown = JSON.parse(args);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : args;
+  } catch { return args; }
 }
 
 export function registerTurn(turnId: string, secret: string, tools: BridgeTool[]): void {
@@ -133,4 +143,31 @@ export function ensureAgyMcpConfig(shimPath: string, nodeBin = 'node'): void {
   cfg.mcpServers['nm'] = { command: nodeBin, args: [shimPath] };
   mkdirSync(dirname(cfgPath), { recursive: true });
   writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  ensureAgyMcpAllow();
+}
+
+/** the rule that lets headless agy call the nm tools. agy 1.4.0 refuses an MCP call it cannot prompt for
+ *  ("a tool required the mcp permission that headless mode cannot prompt for") unless its own settings
+ *  allow it, which took rex's board tools and the coding lane's shell away (verified 2026-10-16, docs/design/
+ *  gemini-code-lane-2026-10). merged, and a file that does not parse is left alone. nm offers no tool outside
+ *  a NeuraMesh turn, so the person's own agy sessions gain nothing from it */
+export const NM_MCP_ALLOW = 'mcp(nm/*)';
+export function ensureAgyMcpAllow(home = homedir()): boolean {
+  const path = join(home, '.gemini', 'antigravity-cli', 'settings.json');
+  let raw = '';
+  try { raw = readFileSync(path, 'utf8'); } catch { /* no settings yet */ }
+  let cfg: Record<string, unknown>;
+  try {
+    const parsed: unknown = raw.trim() ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+    cfg = parsed as Record<string, unknown>;
+  } catch { return false; }
+  const current = cfg['permissions'];
+  const permissions = current && typeof current === 'object' && !Array.isArray(current) ? current as Record<string, unknown> : {};
+  const allow: unknown[] = Array.isArray(permissions['allow']) ? permissions['allow'] : [];
+  if (allow.includes(NM_MCP_ALLOW)) return true;
+  cfg['permissions'] = { ...permissions, allow: [...allow, NM_MCP_ALLOW] };
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600 });
+  return true;
 }

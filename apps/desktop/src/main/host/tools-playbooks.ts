@@ -75,16 +75,13 @@ function stateLine(pb: Playbook, s: RoomState | undefined): string {
  *  describe a playbook differently */
 export async function playbookCatalogText(db: ReplicaDb, roomId: string): Promise<string> {
   const states = await roomStates(db, roomId);
-  const room = (await db.getAll<{ kind: string | null }>(`select kind from channels where id = ?`, [roomId]).catch(() => []))[0];
-  const marketing = room?.kind === 'marketing';
   const lines = PLAYBOOKS.map((p) => {
     const how = p.engine === 'unit'
       ? `unit via run_playbook('${p.id}')`
       : `in-thread: load_skill('${p.skill}') and answer here`;
     return `- ${p.id} — ${p.title}: ${p.tagline}. [${how}] (${stateLine(p, states.get(p.id))})`;
   });
-  return `${marketing ? '' : 'NOTE: this is not a marketing room — playbooks run in a marketing HQ; suggest the right room first.\n'}` +
-    `Marketing playbooks (marketing-os pack). Heavy flows run as units the moment they're asked for — no plan-review stop; the human's gate is accepting the deliverable. Light ones answer in the conversation.\n${lines.join('\n')}\n` +
+  return     `Marketing playbooks (marketing-os pack). Heavy flows run as units the moment they're asked for — no plan-review stop; the human's gate is accepting the deliverable. Light ones answer in the conversation.\n${lines.join('\n')}\n` +
     `Cross-cutting skills (never playbooks): honest-analytics, slop-patterns.`;
 }
 
@@ -92,15 +89,15 @@ export function playbookTools(tc: ToolCtx, capable: () => Promise<boolean> = ghL
   const { z, db, post, ch, actor, thread, convoThreadId, log, here, known, apiGet, agent } = tc;
   // ch carries no kind/marketing — read the (possibly filed-to) room's row when needed
   const roomRow = async (): Promise<{ kind: string | null; marketing: string | null }> =>
-    (await db.getAll<{ kind: string | null; marketing: string | null }>(`select kind, marketing from channels where id = ?`, [here()]).catch(() => []))[0]
+    (await db.getAll<{ kind: string | null; marketing: string | null }>(`select c.kind, coalesce(case when p.context_channel_id = c.id then p.brand_profile end, c.marketing) as marketing from channels c join projects p on p.id = c.project_id where c.id = ?`, [here()]).catch(() => []))[0]
     ?? { kind: null, marketing: null };
   return [
-    { name: 'list_playbooks', description: 'The marketing playbook catalog (marketing-os) joined to THIS room\'s state — what each flow does, how it runs (a unit you start with run_playbook, or answered here in the thread with its skill loaded), the last run + score, and any armed cadence. Consult it BEFORE improvising on a marketing ask; route the ask to the playbook it matches.', schema: {},
+    { name: 'list_playbooks', description: 'The marketing playbook catalog (marketing-os) joined to THIS project\'s state — what each flow does, how it runs (a unit you start with run_playbook, or answered here in the thread with its skill loaded), the last run + score, and any armed cadence. Consult it BEFORE improvising on a marketing ask; route the ask to the playbook it matches.', schema: {},
       run: async () => {
         log?.({ kind: 'tool', phase: 'call', summary: 'list_playbooks' });
         return playbookCatalogText(db, here());
       } },
-    { name: 'run_playbook', description: 'START a marketing playbook from its registry template — no approval stop: the human\'s ask IS the consent for a canned template (only architect-authored plans go through plan review). In a CONVERSATION it creates a hands-off unit anchored here (born approved, starts immediately, the human accepts the deliverable at the end); in a TASK THREAD it creates a SUBTASK of that task, so the flow stays in one session and the deliverable attaches to the parent. Only unit-engine playbooks are runnable (chat ones you answer in place after load_skill). Inputs fall back to the room\'s marketing profile (url ← website); a missing required input is refused by name — ask the human instead of inventing a subject.', schema: {
+    { name: 'run_playbook', description: 'START a marketing playbook from its registry template — no approval stop: the human\'s ask IS the consent for a canned template (only architect-authored plans go through plan review). In a CONVERSATION it creates a hands-off unit anchored here (born approved, starts immediately, the human accepts the deliverable at the end); in a TASK THREAD it creates a SUBTASK of that task, so the flow stays in one session and the deliverable attaches to the parent. Only unit-engine playbooks are runnable (chat ones you answer in place after load_skill). Inputs fall back to the project\'s brand profile (url ← website); a missing required input is refused by name — ask the human instead of inventing a subject.', schema: {
       playbook: z.enum(UNIT_PLAYBOOK_IDS as [string, ...string[]]).describe('which playbook — from list_playbooks'),
       inputs: z.record(z.string()).optional().describe('the playbook\'s inputs by key (e.g. {"url": "https://…"} or {"competitor": "Linear, Height"}) — omit what the profile already knows'),
     }, run: async (input: { playbook: string; inputs?: Record<string, string> }) => {
@@ -110,7 +107,7 @@ export function playbookTools(tc: ToolCtx, capable: () => Promise<boolean> = ghL
       if (missing.length) {
         const shape = `{${missing.map((k) => `"${k}": "…"`).join(', ')}}`;
         const asks = missing.map((k) => pb.inputs.find((i) => i.key === k)?.label ?? k);
-        return `MISSING_INPUT: ${pb.title} needs ${asks.join(' + ')} and the room's profile doesn't carry it — ask the human, then call run_playbook again with EXACTLY inputs: ${shape}.`;
+        return `MISSING_INPUT: ${pb.title} needs ${asks.join(' + ')} and the project's profile doesn't carry it — ask the human, then call run_playbook again with EXACTLY inputs: ${shape}.`;
       }
       // pre-offer the room's marketer (found live: the plan-release watch offers workers, and
       // a marketing room has none — the pre-offer is what lets the run start unattended)
@@ -146,9 +143,9 @@ export function playbookTools(tc: ToolCtx, capable: () => Promise<boolean> = ghL
       if (!verdict.ok) {
         const need = pb.needs?.find((n) => n.kind === (verdict.repoMissing || verdict.repoUnreadable ? 'repo' : 'connector'));
         const [chRow] = verdict.repoMissing ? await db.getAll<{ project_id: string | null }>(`select project_id from channels where id = ?`, [here()]).catch(() => []) : [];
-        const lead = verdict.repoMissing ? `${pb.title} needs a repository to read, and this room's project has none`
+        const lead = verdict.repoMissing ? `${pb.title} needs a repository to read, and this project has none`
           : verdict.repoUnreadable ? `${pb.title} needs to read ${repoState?.slug}, and nothing here can: this machine has no GitHub login and GitHub is not connected`
-          : `${pb.title} needs an account to read, and this room has none`;
+          : `${pb.title} needs an account to read, and this project has none`;
         // the card is the tool's: it mints the Needs-you row, and a GitHub grant resumes the run (docs/design/repo-connect-2026-10).
         // a Local stack has no GitHub app, so its GitHub card renders, mints no row and promises no resume
         const tracked = !verdict.repoUnreadable || await githubGrantable(apiGet, actor, here());
@@ -165,10 +162,10 @@ export function playbookTools(tc: ToolCtx, capable: () => Promise<boolean> = ghL
         }).catch(() => null);
         log?.({ kind: 'tool', phase: 'call', summary: `run_playbook ${pb.id} — blocked, ${verdict.repoMissing ? 'no repository' : verdict.repoUnreadable ? 'repository unreadable' : 'no connector'}` });
         return verdict.repoMissing
-          ? `NOT created: ${pb.title} needs a repository and this room's project has none. The human has a card here to attach one — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
+          ? `NOT created: ${pb.title} needs a repository and this project has none. The human has a card here to attach one — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
           : verdict.repoUnreadable
             ? `NOT created: ${pb.title} needs to read ${repoState?.slug} and nothing here can. The human has a card here to connect GitHub (read only, one minute) — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
-            : `NOT created: ${pb.title} needs at least one connected account and this room has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
+            : `NOT created: ${pb.title} needs at least one connected account and this project has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
       }
       // what the run may READ, and how each connected network is covered (George, 2026-08-26:
       // one connector is enough, and a run covers every one that is live)

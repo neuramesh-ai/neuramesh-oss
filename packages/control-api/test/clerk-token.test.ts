@@ -7,13 +7,13 @@ import { MemoryStore } from '../src/store';
 // (SESSION_EXPIRED). Every transient failure (Clerk outage, network, missing config,
 // missing JWT template) must be 503 AUTH_UNAVAILABLE: the 2026-07-10 class bug was a
 // Clerk blip reading as "logged out".
-describe('POST /auth/clerk/token', () => {
+describe.each(['token', 'api-token'])('POST /auth/clerk/%s', endpoint => {
   const app = createApp(new MemoryStore());
-  const mintUrl = (id: string) => `https://api.clerk.com/v1/sessions/${id}/tokens/powersync`;
+  const mintUrl = (id: string) => `https://api.clerk.com/v1/sessions/${id}/tokens${endpoint === 'token' ? '/powersync' : ''}`;
   const probeUrl = (id: string) => `https://api.clerk.com/v1/sessions/${id}`;
 
   const post = (sessionId = 'sess_1') =>
-    app.request('/auth/clerk/token', {
+    app.request(`/auth/clerk/${endpoint}`,  {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId }),
@@ -22,12 +22,12 @@ describe('POST /auth/clerk/token', () => {
   // stub fetch by URL: the mint POST and the session probe GET get their own responses
   const stubClerk = (opts: { mint: Response | Error; probe?: Response | Error }) => {
     const calls: string[] = [];
-    vi.stubGlobal('fetch', (input: unknown) => {
+    vi.stubGlobal('fetch', vi.fn((input: unknown, _init?: RequestInit) => {
       const url = String(input);
       calls.push(url);
       const pick = url === mintUrl('sess_1') ? opts.mint : url === probeUrl('sess_1') ? (opts.probe ?? new Error('unexpected probe')) : new Error(`unexpected fetch ${url}`);
       return pick instanceof Error ? Promise.reject(pick) : Promise.resolve(pick.clone());
-    });
+    }));
     return calls;
   };
 
@@ -42,6 +42,7 @@ describe('POST /auth/clerk/token', () => {
     const res = await post();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ token: 'jwt_ok' });
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ expires_in_seconds: 600 }) });
   });
 
   it('a verified-dead session (mint 4xx + probe 404) is 401 SESSION_EXPIRED — the one sign-out signal', async () => {
@@ -108,7 +109,7 @@ describe('POST /auth/clerk/token', () => {
   });
 
   it('a missing sessionId is still 400', async () => {
-    const res = await app.request('/auth/clerk/token', {
+    const res = await app.request(`/auth/clerk/${endpoint}`,  {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({}),

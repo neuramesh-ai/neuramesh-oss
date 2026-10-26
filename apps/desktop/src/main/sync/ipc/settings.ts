@@ -33,7 +33,7 @@ export function registerSettings({ db, ws }: SettingsDeps): void {
 // a max over messages would scan the largest table every 2.5s poll for little gain.
 ipcMain.handle('nm:workspace-meta', async () => ({
   projects: await db().getAll(
-    `select p.id, p.name, p.slug, p.is_default, p.status, p.description, p.auto_open_pr, p.run_ci_before_merge, p.ship_gate, p.website, p.logo_url, p.model_pack,
+    `select p.context_channel_id, p.brand_profile, p.settings, p.id, p.name, p.slug, p.is_default, p.status, p.description, p.auto_open_pr, p.run_ci_before_merge, p.ship_gate, p.website, p.logo_url, p.model_pack,
        (select group_concat(c.slug) from channels c where c.project_id = p.id) as channel_slugs,
        (select c.slug from channels c where c.project_id = p.id order by c.slug limit 1) as primary_channel,
        (select count(*) from tasks t where t.project_id = p.id and t.state not in ('closed', 'accepted')) as open_tasks,

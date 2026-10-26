@@ -59,7 +59,7 @@ export async function smokeSync(): Promise<void> {
 
   const deadline = Date.now() + 20_000;
   for (;;) {
-    const [q] = await db.getAll<{ n: number }>('select count(*) as n from ps_crud');
+    const [q] = await db.getAll<{ n: number }>('select count(*) as n from nm_outbox');
     const rows = await db.getAll('select id from messages where id = ?', [id]);
     if (Number(q?.n ?? 1) === 0 && rows.length === 1) break;
     if (Date.now() > deadline) throw new Error('round trip timed out');

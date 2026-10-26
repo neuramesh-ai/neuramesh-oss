@@ -19,12 +19,12 @@ export interface Grounding { read: Set<string>; drafts: Set<string> }
 export const newGrounding = (): Grounding => ({ read: new Set(), drafts: new Set() });
 
 type Scope = 'room' | 'project' | 'workspace';
-export type LibraryReader = (channelId: string, limit?: number, scope?: Scope) => Promise<LibDoc[]>;
+export type LibraryReader = (channelId: string, limit?: number, scope?: Scope, at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => Promise<LibDoc[]>;
 
 /** the shelf as a list: names, kinds, and where a widened scope found them */
-export async function listLibrary(libraryDocs: LibraryReader, channelId: string, scope: Scope): Promise<string> {
-  const docs = await libraryDocs(channelId, 60, scope);
-  if (!docs.length) return scope === 'room' ? 'this room\'s library is empty — try scope:\'project\' or scope:\'workspace\'' : `no documents in this ${scope}`;
+export async function listLibrary(libraryDocs: LibraryReader, channelId: string, scope: Scope, offset = 0): Promise<string> {
+  const docs = await libraryDocs(channelId, 60, scope, undefined, undefined, offset);
+  if (!docs.length) return `no documents in this ${scope === 'room' ? 'project' : scope}`;
   return JSON.stringify(docs.map((d) => ({
     name: d.name, kind: d.kind, promoted: !!d.promoted,
     ...(scope === 'room' ? {} : { room: d.room, project: d.project }),
@@ -34,7 +34,7 @@ export async function listLibrary(libraryDocs: LibraryReader, channelId: string,
 
 /** one document's text, capped, with the read recorded on the turn's grounding */
 export async function readLibraryDoc(libraryDocs: LibraryReader, channelId: string, want: string, scope: Scope, grounding: Grounding): Promise<string> {
-  const docs = await libraryDocs(channelId, 60, scope);
+  const docs = await libraryDocs(channelId, 1, scope, undefined, want);
   const hit = docs.find((d) => d.name === want) ?? docs.find((d) => d.name.toLowerCase() === want.toLowerCase());
   if (!hit) return `no document named "${want}" in this ${scope} — call list_library${scope === 'room' ? ' (or widen it with scope)' : ` with scope:'${scope}'`} for the names`;
   let body = hit.inline_content ?? '';
@@ -53,15 +53,14 @@ export async function readLibraryDoc(libraryDocs: LibraryReader, channelId: stri
 
 /**
  * The gate `draft_posts` asks before it writes: null when the draft may proceed, else the
- * refusal that names the read that lifts it. Only a marketing room with brand docs on its
- * shelf gates; every other room drafts as before.
+ * refusal that names the read that lifts it. Every thread in a project with brand documents must read them before drafting.
  */
-export async function ungrounded(db: AttDbLike, channelId: string, grounding: Grounding): Promise<string | null> {
-  const b = await readBrand(db, channelId);
+export async function ungrounded(db: AttDbLike, channelId: string, grounding: Grounding, at: import('./project-context').ProjectAnchor = {}): Promise<string | null> {
+  const b = await readBrand(db, channelId, at);
   if (!b.marketing || !b.docs.size) return null;
   const names = [...b.docs.keys()];
   if (names.some((n) => grounding.read.has(n))) return null;
   const first = names.includes('business-profile.md') ? 'business-profile.md' : names[0]!;
   const rest = names.filter((n) => n !== first);
-  return `Not yet: read this room's brand docs before you draft. Call read_library_doc with name "${first}" (scope room)${rest.length ? `, and ${rest.join(', ')} for the voice and the market` : ''}. Then call draft_posts again with copy grounded in what they say.`;
+  return `Not yet: read this project's brand docs before you draft. Call read_library_doc with name "${first}" (scope project)${rest.length ? `, and ${rest.join(', ')} for the voice and the market` : ''}. Then call draft_posts again with copy grounded in what they say.`;
 }

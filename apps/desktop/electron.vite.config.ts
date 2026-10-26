@@ -20,14 +20,9 @@ import { fileURLToPath } from 'node:url';
 function bakedCloudConfig(): Record<string, string> {
   if (process.env['NM_DIST'] !== '1') return {};
   const apiUrl = process.env['NM_API'] || 'https://api.neuramesh.app';
-  const powersync = process.env['NM_POWERSYNC'] || '';
   const webUrl = process.env['NM_WEB'] || 'https://neuramesh.app';
-  // A release that points PowerSync at localhost is broken on every downloader's
-  // machine — fail the build loudly, not silently.
-  if (!powersync) throw new Error('dist build (NM_DIST=1): NM_POWERSYNC must be set to the cloud PowerSync endpoint');
   return {
     'process.env.NM_API': JSON.stringify(apiUrl),
-    'process.env.NM_POWERSYNC': JSON.stringify(powersync),
     'process.env.NM_WEB': JSON.stringify(webUrl),
   };
 }

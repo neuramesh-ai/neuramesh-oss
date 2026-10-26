@@ -1,3 +1,5 @@
+import { beginImageGeneration } from '../agent-stream';
+import { originalImage } from '../image-original';
 // THE BUTTON'S DRAW: one draft's picture, whoever pressed Generate (docs/design/calendar-image-gen-2026-08).
 //
 // the desktop's calendar modal calls draftImageFor in process. no other surface can: a tab, the
@@ -18,7 +20,12 @@ import type { HostCtx } from './ctx';
 
 type Ch = { id: string; slug: string; workspace_id: string };
 type DraftRow = { platform: string; media: string | null; body: string };
-export type DrawOutcome = { ok: boolean; thumb?: string; body?: string; model?: string; error?: string };
+export type DrawOutcome = { ok: true; mediaId: string; thumb?: string; body?: string; model?: string; error?: never } | { ok: false; error: string; thumb?: never; body?: string; model?: never };
+
+export function drawOutcomeText(out: DrawOutcome): string {
+  return out.ok ? `Drew the image${out.model ? ` on ${out.model}` : ''} — the original is saved and the image is on the card. Nothing publishes until you approve.`
+    : `Could not redraw the image: ${out.error} Report this failure plainly; do not claim the image changed.`;
+}
 
 /** the reason a card shows when the workspace holds no image key (the one credential story) */
 export const NO_IMAGE_KEY = 'This workspace has no image key. Add one under Image generation.';
@@ -48,24 +55,43 @@ export function makeDraw(ctx: Pick<HostCtx, 'post'> & {
    *  `stale`: the draft carries an old reason. it goes first, so a retry that fails the same way
    *  reads as a new outcome to a surface that waits for one (the tab's modal). */
   async function drawBriefed(agent: HostedAgent, ch: Ch, itemId: string, platform: string, brief: string, stale = false): Promise<DrawOutcome> {
-    const postCmd = postAs(agent);
-    const cred = await imageCred(ch);
-    if (!cred) {
-      await postCmd({ type: 'content.revise', item: itemId, imageError: NO_IMAGE_KEY });
-      return { ok: false, error: NO_IMAGE_KEY };
-    }
-    if (stale) await postCmd({ type: 'content.revise', item: itemId, imageError: '' });
-    const g = await paint(cred, seatOf(agent, cred), await brandOf(ch.id), brief, platform, agent.name);
-    if (g.error || (!g.thumb && !g.publish)) {
-      const why = g.error ?? 'the image came back empty';
-      await postCmd({ type: 'content.revise', item: itemId, imageError: why });
-      console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} failed=${why}`);
-      return { ok: false, error: why };
-    }
-    if (g.publish) await postCmd({ type: 'content.attach_media', item: itemId, dataUrl: g.publish });
-    if (g.thumb) await postCmd({ type: 'content.revise', item: itemId, thumb: g.thumb });
-    console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} ok model=${g.model ?? '?'}`);
-    return { ok: true, thumb: g.thumb, model: g.model };
+    const [anchor] = await db.getAll<{ thread_id?: string; task_id?: string }>('select thread_id, task_id from content_items where id = ? and channel_id = ?', [itemId, ch.id]);
+    const progress = beginImageGeneration(ch.id, agent.name, { threadId: anchor?.thread_id, taskId: anchor?.task_id });
+    try {
+      const postCmd = postAs(agent);
+      const cred = await imageCred(ch);
+      if (!cred) {
+        await postCmd({ type: 'content.revise', item: itemId, imageError: NO_IMAGE_KEY });
+        return { ok: false, error: NO_IMAGE_KEY };
+      }
+      if (stale) await postCmd({ type: 'content.revise', item: itemId, imageError: '' });
+      const g = await paint(cred, seatOf(agent, cred), await brandOf(ch.id), brief, platform, agent.name);
+      if (g.error || !g.bytes?.length) {
+        const why = g.error ?? 'the image came back empty';
+        await postCmd({ type: 'content.revise', item: itemId, imageError: why });
+        console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} failed=${why}`);
+        return { ok: false, error: why };
+      }
+      let mediaId: string | undefined;
+      try {
+        progress.saving();
+        const response = await post('/v1/commands', { kind: 'agent', id: agent.id, role: agent.role }, { type: 'content.attach_media', item: itemId, dataUrl: originalImage(g).dataUrl });
+        const saved = response.ok ? await response.json() : null;
+        if (typeof saved?.mediaId === 'string' && saved.mediaId) mediaId = saved.mediaId;
+      } catch { /* record failure on the draft below */ }
+      if (!mediaId) {
+        const error = 'The original image could not be saved. Try again.';
+        await postCmd({ type: 'content.revise', item: itemId, imageError: error });
+        return { ok: false, error };
+      }
+      if (g.thumb) await postCmd({ type: 'content.revise', item: itemId, thumb: g.thumb });
+      console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} ok model=${g.model ?? '?'}`);
+      return { ok: true, mediaId, thumb: g.thumb, model: g.model };
+    } catch (cause) {
+      const error = cause instanceof Error ? cause.message : 'Image generation failed.';
+      await postAs(agent)({ type: 'content.revise', item: itemId, imageError: error });
+      return { ok: false, error };
+    } finally { progress.finish(); }
   }
 
   /**
@@ -143,5 +169,15 @@ export function makeDraw(ctx: Pick<HostCtx, 'post'> & {
       : `The draw failed: ${(out.error ?? 'no reason came back').replace(/[.\s]+$/, '')}. The card shows the reason. Press Try again on the card to draw it again.`;
   }
 
-  return { drawBriefed, draftImageFor, drawOnAsk };
+  async function generateDraftImage(agent: HostedAgent, ch: Ch, itemId: string): Promise<DrawOutcome> {
+    const [draft] = await db.getAll<DraftRow>(
+      "select platform, media, body from content_items where id = ? and channel_id = ? and status = 'draft'", [itemId, ch.id],
+    ).catch(() => [] as DraftRow[]);
+    if (!draft) return { ok: false, error: "That draft isn't available to re-image (already scheduled or gone)." };
+    const media = mediaOf(draft.media);
+    if (!media.brief) return { ok: false, error: "That draft has no image brief to draw from. Ask me for a visual and I'll add one." };
+    return drawBriefed(agent, ch, itemId, draft.platform, media.brief, !!media.image_error);
+  }
+
+  return { drawBriefed, draftImageFor, drawOnAsk, generateDraftImage };
 }

@@ -16,7 +16,7 @@ export const FIRST_RUN_COPY = {
   kicker: 'First run',
   title: 'Where should your workspace live?',
   sub: 'Pick one now. You can upgrade to the cloud at any time.',
-  mac: { name: 'This Mac', fact: 'No account. Three containers on this Mac. Your keys stay here.' },
+  mac: { name: 'This Mac', fact: 'No account. Your workspace and keys stay on this Mac.' },
   cloud: { name: 'The cloud', fact: '500 free credits to start. Sync across desktop, web and mobile.' },
   continue: 'Continue →',
   signin: 'Sign in',

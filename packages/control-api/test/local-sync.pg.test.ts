@@ -7,8 +7,11 @@ import { createApp } from '../src/app';
 import { PostgresStore } from '../src/pgstore';
 import { decodeLocalCursor, localBootstrap, localChanges, localReplicaRow } from '../src/local-sync';
 import { hashLocalToken } from '../src/local-auth';
+import { mintMachineToken } from '../src/machine-auth';
 import type { Actor } from '@neuramesh/shared';
-import { LocalReplica } from '../../../apps/desktop/src/main/sync/local-replica';
+import { SQLiteReplica } from '@neuramesh/client-core/sqlite-replica';
+import { sqliteDriver } from '../../../apps/desktop/src/main/sync/sqlite-driver';
+const replica = (file: string) => new SQLiteReplica(sqliteDriver(file, { nodeSqlite: true }));
 
 // Opt-in to a throwaway database. Never run these destructive authorization/retention scenarios
 // against an ordinary DATABASE_URL or the user's running workspace.
@@ -67,6 +70,54 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
     expect(data.changes.length).toBeGreaterThan(0);
     expect(localReplicaRow('machines', { id: 'id', token_hash: 'secret' })).not.toHaveProperty('token_hash');
     expect(localReplicaRow('messages', { id: 'id', pinned: true, body: 'text' })).toMatchObject({ id: 'id', pinned: 1, body: 'text' });
+  });
+
+  it('limits machine snapshots to their workspace and revokes cursors with the token or membership', async () => {
+    const sql = store!.sql, app = createApp(store!);
+    const foreign = randomUUID(), { token, hash } = mintMachineToken();
+    await sql`insert into workspaces(id,name,slug,created_by) values (${foreign},'Private sibling',${`replica-${foreign}`},${actor.id})`;
+    await sql`insert into workspace_members(workspace_id,user_id,role) values (${foreign},${actor.id},'owner')`;
+    const [machine] = await sql`insert into machines(workspace_id,owner_user_id,name,kind,token_hash)
+      values (${ws},${actor.id},${`replica-${randomUUID()}`},'member',${hash}) returning id`;
+    const headers = { authorization:`Bearer ${token}` };
+    try {
+      const human = await localBootstrap(sql, actor);
+      expect(human.workspaces).toContain(foreign);
+      const response = await app.request('/v1/brain/replica/bootstrap', { headers });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+      const snapshot = await response.json() as { workspaces:string[];cursor:string;changes:Array<{row:Record<string,unknown>|null}> };
+      expect(snapshot.workspaces).toEqual([ws]);
+      expect(snapshot.changes.some(c => c.row?.['workspace_id'] === foreign)).toBe(false);
+      expect((await app.request('/v1/brain/replica/bootstrap', { headers:{ ...headers,'x-nm-actor':JSON.stringify({kind:'human',id:randomUUID()}) } })).status).toBe(401);
+      await sql`delete from workspace_members where workspace_id=${ws} and user_id=${actor.id}`;
+      const changed = await app.request(`/v1/brain/replica/changes?cursor=${encodeURIComponent(snapshot.cursor)}`, { headers });
+      expect(changed.status).toBe(409);
+      const revoked = await app.request('/v1/brain/replica/bootstrap', { headers });
+      expect((await revoked.json() as {workspaces:string[]}).workspaces).toEqual([]);
+      await sql`update machines set token_hash=null where id=${machine!['id']}`;
+      expect((await app.request('/v1/brain/replica/bootstrap',{headers})).status).toBe(401);
+    } finally {
+      await sql`insert into workspace_members(workspace_id,user_id,role) values (${ws},${actor.id},'owner') on conflict do nothing`;
+      await sql`delete from machines where id=${machine!['id']}`;
+      await sql`delete from workspace_members where workspace_id=${foreign}`;
+      await sql`delete from workspaces where id=${foreign}`;
+    }
+  });
+
+  it('streams project team additions and removals after the initial snapshot', async () => {
+    const sql = store!.sql;
+    const [project] = await sql`select id from projects where workspace_id = ${ws}::uuid limit 1`;
+    const [agent] = await sql`insert into agents(workspace_id, name, role, runtime, model)
+      values (${ws}::uuid, ${`replica-${randomUUID().slice(0,8)}`}, 'worker', 'claude-code', 'test') returning id`;
+    const before = await localBootstrap(sql, actor);
+    const [member] = await sql`insert into project_agents(workspace_id, project_id, agent_id)
+      values (${ws}::uuid, ${project!['id']}::uuid, ${agent!['id']}::uuid) returning id`;
+    const added = await localChanges(sql, actor, decodeLocalCursor(before.cursor)!);
+    expect(added!.changes.find(c => c.table === 'project_agents' && c.id === member!['id'])?.row?.['project_id']).toBe(project!['id']);
+    await sql`delete from project_agents where id = ${member!['id']}::uuid`;
+    const removed = await localChanges(sql, actor, decodeLocalCursor(added!.cursor)!);
+    expect(removed!.changes.find(c => c.table === 'project_agents' && c.id === member!['id'])?.row).toBeNull();
   });
 
   it('binds a repeatable snapshot to its cursor and never skips an uncommitted earlier revision', async () => {
@@ -131,8 +182,8 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
       apiUrl: 'http://local.test', workspaceFallback: ws, defaultActor: { kind: 'human', id: actor.id }, authHeaders: { authorization: `Bearer ${bearer}` },
     }) };
     const directory = mkdtempSync(join(tmpdir(), 'nm-two-replicas-'));
-    let first = new LocalReplica(join(directory, 'first.sqlite'));
-    const second = new LocalReplica(join(directory, 'second.sqlite'));
+    let first = replica(join(directory, 'first.sqlite'));
+    const second = replica(join(directory, 'second.sqlite'));
     try {
       await first.connect(config);
       await second.connect(config);
@@ -145,14 +196,14 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
         values(?,?,?,?,'human',?,?,?)`, [id, ws, channel!.id, thread, actor.id, 'Retain this across a device restart.', new Date().toISOString()]);
       await expect(first.syncNow()).rejects.toThrow('device offline');
       await first.close();
-      first = new LocalReplica(join(directory, 'first.sqlite'));
+      first = replica(join(directory, 'first.sqlite'));
       offline = false;
       await first.connect(config);
       await first.syncNow();
       await second.syncNow();
       expect(await second.get('select id,thread_id,body from messages where id=?', [id])).toEqual({ id, thread_id: thread, body: 'Retain this across a device restart.' });
       expect(await second.get('select id from threads where id=?', [thread])).toEqual({ id: thread });
-      expect(await first.get('select count(*) n from ps_crud')).toEqual({ n: 0 });
+      expect(await first.get('select count(*) n from nm_outbox')).toEqual({ n: 0 });
       await store!.sql`delete from messages where id=${id}`;
       await second.syncNow();
       expect(await second.getAll('select id from messages where id=?', [id])).toEqual([]);
