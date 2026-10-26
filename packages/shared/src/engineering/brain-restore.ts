@@ -4,6 +4,7 @@ import { isEngineeringWorkPlan } from './handoff';
 import { applyRemoteEngineeringEvent, beginRemoteEngineeringPrompt } from './remote';
 import { isEngineeringSelection } from './selection';
 import { interruptReviews } from './review-history';
+import { interruptToolReceipts } from './tool-receipts';
 import { recoverRecordedEngineeringPlan } from './recorded-plan-progress';
 
 const object = (v: unknown): Record<string, any> => v && typeof v === 'object' ? v as Record<string, any> : {};
@@ -67,6 +68,6 @@ export function restoreEngineeringBrain(shell: EngineeringSession, snapshot: Bra
     state: interrupted ? 'resumable' : session.state === 'error' ? 'error' : 'completed',
     activeActivity: null, pendingApproval: null, proposedChanges: [],
     pendingModeHandoff: metadata.mode === 'act' || interrupted ? null : session.pendingModeHandoff,
-    messages: interruptReviews(session.messages).map(m => ({ ...m, streaming: false })),
+    messages: interruptToolReceipts(interruptReviews(session.messages)).map(m => ({ ...m, streaming: false })),
     updatedAt: snapshot.events.at(-1)?.timestamp ?? shell.updatedAt };
 }

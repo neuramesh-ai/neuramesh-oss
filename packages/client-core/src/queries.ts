@@ -47,7 +47,7 @@ export const ARTIFACTS_FOR_TASK =
 // that forgot its `workspace_id = ?` would quietly mix two workspaces together. These exist so
 // mobile's screens stop hand-rolling unscoped SQL. params: [workspaceId]
 export const PROJECTS_FOR_WORKSPACE =
-  `select id, name, is_default, model_pack from projects where workspace_id = ? order by is_default desc, name`;
+  `select id, name, is_default, model_pack, context_channel_id from projects where workspace_id = ? order by is_default desc, name`;
 // the repos a phone may attach to a project: REMOTE ones only. A `local` repo is a folder on one
 // person's machine, and re-registering it from a phone would mint a GitHub repo that never existed
 // (the server assumes github for a bare org/name). The card says so in words as well.
@@ -130,8 +130,10 @@ export const THREAD_MESSAGES =
 
 // The thread's own row — its head: title, mode, the birth machine and origin (0134), the room. params: [threadId]
 export const THREAD_HEAD =
-  `select t.id, t.title, t.mode, t.kind, t.brain_override, t.machine_id, t.origin, t.task_id, t.schedule_id, t.root_message_id, t.channel_id, c.slug as channel_slug, c.kind as channel_kind, t.workspace_id, t.created_at, t.settled_at
-     from threads t join channels c on c.id = t.channel_id where t.id = ? limit 1`;
+  `select t.id, t.title, t.mode, t.kind, t.brain_override, t.machine_id, t.origin, t.task_id, t.schedule_id, t.root_message_id, t.channel_id, c.slug as channel_slug, c.kind as channel_kind, p.name as project_name, t.workspace_id, t.created_at, t.settled_at
+     from threads t join channels c on c.id = t.channel_id
+     left join projects p on p.id = coalesce(t.project_id, c.project_id) and p.workspace_id = t.workspace_id
+     where t.id = ? limit 1`;
 
 // The agents registered to a room (the ACL) — the composer's brain pill and the room's crew. params: [channelId]
 export const AGENTS_IN_CHANNEL =

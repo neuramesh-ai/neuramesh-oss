@@ -80,6 +80,7 @@ export interface ScheduleInput {
 }
 
 export interface NMMessage {
+  projectId?: string;
   id: string;
   workspace: string;
   channel: string;

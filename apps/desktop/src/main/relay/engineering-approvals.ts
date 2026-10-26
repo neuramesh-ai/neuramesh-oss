@@ -23,8 +23,11 @@ export async function requestEngineeringApproval(request: ToolApprovalRequest, c
     }
     return policyResult(false, 'Blocked by Neuramesh workspace policy');
   }
-  if (sessionDecision === 'auto' && policyVerdict === 'allow') return policyResult(true);
   const changes = cwd && category === 'edit' ? await previewEngineeringChanges(cwd, request.toolName, request.input) : [];
+  if (cwd && category === 'edit' && (!changes.length || changes.some(change => change.previewError))) {
+    return policyResult(false, `The edit could not be safely previewed. Nothing was changed. The selected repository root is ${JSON.stringify(cwd)}. Read the current file and retry with a valid repository-relative path and matching edit contents. Do not invent a /workspace prefix or use shell commands to bypass file review.`);
+  }
+  if (sessionDecision === 'auto' && policyVerdict === 'allow') return policyResult(true);
   if (changes.length) record('review.proposed', { approvalId: request.toolCallId, toolName: request.toolName, category, input: request.input, changes });
   if (!isActive()) return { approved: false, reason: 'The session closed while preparing the preview.' };
   return new Promise((resolve) => {

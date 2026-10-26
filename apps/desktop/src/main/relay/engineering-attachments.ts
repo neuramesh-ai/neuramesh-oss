@@ -38,6 +38,9 @@ export class EngineeringAttachmentInbox {
     mkdirSync(this.dir, { recursive: true });
   }
 
+  /** the folder the files land in: the agy lane adds it to agy's workspace, which reads nothing outside */
+  get folder(): string { return this.dir; }
+
   start(id: string, name: string, mime: string, size: number): void {
     if (this.closed) throw new Error('That attachment inbox is closed.');
     if (this.pending.has(id)) throw new Error('That attachment has already started.');

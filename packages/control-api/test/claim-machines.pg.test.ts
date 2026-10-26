@@ -26,7 +26,7 @@ const app = store ? createApp(store) : null;
 const sql = DB ? postgres(DB) : null;
 
 // GitHub as a fixture for the write token (github-write.ts): installation 4242 covers acme/marketing-site
-// (the fixtures' repo); the scoped mint records what it was asked for, and `appWrite` flips it to 422
+// (the suite's workspace-owned repo); the scoped mint records what it was asked for, and `appWrite` flips it to 422
 const githubCalls: { path: string; body: unknown }[] = [];
 let appWrite = true;
 const github: typeof fetch = async (input, init) => {
@@ -129,7 +129,8 @@ describe.skipIf(!DB)('the claim substrate on postgres (0143)', () => {
   });
 
   it('a machine mints a per-run repository write token, narrowed to the room\'s repository (D6)', async () => {
-    // the room: a project with the fixtures\' GitHub repository attached, and a connected github row
+    // Start with an invalid legacy link to another workspace's repository: even a valid
+    // machine and connector must not turn that link into a repository credential.
     const proj = await (await appWithGitHub!.request('/v1/commands', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(george) }, body: json({ type: 'project.create', workspace: WS, name: 'Write token' }) })).json() as { projectId: string };
     const chan = await (await appWithGitHub!.request('/v1/commands', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(george) }, body: json({ type: 'channel.create', workspace: WS, project: proj.projectId, slug: 'write-token' }) })).json() as { channelId: string };
     await sql!`insert into project_repos (project_id, repo_id, is_primary) values (${proj.projectId}::uuid, 'b0000000-0000-0000-0000-000000000001'::uuid, true)`;
@@ -137,6 +138,14 @@ describe.skipIf(!DB)('the claim substrate on postgres (0143)', () => {
     const mint = (auth: Record<string, string>) => appWithGitHub!.request('/v1/repo/token', { method: 'POST', headers: { 'content-type': 'application/json', ...auth }, body: json({ channel: chan.channelId }) });
     // a person cannot: the token is a machine\'s
     expect((await mint({ 'x-nm-actor': JSON.stringify(george) })).status).toBe(403);
+    const foreignRepo = await mint({ authorization: `Bearer ${MACHINE_TOKEN}` });
+    expect(foreignRepo.status).toBe(409);
+    expect(await foreignRepo.json()).toMatchObject({ code: 'NO_REPO' });
+    expect(githubCalls).toHaveLength(0);
+    // The valid fixture belongs to the same workspace as the project and machine.
+    const [repo] = await sql!`insert into repos (workspace_id, org_name, name, clone_url)
+      values (${WS}::uuid, 'acme', 'marketing-site', 'git@github.com:acme/marketing-site.git') returning id`;
+    await sql!`update project_repos set repo_id = ${repo!['id']}::uuid where project_id = ${proj.projectId}::uuid`;
     // the machine can, and the mint asked GitHub for exactly one repository, the write pair, and the CI reads
     const res = await mint({ authorization: `Bearer ${MACHINE_TOKEN}` });
     expect(res.status).toBe(200);

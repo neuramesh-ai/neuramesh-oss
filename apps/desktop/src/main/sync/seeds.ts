@@ -107,7 +107,7 @@ export async function backfillSeeds(conn: Connection, db: ReplicaDatabase, machi
       // marketing-kind rooms: the marketing-core pack + plume 🦚, via the same helper the
       // kind-set IPC fires — boot covers rooms that predate this machine; the IPC covers rooms
       // flipped to marketing mid-session.
-      const mkAll = await db.getAll<{ id: string }>(`select id from channels where kind = 'marketing' and workspace_id = ? order by created_at, id`, [d.workspace_id]).catch(() => []);
+      const mkAll = await db.getAll<{ id: string }>(`select id from channels where (kind = 'marketing' or exists (select 1 from tasks t where t.channel_id = channels.id and t.kind = 'setup')) and workspace_id = ? order by created_at, id`, [d.workspace_id]).catch(() => []);
       await ensureMarketingSeeds(conn, db, d.workspace_id, mkAll.map((m) => m.id));
     }
     return;

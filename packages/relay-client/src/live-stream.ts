@@ -7,7 +7,7 @@
 // read-only JSON channel per cloud machine that may serve this workspace, deltas applied into the
 // SAME {key, agent, text, done} events the desktop's preload delivers, so no surface can tell the
 // transports apart. hq (apps/hq/web/webnm-stream.ts) and the phone (apps/mobile/src/stream-lane.ts)
-// run it over their own PowerSync replica. It moved here from hq unchanged.
+// run it over their local workspace replica.
 //
 // THREE RULES, each one a failure the lane must not have:
 //   · IT NEVER WAKES A MACHINE. A subscription attaches only to a machine whose heartbeat is fresh
@@ -23,12 +23,12 @@
 //     shows its synced replies, which is the behaviour without the lane exactly.
 import {
   LIVE_SILENCE_MS, LIVE_STREAM_LANE, applyLiveFrame, liveFrameOf, liveKeySurface,
-  type LiveFrame, type LiveKeyState,
+  type LiveFrame, type LiveKeyState, type ImageGenerationProgress,
 } from '@neuramesh/shared';
 import { openRelayJsonChannel, type RelayConfig } from './relay-client';
 
 /** `thinking`: the turn's thoughts so far, when the runtime shows them (the repo-connect round's Option A) */
-export type StreamEvent = { key: string; agent: string; text: string; done: boolean; thinking?: string };
+export type StreamEvent = { key: string; agent: string; text: string; done: boolean; thinking?: string; imageGeneration?: ImageGenerationProgress | null };
 
 /** how long a finished stream holds its text waiting for the synced reply */
 export const LAND_MAX_MS = 15_000;
@@ -84,6 +84,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
   const keys = new Map<string, KeyEntry>();
   const subs = new Map<string, Sub>();
   let wanted = new Set<string>();
+  let closed = false;
 
   const emit = (e: StreamEvent): void => { for (const w of watchers) w(e); };
 
@@ -114,6 +115,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
   const land = (key: string): void => {
     const entry = keys.get(key);
     if (!entry || entry.landing) return;
+    if (entry.st.imageGeneration) { entry.st = { ...entry.st, imageGeneration: null }; emit({ key, agent: entry.st.a, text: entry.st.text, done: false, thinking: entry.st.th, imageGeneration: null }); }
     // presence with no words: nothing to hold, the ghost simply goes
     if (!entry.st.text.trim()) { close(key); return; }
     entry.landing = { timer: setTimer(() => { if (keys.get(key) === entry) close(key); }, LAND_MAX_MS), landed: false };
@@ -121,6 +123,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
   };
 
   const onFrame = (machine: string, f: LiveFrame): void => {
+    if (closed) return;
     const sub = subs.get(machine);
     if (sub) {
       // any frame is proof of life, and a subscription that works has earned a fast redial again
@@ -151,7 +154,7 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
       ? { machine, st: step.state, baseline: deps.latestReply(f.k).catch(() => null), landing: null, resyncing: false }
       : { ...cur!, st: step.state, resyncing: false };
     keys.set(f.k, entry);
-    emit({ key: f.k, agent: step.state.a, text: step.state.text, done: false, ...(step.state.th ? { thinking: step.state.th } : {}) });
+    emit({ key: f.k, agent: step.state.a, text: step.state.text, done: false, ...(step.state.th ? { thinking: step.state.th } : {}), ...(step.state.imageGeneration !== undefined ? { imageGeneration: step.state.imageGeneration } : {}) });
   };
 
   const dial = (machine: string): void => {
@@ -189,16 +192,18 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
 
   return {
     watch(cb: (e: StreamEvent) => void): () => void {
+      if (closed) return () => {};
       watchers.add(cb);
       // a surface mounting mid-reply gets the reply so far, the way the IPC stream would have, and the
       // thoughts so far: without them a turn still in its thoughts reads as the ghost until its next frame
-      for (const [key, entry] of keys) cb({ key, agent: entry.st.a, text: entry.st.text, done: false, ...(entry.st.th ? { thinking: entry.st.th } : {}) });
+      for (const [key, entry] of keys) cb({ key, agent: entry.st.a, text: entry.st.text, done: false, ...(entry.st.th ? { thinking: entry.st.th } : {}), ...(entry.st.imageGeneration !== undefined ? { imageGeneration: entry.st.imageGeneration } : {}) });
       return () => { watchers.delete(cb); };
     },
     /** the machines this tab should hear. The list gates DIALLING only: a subscription that is
      *  live stays live until the relay closes it (the machine left), whatever a heartbeat row says,
      *  and a machine no longer listed is simply not redialled when it goes. */
     setMachines(ids: string[]): void {
+      if (closed) return;
       wanted = new Set(ids);
       for (const id of ids) {
         const held = subs.get(id);
@@ -213,12 +218,24 @@ export function createLiveStreamClient(deps: LiveClientDeps) {
       for (const [key, entry] of keys) if (entry.landing) void checkLanded(key, entry);
     },
     stats: () => ({ keys: keys.size, machines: [...subs.keys()] }),
+    close(): void {
+      closed = true;
+      wanted.clear();
+      for (const sub of subs.values()) {
+        for (const timer of [sub.retry, sub.silence, sub.orphan]) if (timer) clearTimer(timer);
+      }
+      const channels = [...subs.values()].map(sub => sub.channel);
+      subs.clear(); // exit callbacks must not schedule another connection
+      for (const channel of channels) channel?.close();
+      for (const key of [...keys.keys()]) close(key);
+      watchers.clear();
+    },
   };
 }
 
 // ── The host wiring: the relay channel, the replica, the machine list ───────────────────────────
 
-/** the part of the replica this lane reads (PowerSync's `getAll` + change callback, on the web and on the phone) */
+/** the part of the replica this lane reads (`getAll` + change callback, on the web and on the phone) */
 export interface StreamDb {
   getAll<T>(sql: string, params?: unknown[]): Promise<T[]>;
   onChangeWithCallback(handler: { onChange: () => void }, options: { tables: string[] }): () => void;
@@ -303,10 +320,10 @@ export function openLiveStreamLane(env: StreamEnv, db: StreamDb, relayUrl: strin
     });
   };
   refresh();
-  db.onChangeWithCallback({ onChange: refresh }, { tables: ['machines'] });
-  db.onChangeWithCallback({ onChange: () => c.messagesChanged() }, { tables: ['messages', 'runs'] });
+  const stopMachines = db.onChangeWithCallback({ onChange: refresh }, { tables: ['machines'] });
+  const stopMessages = db.onChangeWithCallback({ onChange: () => c.messagesChanged() }, { tables: ['messages', 'runs'] });
   // "online" is a clock question as much as a row question: a machine goes quiet without a write
   const tick = setInterval(refresh, 30_000);
   (tick as { unref?: () => void }).unref?.(); // a browser and a phone have no unref; a node test must still exit
-  return c;
+  return { ...c, close() { clearInterval(tick); stopMachines(); stopMessages(); c.close(); } };
 }

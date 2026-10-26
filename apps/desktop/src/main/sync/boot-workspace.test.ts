@@ -15,10 +15,10 @@ let memberships: Array<{ id: string; name: string; slug: string; onboarded: bool
 let registrations = 0;
 class Replica {
   async connect() {}
+  async activate() {}
   async disconnectAndClear() { throw new Error('a held workspace must not erase its replica'); }
   registerListener() {}
 }
-class LocalReplica extends Replica {}
 const fakeSync = {
   ApiError: class extends Error {}, actorId: () => 'owner',
   apiOn: async (_conn: unknown, path: string) => {
@@ -29,11 +29,11 @@ const fakeSync = {
 };
 const mocks: Record<string, unknown> = {
   electron: { app: {}, BrowserWindow: { getAllWindows: () => [] }, Notification: {} },
-  '@powersync/node': { PowerSyncDatabase: Replica, SyncStreamConnectionMethod: { HTTP: 'http' } },
-  './local-replica': { LocalReplica }, '../apiauth': {}, '../auth': {}, '../auth-clerk': {},
+  '@neuramesh/client-core/sqlite-replica': { SQLiteReplica: Replica },
+  '../apiauth': {}, '../auth': {}, '../auth-clerk': {},
   '../agents': { startAgentHost: () => {} }, '../notify': { startNotifications: () => {} },
-  '../sync': fakeSync, './connector': { Connector: class {} },
-  './local-upgrade': { powerSyncReplica: () => new Replica() },
+  '../sync': fakeSync,
+  './sqlite-driver': { sqliteDriver: () => ({}), upgradeReplica: async () => {} },
   './machine': { registerThisMachine: async () => { registrations++; return 'machine'; } },
   './seeds': { backfillSeeds: async () => {} },
 };
@@ -50,7 +50,7 @@ before(async () => {
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 const fixture = (name: string, workspace?: string) => {
-  const conn = makeConnection({ id: name, kind: 'cloud', authMode: 'clerk', apiUrl: 'https://api.example', powersyncUrl: 'https://sync.example', webUrl: '' },
+  const conn = makeConnection({ id: name, kind: 'cloud', authMode: 'clerk', apiUrl: 'https://api.example', webUrl: '' },
     { replicaPath: join(root, `${name}.db`), markerPath: join(root, `${name}.json`) }, 'owner');
   if (workspace) writeFileSync(conn.markerPath, JSON.stringify({ workspaceId: workspace }));
   return conn;

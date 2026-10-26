@@ -94,7 +94,7 @@ corepack pnpm install --frozen-lockfile
 pnpm app:local
 ```
 
-The second command starts the dev stack in Docker (Postgres and PowerSync), starts the control-api, builds the desktop app, and opens it. `pnpm check` runs the typecheck, the lint, and the tests.
+The second command starts the dev stack in Docker (Postgres), starts the control-api, builds the desktop app, and opens it. `pnpm check` runs the typecheck, the lint, and the tests.
 
 | Where to read | What it holds |
 |---|---|
@@ -110,7 +110,7 @@ The second command starts the dev stack in Docker (Postgres and PowerSync), star
 apps/desktop           the Electron app, the browser client, and the preview harness
 packages/control-api   the API (Hono) and the migrations
 packages/shared        the types, the FSM, the entitlements, the protocols every client speaks
-dev/stack              the dev stack: Postgres, PowerSync, the sync rules
+dev/stack              the dev stack: Postgres; clients sync through the authenticated API
 ```
 
 ## Private by default

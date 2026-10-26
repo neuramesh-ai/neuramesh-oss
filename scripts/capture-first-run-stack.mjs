@@ -37,10 +37,10 @@ const CARD_SETTLED = (words) => `(() => {
 })()`;
 
 const SHOTS = [
-  ['01-starting', 'starting', ['NeuraMesh is starting up…', 'Postgres', 'NeuraMesh API', 'PowerSync']],
+  ['01-starting', 'starting', ['NeuraMesh is starting up…', 'Postgres', 'NeuraMesh API']],
   ['02-stalled', 'stalled', ['NeuraMesh is starting up…', 'stopped']],
-  ['03-error-stopped', 'error', ['NeuraMesh did not start on this Mac', 'PowerSync stopped 3 times.', 'postgres query failed', 'Try again starts a fresh PowerSync container.', 'Copy details']],
-  ['04-error-port', 'error-port', ['Port 58081 is in use by another program.', 'stack-powersync-1', 'Stop that program, then try again.']],
+  ['03-error-stopped', 'error', ['NeuraMesh did not start on this Mac', 'NeuraMesh API stopped 3 times.', 'postgres query failed', 'Try again starts a fresh NeuraMesh API container.', 'Copy details']],
+  ['04-error-port', 'error-port', ['Port 8788 is in use by another program.', 'stack-control-api-1', 'Stop that program, then try again.']],
   ['05-error-plain', 'error-plain', ['Colima did not start.']],
 ];
 

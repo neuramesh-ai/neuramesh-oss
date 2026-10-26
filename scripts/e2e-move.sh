@@ -28,7 +28,6 @@ for f in supabase/migrations/*.sql; do
   case "$b" in 0001_*) continue ;; *publication*|*publish*) continue ;; esac
   q "$f"
 done
-q dev/stack/init/99-publication.sql
 
 # the server: the postgres store, the actor header open (the script speaks as two users), no fleet, no push
 DATABASE_URL="postgresql://postgres:nm@127.0.0.1:$PORT/nm" PORT="$API_PORT" HOST=127.0.0.1 FLEET_AUTOPROVISION=off \

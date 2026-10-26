@@ -1,7 +1,7 @@
 // Electron, loaded ON USE.
 //
-// `require('electron')` THROWS outside a packaged/dev Electron: its entry resolves the binary
-// path at require time and fails when there is none. CI sets ELECTRON_SKIP_BINARY_DOWNLOAD=1, so
+// Outside Electron, `require('electron')` returns the binary path when installed and throws
+// when the binary is absent. Neither result is the main-process API. CI skips the download, so
 // any main-process module with a top-level `import … from 'electron'` cannot be imported by a
 // test — and a module that cannot be imported cannot be tested.
 //
@@ -19,7 +19,10 @@ let mod: ElectronMain | null | undefined;
 /** The electron main module, or null when we are not running inside Electron. */
 export function electron(): ElectronMain | null {
   if (mod === undefined) {
-    try { mod = require('electron') as ElectronMain; } catch { mod = null; }
+    try {
+      const loaded = require('electron') as ElectronMain | string;
+      mod = typeof loaded === 'object' && typeof loaded?.BrowserWindow?.getAllWindows === 'function' ? loaded : null;
+    } catch { mod = null; }
   }
   return mod;
 }

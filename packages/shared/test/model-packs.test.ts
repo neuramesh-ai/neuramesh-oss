@@ -13,6 +13,16 @@ import { STARTER_MODEL } from '../src/rates';
 const ALL_ROLES: AgentRole[] = ['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator'];
 
 describe('catalog integrity', () => {
+  it('offers the verified October models and preserves previous Claude IDs for saved picks', () => {
+    expect(CURRENT_MODELS['claude-code']).toEqual(['claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
+    expect(CURRENT_MODELS.gemini).toContain('gemini-4-argon');
+    for (const old of ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5']) {
+      expect(LEGACY_MODELS).toContain(old);
+      expect(MODEL_ID_SET.has(old)).toBe(true);
+      expect(CURRENT_MODELS['claude-code']).not.toContain(old);
+    }
+    expect(PACKS.fast!.latency?.developer).toBeUndefined();
+  });
   it('every pack model is a known, routable id (no hallucinated/typo ids)', () => {
     expect(() => assertPacksValid()).not.toThrow();
     for (const pack of Object.values(PACKS)) {
@@ -112,10 +122,10 @@ describe('role resolution', () => {
   });
 });
 
-describe('benchmark reseat 2026-09-08 (suite v1.1 — revert only with bench evidence)', () => {
-  it('claude-sonnet-5 is the DEFAULT Claude orchestrator (directed, and measured level with the leaders)', () => {
-    expect(PACKS['claude-core']!.roles.orchestrator).toBe('claude-sonnet-5');
-    expect(PACKS['balanced']!.roles.orchestrator).toBe('claude-sonnet-5');
+describe('role allocation from 2026-09-08 with the requested October Claude upgrade', () => {
+  it('Sonnet 5.5 replaces the default Claude orchestrator', () => {
+    expect(PACKS['claude-core']!.roles.orchestrator).toBe('claude-sonnet-5-5');
+    expect(PACKS['balanced']!.roles.orchestrator).toBe('claude-sonnet-5-5');
   });
   it('claude-fable-5-1 holds the claude-core architect seat (DIRECTED against the measurement)', () => {
     // measured claude-sonnet-5 88 vs claude-fable-5-1 78, at an eighth of the cost and half the
@@ -129,12 +139,12 @@ describe('benchmark reseat 2026-09-08 (suite v1.1 — revert only with bench evi
     expect(PACKS['ultracode']!.roles.architect).toBe('gpt-6-astra');
     expect(PACKS['openai-core']!.roles.architect).toBe('gpt-6-astra');
   });
-  it('claude-sonnet-5 holds the developer seat wherever Anthropic is available', () => {
-    // seven models tied at exactly 100%, so the seat broke on speed and cost: sonnet-5 was the
-    // fastest of them and the second cheapest
+  it('Sonnet 5.5 replaces the Claude developer seats', () => {
+    // The role allocation stays the same. The October refresh upgrades the model,
+    // without treating Sonnet 5 measurements as evidence for Sonnet 5.5.
     for (const pack of ['ultracode', 'balanced', 'fast', 'claude-core'] as const) {
-      expect(PACKS[pack]!.roles.developer, pack).toBe('claude-sonnet-5');
-      expect(PACKS[pack]!.roles.worker, pack).toBe('claude-sonnet-5');
+      expect(PACKS[pack]!.roles.developer, pack).toBe('claude-sonnet-5-5');
+      expect(PACKS[pack]!.roles.worker, pack).toBe('claude-sonnet-5-5');
     }
   });
   it('the Gemini architect seat no longer needs the preview exception, but the developer seat still does', () => {
@@ -167,12 +177,12 @@ describe('fast pack (fastest full-strength seat per role, founder rule: no mini/
   it('holds the measured + curated seats (re-seated on the 2026-09 latencies)', () => {
     expect(packModelForRole('fast', 'orchestrator')).toBe('gemini-3.8-flash');
     expect(packModelForRole('fast', 'architect')).toBe('gemini-3.8-flash');
-    expect(packModelForRole('fast', 'developer')).toBe('claude-sonnet-5');
+    expect(packModelForRole('fast', 'developer')).toBe('claude-sonnet-5-5');
     expect(packModelForRole('fast', 'reviewer')).toBe('gemini-3.8-flash');
-    expect(packModelForRole('fast', 'designer')).toBe('claude-sonnet-5');
-    expect(packModelForRole('fast', 'shipper')).toBe('claude-sonnet-5');
-    expect(packModelForRole('fast', 'sales')).toBe('claude-haiku-4-5');
-    expect(packModelForRole('fast', 'curator')).toBe('claude-haiku-4-5');
+    expect(packModelForRole('fast', 'designer')).toBe('claude-sonnet-5-5');
+    expect(packModelForRole('fast', 'shipper')).toBe('claude-sonnet-5-5');
+    expect(packModelForRole('fast', 'sales')).toBe('claude-haiku-5-5');
+    expect(packModelForRole('fast', 'curator')).toBe('claude-haiku-5-5');
   });
   it('no mini/lite-tier model holds a WORKING seat (haiku allowed on support only)', () => {
     const smallTier = ['gpt-5.4-mini', 'gemini-3.1-flash-lite'];
@@ -197,12 +207,13 @@ describe('fast pack (fastest full-strength seat per role, founder rule: no mini/
       expect(defaultPackForProviders(ready)).not.toBe('fast');
     }
   });
-  it('carries measured latency toks for the benched working roles (worker mirrors developer)', () => {
+  it('shows latency only for unchanged, measured models', () => {
     const lat = PACKS['fast']!.latency!;
-    for (const role of ['orchestrator', 'architect', 'developer', 'worker', 'reviewer'] as const) {
+    for (const role of ['orchestrator', 'architect', 'reviewer'] as const) {
       expect(lat[role], `latency.${role}`).toMatch(/^\d+(\.\d+)?s$/);
     }
-    expect(lat.worker).toBe(lat.developer);
+    expect(lat.developer).toBeUndefined(); // Sonnet 5.5 has no measured latency yet
+    expect(lat.worker).toBeUndefined();
     expect(lat.designer).toBeUndefined(); // curated seat — no bench dimension yet
   });
 });
@@ -269,8 +280,8 @@ describe('legacy compatibility', () => {
 describe('custom brains (user-authored packs)', () => {
   const roles = {
     orchestrator: 'claude-sonnet-4-6', architect: 'claude-opus-4-8',
-    developer: 'claude-haiku-4-5', worker: 'claude-haiku-4-5',
-    reviewer: 'gemini-3.5-flash', designer: 'claude-sonnet-5',
+    developer: 'claude-haiku-5-5', worker: 'claude-haiku-5-5',
+    reviewer: 'gemini-3.5-flash', designer: 'claude-sonnet-5-5',
     sales: 'gemini-3.1-flash-lite', curator: 'gemini-3.1-flash-lite',
   } as const;
 

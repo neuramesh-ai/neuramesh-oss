@@ -16,6 +16,11 @@ describe('messageUploadInput', () => {
     });
   });
 
+  it('retains project intent across offline upload and leaves old queued rows compatible', () => {
+    expect(messageUploadInput('m1', { ...row, birth_project: 'p1' }).project).toBe('p1');
+    expect(messageUploadInput('m2', row).project).toBeUndefined();
+  });
+
   it('Auto writes no designation: a NULL or empty birth_machine is absent, not the string "null"', () => {
     expect(messageUploadInput('m2', { ...row, birth_machine: null }).threadMachineId).toBeUndefined();
     expect(messageUploadInput('m2', { ...row, birth_machine: '' }).threadMachineId).toBeUndefined();

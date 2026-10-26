@@ -6,7 +6,7 @@ import { customBearerAccount, customReachable, customServerId, validateCustomSer
 import { memoryKeychain } from './keychain';
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-const CFG = { mode: 'local', powersyncUrl: 'http://box.local:58081', version: '0.132.0', schemaVersion: '0140' };
+const CFG = { mode: 'local', version: '0.132.0', schemaVersion: '0140' };
 const ME = { actor: { kind: 'human', id: 'u-local' }, workspaces: [{ id: 'w1', name: 'Box', slug: 'box' }] };
 
 /** a fake server: nm-config and /v1/me by path, the bearer it accepts */
@@ -21,20 +21,19 @@ const server = (over: { cfg?: unknown; cfgStatus?: number; bearer?: string; me?:
   return json({ error: 'not found' }, 404);
 };
 
-test('a good pair: the address answers with a mode, the bearer names a human, the PowerSync address comes from the server', async () => {
+test('a good pair: the address answers with a mode and the bearer names a human', async () => {
   const v = await validateCustomServer({ apiUrl: 'http://box.local:8788/', bearer: ' nmh_good ' }, server());
-  assert.deepEqual(v, { ok: true, apiUrl: 'http://box.local:8788', powersyncUrl: 'http://box.local:58081', mode: 'local', version: '0.132.0', actorId: 'u-local', workspaces: ME.workspaces });
+  assert.deepEqual(v, { ok: true, apiUrl: 'http://box.local:8788', mode: 'local', version: '0.132.0', actorId: 'u-local', workspaces: ME.workspaces });
 });
 
-test('a Local server syncs through its API without a PowerSync address', async () => {
-  const v = await validateCustomServer({ apiUrl: 'http://box.local:8788', bearer: 'nmh_good' }, server({ cfg: { mode: 'local', powersyncUrl: null } }));
+test('a Local server syncs through its API', async () => {
+  const v = await validateCustomServer({ apiUrl: 'http://box.local:8788', bearer: 'nmh_good' }, server({ cfg: { mode: 'local' } }));
   assert.ok(v.ok);
-  assert.equal(v.powersyncUrl, '');
 });
 
-test('a pasted PowerSync address wins over the server-named one', async () => {
-  const v = await validateCustomServer({ apiUrl: 'https://nm.example', powersyncUrl: 'https://ps.example/', bearer: 'nmh_good' }, server());
-  assert.ok(v.ok && v.powersyncUrl === 'https://ps.example');
+test('a cloud server uses the same API feed without a second sync endpoint', async () => {
+  const v = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, server({ cfg: { mode: 'cloud' } }));
+  assert.ok(v.ok && v.apiUrl === 'https://nm.example');
 });
 
 test('a bad nm-config: no mode, or not a NeuraMesh API at all', async () => {
@@ -62,8 +61,6 @@ test('a bad address: not a url, a file scheme, or nothing answers', async () => 
   assert.ok(!file.ok && file.code === 'ADDRESS');
   const dead = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, async () => { throw new TypeError('fetch failed'); });
   assert.deepEqual(dead, { ok: false, code: 'UNREACHABLE', message: 'The address did not answer.' });
-  const noPs = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, server({ cfg: { mode: 'cloud' } }));
-  assert.ok(!noPs.ok && noPs.code === 'ADDRESS');
 });
 
 test('the id and the keychain account derive from the host, so one server has one slot', () => {

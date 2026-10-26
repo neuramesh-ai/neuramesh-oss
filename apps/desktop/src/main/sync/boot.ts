@@ -1,5 +1,6 @@
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
-import { LocalReplica } from './local-replica';
+import { SQLiteReplica } from '@neuramesh/client-core/sqlite-replica';
+import { sqliteDriver, upgradeReplica } from './sqlite-driver';
 import { apiBearerHeader } from '../apiauth';
 import type { UploadIdentity } from '@neuramesh/client-core/crud-upload';
 // THE REPLICA'S BOOT, per connection: open the replica, resolve the workspace, connect the
@@ -10,18 +11,14 @@ import type { UploadIdentity } from '@neuramesh/client-core/crud-upload';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { app, BrowserWindow, Notification } from 'electron';
-import { PowerSyncDatabase, SyncStreamConnectionMethod } from '@powersync/node';
 import { startAgentHost } from '../agents';
 import type { AgentLog } from '../agentlog';
-import { sessionExpiresAt } from '../auth';
-import { clerkLogout } from '../auth-clerk';
+import { clerkLogout, clearClerkApiToken } from '../auth-clerk';
 import { connections, type Connection } from '../connections';
 import { startNotifications } from '../notify';
 import { membershipChanged, parseWorkspaceIdent, pickBootWorkspace, shouldWipeReplica } from '../wsident';
 import { ApiError, actorId, apiOn } from '../sync';
-import { Connector } from './connector';
 import { registerThisMachine } from './machine';
-import { connectLocalReplica, powerSyncReplica } from './local-upgrade';
 import { backfillSeeds } from './seeds';
 
 export interface BootDeps {
@@ -94,15 +91,16 @@ export async function connectStream(conn: Connection): Promise<void> {
   }
   // a resolved EMPTY list is authoritative too (onboarding) — but there is no workspace to stamp
   if (conn.wsAuthoritative && conn.ws) writeWorkspaceMarker(conn);
-  if (target instanceof LocalReplica) {
-    const identity = async (): Promise<UploadIdentity> => ({
-      apiUrl: conn.apiUrl, workspaceFallback: conn.ws, defaultActor: { kind: 'human', id: actorId(conn) },
-      authHeaders: await apiBearerHeader(conn.apiUrl),
+  if (!(target instanceof SQLiteReplica)) throw new Error('Unknown replica transport');
+  const identity = async (force = false): Promise<UploadIdentity> => {
+    if (force && conn.authMode === 'clerk') clearClerkApiToken();
+    return ({
+    apiUrl: conn.apiUrl, workspaceFallback: conn.ws, defaultActor: { kind: 'human', id: actorId(conn) },
+    authHeaders: await apiBearerHeader(conn.apiUrl),
     });
-    await connectLocalReplica(target, conn.replicaPath, conn.apiUrl, identity);
-  } else if (target instanceof PowerSyncDatabase) {
-    await target.connect(new Connector(conn, actorId), { connectionMethod: SyncStreamConnectionMethod.HTTP });
-  } else throw new Error('Unknown replica transport');
+  };
+  await target.activate({ kind: 'human', id: actorId(conn) });
+  await target.connect({ apiUrl: conn.apiUrl, identity, beforeSync: () => upgradeReplica(target, conn.replicaPath, { kind: 'human', id: actorId(conn) }) });
 }
 
 // Re-resolve the active workspace and reconnect — for when a workspace appears or changes AFTER
@@ -131,16 +129,12 @@ export async function resyncWorkspace(conn: Connection): Promise<void> {
   await connectStream(conn).catch((err) => console.error('resyncWorkspace connect failed:', err));
 }
 
-/** open the connection's replica — CREATE the directory first: neither better-sqlite3 nor PowerSync
- *  will mkdir for you, and a throw here before the IPC wall registers is a HANG behind the splash,
+/** open the connection's replica — CREATE the directory first: SQLite will not mkdir for you, and a throw here before the IPC wall registers is a HANG behind the splash,
  *  not an error (2026-08-01). */
 export function openReplica(conn: Connection): ReplicaDatabase {
   mkdirSync(dirname(conn.replicaPath), { recursive: true });
-  // Local connections use the repository-owned sync protocol. A separate file preserves
-  // the existing PowerSync cache and queue for rollback. Never reinterpret SDK internal tables.
-  const useLocalSync = conn.authMode === 'local' || (conn.authMode === 'dev' && process.env['NM_LOCAL_SYNC'] === '1');
-  const db = useLocalSync ? new LocalReplica(`${conn.replicaPath}.local.sqlite`) : powerSyncReplica(conn.replicaPath);
-  if (db instanceof LocalReplica) db.adoptPowerSyncCache(conn.replicaPath);
+  // All connections use the same API feed. Keep the previous cache intact for upgrade recovery.
+  const db = new SQLiteReplica(sqliteDriver(`${conn.replicaPath}.local.sqlite`));
   conn.db = db;
   // the registry's list did not change, its SHAPE did: the rail's union (watch-rail.ts) has
   // nothing to read on this connection until now
@@ -246,11 +240,8 @@ async function resolveWorkspace(conn: Connection, db: ReplicaDatabase, deps: Boo
 /** the hourly-rotation reconnector and the membership watch — the two timers a cloud stream needs */
 function armCloudWatches(conn: Connection): void {
   if (conn.authMode !== 'supabase' && conn.authMode !== 'clerk') return;
-  // ── membership watch (2026-08-13) ──────────────────────────────────────────────────────────
-  // PowerSync fixes a connection's buckets at connect time from `my_workspaces`, so a workspace
-  // you are added to WHILE THE APP RUNS streams nothing: the replica keeps whatever it had, the
-  // pill reads Local, and only a relaunch fixes it. Cheap by construction: one GET a minute, and
-  // it only reconnects when the membership SET actually differs.
+  // The feed independently refreshes membership scope on every request. This watch updates
+  // the selected workspace and invitation UI without reconnecting or wiping its replica.
   const memberWatch = setInterval(() => {
     void (async () => {
       try {
@@ -265,24 +256,11 @@ function armCloudWatches(conn: Connection): void {
           conn.wsAuthoritative = true;
         }
         await refreshPendingInvites(conn);
-        // reconnect, not just re-pick: the new membership's buckets only exist on a fresh stream
-        await connectStream(conn).catch((err) => console.error('sync_membership connect failed:', err));
       } catch { /* offline — the next tick retries */ }
     })();
   }, 60_000);
   memberWatch.unref?.();
-  // HTTP streams have not been observed surviving the hourly token rotation: live updates stop
-  // while the pill stays "connected". Reconnect proactively just before each expiry — connect()
-  // re-runs fetchCredentials, which refreshes the session.
-  const reconnector = setInterval(() => {
-    const exp = conn.authMode === 'clerk' ? conn.clerkTokenExp?.getTime() : sessionExpiresAt();
-    const window = conn.authMode === 'clerk' ? 120_000 : 240_000;
-    if (exp && exp - Date.now() < window) {
-      console.log('sync_reconnect: token nearing expiry — re-establishing stream');
-      connectStream(conn).catch((err) => console.error('sync_reconnect failed:', err));
-    }
-  }, 60_000);
-  reconnector.unref?.();
+
 }
 
 /** desktop push notifications for this connection: ping the human when something needs them and

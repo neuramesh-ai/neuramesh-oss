@@ -10,20 +10,20 @@ export function libraryChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'c
   return [
     tool(
       'list_library',
-      'The documents in a room\'s library — brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about the product, its market or its voice, and before you draft.',
-      { scope: z.enum(['room', 'project', 'workspace']).optional().describe("'room' (default) = this room's shelf. 'project' = every room in this project. 'workspace' = everything the team keeps.") },
+      'The documents in a project\'s Files — brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about the product, its market or its voice, and before you draft.',
+      { offset: z.number().int().min(0).optional().describe('Returns up to 60 documents; use offset 60, 120, etc. for subsequent pages.'), scope: z.enum(['room', 'project', 'workspace']).optional().describe("'project' (default) = all files of the active project; 'room' is a compatibility alias. 'workspace' = everything the team keeps.") },
       async (i) => {
-        const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
+        const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'project';
         log({ kind: 'tool', phase: 'call', summary: `list_library ${scope}` });
-        return text(await listLibrary(libraryDocs, ch.id, scope));
+        return text(await listLibrary(libraryDocs, ch.id, scope, i.offset as number | undefined));
       },
     ),
     tool(
       'read_library_doc',
-      'Read a document from a room\'s library by name (the names come from list_library). The team\'s own record: it outranks anything on the open web about this product. Read the brand docs before you draft.',
+      'Read a document from a project\'s Files by name (the names come from list_library). The team\'s own record: it outranks anything on the open web about this product. Read the brand docs before you draft.',
       { name: z.string().min(1).describe('the exact document name from list_library, e.g. business-profile.md'), scope: z.enum(['room', 'project', 'workspace']).optional().describe('the scope you found the name in') },
       async (i) => {
-        const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
+        const scope = (i.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'project';
         log({ kind: 'tool', phase: 'call', summary: `read_library_doc ${String(i.name)}` });
         return text(await readLibraryDoc(libraryDocs, ch.id, String(i.name), scope, grounding));
       },
@@ -47,11 +47,11 @@ export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent
       },
       async (i) => {
         const input = i as AngleInput;
-        const gate = await angleGate(db, ch.id, grounding, input);
+        const gate = await angleGate(db, ch.id, grounding, input, { threadId });
         if (gate) return text(gate);
         // the platforms as chips, and the lengths the workspace's tier films, priced (video-rung plan §8)
         const actor = { kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) };
-        const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id), videoLengths(apiGet, actor, ch.workspace_id)]);
+        const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id, { threadId }), videoLengths(apiGet, actor, ch.workspace_id)]);
         const posted = await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, threadId, body: angleCard(input, conns, lengths) }).catch(() => null);
         if (!posted?.ok) return text('the angle card could not be posted — say so plainly rather than listing the angles in your reply');
         log({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });

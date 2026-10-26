@@ -10,10 +10,10 @@
 // connection at boot, and this module is what it calls.
 import type { Keychain } from './keychain';
 
-export interface CustomServerInput { apiUrl: string; powersyncUrl?: string; bearer: string }
+export interface CustomServerInput { apiUrl: string; bearer: string }
 
 export type CustomServerVerdict =
-  | { ok: true; apiUrl: string; powersyncUrl: string; mode: string; version: string | null; actorId: string; workspaces: Array<{ id: string; name: string; slug: string }> }
+  | { ok: true; apiUrl: string; mode: string; version: string | null; actorId: string; workspaces: Array<{ id: string; name: string; slug: string }> }
   | { ok: false; code: 'ADDRESS' | 'NM_CONFIG' | 'BEARER' | 'UNREACHABLE'; message: string };
 
 /** the keychain account a custom server's bearer is filed under (keychain.ts KEYCHAIN_SERVICE) */
@@ -36,7 +36,7 @@ export async function validateCustomServer(input: CustomServerInput, fetchImpl: 
   const bearer = input.bearer.trim();
   if (!bearer) return { ok: false, code: 'BEARER', message: 'Paste the bearer from your stack.' };
 
-  let cfg: { mode?: unknown; version?: unknown; powersyncUrl?: unknown } = {};
+  let cfg: { mode?: unknown; version?: unknown } = {};
   try {
     const res = await fetchImpl(`${apiUrl}/.well-known/nm-config`);
     if (!res.ok) return { ok: false, code: 'NM_CONFIG', message: `The address did not answer as a NeuraMesh API (${res.status}).` };
@@ -57,9 +57,7 @@ export async function validateCustomServer(input: CustomServerInput, fetchImpl: 
   }
   if (typeof me.actor?.id !== 'string' || me.actor.kind !== 'human') return { ok: false, code: 'BEARER', message: 'The bearer is not a human bearer.' };
 
-  const powersyncUrl = trimSlash((input.powersyncUrl?.trim() || (typeof cfg.powersyncUrl === 'string' ? cfg.powersyncUrl : '')));
-  if (!powersyncUrl && cfg.mode !== 'local') return { ok: false, code: 'ADDRESS', message: 'Paste the PowerSync address. The server did not name one.' };
-  return { ok: true, apiUrl, powersyncUrl, mode: cfg.mode, version: typeof cfg.version === 'string' ? cfg.version : null, actorId: me.actor.id, workspaces: me.workspaces ?? [] };
+  return { ok: true, apiUrl, mode: cfg.mode, version: typeof cfg.version === 'string' ? cfg.version : null, actorId: me.actor.id, workspaces: me.workspaces ?? [] };
 }
 
 /**

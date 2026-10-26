@@ -4,8 +4,8 @@ import { resolveEngineeringDisplayContext } from './relay/engineering-display-co
 // the same daemon the desktop app runs, minus the window: electronlazy already returns
 // null for every daemon-core module outside electron, so this entry only replaces what
 // the desktop boot (sync.ts startSync) wires by hand — paths, sync credentials, and the
-// agent host. identity is the machine token (architecture.md §3.3): exchanged at
-// control-api for a short-lived PowerSync JWT; never a user session, never a vendor key.
+// agent host. The API authenticates the machine token (architecture.md §3.3) directly
+// and restricts its replica feed to its own workspace.
 //
 //   env contract (stamped by the fleet's statefulset template — infra/k8s/templates):
 //     NM_MACHINE_TOKEN   the once-delivered machine secret (nmm_…) — ABSENT on a warm spare
@@ -17,7 +17,6 @@ import { resolveEngineeringDisplayContext } from './relay/engineering-display-co
 //     NM_MACHINE_KIND    member | runner
 //     NM_OWNER_USER_ID   the sync principal (member, or the runner's provisioning owner)
 //     NM_API_URL         control-api base (default https://api.neuramesh.app)
-//     NM_POWERSYNC_URL   the PowerSync instance url
 //     NM_STATE           writable state dir (default /nm/state — the PVC)
 //
 //   run modes: `tsx machined.ts` boots for good; `--check` boots, syncs once, prints a
@@ -25,20 +24,14 @@ import { resolveEngineeringDisplayContext } from './relay/engineering-display-co
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  AbstractPowerSyncDatabase,
-  PowerSyncDatabase,
-  SyncStreamConnectionMethod,
-  type PowerSyncBackendConnector,
-} from '@powersync/node';
+import { SQLiteReplica } from '@neuramesh/client-core/sqlite-replica';
+import { sqliteDriver, upgradeReplica } from './sync/sqlite-driver';
 import { executing, startAgentHost } from './agents';
-import { machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
+import { localRuntimes, machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
+import { watchRuntimeAvailability } from './runtime/availability';
 import { initAgentLog } from './agentlog';
-import { AppSchema } from '@neuramesh/client-core/schema';
-import { uploadCrudEntry, type UploadIdentity } from '@neuramesh/client-core/crud-upload';
 import { adoptIdentity, bootstrapEnvOf, heartbeatBody, imageShaOf, readConfig, type MachinedConfig } from './machined-config';
 import { bootstrapIdentity } from './machined-bootstrap';
-import { machineSyncCredentials } from './machined-credentials';
 import { connectMachineEdge } from './relay/machine-edge';
 import { liveStreams } from './livestreams';
 import { createClineEngineeringHost } from './relay/engineering-host';
@@ -53,42 +46,6 @@ import { setBrowserService } from './browser/registry';
 import { apiAuthHeaders } from './apiauth';
 import { readActivePackRoles } from './host/hire';
 import { startRunnerSeeds } from './machined-seeds';
-
-// the machine's sync credentials: machine token in, short-lived RS256 JWT out
-// (control-api /v1/machines/sync-token, verified against the static key in PowerSync).
-class MachineConnector implements PowerSyncBackendConnector {
-  constructor(private readonly cfg: MachinedConfig) {}
-
-  async fetchCredentials() {
-    const credentials = await machineSyncCredentials(this.cfg);
-    console.log(credentials.expiresAt ? '[machined] cloud sync token minted' : '[machined] local dev sync token minted');
-    return credentials;
-  }
-
-  // the same shared uploader the desktop Connector runs (client-core's crud-upload.ts — full table
-  // coverage, per-table error policy), authenticated with the machine bearer; the actor
-  // header carries authorship. tables the uploader doesn't know still throw loudly here:
-  // better a visible wedge than a silently dropped write.
-  async uploadData(db: AbstractPowerSyncDatabase) {
-    const ident: UploadIdentity = {
-      apiUrl: this.cfg.apiUrl,
-      workspaceFallback: this.cfg.workspaceId,
-      defaultActor: { kind: 'agent', id: this.cfg.ownerUserId },
-      authHeaders: { authorization: `Bearer ${this.cfg.machineToken}` },
-      logPrefix: '[machined] ',
-    };
-    let tx;
-    while ((tx = await db.getNextCrudTransaction()) != null) {
-      for (const op of tx.crud) {
-        if ((await uploadCrudEntry(ident, op)) === 'unhandled') {
-          console.error(`[machined] upload for table=${op.table} op=${op.op} not implemented`);
-          throw new Error(`machined upload not implemented for ${op.table}`);
-        }
-      }
-      await tx.complete();
-    }
-  }
-}
 
 /** a stamped machine reads its env; a warm spare redeems its binding first (round §5.2) */
 async function resolveConfig(): Promise<MachinedConfig> {
@@ -114,23 +71,17 @@ export async function main(): Promise<void> {
     mkdirSync(dir, { recursive: true });
   }
   console.log(`[machined] opening replica at ${cfg.stateDir}`);
-  const db = new PowerSyncDatabase({
-    schema: AppSchema,
-    database: {
-      dbFilename: 'replica.db', dbLocation: cfg.stateDir,
-      // Local macOS development often runs the desktop tests under a different Node ABI than
-      // the production machine runtime. The harness opts into Node 24's built-in SQLite so it
-      // never rebuilds better-sqlite3 out from under Electron; cloud keeps the proven default.
-      ...(process.env['NM_MACHINED_NODE_SQLITE'] === '1' ? { implementation: { type: 'node:sqlite' as const } } : {}),
-    },
-  });
-  // the replica lives on the volume, and PowerSync restores hasSynced from the file: after a sleep,
-  // waitForFirstSync below returns before this process downloads anything. the runner's seed waits
-  // for a checkpoint later than the file's own (machined-seeds.ts)
+  const nodeSqlite = process.env['NM_MACHINED_NODE_SQLITE'] === '1';
+  const db = new SQLiteReplica(sqliteDriver(join(cfg.stateDir, 'replica.sqlite'), { nodeSqlite }));
+  const owner = { kind: 'human', id: cfg.ownerUserId };
+  await db.activate(owner);
   await db.waitForReady();
   const syncedBefore = db.currentStatus.lastSyncedAt?.getTime() ?? 0;
-  console.log(`[machined] connecting to PowerSync ${cfg.powersyncUrl}`);
-  await db.connect(new MachineConnector(cfg), { connectionMethod: SyncStreamConnectionMethod.HTTP });
+  console.log('[machined] connecting to the API replica feed');
+  await db.connect({ apiUrl: cfg.apiUrl, identity: async () => ({
+    apiUrl: cfg.apiUrl, workspaceFallback: cfg.workspaceId, defaultActor: owner,
+    authHeaders: { authorization: `Bearer ${cfg.machineToken}` }, logPrefix: '[machined] ',
+  }), beforeSync: () => upgradeReplica(db, join(cfg.stateDir, 'replica.db'), owner, nodeSqlite) });
   console.log('[machined] waiting for first sync');
   await db.waitForFirstSync();
   // workspaces itself is not in the client publication (0047) — machines is, and seeing
@@ -166,33 +117,38 @@ export async function main(): Promise<void> {
   // WHAT THIS MACHINE CAN SERVE rides the beat (member-machines plan §4). A cloud machine never
   // registers, so without this its `runtimes` stays [] and the ladder can never choose it while
   // it sleeps — a login made in the browser terminal would be invisible to every peer. Detected
-  // at boot, again when a terminal session ends (a login may just have happened), and every ten
-  // minutes; sent when it changed, and on every tenth beat regardless so a lost beat heals.
+  // at boot and every five seconds, even while a sign-in terminal stays open. Login changes
+  // publish immediately; the normal beat also carries the current report to heal lost writes.
   // and the runtimes the workspace's stored API keys unlock: a key typed in the Keys step is what
   // makes this machine serve that provider (runtime/localruntimes.ts)
-  const probe = () => machineRuntimes({ cloud: true, hasKey: workspaceKeyProbe(cfg.apiUrl, cfg.workspaceId, async () => ({ authorization: `Bearer ${cfg.machineToken}` })) });
-  let runtimes = await probe().catch(() => [] as string[]);
-  let publishRuntimes = true;
-  const redetect = async (): Promise<void> => {
-    const r = await probe().catch(() => runtimes);
-    if (r.join(',') !== runtimes.join(',')) { runtimes = r; publishRuntimes = true; console.log(`[machined] runtimes ${r.join(',') || 'none'}`); }
-  };
-  const redetectTimer = setInterval(() => void redetect(), 10 * 60_000);
-  let beats = 0;
-  console.log(`[machined] runtimes ${runtimes.join(',') || 'none'}`);
+  // Workspace keys keep their existing network cadence. Frequent detection reads local
+  // credential stores only, so an open sign-in terminal never polls the credentials API.
+  const probeKeys = () => machineRuntimes({ cloud: true, local: async () => [], hasKey: workspaceKeyProbe(cfg.apiUrl, cfg.workspaceId, async () => ({ authorization: `Bearer ${cfg.machineToken}` })) });
+  let keyed = await probeKeys();
+  const probe = async () => [...new Set([...await localRuntimes(), ...keyed])];
+  const initialRuntimes = await probe().catch(() => keyed);
+  let posting = Promise.resolve(false);
+  const postBeat = (runtimes: string[], activity = 0): Promise<boolean> => posting = posting.catch(() => false).then(async () => {
+    const response = await fetch(`${cfg.apiUrl}/v1/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.machineToken}` },
+      body: JSON.stringify(heartbeatBody(cfg.machineId, { activeSeconds: activity, busy: busyNow(), runtimes, imageSha })),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return response.ok;
+  });
+  const availability = watchRuntimeAvailability({ initial: initialRuntimes, probe, publish: (r) => postBeat(r) });
+  const redetectTimer = setInterval(() => {
+    void probeKeys().then((r) => { keyed = r; return availability.refresh(); }).catch(() => {});
+  }, 10 * 60_000);
+  console.log(`[machined] runtimes ${initialRuntimes.join(',') || 'none'}`);
 
   // the ladder treats a silent machine as unwaitable — same 30s beat the desktop sends
   // (sync.ts registration path), over the same command lane
   const beat = setInterval(() => {
     const report = Math.round(activeSeconds);
     activeSeconds = 0; // reset optimistically: a lost beat under-charges, never double-charges
-    const withRuntimes = publishRuntimes || beats++ % 10 === 0;
-    publishRuntimes = false;
-    fetch(`${cfg.apiUrl}/v1/commands`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.machineToken}` },
-      body: JSON.stringify(heartbeatBody(cfg.machineId, { activeSeconds: report, busy: busyNow(), ...(withRuntimes ? { runtimes } : {}), imageSha })),
-    }).catch(() => {});
+    void postBeat(availability.current(), report).catch(() => {});
   }, 30_000);
 
   // The browser Engineering harness needs the machine's replica, relay edge, workspace manager,
@@ -227,7 +183,7 @@ export async function main(): Promise<void> {
     // the `stream` lane: a browser's live bubble for the replies this machine writes (livestreams.ts)
     streams: liveStreams,
     ...(browser ? { browser } : {}),
-    onSessionEnd: () => void redetect(),
+    onSessionEnd: () => void availability.refresh(),
   }) : null;
   console.log(relayUrl ? `[machined] relay edge dialling ${relayUrl}` : '[machined] NM_RELAY_URL unset — no browser terminal on this machine');
 
@@ -267,6 +223,7 @@ export async function main(): Promise<void> {
     clearInterval(beat);
     clearInterval(sampler);
     clearInterval(redetectTimer);
+    availability.stop();
     relay?.close();
     await browser?.close().catch(() => {});
     await db.disconnect();

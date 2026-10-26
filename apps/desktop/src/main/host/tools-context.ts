@@ -1,3 +1,4 @@
+import { projectRepos } from './project-context';
 // The READ tools — what the orchestrator can look up before it decides (docs/harness/04).
 //
 // Read before you decide. list_library outranks the open web for anything about this product,
@@ -42,23 +43,13 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
         rows.map(({ description, ...rest }) => ({ ...rest, ...(description ? { description } : {}) }));
       return JSON.stringify({ in_channel: trim(inChannel as never), workspace_not_in_this_channel: trim(elsewhere as never), retired_names: trim(retired as never) });
     } },
-    { name: 'list_repos', description: 'Repositories in this workspace that tasks can target. `checked_out_at` is a path on THIS machine when the repo has a local checkout — the code is readable there, so answer questions about what the product actually does from it rather than guessing or searching the web for a same-named product.', schema: {}, run: async () => {
-      // local_path is what makes "check the repo" answerable rather than a shrug: the column
-      // already exists and the daemon already resolves it for the marketing bootstrap.
-      const rows = await db.getAll<{ org_name: string; name: string; default_branch: string; local_path: string | null }>(
-        `select org_name, name, default_branch, local_path from repos where workspace_id = ?`, [ch.workspace_id],
-      );
-      const { existsSync } = await import('node:fs');
-      return JSON.stringify(rows.map((r) => ({
-        org_name: r.org_name, name: r.name, default_branch: r.default_branch,
-        ...(r.local_path && existsSync(r.local_path) ? { checked_out_at: r.local_path } : {}),
-      })));
-    } },
-    { name: 'list_library', description: 'The documents in a room\'s library \u2014 brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about what the product is, who it is for, or how the team talks about it, and before routing work that depends on any of that. Defaults to THIS room; widen with scope when the record you need was written elsewhere (brand voice lives in #marketing even when you are working in #build). Returns names, rooms and sizes; read one with read_library_doc.', schema: {
-      scope: z.enum(['room', 'project', 'workspace']).optional().describe("'room' (default) = this room's shelf \u2014 the ACL you are registered to. 'project' = every room in this project. 'workspace' = everything the team keeps. Widen only when you actually need it: a wider list is a longer list, not a better one."),
+    { name: 'list_repos', description: 'Repositories attached to the active project, available in any thread. Pass an id as repo to list_repo_files, read_repo_file or list_repo_changes. Never infer that a project has no code without checking this list.', schema: {}, run: async () => JSON.stringify(await projectRepos(db, ch.id, { threadId: convoThreadId, taskId: thread?.id })) },
+    { name: 'list_library', description: 'The documents in a room\'s library \u2014 brand guidelines, business profile, market research, strategy notes, reports the team has produced. Check this BEFORE answering anything about what the product is, who it is for, or how the team talks about it, and before routing work that depends on any of that. Defaults to the active project, including files from its historical contexts. Returns up to 60 names and sizes; use offset 60, 120, etc. for subsequent pages. Read one with read_library_doc.', schema: {
+      offset: z.number().int().min(0).optional(),
+      scope: z.enum(['room', 'project', 'workspace']).optional().describe("Project scope is the default. Room is a compatibility alias for project. Workspace explicitly searches the wider team record."),
     }, run: async (input) => {
-      const scope = (input?.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
-      const docs = await libraryDocs(ch.id, 60, scope);
+      const scope = (input?.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'project';
+      const docs = await libraryDocs(ch.id, 60, scope, undefined, undefined, input?.offset as number | undefined);
       if (!docs.length) return scope === 'room' ? 'this room\'s library is empty \u2014 try scope:\'project\' or scope:\'workspace\'' : `no documents in this ${scope}`;
       return JSON.stringify(docs.map((d) => ({
         name: d.name, kind: d.kind, promoted: !!d.promoted,
@@ -100,7 +91,7 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       scope: z.enum(['room', 'project', 'workspace']).optional().describe('the scope you found the name in \u2014 must match the list_library call, or the name will not resolve'),
     }, run: async (input) => {
       const want = String(input.name);
-      const scope = (input.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
+      const scope = (input.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'project';
       log?.({ kind: 'tool', phase: 'call', summary: `read_library_doc ${want}` });
       // the shared reader (host/grounding.ts): the read is RECORDED on the turn, and draft_posts asks
       return readLibraryDoc(libraryDocs, ch.id, want, scope, grounding);

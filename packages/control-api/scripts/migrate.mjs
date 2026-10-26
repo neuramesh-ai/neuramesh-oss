@@ -46,13 +46,6 @@ const MIGRATIONS_DIR = join(REPO_ROOT, 'supabase/migrations');
 // migrations reference auth.users + auth.uid() — the validation shim supplies both. Applied only
 // when the schema is absent, so Supabase (which has it) never sees this step.
 const AUTH_SHIM = join(REPO_ROOT, 'supabase/validate/auth-shim.sql');
-// Self-hosted PowerSync (the local stack) needs its storage role + database and the publication,
-// exactly what dev/stack/init/00-bootstrap.sh gives the dev stack. Gated on NM_LOCAL=1: the
-// cloud's PowerSync is hosted, its publication was born in 0002, and the Vercel path must not
-// grow a role on prod.
-const STORAGE_SQL = join(REPO_ROOT, 'dev/stack/init/98-storage.sql');
-const PUBLICATION_SQL = join(REPO_ROOT, 'dev/stack/init/99-publication.sql');
-const selfHostedPowerSync = process.env.NM_LOCAL === '1' && process.env.NM_LEGACY_POWERSYNC === '1';
 
 const env = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 const onVercel = process.env.VERCEL === '1';
@@ -179,7 +172,6 @@ try {
     ran++;
   }
 
-  if (selfHostedPowerSync) await ensureSelfHostedPowerSync();
 
   console.log(
     `[migrate] done — ${ran} applied, ${baselined} baselined, ${files.length} total (env=${env}).`,
@@ -194,36 +186,4 @@ try {
   process.exitCode = 1;
 } finally {
   await sql.end({ timeout: 5 }).catch(() => {});
-}
-
-/** the storage role + database (98) statement by statement, and the publication (99) — each only when missing */
-async function ensureSelfHostedPowerSync() {
-  // CREATE DATABASE cannot run inside a transaction block, so 98 is never one batch: each
-  // statement runs alone, guarded by the catalog rather than by "if not exists" (which CREATE
-  // DATABASE also lacks).
-  for (const stmt of splitSql(await readFile(STORAGE_SQL, 'utf8'))) {
-    const m = /^create\s+(user|role|database)\s+(\w+)/i.exec(stmt);
-    if (!m) throw new Error(`98-storage.sql: unexpected statement: ${stmt.slice(0, 80)}`);
-    const [, kind, name] = m;
-    const exists = kind.toLowerCase() === 'database'
-      ? await sql`select 1 from pg_database where datname = ${name}`
-      : await sql`select 1 from pg_roles where rolname = ${name}`;
-    if (exists.length) continue;
-    await sql.unsafe(stmt);
-    console.log(`[migrate] created powersync ${kind.toLowerCase()} ${name}`);
-  }
-  // a run from empty already has the publication (0002 creates it, the publish migrations grow
-  // it); this covers a database bootstrapped some other way
-  const pub = await sql`select 1 from pg_publication where pubname = 'powersync'`;
-  if (pub.length === 0) {
-    await sql.unsafe(await readFile(PUBLICATION_SQL, 'utf8'));
-    console.log('[migrate] created the powersync publication (99-publication.sql)');
-  }
-}
-
-function splitSql(text) {
-  return text
-    .split(/;\s*\n|;\s*$/)
-    .map((s) => s.replace(/^\s*--.*$/gm, '').trim())
-    .filter(Boolean);
 }

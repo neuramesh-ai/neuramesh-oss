@@ -24,7 +24,7 @@
 .fileHeader small { width: 100%; color: var(--muted); font: 11px/1.5 var(--fmono); overflow-wrap: anywhere; }
 .status { flex: none; font-size: 11px; }
 .codeScroll { flex: 1; min-height: 0; min-width: 0; overflow: auto; background: var(--bg); color: var(--text); }
-.diffCode, .sourceCode { width: max-content; min-width: 100%; padding-bottom: 12px; font: 12px/1.8 var(--fmono); tab-size: 2; }
+.diffCode, .sourceCode { width: max-content; min-width: 100%; padding-bottom: 12px; font: 12px/1.8 var(--fcode); tab-size: 2; }
 .diffLine { display: grid; grid-template-columns: 4.3ch 4.3ch 2.5ch minmax(0, 1fr); min-height: 22px; }
 .diffLine code, .sourceLine code { padding-right: 18px; font: inherit; color: inherit; white-space: pre; }
 .lineNumber { padding-inline: 6px; color: var(--muted); text-align: right; user-select: none; font-variant-numeric: tabular-nums; }

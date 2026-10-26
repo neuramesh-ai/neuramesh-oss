@@ -1,3 +1,7 @@
+import { orchToolsToBridge } from './orchtools-bridge';
+export { orchToolsToBridge } from './orchtools-bridge';
+import { agyConversationStream } from './agy-stream';
+import { agyModelFor } from '../relay/engineering-agy-args';
 // THE ORCHESTRATOR'S FOUR TRANSPORTS — extracted from agents.ts (track B2).
 //
 // One registry (host/orchtools.ts), four ways to hand it to a model: the Agent SDK wraps each
@@ -111,9 +115,8 @@ export async function geminiOrchestratorTurn(args: {
   const contents: any[] = [{ role: 'user', parts: [{ text: args.transcript }] }];
   // the person's level rides an API key only: the metered lane's level is fixed, and part of its price
   const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
-  // the bubble's Thoughts (host/starterthoughts.ts): the metered lane only, and only while someone
-  // watches. The person's own key through the SDK types no words, so it shows no thoughts either
-  const th = viaProxy && args.onDelta ? starterThoughts() : null;
+  // Both the metered lane and a personal key stream provider reasoning and tool activity.
+  const th = args.onDelta ? starterThoughts() : null;
   // the bubble's words outlive their round: a thought or a tool step keeps them, and only the next round's
   // first word replaces them, as on codex and Claude (an update with no words opens the folded Thoughts again)
   let shown = '';
@@ -130,7 +133,17 @@ export async function geminiOrchestratorTurn(args: {
     let said = '';
     th?.round();
     const r: any = !viaProxy
-      ? await ai!.models.generateContent({ model: args.model, contents, config })
+      ? onDelta ? await (async () => {
+        const parts: any[] = [];
+        const stream = await ai!.models.generateContentStream({ model: args.model, contents, config: { ...config, thinkingConfig: { ...geminiThinking(args).thinkingConfig, includeThoughts: true } } });
+        for await (const chunk of stream) for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+          parts.push(part);
+          if (part.text && part.thought) th?.thought(part.text);
+          else if (part.text) { said += part.text; shown = stripPseudoToolCalls(said, byName.keys()).text; }
+          show();
+        }
+        return { candidates: [{ content: { role: 'model', parts } }] };
+      })() : await ai!.models.generateContent({ model: args.model, contents, config })
       : onDelta ? await starterStream({ ...call, onText: (d) => { said += d; shown = stripPseudoToolCalls(said, byName.keys()).text; show(); }, onThought: (d) => { th?.thought(d); show(); } })
         : await starterGenerate(call);
     recordRuntimeEvent('gemini', r);
@@ -230,28 +243,6 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
 // the shim, verified). stdin is closed — `agy --print` hangs on an open stdin pipe (see gemini.ts).
 // zod shape → MCP JSON-Schema BridgeTool[] (string/number/boolean/array/enum/optional subset) —
 // shared by the agy + codex orchestrators, which both drive the same nm tools over the orchmcp bridge.
-export function orchToolsToBridge(tools: OrchTransportArgs['tools']) {
-  const jsonType = (t: any): any => {
-    const tn = t?._def?.typeName;
-    if (tn === 'ZodNumber') return { type: 'number' };
-    if (tn === 'ZodBoolean') return { type: 'boolean' };
-    if (tn === 'ZodArray') return { type: 'array', items: jsonType(t._def.type) };
-    if (tn === 'ZodEnum') return { type: 'string', enum: t._def.values };
-    return { type: 'string' };
-  };
-  const inputSchemaOf = (shape: Record<string, any>): any => {
-    const properties: Record<string, any> = {}; const required: string[] = [];
-    for (const [key, zt] of Object.entries(shape)) {
-      let inner: any = zt; let optional = false;
-      while (['ZodOptional', 'ZodNullable', 'ZodDefault'].includes(inner?._def?.typeName)) { optional = true; inner = inner._def.innerType; }
-      const description = (zt as any).description as string | undefined;
-      properties[key] = { ...jsonType(inner), ...(description ? { description } : {}) };
-      if (!optional) required.push(key);
-    }
-    return { type: 'object', properties, required, additionalProperties: false };
-  };
-  return tools.map((t) => ({ name: t.name, description: t.description, inputSchema: inputSchemaOf(t.schema), run: (i: unknown) => t.run(i) }));
-}
 
 export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<string> {
   args = { ...args, transcript: conversationInput('agy', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
@@ -272,36 +263,33 @@ export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<stri
   const secret = randomUUID();
   orchmcp.registerTurn(turnId, secret, orchToolsToBridge(args.tools));
 
-  // agy is the Antigravity coding agent — in headless `--print` it AUTO-DENIES any of its native
-  // tools that need an interactive permission (shell/command/file), and when the model reaches for
-  // one it produces EMPTY output (exit 0, nothing on stdout). So steer it to answer a human
-  // directly in text and reserve tools for real board actions (the nm MCP tools over the bridge),
-  // never a native tool. It narrates tool steps, so fence the reply in markers and post only that.
-  // (An empty native-tool turn is exactly why a gemini-3.5-flash orchestrator posted "(no digest)"
-  // on a plain research question, 2026-07-19 — reproduced via `agy --print`.)
+  // Project reads and tool progress use the same MCP bridge and stream wire as Code.
   const env = { ...process.env, NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret };
   const runAgy = (promptText: string) => new Promise<string>((resolve, reject) => {
-    const child = spawn(bin, ['--print', promptText], { stdio: ['ignore', 'pipe', 'pipe'], env });
-    let out = ''; let errTail = '';
-    child.stdout.on('data', (d) => { out += String(d); });
+    const model = agyModelFor(args.model, args.thinking);
+    const child = spawn(bin, ['--output-format', 'stream-json', ...(model ? ['--model', model] : []), '--print', promptText], { stdio: ['ignore', 'pipe', 'pipe'], env, cwd: args.cwd });
+    const stream = agyConversationStream(args.tools.map(t => t.name), args.onDelta, event => recordRuntimeEvent('agy', event));
+    let errTail = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (data: string) => { try { stream.push(data); } catch (error) { child.kill(); reject(error); } });
     child.stderr.on('data', (d) => { errTail = (errTail + String(d)).slice(-400); });
     child.on('error', (e) => reject(new Error(`agy failed to start: ${e.message}`)));
     child.on('close', (code) => {
       if (code !== 0) { reject(new Error(`agy orchestrator exited ${code}: ${errTail.replace(/\s+/g, ' ').slice(-200) || 'is agy signed in? run `agy` to sign in'}`)); return; }
-      const m = /NMREPLYSTART\s*([\s\S]*?)\s*NMREPLYEND/.exec(out); // strip agy's step narration
-      resolve((m?.[1] ?? out).trim());
+      try { resolve(stream.finish()); } catch (error) { reject(error); }
     });
   });
-  const answerSuffix = `Answer the human directly. For a question, opinion, or research / general-knowledge ask, reply from your OWN knowledge in plain text — do NOT reach for a tool, and NEVER run a shell / command / file / other native tool (headless mode can't grant it and the turn will come back empty). Use a NeuraMesh tool ONLY when the request needs a concrete board action (create / route / check a task, backlog, hire). A direct human message ALWAYS gets a real reply — never answer a person with NO_REPLY. Do NOT narrate your steps: your entire output must be ONLY the final channel message, wrapped between the marker lines NMREPLYSTART and NMREPLYEND on their own lines.`;
+  const answerSuffix = `Answer the human in this thread. Use the NeuraMesh tools on the nm MCP server to inspect the active project's library, brand documents, repositories and connected services before making claims about them. Call them with call_mcp_tool, ServerName nm. These tools are available in every conversation, including general and marketing work. Native shell and file writes require interactive permissions unavailable in this headless conversation; use the supplied NeuraMesh tools and their approval gates. Brief progress and a direct final answer are welcome. Never invent project facts or report a tool succeeded when it failed.`;
   try {
     let reply = await runAgy(`${args.systemPrompt}\n\n${args.transcript}\n\n${answerSuffix}`);
     if (!reply) {
       // agy came back empty — almost always a native tool it auto-denied headless. A human is
-      // waiting (the whole point of a wake), so retry ONCE forcing a plain-text answer, no tools.
-      args.log?.({ kind: 'result', phase: 'retry', summary: 'agy returned empty — retrying plain-text (no tools)', level: 'warn' });
-      reply = await runAgy(`${args.systemPrompt}\n\n${args.transcript}\n\nAnswer the human NOW in plain text from your own knowledge. Do NOT call any tool. Output ONLY the reply, wrapped between the marker lines NMREPLYSTART and NMREPLYEND on their own lines.`);
+      // waiting, so retry once while preserving access to the project tools.
+      args.log?.({ kind: 'result', phase: 'retry', summary: 'agy returned empty — retrying the conversation', level: 'warn' });
+      reply = await runAgy(`${args.systemPrompt}\n\n${args.transcript}\n\nThe previous attempt returned no answer. Inspect the project with the available NeuraMesh tools if needed, then answer the human directly. If a tool failed, explain that failure without inventing project facts.`);
     }
     args.log?.({ kind: 'result', phase: 'success', summary: 'replied · agy (Google OAuth)' });
+    recordConversationEvent('assistant.message', { text: reply, provider: 'agy', model: args.model });
     return reply || ORCH_EMPTY_TURN; // still empty after the retry → genuine stand-down, never a placeholder
   } finally {
     orchmcp.unregisterTurn(turnId);
@@ -323,7 +311,7 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const { userDataDir } = await import('../harness/turntools'); // not electron: see agyOrchestratorTurn
   const orchmcp = await import('../runtime/orchmcp');
   const { ensureCli } = await import('../runtime/cli');
-  const { runResilient } = await import('../runtime/codexsdk');
+  const { runResilient, codexInput } = await import('../runtime/codexsdk');
   const { Codex } = (await import('@openai/codex-sdk')) as unknown as { Codex: CodexCtor };
 
   const port = await orchmcp.ensureBridge();
@@ -337,14 +325,20 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   for (const [k, v] of Object.entries(raw)) if (typeof v === 'string') env[k] = v;
   const dir = mkdtempSync(join(os.tmpdir(), 'nm-codexorch-'));
   // model_reasoning_summary: the reasoning sections are the live bubble's Thoughts (the repo-connect round's Option A)
-  const config = { model_reasoning_summary: 'detailed', mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
+  // Codex's native image tool renders into its own client, which this text-event transport
+  // cannot deliver. Keep image generation on the tool that saves a NeuraMesh attachment.
+  const imageDelivery = args.tools.some((tool) => tool.name === 'share_images') ? {
+    features: { image_generation: false },
+    developer_instructions: 'This turn runs inside NeuraMesh. Generate and deliver images with the nm share_images tool. It saves the image as an attachment in the current conversation. Host image-generation skills and files rendered in another client do not deliver images here. Only report an image as delivered after share_images confirms attachment success.',
+  } : {};
+  const config = { model_reasoning_summary: 'detailed', ...imageDelivery, mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
   const codex = new Codex({ codexPathOverride: bin, apiKey: args.token || undefined, env, config });
   const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' as const };
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
     // STREAMED, like every other codex turn: `.run()` gave the bubble nothing until the whole reply
     // landed. runResilient falls back to the account default when the plan lacks the model.
-    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, prompt, {}, args.log, args.onDelta);
+    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, codexInput(prompt, args.attachments), {}, args.log, args.onDelta);
     if (!turn.text && turn.failure) throw new Error(`codex: ${turn.failure.slice(0, 200)}`);
     args.log?.({ kind: 'result', phase: 'success', summary: 'replied · codex (ChatGPT login)' });
     return turn.text.trim() || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder

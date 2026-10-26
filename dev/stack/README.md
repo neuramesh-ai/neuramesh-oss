@@ -2,7 +2,8 @@
 
 The desktop development stack uses Postgres on `127.0.0.1:55435` and the control API for SQLite synchronization. `pnpm app:local` starts Postgres, the API, and the desktop with `NM_LOCAL_SYNC=1`. Stop the containers with `docker compose -f dev/stack/docker-compose.yaml stop`; their data stays on disk.
 
-PowerSync remains available for hosted compatibility tests through the explicit `legacy-sync` profile: `docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml up -d --wait`. Those tests use `127.0.0.1:58081`; the Local desktop does not.
+There is no PowerSync service or `legacy-sync` profile in this stack. Existing local service
+volumes and caches can be retained for upgrade recovery; do not reset them to validate migration.
 
 ## Web Engineering harness
 
@@ -10,7 +11,7 @@ PowerSync remains available for hosted compatibility tests through the explicit 
 pnpm web:engineering
 ```
 
-This starts the same Docker Postgres and PowerSync stack, the local control API, `nm-relay`, a
+This starts Docker Postgres, the local control API, `nm-relay`, a
 headless runner, and the real browser app. Engineering sessions run through Cline Core. By default,
 an included deterministic OpenAI-compatible endpoint drives the documented `HARNESS_PLAN` →
 `HARNESS_ACT` fixture workflow, including real approval gates, a real file edit, a real command,
@@ -38,27 +39,17 @@ Migrations live in [`supabase/migrations/`](../../supabase/migrations) and are a
 
 > The first `pnpm db:dev-migrate` against a legacy (untracked) dev DB adopts tracking at the latest migration — it assumes the running DB is already current and records the set without re-running. New migrations apply normally after that.
 
-## PowerSync sync rules
+## SQLite replica schema
 
-The sync rules are the **single source of truth** in [`powersync/sync-config.yaml`](powersync/sync-config.yaml) — the dev stack mounts that file, and prod deploys the same file. **Edit it there only.**
+Clients consume the authenticated API snapshot and committed change feed. Shared read-model
+fields live in `packages/client-core/src/schema.ts` and its table modules; the API uses the same
+allowlist and schema hash. A new table also needs a change-capture trigger and workspace scope.
+Deploy additive API/schema changes before clients that consume them.
 
-| Action | Command |
-|---|---|
-| **Validate** a rule change against the running dev instance | `pnpm sync:dev-validate` (catches bad table/column/SQL — the same `powersync validate` CI runs against prod) |
-| **Reload** edited rules into the dev instance | `pnpm sync:dev-reload` (restarts the PowerSync container, which re-reads + reprocesses) |
-| **Deploy to prod** | Automatic — merging a change to `powersync/sync-config.yaml` triggers [`.github/workflows/powersync-sync-rules.yml`](../../.github/workflows/powersync-sync-rules.yml), which applies DB migrations then deploys the rules to the Cloud instance. No more hand-editing the dashboard. |
-
-### `select *` and new columns
-
-The rules use `select *`, so adding a **nullable** column to an already-published table flows to clients without a sync-rules redeploy (new rows carry it via Postgres logical replication; the desktop client schema in `apps/desktop/src/main/sync.ts` exposes it). A redeploy/reprocess is only needed for replica-identity changes, publication-membership changes, table drops/renames, or to **backfill** the new column onto pre-existing rows. The deploy workflow handles it uniformly either way. See PowerSync's [Implementing Schema Changes](https://docs.powersync.com/maintenance-ops/implementing-schema-changes).
-
-### Prod deploy — one-time secret setup
-
-The deploy workflow no-ops (green, with a notice) until these repo **Secrets** exist (Settings → Secrets and variables → Actions):
-
-- `PS_ADMIN_TOKEN` — PowerSync personal access token (dashboard → Account → Access Tokens)
-- `POWERSYNC_INSTANCE_ID` — the prod Cloud instance id (`powersync fetch instances`)
-- `SUPABASE_DB_URL` — prod Postgres url (optional; when set, migrations are applied before the deploy)
+[`powersync/sync-config.yaml`](powersync/sync-config.yaml) is a frozen contract for older
+installed clients during the [retirement rollout](../../docs/design/powersync-retirement-2026-10/plan.md).
+It is neither mounted by this stack nor deployed by CI. The old sync-rule commands and workflow
+have been removed.
 
 ## End-to-end testing the WEB client locally
 
@@ -109,7 +100,7 @@ kubectl logs -n ws-<workspace-id> machine-<machine-id>-0 -f
 You want three lines. Anything less and the machine is not really up:
 
 ```
-[machined] sync token minted, refresh in ~840s
+[machined] connecting to the API replica feed
 [machined] first sync complete — machines visible: N, self visible: true
 [machined] agent host started
 ```
@@ -134,7 +125,7 @@ k3s has no gVisor and no PD CSI, so machines here run the default runtime and lo
 storage. The reconciler logic is identical to production; **the isolation is not**. Never
 conclude anything about sandboxing from this setup.
 
-### Four traps this cost the first time
+### Local fleet diagnostics
 
 - **`FLEET_DESIRED_URL` is fetched verbatim**, while the token minter treats the same value as
   a *base* for `/internal/machines/:id/token`. Give it the origin and you get a bare 404 and a
@@ -143,9 +134,6 @@ conclude anything about sandboxing from this setup.
 - **The operator's api url and the POD's api url are different strings.** The operator runs on
   the host; the pods reach the laptop through `host.k3d.internal`. Put localhost in the pod env
   and machined dials itself.
-- **Without `FLEET_JWT_PRIVATE_KEY` the failure is invisible**: `/v1/machines/sync-token`
-  answers 503 and machined hangs inside `waitForFirstSync()` — a Running, Ready pod, zero
-  restarts, one boot line, and nothing else, forever.
-- **PowerSync refuses to substitute any env name not prefixed `PS_`.** The machine's public key
-  reaches it as `PS_NM_MACHINE_JWK_N`; it is read at STARTUP, so a stack already running when
-  the key is generated must be restarted (the script does this).
+- **A Ready pod alone does not prove the daemon is serving.** Verify first sync, agent-host
+  startup, a fresh machine heartbeat and the relay connection. The release boot checks also
+  open, write and reopen the native SQLite replica; importing the module is insufficient.

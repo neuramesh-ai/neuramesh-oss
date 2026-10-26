@@ -21,27 +21,30 @@ export function repoTools(tc: ToolCtx): OrchTool[] {
     return up;
   };
   // built per call: `here()` moves when a conversation is filed into another room mid-turn
-  const reader = () => makeRepoReader({ apiGet, actor, db, channelId: here(), onNeed });
+  const reader = () => makeRepoReader({ apiGet, actor, db, channelId: here(), at: { threadId: convoThreadId, taskId: thread?.id }, onNeed });
   return [
     { name: 'list_repo_changes', description: REPO_CHANGES_DESC, schema: {
+      repo: z.string().uuid().optional().describe('A repository id from list_repos; omit for the primary repository.'),
       since: z.string().optional().describe('an ISO date; the window starts here (default: the last 30 days)'),
-    }, run: async (input: { since?: string }) => {
+    }, run: async (input: { since?: string; repo?: string }) => {
       log?.({ kind: 'tool', phase: 'call', summary: `list_repo_changes${input.since ? ` since ${input.since.slice(0, 10)}` : ''}` });
-      return reader().changes({ ...(input.since ? { since: input.since } : {}) });
+      return reader().changes({ repo: input.repo, ...(input.since ? { since: input.since } : {}) });
     } },
     { name: 'read_repo_file', description: REPO_FILE_DESC, schema: {
+      repo: z.string().uuid().optional().describe('A repository id from list_repos; omit for the primary repository.'),
       path: z.string().min(1).max(500).describe('the file path from the repository root, e.g. CHANGELOG.md or src/app/page.tsx'),
       ref: z.string().max(200).optional().describe('a branch, tag or commit (default: the default branch)'),
-    }, run: async (input: { path: string; ref?: string }) => {
+    }, run: async (input: { path: string; ref?: string; repo?: string }) => {
       log?.({ kind: 'tool', phase: 'call', summary: `read_repo_file ${input.path.slice(0, 80)}` });
-      return reader().file({ path: input.path, ...(input.ref ? { ref: input.ref } : {}) });
+      return reader().file({ repo: input.repo, path: input.path, ...(input.ref ? { ref: input.ref } : {}) });
     } },
     { name: 'list_repo_files', description: REPO_TREE_DESC, schema: {
+      repo: z.string().uuid().optional().describe('A repository id from list_repos; omit for the primary repository.'),
       path: z.string().max(500).optional().describe('a directory to list (default: the whole repository, capped)'),
       ref: z.string().max(200).optional().describe('a branch, tag or commit (default: the default branch)'),
-    }, run: async (input: { path?: string; ref?: string }) => {
+    }, run: async (input: { path?: string; ref?: string; repo?: string }) => {
       log?.({ kind: 'tool', phase: 'call', summary: `list_repo_files ${(input.path ?? '/').slice(0, 80)}` });
-      return reader().tree({ ...(input.path ? { path: input.path } : {}), ...(input.ref ? { ref: input.ref } : {}) });
+      return reader().tree({ repo: input.repo, ...(input.path ? { path: input.path } : {}), ...(input.ref ? { ref: input.ref } : {}) });
     } },
   ];
 }

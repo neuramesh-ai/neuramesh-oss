@@ -9,7 +9,7 @@ const PROFILE = `# Business profile\n\nFlowe AI turns a founder's notes into a w
 function fakeDb(rows: { channel?: Record<string, unknown>; docs?: Array<{ name: string; kind?: string; inline_content: string | null; created_by_kind?: string | null; source?: string | null }>; conns?: Array<{ provider: string; handle: string | null }> }) {
   return {
     getAll: async <T = Record<string, unknown>>(sql: string): Promise<T[]> => {
-      if (sql.includes('from channels c')) return (rows.channel ? [rows.channel] : []) as T[];
+      if (sql.includes('from channels c')) return (rows.channel ? [{ id: 'p1', workspace_id: 'w1', brand_profile: rows.channel.marketing ?? (rows.channel.kind === 'marketing' ? '{}' : null), website: rows.channel.website, logo_url: rows.channel.logo }] : []) as T[];
       if (sql.includes('from artifacts')) return (rows.docs ?? []).map((d) => ({ kind: 'doc', ...d })) as T[];
       if (sql.includes('from connectors')) return (rows.conns ?? []) as T[];
       return [];
@@ -42,7 +42,7 @@ test('a marketing room: the product, the docs by name, and the tool that reads t
   assert.match(note, /^\n\n\[MARKETING CONTEXT/);
   assert.match(note, /Product: https:\/\/flowe\.ai \(logo on file\)\./);
   assert.match(note, /Growth goal: first 100 paying teams\./);
-  assert.match(note, /Brand docs on this room's shelf: brand-guidelines\.md, business-profile\.md\. Read them with read_library_doc \(scope room\) before you draft/);
+  assert.match(note, /Brand docs on this project's shelf: brand-guidelines\.md, business-profile\.md\. Read them with read_library_doc \(scope project\) before you draft/);
   assert.match(note, /App screenshots on the shelf: App-Home\.png, store-home\.png\. A beat that puts the app's screen on camera names one of them/);
   assert.doesNotMatch(note, /x-profile-capture/);
   assert.doesNotMatch(note, /Never say/, 'guidance on the tools, not a forbidden sentence');
@@ -52,12 +52,12 @@ test('a marketing room: the product, the docs by name, and the tool that reads t
 
 test('a marketing room with no brand docs: the tools that widen the search, then the ask, then the shelf', async () => {
   const note = await brandNote(fakeDb({ channel: { kind: 'marketing', marketing: null, website: null, logo: null } }), 'ch3');
-  assert.match(note, /This room has no brand docs yet \(the marketing setup writes business-profile\.md, brand-guidelines\.md, market-research\.md, social-strategy\.md\)/);
-  assert.match(note, /list_library with scope project in case they live in another room of this project/);
+  assert.match(note, /This project has no brand docs yet \(the marketing setup writes business-profile\.md, brand-guidelines\.md, market-research\.md, social-strategy\.md\)/);
+  assert.match(note, /Check list_library for other project documents/);
   assert.doesNotMatch(note, /workspace/, 'another project is another product: the search never widens past the project');
   assert.match(note, /ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc/);
   // no screenshot either: the note names the two ways to get a real one, and that a beat with no screen needs none
-  assert.match(note, /No app screenshot is on this room's shelf\. A film shows only a real one: take one from the project's repository with shelve_repo_screenshot, or ask the human to upload one/);
+  assert.match(note, /No app screenshot is on this project's shelf\. A film shows only a real one: take one from the project's repository with shelve_repo_screenshot, or ask the human to upload one/);
 });
 
 test('outside a marketing room: no note at all', async () => {

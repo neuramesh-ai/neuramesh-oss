@@ -34,10 +34,10 @@ const skip = !sqlite && 'better-sqlite3 unavailable';
 function fixture() {
   const db = new Database(':memory:');
   db.exec(`
-    create table channels (id text primary key, workspace_id text, slug text, kind text);
+    create table channels (project_id text, id text primary key, workspace_id text, slug text, kind text);
     create table schedules (id text primary key, channel_id text, payload text);
     create table tasks (id text primary key, workspace_id text, number integer, parent_task_id text);
-    create table threads (id text primary key, workspace_id text, channel_id text, title text, task_id text, updated_at text, created_at text,
+    create table threads (project_id text, id text primary key, workspace_id text, channel_id text, title text, task_id text, updated_at text, created_at text,
       schedule_id text, settled_at text, kind text, archived_at text, machine_id text, origin text, mode text);
     create table messages (id text primary key, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, body text,
       created_at text, schedule_id text);

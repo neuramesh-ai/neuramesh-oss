@@ -14,7 +14,7 @@ The fixtures use Node and browser APIs without dependencies. The runner serves g
 
 ## Test manually in NeuraMesh
 
-Open the local app at `http://127.0.0.1:5302/acme?db=brain-device-a` if using the current development stack. Choose **New session**, select the matching repo in the composer, and use **Rex → GPT-5.6 Sol → Medium → Plan**. Select a room in the default project, such as `#general`, so the eval repositories are available.
+Open the local app at `http://127.0.0.1:5302/acme?db=brain-device-a` if using the current development stack. Choose **New session**, select the matching repo in the composer, and use **Rex → GPT-5.6 Sol → Medium → Plan**. Select the default project so the eval repositories are available. The composer resolves its conversation context automatically.
 
 The following reusable starter repositories were verified clean on 2026-10-10. Select the repo, then start a **new thread**; completed eval conversations have their own edited worktrees. If these repos are absent, run the automated command below to prepare fresh fixtures, then take the new repo labels from its `run.json`. Do not use the main NeuraMesh repo for these prompts.
 
@@ -44,7 +44,7 @@ Build TaskGarden according to README.md. First inspect the starter and propose a
 Build LedgerDesk according to README.md. Inspect the starter and propose a concrete plan before editing, including migration, money validation, accessible UI and tests. Wait for Act, then implement the complete contract and run npm test. Use file-edit tools for changes; run_commands only for npm test. No installs, servers or commits.
 ```
 
-After the initial implementation and tests finish, change the model in **the same thread** to **Claude Haiku 4.5 → Medium**, keep Act mode, and send:
+After the initial implementation and tests finish, change the model in **the same thread** to **Claude Haiku 5.5 → Medium**, keep Act mode, and send:
 
 ```text
 Continue from the implementation in this thread. Add import/export without losing the existing dashboard: export named function importExpenses(state,jsonText) from src/ledger.mjs. Accept a JSON array of v2 expense records, validate all records before changing anything, reject duplicates both within the import and against existing IDs, and return a new state. Add an Export JSON button and a textarea labelled Import JSON with an Import button; export writes the current expenses array into that textarea. Import success updates storage and clears the textarea; failure shows role=alert and leaves state/storage unchanged. Add tests and run npm test. Preserve the existing contracts, use file-edit tools, and run_commands only for npm test.
@@ -103,14 +103,14 @@ When asking a coding agent to run the checks, this is a reusable prompt:
 Run the NeuraMesh coding UI evals against the existing local real-provider stack. Follow AGENTS.md and evals/coding/README.md. Run focused tests and all three cases (simple, medium, complex), including the complex model handoff and browser preview interactions. Preserve existing data, use fresh fixture threads, inspect the screenshots, and report each result with evidence links. Retain failures and disclose retries; do not count mocked or unrun cases as passing.
 ```
 
-Set the URL, database and machine cache paths to **your** local stack. Only loopback app/database addresses are accepted. Defaults target the dev fixture workspace/user; override with `--workspace` and `--actor` if needed. The selected room must belong to the default project containing the eval repositories.
+Set the URL, database and machine cache paths to **your** local stack. Only loopback app/database addresses are accepted. Defaults target the dev fixture workspace/user; override with `--workspace` and `--actor` if needed. Select the default project containing the eval repositories.
 
 `--layout` sends no messages: it measures writing space and controls at desktop and narrower widths, and saves screenshots. A quiet UI does not end a turn until its recording contains a fresh passing test run. After a model handoff, that record must also name the new model. The full eval reads the local conversation recording to verify actual agent tool outcomes; the brain directory defaults to the cache's parent, or set `--brain PATH` when preparing a run.
 
 For both normal and repository-selected layouts, add `--repo 'org/repository'` using a repo visible in the picker. Layout checks cover 1440px and 1000px viewports in dark and light palettes, restore the original palette, and write `layout-checks.json` with measurements. This tests palette rendering without changing saved appearance preferences. Add `--thread-url` with an existing idle coding-thread URL to also verify its 48px writing area, control layout and screenshots.
 
 - `--case simple|medium|complex` limits a run. Use simple for a quick smoke; run all three before accepting coding-flow changes.
-- `--model 'GPT-5.6 Sol'` selects the initial model; `--handoff-model 'Claude Haiku 4.5'` selects the complex follow-up model. Both use Medium. Names must match UI labels and support reasoning controls.
+- `--model 'GPT-5.6 Sol'` selects the initial model; `--handoff-model 'Claude Haiku 5.5'` selects the complex follow-up model. Both use Medium. Names must match UI labels and support reasoning controls.
 - `--out PATH` chooses the evidence directory. Default: `.nm-evidence/coding/<unique-run-id>`.
 - `--resume PATH --case medium` uses already prepared fixtures and runs a fresh thread for that case. It does not pick up a partially running agent turn.
 - `--resume PATH --case medium --verify-only` reruns acceptance/reload/preview checks on a completed thread without sending another agent prompt. The prior assessment is retained; the report records reassessment. This is useful after fixing the runner, and does not substitute for a fresh UI run after product changes.

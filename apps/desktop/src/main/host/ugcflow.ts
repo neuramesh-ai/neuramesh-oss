@@ -111,16 +111,16 @@ export async function draftSeconds<P extends { script?: string; seconds?: number
 }
 
 /** what `propose_angles` asks before it posts: the shelf read (research first), and a real set of angles */
-export async function angleGate(db: AttDbLike, channelId: string, grounding: Grounding, input: AngleInput): Promise<string | null> {
-  const shelf = await ungrounded(db, channelId, grounding);
+export async function angleGate(db: AttDbLike, channelId: string, grounding: Grounding, input: AngleInput, at: import('./project-context').ProjectAnchor = {}): Promise<string | null> {
+  const shelf = await ungrounded(db, channelId, grounding, at);
   if (shelf) return `Research first: ${shelf}`;
   if (input.angles.length < 2) return 'Give the human a real choice: two to five angles, each with the product fact it rests on.';
   return null;
 }
 
 /** the room's connected platforms, for the chips that come picked */
-export async function connectedPlatforms(db: AttDbLike, channelId: string): Promise<string[]> {
-  const b = await readBrand(db, channelId);
+export async function connectedPlatforms(db: AttDbLike, channelId: string, at: import('./project-context').ProjectAnchor = {}): Promise<string[]> {
+  const b = await readBrand(db, channelId, at);
   return b.conns.map((c) => c.provider).filter((p) => (PLATFORM_IDS as string[]).includes(p));
 }
 
@@ -135,11 +135,11 @@ export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'apiGet' | 
         why: z.string().min(1).max(200).describe('the product fact from the shelf this angle rests on'),
       })).min(2).max(5),
     }, run: async (input: AngleInput) => {
-      const gate = await angleGate(db, ch.id, grounding, input);
+      const gate = await angleGate(db, ch.id, grounding, input, msgAnchor() ?? {});
       if (gate) return gate;
       const anchor = msgAnchor();
       if (!anchor) return 'propose_angles needs a conversation to post into — reply inside the thread and propose there.';
-      const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id), videoLengths(apiGet, actor, ch.workspace_id)]);
+      const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id, anchor), videoLengths(apiGet, actor, ch.workspace_id)]);
       const posted = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: angleCard(input, conns, lengths) }).catch(() => null);
       if (!posted?.ok) return 'the angle card could not be posted — say so plainly rather than listing the angles in your reply';
       log?.({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });

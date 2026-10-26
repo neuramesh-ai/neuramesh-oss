@@ -22,6 +22,7 @@ function replica(o: { connected?: boolean; repo?: unknown | null; open?: number;
     seen,
     getAll: async <T,>(sql: string, params: unknown[] = []): Promise<T[]> => {
       seen.push({ sql, params });
+      if (/select p\.\* from channels c/.test(sql)) return [{ id: 'project-a', workspace_id: 'ws', context_channel_id: 'ch-build' }] as T[];
       if (/from connectors/.test(sql)) return [{ n: o.connected ? 1 : 0 }] as T[];
       if (/from repos/.test(sql)) return (o.repo === null || o.repo === undefined ? [] : [o.repo]) as T[];
       if (/from decisions/.test(sql)) return [{ n: o.open ?? 0 }] as T[];

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Runs the real app with CLERK auth against the LOCAL dev stack: sign in for real
 # through Clerk (Google / GitHub / email) in your browser, sync against the local
-# Postgres + PowerSync. No cloud config needed — the local PowerSync validates our
-# own minted token (sub = the internal uuid resolved from your Clerk identity).
-# Stop the stack after: docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml down -v
+# Postgres + the authenticated API replica. The API validates the Clerk session;
+# the feed resolves its workspace membership using the normal API identity.
+# Stop containers without deleting their data: docker compose -f dev/stack/docker-compose.yaml stop
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,7 +18,7 @@ if [ -z "${CLERK_PUBLISHABLE_KEY:-}" ] || [ -z "${CLERK_SECRET_KEY:-}" ]; then
   echo "ERROR: CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY missing from .env"; exit 1
 fi
 
-docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml up -d --wait
+docker compose -f dev/stack/docker-compose.yaml up -d --wait
 
 lsof -ti:8788 | xargs kill 2>/dev/null || true; sleep 0.4
 (cd packages/control-api && DATABASE_URL="postgresql://postgres:nm@127.0.0.1:55435/nm" PORT=8788 pnpm exec tsx src/server.ts) &
@@ -46,4 +46,4 @@ pnpm --filter @neuramesh/desktop build
 export NM_USERDATA="${NM_USERDATA:-$HOME/.neuramesh-clerk}"
 echo "launching in CLERK mode (profile: $NM_USERDATA) — watch for 'auth_mode=clerk' and a single 'Sign in →' button"
 
-cd apps/desktop && NM_AUTH=clerk NM_API=http://127.0.0.1:8788 NM_POWERSYNC=http://127.0.0.1:58081 NM_WEB=http://localhost:5173 pnpm exec electron . --sync
+cd apps/desktop && NM_AUTH=clerk NM_API=http://127.0.0.1:8788 NM_WEB=http://localhost:5173 pnpm exec electron . --sync

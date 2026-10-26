@@ -1,5 +1,9 @@
 // Human display labels for model ids (the page shows these). Ids remain the source of truth.
 export const LABELS: Record<string, string> = {
+  'claude-opus-5-5': 'Claude Opus 5.5',
+  'claude-sonnet-5-5': 'Claude Sonnet 5.5',
+  'claude-haiku-5-5': 'Claude Haiku 5.5',
+  'gemini-4-argon': 'Gemini 4 Argon',
   'claude-fable-5-1': 'Claude Fable 5.1',
   'claude-fable-5': 'Claude Fable 5',
   'claude-opus-5': 'Claude Opus 5',

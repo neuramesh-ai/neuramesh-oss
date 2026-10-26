@@ -1,4 +1,4 @@
-import type { AbstractPowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import {
   classifyShellCommand,
   defaultBaselineRules,
@@ -95,7 +95,7 @@ export function engineeringPolicyVerdict(rules: readonly PolicyRule[], toolName:
 
 /** Load workspace rules, locked invariants, and only the selected authoritative project's rules. */
 export async function loadEngineeringPolicyRules(
-  db: Pick<AbstractPowerSyncDatabase, 'getAll'>,
+  db: Pick<ReplicaDatabase, 'getAll'>,
   workspaceId: string,
   projectId: string | null = null,
 ): Promise<PolicyRule[]> {

@@ -88,7 +88,7 @@ test('waitForPlan: true the moment the row reads cloud, false once the wait runs
   assert.equal(await waitForPlan({ plan: async () => { throw new Error('offline'); }, sleep: c.sleep, now: c.now, timeoutMs: 2000, everyMs: 1000 }), false);
 });
 
-const SPEC: ConnectionSpec = { id: 'cloud', kind: 'cloud', authMode: 'clerk', apiUrl: 'https://api.example', powersyncUrl: 'https://ps.example', webUrl: 'https://neuramesh.app' };
+const SPEC: ConnectionSpec = { id: 'cloud', kind: 'cloud', authMode: 'clerk', apiUrl: 'https://api.example', webUrl: 'https://neuramesh.app' };
 const SESSION: HandoffSession = { userId: 'u1', email: 'dana@vertex.dev', sessionId: 'sess_1' };
 
 test('completion: the session is saved first, the cloud connection is added, the plan is awaited, then the foreground swaps', async () => {

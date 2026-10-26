@@ -1,5 +1,5 @@
 // machined's pure config core — dependency-free so tests import it without dragging
-// the daemon's native modules (@powersync/node) through the test loader.
+// the daemon's native SQLite modules through the test loader.
 
 export interface MachinedConfig {
   machineToken: string;
@@ -8,7 +8,6 @@ export interface MachinedConfig {
   kind: string;
   ownerUserId: string;
   apiUrl: string;
-  powersyncUrl: string;
   stateDir: string;
 }
 
@@ -86,7 +85,6 @@ export function readConfig(env: Record<string, string | undefined>): MachinedCon
     kind: env['NM_MACHINE_KIND'] ?? 'runner',
     ownerUserId: need('NM_OWNER_USER_ID'),
     apiUrl: env['NM_API_URL'] ?? 'https://api.neuramesh.app',
-    powersyncUrl: need('NM_POWERSYNC_URL'),
     stateDir: env['NM_STATE'] ?? '/nm/state',
   };
 }

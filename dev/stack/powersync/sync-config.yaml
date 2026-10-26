@@ -1,9 +1,7 @@
-# SINGLE SOURCE OF TRUTH for the PowerSync sync rules — consumed by BOTH:
-#   - the dev stack (mounted into the powersync container; reload with `pnpm sync:dev-reload`), and
-#   - prod, deployed to the Cloud instance by .github/workflows/powersync-sync-rules.yml when this
-#     file changes on main (no more hand-editing the dashboard).
-# Edit here only. `select *` means additive nullable columns flow without a redeploy; this is still
-# the place to add/remove a synced table or restrict columns. Validate a change: `pnpm sync:dev-validate`.
+# Frozen contract for installed PowerSync clients during the retirement rollout.
+# Current clients use the authenticated SQLite replica API. Neither the local stack nor CI
+# deploys this file. Retain it only until replacement clients are published and the supported
+# version gate is updated; see docs/design/powersync-retirement-2026-10/plan.md.
 config:
   edition: 3
 
@@ -27,6 +25,7 @@ streams:
     queries:
       - select * from channels where workspace_id in (select workspace_id from my_workspaces)
       - select * from projects where workspace_id in (select workspace_id from my_workspaces)
+      - select * from project_agents where workspace_id in (select workspace_id from my_workspaces)
       - select id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at, pinned, schedule_id from messages where workspace_id in (select workspace_id from my_workspaces)
       - select * from threads where workspace_id in (select workspace_id from my_workspaces)
       - select * from tasks where workspace_id in (select workspace_id from my_workspaces)

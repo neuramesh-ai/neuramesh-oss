@@ -86,7 +86,7 @@ test('Engineering provider resolution ends with an actionable error when nothing
 
 // George, 2026-10-04: model setup lives on the machine. The coding runtime reads this machine's sign-ins and keys
 // with the agents' own rule (runtime/authpolicy.ts), so a sign-in made on a cloud machine runs code with no stored
-// row, and a Google sign-in, which the coding runtime has no lane for, gets a refusal that names the fix
+// row. a Google sign-in runs code through agy (George, 2026-10-16, docs/design/gemini-code-lane-2026-10)
 test('the coding runtime reads the machine\'s own sign-ins and keys, as agents do', async () => {
   const opts = (body: Record<string, unknown>) => ({ apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: async () => new Response(JSON.stringify(body), { status: 200 }) });
   const cloud = { NM_MACHINE_KIND: 'member' };
@@ -99,11 +99,18 @@ test('the coding runtime reads the machine\'s own sign-ins and keys, as agents d
   // a stored preference for a sign-in that lapsed here: a refusal, never a silent key
   await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: false, login: true, env: 'sk-env' })),
     /^Error: The Claude sign-in on this machine expired\. Sign in again on this machine, or pick another model\.$/);
-  // Gemini: a Google sign-in never runs code, a Gemini key on the machine does
-  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true })),
-    /^Error: Code runs Gemini on an API key only\. Add a Gemini API key, or pick another model\.$/);
-  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-env' });
-  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine()), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
+  // Gemini: a Google sign-in runs code on the agy lane, with or without a key on the machine (the sign-in is preferred)
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'gemini-4-argon' }, cloud, machine({ sub: true, login: true })), { providerId: 'gemini', modelId: 'gemini-4-argon', lane: 'agy' });
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', lane: 'agy' });
+  // a stored API-key choice keeps the key lane
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
+  // a Gemini model agy does not offer runs on a key when there is one, and is refused with the fix when there is none
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-flash-lite' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-flash-lite', apiKey: 'g-env' });
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-flash-lite' }, cloud, machine({ sub: true })),
+    (error: unknown) => error instanceof EngineeringModelRefused && /does not run on a Google sign-in\. Pick Gemini 4 Argon, Gemini 3\.8 Flash or Gemini 3\.1 Pro, or add a Gemini API key\.$/.test(error.message));
+  // a lapsed Google sign-in says so, like any other sign-in
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-4-argon' }, cloud, machine({ sub: false, login: true })),
+    /^Error: The Gemini sign-in on this machine expired\. Sign in again on this machine, or pick another model\.$/);
 });
 
 test('explicit provider overrides cannot enable a subprocess that bypasses managed coding tools', async () => {
@@ -134,7 +141,9 @@ test('starter brain requests stay on the authenticated metered control-plane rou
   assert.match(await response.text(), /^data: /);
 });
 
-test('machine-side Cline approvals enforce Plan and current session controls', async () => {
+test('machine-side Cline approvals enforce Plan and current session controls', async (t) => {
+  const root = await mkdtemp('/tmp/nm-engineering-approval-');
+  t.after(() => rm(root, { recursive: true, force: true }));
   let capability: ((request: ToolApprovalRequest) => Promise<{ approved: boolean; reason?: string }> | { approved: boolean; reason?: string }) | undefined;
   const fake = {
     subscribe: () => () => {},
@@ -152,19 +161,26 @@ test('machine-side Cline approvals enforce Plan and current session controls', a
     return fake;
   }) as typeof import('@cline/sdk').ClineCore.create;
   const events: EngineeringRuntimeEvent[] = [];
+  type ApprovalEvent = Extract<EngineeringRuntimeEvent, { type: 'approval' }>;
+  let resolveApproval!: (event: ApprovalEvent) => void;
+  const approval = new Promise<ApprovalEvent>(resolve => { resolveApproval = resolve; });
   const host = createClineEngineeringHost({
     apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: keyFetch,
-    resolveCwd: async () => '/work/app', resolveBrain: async () => ({ modelId: 'claude-sonnet-4-6' }), createCore, log: () => {},
+    resolveCwd: async () => root, resolveBrain: async () => ({ modelId: 'claude-sonnet-4-6' }), createCore, log: () => {},
   });
   const session = await host.open({
     threadId: 'e1', actorId: 'u1', repoId: 'r1', repoName: 'app', branch: 'main', mode: 'plan',
     permissions: { read: true, edit: true, command: true, web: false, mcp: false },
     policy: { read: true, edit: true, command: true, web: true, mcp: true },
-  }, (event) => events.push(event));
+  }, (event) => {
+    events.push(event);
+    if (event.type === 'approval' && event.approvalId === 'edit-ask') resolveApproval(event);
+  });
+  t.after(() => session.close());
   assert.ok(capability);
   const request = (toolName: string, id: string): ToolApprovalRequest => ({
     sessionId: 's', agentId: 'a', conversationId: 'c', iteration: 1, toolCallId: id, toolName,
-    input: toolName === 'editor' ? { path: 'src/app.ts' } : {}, policy: {},
+    input: toolName === 'editor' ? { path: 'app.ts', new_text: 'export const app = true;\n' } : {}, policy: {},
   });
   assert.deepEqual(await capability!(request('read_files', 'read-1')), { approved: true });
   assert.equal((await capability!(request('editor', 'edit-plan'))).approved, false);
@@ -177,11 +193,17 @@ test('machine-side Cline approvals enforce Plan and current session controls', a
     },
   });
   const pending = capability!(request('editor', 'edit-ask'));
-  for (let attempt = 0; attempt < 100 && !events.some((event) => event.type === 'approval' && event.approvalId === 'edit-ask'); attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(events.some((event) => event.type === 'approval' && event.approvalId === 'edit-ask'), true);
+  // A cold SDK import prepares the real preview before asking. Synchronize with the
+  // event, not the speed of the CI runner; a decision without review still fails.
+  const review = await Promise.race([
+    approval,
+    Promise.resolve(pending).then(result => assert.fail(`The edit resolved before approval: ${JSON.stringify(result)}`)),
+  ]);
+  assert.equal(review.changes?.[0]?.path, 'app.ts');
+  assert.equal(review.changes?.[0]?.after, 'export const app = true;\n');
+  await assert.rejects(readFile(`${root}/app.ts`), { code: 'ENOENT' });
   session.command({ type: 'approval', approvalId: 'edit-ask', approved: true });
   assert.deepEqual(await pending, { approved: true });
-  session.close();
 });
 
 test('browser controls cannot widen a locked machine-side workspace policy', async () => {

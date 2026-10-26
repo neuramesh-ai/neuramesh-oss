@@ -21,7 +21,7 @@ private until it is named** (2026-09-19): a new page, a new folder or a new desi
 | `apps/desktop` | The Electron app and its preview harness. The browser client left it on 2026-09-26 (`apps/hq`, private) |
 | `packages/control-api` | The API (Hono), the command handler, and the migrations |
 | `packages/shared` | The types, the FSM, the entitlements, and the protocols every client speaks |
-| `dev/stack` | The dev stack: Postgres, PowerSync, and the sync rules |
+| `dev/stack` | Postgres and the local API replica setup |
 | `docs` | The documents named in `PUBLIC_DOCS`: the numbered design docs, the decision log, the design rounds' plans and boards. A new document is private until it is named |
 
 | Private | Why |
@@ -109,7 +109,7 @@ ships with the next desktop release.
 
 ## 4. One app, two connections
 
-The desktop app is one app with two kinds of connection. **Local** is Free: the app starts three
+The desktop app is one app with two kinds of connection. **Local** is Free: the app starts two
 containers on this Mac, bound to `127.0.0.1`, and the person's keys and sign-ins stay on this Mac.
 No account. **Cloud** is Pro: the same app connects to the hosted service at hq.neuramesh.app, with
 a cloud machine for every member, invites, the browser app, and the phone.
@@ -136,7 +136,7 @@ flowchart TB
   subgraph app["The NeuraMesh desktop app, open source"]
     direction LR
     subgraph local["Local connection, Free"]
-      stack["three containers on 127.0.0.1<br/>Postgres, PowerSync, the API image"]
+      stack["two containers on 127.0.0.1<br/>Postgres and the API image"]
       keys["your keys and sign-ins on this Mac"]
     end
     subgraph cloud["Cloud connection, Pro"]

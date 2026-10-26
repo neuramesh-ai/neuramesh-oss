@@ -22,7 +22,6 @@ on:
       - supabase/validate/auth-shim.sql
       - dev/stack/init/98-storage.sql
       - dev/stack/init/99-publication.sql
-      - dev/stack/powersync/**
       - pnpm-lock.yaml
       - .github/workflows/control-api-image.yml
   workflow_dispatch:
@@ -69,7 +68,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          # repo-root context: the image carries the migrations, the auth shim, and PowerSync's config
+          # repo-root context: the image carries the migrations, auth shim, and frozen legacy-client contract
           context: .
           file: packages/control-api/Dockerfile
           platforms: linux/amd64,linux/arm64

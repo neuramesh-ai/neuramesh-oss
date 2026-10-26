@@ -1,7 +1,7 @@
 // MESSAGE IPC — sending, pinning, the unread/latest reads, and answering a decision card.
 //
 // Seven handlers split out of startSync. Sending is local-first: the row goes into the replica
-// and the ordered ps_crud queue uploads it, which is why there is no await on a server round
+// and the ordered nm_outbox queue uploads it, which is why there is no await on a server round
 // trip here and why /v1/messages has to stay idempotent.
 //
 // REGISTRATION POSITION IS LOAD-BEARING (see whiteboards.ts) — called from where these sat.
@@ -29,17 +29,17 @@ export function registerMessageIpc(deps: {
     watchers.delete(subId);
   });
 
-  ipcMain.handle('nm:send', async (_e, { channelId, body, id: givenId, attachments, threadId, rootMessageId, threadMode, brainOverride, threadMachineId, threadOrigin, threadKind }: { channelId: string; body: string; id?: string; attachments?: Array<{ id: string; name: string; mime: string }>; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) => {
+  ipcMain.handle('nm:send', async (_e, { channelId, body, id: givenId, attachments, threadId, rootMessageId, threadMode, brainOverride, threadMachineId, threadOrigin, threadKind, projectId }: { projectId?: string; channelId: string; body: string; id?: string; attachments?: Array<{ id: string; name: string; mime: string }>; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) => {
     const id = givenId ?? randomUUID();
     // threads stay server-born (the message upload births the row; it syncs back down) —
     // the client only stamps the id, so offline sends still group correctly on arrival
     await db().execute(
-      `insert into messages (id, workspace_id, channel_id, thread_id, root_message_id, birth_mode, birth_brain, birth_machine, birth_origin, author_kind, author_id, body, created_at, birth_kind)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'human', ?, ?, ?, ?)`,
+      `insert into messages (id, workspace_id, channel_id, thread_id, root_message_id, birth_mode, birth_brain, birth_machine, birth_origin, author_kind, author_id, body, created_at, birth_kind, birth_project)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'human', ?, ?, ?, ?, ?)`,
       [id, ws(), channelId, threadId ?? null, rootMessageId ?? null, threadMode ?? null,
        brainOverride && Object.keys(brainOverride).length ? JSON.stringify(brainOverride) : null,
        threadMachineId ?? null, threadOrigin ?? null,
-       actorId(), body, new Date().toISOString(), threadKind ?? null],
+       actorId(), body, new Date().toISOString(), threadKind ?? null, projectId ?? null],
     );
     if (attachments?.length) await insertAttachments(id, channelId, null, attachments);
     return { id };
@@ -50,7 +50,7 @@ export function registerMessageIpc(deps: {
     // control-api is unreachable — surfaced in the status pill, not buried
     let queued = 0;
     try {
-      const [c] = await db().getAll<{ n: number }>('select count(*) as n from ps_crud');
+      const [c] = await db().getAll<{ n: number }>('select count(*) as n from nm_outbox');
       queued = Number(c?.n ?? 0);
     } catch {
       // table absent pre-first-write — zero is correct

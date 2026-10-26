@@ -12,6 +12,7 @@ import { parseCard } from './cards';
 import { stripCardFences } from './cardfence';
 
 export interface HistoryThread {
+  project_id?: string | null;
   id: string;
   task_id: string | null;
   title: string | null;
@@ -43,6 +44,7 @@ export interface CodeSessionLite {
 }
 
 export interface HistoryTask {
+  project_id?: string | null;
   /** the task's git branch (repo-backed work) — the rail's second line */
   branch?: string | null;
   id: string;
@@ -74,6 +76,7 @@ export interface RoomMessage {
 }
 
 export interface HistoryRow<T extends HistoryTask> {
+  projectId?: string | null;
   branch: string | null;
   key: string;
   threadId: string | null;
@@ -201,6 +204,7 @@ export function historyRows<T extends HistoryTask>(input: {
       return [{
         key: `th:${t.id}`,
         threadId: t.id as string | null,
+        projectId: t.project_id ?? task?.project_id ?? null,
         channelId: t.channel_id ?? task?.channel_id ?? channelId,
         channelSlug: t.channel_slug ?? task?.channel_slug ?? slugOf(t.channel_id),
         task,
@@ -222,6 +226,7 @@ export function historyRows<T extends HistoryTask>(input: {
     ...bare.map((t) => ({
       key: `tk:${t.id}`,
       threadId: null as string | null,
+      projectId: t.project_id ?? null,
       channelId: t.channel_id,
       channelSlug: t.channel_slug ?? channelSlug,
       task: t,

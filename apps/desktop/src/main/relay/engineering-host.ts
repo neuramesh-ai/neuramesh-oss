@@ -1,10 +1,13 @@
 import { engineeringDisplayTools, type EngineeringDisplayContext } from './engineering-display';
 import { engineeringThreadNamer } from './engineering-title';
 import { EngineeringSessionRegistry } from './engineering-session-registry';
-import { defaultBaselineRules, isEngineeringSelection, type PolicyRule } from '@neuramesh/shared';
+import { defaultBaselineRules, isEngineeringSelection, type EngineeringAgent, type PolicyRule } from '@neuramesh/shared';
 import type { EngineeringMachineOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import type { EngineeringBrainResolution } from './engineering-brain';
 import { ClineChannelSession } from './engineering-channel';
+import { AgyChannelSession, type AgyLaneDeps } from './engineering-agy';
+import { agyLaneDeps } from './engineering-agy-deps';
+import { EngineeringLanes, laneOf, type EngineeringLane } from './engineering-lanes';
 import { EngineeringModelRefused, engineeringAuthHeaders, resolveEngineeringProvider, type EngineeringProviderResolution, type MachineAuthProbe } from './engineering-provider';
 import { EngineeringConversation } from './engineering-conversation';
 import { createEngineeringToolExecutors } from './engineering-tools';
@@ -48,6 +51,8 @@ export interface ClineEngineeringHostOptions {
   createDefaultExecutors?: typeof import('@cline/sdk').createDefaultExecutors;
   /** this machine's sign-ins and keys (engineering-provider.ts): a test hands in its own */
   authProbe?: MachineAuthProbe;
+  /** the agy lane's binary, bridge and managed tools (engineering-agy-deps.ts): a test hands in a fake agy */
+  agyDeps?: (cwd: string) => AgyLaneDeps;
   log?(line: string): void;
 }
 
@@ -58,7 +63,8 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
     async open(meta, emit) {
       return registry.open(JSON.stringify([opts.workspaceId, meta.actorId, meta.threadId]), async () => {
       const record = opts.recorder ? new CodeSessionRecord(opts.recorder, meta) : null;
-      const emitTo = record ? record.emit(emit) : emit;
+      const recordedEmit = record ? record.emit(emit) : emit;
+      const emitTo = (event: EngineeringRuntimeEvent) => recordedEmit(event.type === 'ready' ? { ...event, filePreview: true } : event);
       const [where, policyRules] = await Promise.all([
         opts.resolveCwd(meta), opts.resolvePolicyRules?.(meta) ?? defaultBaselineRules(),
       ]);
@@ -96,8 +102,23 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
         const selected = await opts.resolveBrain({ ...meta, modelId, brainPack, ...(agentId !== undefined ? { agentId } : {}) });
         return { ...await resolveEngineeringProvider(opts, selected, undefined, opts.authProbe), agent: selected.agent, instructions: selected.instructions };
       };
-      const session = new ClineChannelSession(meta, cwd, provider, meta.modelId ?? null, meta.brainPack ?? null, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }), refused, agent => engineeringDisplayTools({ apiUrl: opts.apiUrl, threadId: meta.threadId, cwd, context: displayContext, conversation, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }, agent));
-      try { await session.init(messages); } catch (error) { managedTools?.close(); throw error; }
+      const namer = engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl });
+      const display = (agent?: EngineeringAgent) => engineeringDisplayTools({ apiUrl: opts.apiUrl, threadId: meta.threadId, cwd, context: displayContext, conversation, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }, agent);
+      const agyDeps = opts.agyDeps?.(cwd) ?? agyLaneDeps({ cwd, ...(managedTools ? { executors: managedTools.executors } : {}), ...(runtimeModule ? { createDefaultTools: runtimeModule.createDefaultTools } : {}) });
+      // a Google sign-in runs on agy, every other brain on the Cline SDK; a model change can cross lanes (engineering-lanes.ts)
+      const open = async (next: EngineeringProviderResolution, modelId: string | null, brainPack: string | null, history: unknown, refusal: string | null = null): Promise<EngineeringLane> => {
+        if (laneOf(next) === 'agy') {
+          const agy = new AgyChannelSession(meta, cwd, next, modelId, brainPack, policyRules, emitTo, agyDeps, log, conversation, namer, display);
+          await agy.init(Array.isArray(history) ? history : []);
+          return agy;
+        }
+        const cline = new ClineChannelSession(meta, cwd, next, modelId, brainPack, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, namer, refusal, display);
+        await cline.init(history as Parameters<ClineChannelSession['init']>[0]);
+        return cline;
+      };
+      let first: EngineeringLane;
+      try { first = await open(provider, meta.modelId ?? null, meta.brainPack ?? null, messages, refused); } catch (error) { managedTools?.close(); throw error; }
+      const session = new EngineeringLanes(first, laneOf(provider), { meta, cwd, current: { provider, modelId: meta.modelId ?? null, brainPack: meta.brainPack ?? null }, resolve: resolveProvider, open: (next, modelId, brainPack, history) => open(next, modelId, brainPack, history), conversation, emit: emitTo, log });
       record?.opened();
       return record ? record.wrap(session) : session;
       } catch (error) { await conversation?.close().catch(() => {}); throw error; }

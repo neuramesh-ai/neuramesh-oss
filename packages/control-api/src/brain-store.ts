@@ -1,5 +1,6 @@
 import { brainArtifactInline } from './brain-compatibility';
 import { brainArtifactBytes } from './brain-artifact-bytes';
+import { artifactPreview } from './artifact-preview';
 import { createEvent, type Actor } from '@neuramesh/shared';
 import type postgres from 'postgres';
 import { brainHash, type BrainObjectRef, type BrainObjectStore } from './brain-objects';
@@ -43,17 +44,20 @@ export function canonicalJson(value: unknown): string {
  * the publication lock, so a revoked writer cannot publish bytes uploaded before revocation. */
 export async function brainThreadAccess(sql: postgres.Sql, actor: Actor, workspace: string, threadId: string): Promise<{ channel_id: string; task_id: string | null; project_id: string | null; kind: string }> {
   const rows = await sql`
-    select t.channel_id, t.task_id, ch.project_id, t.kind from threads t
-    join channels ch on ch.id = t.channel_id
+    select t.channel_id, t.task_id, coalesce(t.project_id, ch.project_id) as project_id, t.kind from threads t
+    join channels ch on ch.id = t.channel_id and ch.workspace_id = t.workspace_id
+    join projects p on p.id = coalesce(t.project_id, ch.project_id) and p.workspace_id = t.workspace_id
     left join code_sessions cs on cs.id = t.id
     left join machines m on m.id = coalesce(cs.machine_id, t.machine_id)
     where t.id = ${threadId}::uuid and t.workspace_id = ${workspace}::uuid
+      and (t.project_id is null or t.project_id = ch.project_id)
       and (
         (${actor.kind} = 'human' and exists (select 1 from workspace_members wm where wm.workspace_id = t.workspace_id and wm.user_id = ${actor.id}::uuid)
           and (t.kind <> 'coding' or t.created_by = ${`human:${actor.id}`} or cs.created_by = ${actor.id}::uuid or m.owner_user_id = ${actor.id}::uuid))
         or (${actor.kind} = 'agent' and t.kind <> 'coding' and exists (
           select 1 from agent_channels ac join agents a on a.id = ac.agent_id
-          where ac.channel_id = t.channel_id and a.id = ${actor.id}::uuid and a.workspace_id = t.workspace_id and a.retired_at is null))
+          where ac.channel_id = t.channel_id and a.id = ${actor.id}::uuid and a.workspace_id = t.workspace_id and a.retired_at is null
+            and (p.context_channel_id is distinct from t.channel_id or exists (select 1 from project_agents pa where pa.project_id = p.id and pa.agent_id = a.id))))
       )`;
   if (!rows[0]) throw new BrainError('NOT_FOUND', 'No accessible brain thread exists in this workspace.', 404);
   return rows[0] as { channel_id: string; task_id: string | null; project_id: string | null; kind: string };
@@ -177,14 +181,15 @@ export class BrainStore {
     return { ok: true, id: input.id, artifactId: input.id, sha256, sizeBytes: bytes.length, url: `/v1/brain/artifacts/${input.id}?workspace=${input.workspace}` };
   }
 
-  async download(actor: Actor, workspace: string, id: string) {
+  async download(actor: Actor, workspace: string, id: string, preview = false) {
     const [row] = await this.sql`select b.thread_id, b.object_ref, a.name from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.artifact_id = ${id}::uuid and b.workspace_id = ${workspace}::uuid`;
     if (!row) throw new BrainError('NOT_FOUND', 'No artifact exists in this workspace.', 404);
     await brainThreadAccess(this.sql, actor, workspace, row['thread_id']);
     const ref = row['object_ref'] as BrainObjectRef;
-    const bytes = await this.objects.get(ref);
+    const small = preview ? await artifactPreview(`${workspace}:${id}:${ref.sha256}:v1`, () => this.objects.get(ref)) : null;
+    const bytes = small?.bytes ?? await this.objects.get(ref);
     await brainThreadAccess(this.sql, actor, workspace, row['thread_id']);
-    return { bytes, ref, name: row['name'] as string };
+    return { bytes, ref: small ? { ...ref, mime: small.mime, sha256: small.sha256, sizeBytes: bytes.length } : ref, name: row['name'] as string };
   }
 
   async artifactMetadata(actor: Actor, workspace: string, id: string) {

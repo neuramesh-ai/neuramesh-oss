@@ -46,7 +46,20 @@ export async function importBatch(db: postgres.Sql, ws: string, body: ImportBatc
     // defense in depth: a merged id the client did not re-point is re-pointed here
     const idMap = body.idMap ?? {};
     for (const r of rows) for (const ref of EXPORT_REFS[body.table]) if (ref.column in r) r[ref.column] = repoint(r[ref.column], ref, idMap);
-    return body.links ? linkPass(sql, ws, body.table, rows, body.seq) : rowPass(sql, ws, body.table, rows, sent, body.seq);
+    const result = body.links ? await linkPass(sql, ws, body.table, rows, body.seq) : await rowPass(sql, ws, body.table, rows, sent, body.seq);
+    if (body.last) {
+      // Older exports/clients have no context link pass. Give imported projects one
+      // deterministic address and derive their team from that address only.
+      await sql`insert into channels(workspace_id, project_id, slug)
+        select p.workspace_id, p.id, 'general' from projects p
+        where p.workspace_id = ${ws}::uuid and p.context_channel_id is null
+          and not exists (select 1 from channels c where c.project_id = p.id)`;
+      await sql`update projects p set context_channel_id = (
+        select c.id from channels c where c.project_id = p.id
+        order by (c.slug = 'general') desc, c.id limit 1
+      ) where p.workspace_id = ${ws}::uuid and p.context_channel_id is null`;
+    }
+    return result;
   }) as Promise<ImportBatchResult>;
 }
 
@@ -58,7 +71,7 @@ async function rowPass(sql: postgres.Sql, ws: string, table: ExportTable, rows: 
   if (table === 'agents') fresh = await mergeAgents(sql, ws, fresh, out);
   if (table === 'repos') fresh = await mergeRepos(sql, ws, fresh, out);
   if (table === 'projects') {
-    for (const r of fresh) r['is_default'] = false; // the target has its default project already
+    for (const r of fresh) { r['is_default'] = false; r['settings'] ??= {}; } // the target has its default project already
     await suffixSlugs(sql, ws, table, fresh);
   }
   if (table === 'channels') await suffixSlugs(sql, ws, table, fresh);

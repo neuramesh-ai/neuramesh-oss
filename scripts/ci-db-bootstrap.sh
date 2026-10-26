@@ -2,9 +2,7 @@
 # Bootstrap a fresh Postgres for the control-api pg integration tests (loop.pg.test.ts).
 # Mirrors the dev stack's init order: the auth shim (the slice of Supabase's auth schema the
 # migrations reference), the base schema (0001), test fixtures, then every schema migration in
-# order. Publication migrations are skipped on purpose — the powersync publication is created
-# wholesale at the end (dev/stack/init/99-publication.sql), so the incremental `alter publication`
-# steps would have nothing to attach to.
+# order. Historical publication-only migrations are skipped; revision triggers power the API feed.
 #
 # Usage: DATABASE_URL=postgres://user:pass@host:port/db scripts/ci-db-bootstrap.sh
 set -euo pipefail
@@ -24,6 +22,5 @@ for f in supabase/migrations/*.sql; do
   esac
   run "$f"
 done
-run dev/stack/init/99-publication.sql     # the powersync publication, all tables at once
 
 echo "ci-db-bootstrap: applied $(ls supabase/migrations/*.sql | wc -l | tr -d ' ') migrations to $DATABASE_URL"

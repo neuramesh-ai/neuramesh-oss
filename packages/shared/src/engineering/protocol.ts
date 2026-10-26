@@ -44,6 +44,7 @@ export interface EngineeringMachineOpenMeta extends EngineeringOpenMeta {
 }
 
 export type EngineeringCommand =
+  | { type: 'preview_file'; requestId: string; path: string }
   | { type: 'attachment_start'; id: string; name: string; mime: string; size: number }
   | { type: 'attachment_chunk'; id: string; index: number; data: string }
   | { type: 'attachment_end'; id: string }
@@ -64,9 +65,12 @@ export interface EngineeringAttachmentRef {
 }
 
 export type EngineeringRuntimeEvent =
+  /** Client transport lifecycle, never an agent reply or a recorded host event. */
+  | { type: 'disconnected'; message: string }
+  | { type: 'file_preview'; requestId: string; path: string; content?: string; error?: string }
   /** `recordedRevision`: the cloud revision the host's recording reaches as it opens. A client whose restore read an
    *  older revision reads again (restore-connection.ts). An older host sends none. */
-  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null; recordedRevision?: number }
+  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null; recordedRevision?: number; filePreview?: boolean }
   | { type: 'model_changed'; provider: string; model: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
   /** @deprecated Accepted so an older machine can finish an already-open browser session. */
   | { type: 'brain_changed'; provider: string; model: string; brainPack: string | null }
@@ -143,6 +147,7 @@ export function isEngineeringControls(value: unknown): value is EngineeringContr
 export function isEngineeringCommand(value: unknown): value is EngineeringCommand {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
+  if (v['type'] === 'preview_file') return isBoundedString(v['requestId'], 200) && isBoundedString(v['path'], 4096) && !v['path'].includes('\0');
   if (v['type'] === 'attachment_start') return isAttachmentId(v['id']) && isBoundedString(v['name'], 255) && isBoundedString(v['mime'], 200)
     && typeof v['size'] === 'number' && Number.isInteger(v['size']) && v['size'] >= 0 && v['size'] <= MAX_ATTACHMENT_LIMITS.maxBytes;
   if (v['type'] === 'attachment_chunk') return isAttachmentId(v['id']) && typeof v['index'] === 'number' && Number.isInteger(v['index']) && v['index'] >= 0
@@ -161,6 +166,12 @@ export function isEngineeringCommand(value: unknown): value is EngineeringComman
 
 const NATIVE_TOOL_CATEGORY: Record<string, EngineeringPermissionCategory> = {
   show_artifact: 'read',
+  list_library: 'read',
+  read_library_doc: 'read',
+  list_repos: 'read',
+  list_repo_files: 'read',
+  read_repo_file: 'read',
+  list_repo_changes: 'read',
   list_whiteboards: 'read',
   read_whiteboard: 'read',
   create_whiteboard: 'edit',

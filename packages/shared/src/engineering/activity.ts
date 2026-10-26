@@ -1,6 +1,6 @@
 import type { EngineeringActiveActivity, EngineeringMessage, EngineeringMode } from './domain';
 
-export type EngineeringActivityKind = 'runtime' | 'brain' | 'read' | 'search' | 'edit' | 'command' | 'web' | 'mcp' | 'checkpoint' | 'verification' | 'other';
+export type EngineeringActivityKind = 'runtime' | 'brain' | 'read' | 'image' | 'search' | 'edit' | 'command' | 'web' | 'mcp' | 'checkpoint' | 'verification' | 'other';
 export type EngineeringActivityStatus = 'info' | 'success' | 'warning';
 
 export interface EngineeringActivityPresentation {
@@ -83,6 +83,11 @@ const titleCase = (value: string) => value
   .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 function toolCopy(toolName: string): ToolCopy {
+  if (['read_file', 'view_file', 'read_file_range', 'Read'].includes(toolName)) return { kind: 'read', done: 'Read a file', active: 'Reading a file' };
+  if (['view_image', 'read_image', 'open_image'].includes(toolName)) return { kind: 'image', done: 'Viewed an image', active: 'Viewing an image' };
+  if (['run_command', 'execute_command', 'exec_command', 'Bash'].includes(toolName)) return { kind: 'command', done: 'Ran a command', active: 'Running a command' };
+  if (['grep_search', 'find_by_name', 'list_dir', 'Grep', 'Glob'].includes(toolName)) return { kind: 'search', done: 'Searched files', active: 'Searching files' };
+  if (['write_to_file', 'replace_file_content', 'multi_replace_file_content'].includes(toolName)) return { kind: 'edit', done: 'Edited a file', active: 'Editing a file' };
   if (TOOL_COPY[toolName]) return TOOL_COPY[toolName]!;
   if (toolName.includes('__')) return { kind: 'mcp', done: `Called ${titleCase(toolName)}`, active: `Calling ${titleCase(toolName)}` };
   return { kind: 'other', done: titleCase(toolName), active: `Using ${titleCase(toolName)}` };
@@ -94,6 +99,10 @@ function runtimeDetail(body: string): string {
 }
 
 export function engineeringActivityPresentation(message: EngineeringMessage): EngineeringActivityPresentation {
+  if (message.tool) {
+    const copy = toolCopy(message.tool.name);
+    return { kind: copy.kind, title: message.tool.state === 'running' ? copy.active : copy.done, detail: message.tool.error ?? '', status: message.tool.state === 'running' ? 'info' : message.tool.state === 'succeeded' ? 'success' : 'warning' };
+  }
   const body = message.body.trim();
   const warning = message.tone === 'warning' || /\b(?:failed|blocked|invalid|error)\b/i.test(body);
 

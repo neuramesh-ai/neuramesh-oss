@@ -70,10 +70,13 @@ ok "two containers; no PowerSync signing key or service required"
 
 echo "── the schema the runner built from empty"
 [ "$(pgq "select count(*) from schema_migrations")" = "$(ls supabase/migrations/*.sql | wc -l | tr -d ' ')" ] || fail "every migration is tracked"
-HAVE=$(pgq "select string_agg(tablename, ',' order by tablename) from pg_publication_tables where pubname = 'powersync'")
-WANT=$(grep -o 'public\.[a-z_]*' dev/stack/init/99-publication.sql | sed 's/public\.//' | sort | paste -sd, -)
-[ "$HAVE" = "$WANT" ] || fail "the publication holds the 99-publication.sql tables (have $HAVE)"
+# Historical migrations still define the old publication until the installed-client retirement
+# gate. It is inert here: Local has no logical WAL, consumer slot or sync storage/service.
+# Do not rewrite applied migration history just to remove this dormant schema definition.
+[ "$(pgq "show wal_level")" = replica ] || fail "Local does not enable logical replication"
+[ "$(pgq "select count(*) from pg_replication_slots where slot_type = 'logical'")" = 0 ] || fail "no logical replication consumer exists"
 [ "$(pgq "select count(*) from pg_database where datname = 'powersync_storage'")" = 0 ] || fail "no PowerSync storage database is created"
-ok "$(pgq "select count(*) from schema_migrations") migrations tracked · publication = 99-publication.sql · no PowerSync storage database"
+[ "$(pgq "select count(*) from information_schema.tables where table_name = 'local_sync_changes'")" = 1 ] || fail "API replica change feed exists"
+ok "$(pgq "select count(*) from schema_migrations") migrations tracked · API replica feed · no PowerSync service state"
 
 echo "LOCAL STACK SMOKE: OK"

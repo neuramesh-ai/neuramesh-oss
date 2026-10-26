@@ -1,4 +1,6 @@
 import { DEFAULT_ENGINEERING_AGENT } from './selection';
+import { failRemoteEngineeringTransport, withEngineeringWarning } from './transport-state';
+import { interruptToolReceipts, recordToolReceipt } from './tool-receipts';
 import { lastMessageIndex, updateMessage, collapseReasoning, finishStreamingMessages } from './transcript-state';
 import { createEngineeringPlanProgress, isEngineeringPlanProgress } from './plan-progress';
 import { applyEngineeringSelection, recordEngineeringAuthors } from './selection-events';
@@ -21,12 +23,6 @@ export const isEngineeringGitHubWait = (m: Pick<EngineeringMessage, 'id'>): bool
 const textValue = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 const isPlanCeiling = (session: EngineeringSession, value: unknown): boolean => session.mode === 'plan' && lineHas(textValue(value).toLowerCase(), 'blocked by', 'plan mode');
 const terminalState = (reason: unknown): EngineeringTurnState => reason === 'completed' ? 'completed' : reason === 'error' ? 'error' : 'resumable';
-// a host that refuses each redial (the phone refreshes on every focus) repeats one sentence: the thread
-// keeps one row for it, not one row for each try
-const withWarning = (messages: EngineeringMessage[], warning: EngineeringMessage): EngineeringMessage[] => {
-  const last = messages.at(-1);
-  return last?.role === 'assistant' && last.tone === 'warning' && last.kind === warning.kind && last.body === warning.body ? messages : [...messages, warning];
-};
 
 
 function applyReasoningDelta(session: EngineeringSession, event: Record<string, unknown>): EngineeringSession {
@@ -106,13 +102,15 @@ function applySnapshot(session: EngineeringSession, core: Record<string, unknown
 
 function applyContentEvent(session: EngineeringSession, event: Record<string, unknown>): EngineeringSession {
   // Cline Core intentionally projects its internal AgentRuntimeEvent vocabulary into this
-  // stable public AgentEvent facade. Capturing tool input at content_start also preserves
+  // stable public AgentEvent facade. Capture display details as the action starts, then update
+  // that receipt in place so its position and disclosure stay stable when the result arrives.
   if (event['type'] === 'content_start' && event['contentType'] === 'tool') {
     const changes = remoteChange(String(event['toolName'] ?? 'tool'), event['input']);
     return {
       ...session,
+      state: 'streaming',
       activeActivity: { phase: 'tool', toolName: String(event['toolName'] ?? 'tool'), startedAt: stamp() },
-      messages: finishStreamingMessages(session.messages, true),
+      messages: recordToolReceipt(finishStreamingMessages(session.messages, true), event, body => message('tool', body)),
       ...(changes.length ? { proposedChanges: changes } : {}),
       updatedAt: stamp(),
     };
@@ -154,13 +152,12 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
     const changed = toolName === 'editor' || toolName === 'apply_patch';
     const errorText = event['error'] ? textValue(event['error']) : '';
     const planBlocked = isPlanCeiling(session, errorText);
-    const detail = event['error'] ? engineeringSystemText(`${toolName} failed · ${errorText}`) : `${toolName} completed`;
     return {
       ...session,
       activeActivity: { phase: 'thinking', startedAt: stamp() },
       changes: changed && !event['error'] ? mergeChanges(session.changes, session.proposedChanges) : session.changes,
       proposedChanges: changed ? [] : session.proposedChanges,
-      messages: planBlocked ? session.messages : [...(changed ? finishChangeReview(session, !!event['error'], stamp()) : session.messages), message('tool', detail, event['error'] ? 'warning' : 'success')],
+      messages: planBlocked ? session.messages.filter(m => !m.tool || (event['toolCallId'] ? m.tool.callId !== event['toolCallId'] : m.tool.name !== toolName || m.tool.state !== 'running')) : recordToolReceipt(changed ? finishChangeReview(session, !!event['error'], stamp()) : session.messages, event, body => message('tool', body)),
       updatedAt: stamp(),
     };
   }
@@ -185,6 +182,10 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
 /** Project Cline Core's transport events into the stable Engineering UI model. */
 function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
   const type = wire['type'];
+  // Keeping a completed thread open is not ongoing agent work. A socket restart must
+  // not manufacture a reply, mark the task failed or bump it to the top of Recents.
+  if (type === 'disconnected') return session.state === 'streaming' || session.state === 'awaiting_approval'
+    ? failRemoteEngineeringTransport(session, wire['message']) : session;
   session = applyEngineeringSelection(session, wire);
   if (type === 'ready') {
     const provider = engineeringSystemText(String(wire['provider']));
@@ -255,8 +256,8 @@ function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<
     // the machine cannot reach the code until GitHub is connected: the gate seat shows the GitHub card, and the
     // grant opens the session again (docs/design/repo-connect-2026-10). The machine's sentence stays, marked
     // (isEngineeringGitHubWait), so a client with no gate (the phone) still shows a reason
-    if (wire['code'] === 'ENGINEERING_GITHUB_REQUIRED') return { ...session, state: 'error', blockedOn: 'github', activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Connect GitHub to code here.')), 'warning', GITHUB_WAIT)), updatedAt: stamp() };
-    return { ...session, state: wire['recoverable'] ? 'resumable' : 'error', activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Engineering failed.')), 'warning')), updatedAt: stamp() };
+    if (wire['code'] === 'ENGINEERING_GITHUB_REQUIRED') return { ...session, state: 'error', blockedOn: 'github', activeActivity: null, pendingApproval: null, messages: withEngineeringWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Connect GitHub to code here.')), 'warning', GITHUB_WAIT)), updatedAt: stamp() };
+    return { ...session, state: wire['recoverable'] ? 'resumable' : 'error', activeActivity: null, pendingApproval: null, messages: withEngineeringWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Engineering failed.')), 'warning')), updatedAt: stamp() };
   }
   if (type === 'changes' && Array.isArray(wire['changes'])) return { ...session, changes: normalizeEngineeringChanges(wire['changes'] as EngineeringChange[]), proposedChanges: [], updatedAt: stamp() };
   if (type === 'restored') {
@@ -275,5 +276,7 @@ function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<
 
 /** Snapshot the speaking identity when a row is recorded, never when history is rendered. */
 export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
-  return recordEngineeringAuthors(session, reduceRemoteEngineeringEvent(session, wire));
+  const next = reduceRemoteEngineeringEvent(session, wire);
+  return recordEngineeringAuthors(session, next.state !== 'streaming' && next.state !== 'awaiting_approval' && next.messages.some(m => m.tool?.state === 'running')
+    ? { ...next, messages: interruptToolReceipts(next.messages) } : next);
 }

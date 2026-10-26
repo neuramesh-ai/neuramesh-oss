@@ -1,5 +1,10 @@
 # Model config packs — plan (for review)
 
+**Current catalog update, 2026-10-16:** Opus 5.5, Sonnet 5.5 and Haiku 5.5 replace their previous
+generations in offered choices and pack defaults. Gemini 4 Argon is an additional stable choice.
+Old IDs remain accepted for saved picks and conversations. The September measurements below describe
+the old generation, not the 5.5 successors. See the [verification record](design/hq-subscription-2026-10/provider-refresh.md).
+
 > **Status:** proposed, not built. Decisions locked with the founder 2026-06-27. This is the review artifact; the reference doc it feeds is [08-model-routing.md](08-model-routing.md).
 
 ## 1. Goal
@@ -34,10 +39,10 @@ Five packs over the **real** catalog (Gemini ids verified against Google's model
 
 | Pack | orchestrator | architect | developer | reviewer | designer | shipper | sales | curator | marketer |
 |---|---|---|---|---|---|---|---|---|---|
-| **Ultracode** | gpt-5.6-sol | gpt-6-astra | claude-sonnet-5 | gpt-6-astra | claude-opus-5 | claude-fable-5-1 | claude-sonnet-5 | claude-haiku-4-5 | claude-opus-5 |
-| **Balanced** | claude-sonnet-5 | gemini-3.8-flash | claude-sonnet-5 | gemini-3.8-flash | claude-sonnet-5 | claude-sonnet-5 | claude-haiku-4-5 | claude-haiku-4-5 | claude-sonnet-5 |
-| **Fast** | gemini-3.8-flash | gemini-3.8-flash | claude-sonnet-5 | gemini-3.8-flash | claude-sonnet-5 | claude-sonnet-5 | claude-haiku-4-5 | claude-haiku-4-5 | claude-sonnet-5 |
-| **Claude Core** | claude-sonnet-5 | claude-fable-5-1 | claude-sonnet-5 | claude-fable-5-1 | claude-sonnet-5 | claude-opus-5 | claude-sonnet-5 | claude-haiku-4-5 | claude-sonnet-5 |
+| **Ultracode** | gpt-5.6-sol | gpt-6-astra | claude-sonnet-5-5 | gpt-6-astra | claude-opus-5-5 | claude-fable-5-1 | claude-sonnet-5-5 | claude-haiku-5-5 | claude-opus-5-5 |
+| **Balanced** | claude-sonnet-5-5 | gemini-3.8-flash | claude-sonnet-5-5 | gemini-3.8-flash | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-haiku-5-5 | claude-haiku-5-5 | claude-sonnet-5-5 |
+| **Fast** | gemini-3.8-flash | gemini-3.8-flash | claude-sonnet-5-5 | gemini-3.8-flash | claude-sonnet-5-5 | claude-sonnet-5-5 | claude-haiku-5-5 | claude-haiku-5-5 | claude-sonnet-5-5 |
+| **Claude Core** | claude-sonnet-5-5 | claude-fable-5-1 | claude-sonnet-5-5 | claude-fable-5-1 | claude-sonnet-5-5 | claude-opus-5-5 | claude-sonnet-5-5 | claude-haiku-5-5 | claude-sonnet-5-5 |
 | **OpenAI Core** | gpt-5.6-sol | gpt-6-astra | gpt-5.6-terra | gpt-6-astra | gpt-5.6-sol | gpt-5.6-sol | gpt-5.4-mini | gpt-5.4-mini | gpt-5.6-sol |
 | **Gemini Core** | gemini-3.8-flash | gemini-3.8-flash | gemini-3.1-pro-preview | gemini-3.1-pro-preview | gemini-3.8-flash | gemini-3.1-pro-preview | gemini-3.1-flash-lite | gemini-3.1-flash-lite | gemini-3.8-flash |
 | **NeuraMesh Starter** | gemini-3.5-flash-lite on every seat (the house brain; the metered proxy is where the spend rule lives) |||||||||

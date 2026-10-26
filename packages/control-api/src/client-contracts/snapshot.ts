@@ -70,7 +70,11 @@ function selected(list: string): string[] {
 }
 
 /** the tables the sync rules serve, as table → columns (`*` for every column) */
-export function syncRulesOf(root: string): Record<string, string[]> {
+export async function syncRulesOf(root: string): Promise<Record<string, string[]>> {
+  // Current clients receive exactly the API feed's TABLE_COLUMNS allowlist. Old tagged trees
+  // still read their historical sync rules so compatibility evidence remains reproducible.
+  if (!existsSync(join(root, SYNC_RULES_FILE))) return Object.fromEntries(
+    Object.entries(await clientSchema(root)).map(([table, columns]) => [table, ['id', ...columns].sort(byName)]));
   // js-yaml is a devDependency of @neuramesh/shared: borrowed, so the control-api's lockfile stays as it is
   const yaml = createRequire(new URL('../../../shared/package.json', import.meta.url))('js-yaml') as { load(text: string): unknown };
   type Stream = { query?: unknown; queries?: unknown[]; data?: unknown[] };
@@ -123,7 +127,7 @@ export async function snapshotTree(root: string, opts: { retired?: boolean } = {
     commands: commandsOf(CommandSchema),
     routes: await routesOf(root),
     clientSchema: await clientSchema(root),
-    syncRules: syncRulesOf(root),
+    syncRules: await syncRulesOf(root),
     relay: relayOf(root),
     agents: readdirSync(join(root, 'defaults/agents')).filter((f) => f.endsWith('.yaml')).sort(byName),
   };

@@ -100,7 +100,7 @@ export type FirstRunState =
   | { phase: 'done'; door: FirstRunDoor | null };
 /** Settings › Connections (main/connectionsipc.ts): one card per connection */
 export interface ConnectionWorkspace { id: string; name: string; slug: string; plan: string | null; seats: number | null; subscriptionStatus: string | null; currentPeriodEnd: string | null }
-export interface ConnectionCard { id: string; kind: ConnectionKind; authMode: AuthMode; foreground: boolean; apiUrl: string; powersyncUrl: string; webUrl: string; account: { email: string } | null; workspaceId: string; workspaces: ConnectionWorkspace[]; moved?: MovedMarker }
+export interface ConnectionCard { id: string; kind: ConnectionKind; authMode: AuthMode; foreground: boolean; apiUrl: string; webUrl: string; account: { email: string } | null; workspaceId: string; workspaces: ConnectionWorkspace[]; moved?: MovedMarker }
 export interface LocalStackInfo { dir: string; ports: { api: number }; engine: string | null; engineVersion: string | null; stackVersion: string | null; appVersion: string }
 export type CustomServerResult = { ok: true; id: string } | { ok: false; code: 'ADDRESS' | 'NM_CONFIG' | 'BEARER' | 'UNREACHABLE'; message: string };
 export type WorkspaceExportResult = { ok: true; path: string } | { ok: false; code: 'NOT_AVAILABLE' | 'CANCELLED' | 'FAILED'; message?: string };
@@ -211,6 +211,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   channelRename(channelId: string, slug?: string, topic?: string): Promise<{ ok: boolean; channelId: string; slug: string }>;
   channelKind(channelId: string, kind: 'build' | 'marketing'): Promise<{ ok: boolean; channelId: string }>;
   /** step 5 (release drafts §4.7) rides `releases`: the repository, a free one-shot (`now`), a daily Team routine (`watch`); the answer says whether the routine armed or the plan refused it */
+  marketingThreadIds(): Promise<string[]>;
+  startProjectMarketing(projectId: string): Promise<{ ok: boolean; channelId: string; taskId: string }>;
   marketingSetup(channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } }>;
   /** the releases step writes an object; every other step a text or a list (the server checks the shape per step) */
   setupStep(channelId: string, flow: string, step: string, value?: string | string[] | Record<string, unknown>): Promise<{ ok: boolean }>;
@@ -442,7 +444,7 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   onUpgrade?(cb: (p: UpgradePush) => void): () => void;
   // ── Settings › Connections (main/connectionsipc.ts) and the hosted shell's export — desktop only ──
   connectionsList?(): Promise<ConnectionCard[]>;
-  connectionAddCustom?(input: { apiUrl: string; powersyncUrl?: string; bearer: string }): Promise<CustomServerResult>;
+  connectionAddCustom?(input: { apiUrl: string; bearer: string }): Promise<CustomServerResult>;
   connectionRemove?(id: string): Promise<{ ok: boolean }>;
   connectionBillingPortal?(id: string): Promise<{ ok: boolean }>;
   showInFolder?(path: string): Promise<void>;

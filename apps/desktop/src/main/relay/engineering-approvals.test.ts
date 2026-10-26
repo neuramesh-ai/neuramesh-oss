@@ -27,3 +27,17 @@ test('records exact review bytes before asking and never treats the receipt as p
     assert.equal(await readFile(join(root, 'file.txt'), 'utf8'), 'old\n');
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('invalid handoff paths are returned to the model for correction without asking for unsafe approval', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'nm-handoff-review-'));
+  const pending = new Map<string, (approved: boolean) => void>();
+  try {
+    const result = await requestEngineeringApproval({ toolCallId: 'bad-edit', toolName: 'editor', input: { path: '/workspace/src/ledger.mjs', new_text: 'wrong root' } } as ToolApprovalRequest,
+      { mode: 'act', permissions: RECOMMENDED_ENGINEERING_PERMISSIONS, policy: OPEN_ENGINEERING_POLICY }, [], pending,
+      () => assert.fail('An invalid edit must not render an approval card'), () => {}, root);
+    assert.equal(result.approved, false);
+    assert.match(result.reason ?? '', /Nothing was changed/);
+    assert.ok(result.reason?.includes(root));
+    assert.equal(pending.size, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

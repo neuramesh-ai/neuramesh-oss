@@ -3,7 +3,7 @@
 // Grouped the same way the renderer groups its row TYPES (bridge/rows-*), so a domain
 // reads the same on both sides of the IPC boundary. A column added here needs the
 // matching sync rule (dev/stack/powersync/sync-config.yaml), because every client reads this file.
-import { column, Table } from '@powersync/common';
+import { column, Table } from '../table';
 
 // INDEXES: a replica row is JSON in ps_data__<table>, and every column is a json_extract, so a
 // table with no index answers every `where x = ?` — and every correlated subquery, once PER OUTER
@@ -44,6 +44,8 @@ export const messages = new Table({
   // 0144, coding threads: the kind the send births the thread with (`coding` when the composer's
   // repo chip was set). Local only, like the four above — the server keeps it on `threads.kind`.
   birth_kind: column.text,
+  // Local-only project intent, validated by the server before a thread is born.
+  birth_project: column.text,
   author_kind: column.text,
   author_id: column.text,
   body: column.text,
@@ -65,6 +67,8 @@ export const messages = new Table({
 export const threads = new Table({
   workspace_id: column.text,
   channel_id: column.text,
+  // Additive ownership projection. Channel contracts remain during desktop compatibility.
+  project_id: column.text,
   title: column.text,
   description: column.text,
   created_by: column.text,
@@ -98,6 +102,7 @@ export const threads = new Table({
 }, {
   indexes: {
     by_channel: ['channel_id', 'updated_at'],
+    by_project: ['project_id', 'updated_at'],
     by_task: ['task_id', 'created_at'],
     by_root: ['root_message_id'],
   },

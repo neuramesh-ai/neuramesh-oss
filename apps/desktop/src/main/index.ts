@@ -24,6 +24,7 @@ import { initAutoUpdate } from './update';
 import { claudeExecutablePath } from './runtime/adapter';
 import { allowedWebviewSrc, navPolicy, popupPolicy } from './browser-guard';
 import { guardMainWindow, registerLinkIpc } from './links';
+import { verifyNativeSQLite } from './sync/sqlite-smoke';
 
 app.setName('NeuraMesh');
 
@@ -90,6 +91,8 @@ if (process.argv.includes('--smoke-cli')) {
   if (r.error) { say(`FAIL — spawn ${(r.error as NodeJS.ErrnoException).code}: ${r.error.message}`); process.exit(1); }
   if (r.status !== 0) { say(`FAIL — exited ${r.status}: ${String(r.stderr).trim().slice(0, 120)}`); process.exit(1); }
   say(`OK — ${p} → ${String(r.stdout).trim().slice(0, 40)}`);
+  try { verifyNativeSQLite(); say('OK — native SQLite writes, reopens and enforces read-only access'); }
+  catch (error) { say(`FAIL — native SQLite: ${String(error)}`); process.exit(1); }
   process.exit(0);
 }
 
@@ -277,13 +280,13 @@ app.whenReady().then(async () => {
   const authMode = () => connections.current().authMode;
   console.log(`auth_mode=${authMode()} signed_in=${!!(authMode() === 'clerk' ? currentClerkUser() : currentUser())}`);
   // Config fingerprint — confirms the launcher wired the right values without leaking secrets: the
-  // HOST for each URL (so you can see *which* control-api / PowerSync / web instance — the last 4
+  // HOST for each URL (so you can see *which* control-api / web instance — the last 4
   // chars would just be ".com"), and the last 4 chars for each key. In a packaged build the NM_*
   // reads are baked literals; keys come from the shell. DATABASE_URL must be ∅ — the desktop never
   // holds DB creds, so ⚠SET means the launcher is misconfigured.
   const t4 = (v?: string) => (v ? `…${v.slice(-4)}` : '∅');
   const host = (v?: string) => { if (!v) return '∅'; try { return new URL(v).host; } catch { return t4(v); } };
-  console.log(`env_check NM_AUTH=${process.env.NM_AUTH ?? '∅'} NM_API=${host(process.env.NM_API)} NM_POWERSYNC=${host(process.env.NM_POWERSYNC)} NM_WEB=${host(process.env.NM_WEB)} CLERK_PK=${t4(process.env.CLERK_PUBLISHABLE_KEY)} CLERK_SK=${t4(process.env.CLERK_SECRET_KEY)} DATABASE_URL=${process.env.DATABASE_URL ? '⚠SET' : '∅'}`);
+  console.log(`env_check NM_AUTH=${process.env.NM_AUTH ?? '∅'} NM_API=${host(process.env.NM_API)} NM_WEB=${host(process.env.NM_WEB)} CLERK_PK=${t4(process.env.CLERK_PUBLISHABLE_KEY)} CLERK_SK=${t4(process.env.CLERK_SECRET_KEY)} DATABASE_URL=${process.env.DATABASE_URL ? '⚠SET' : '∅'}`);
 
   // dev mode acts as DEV_USER everywhere in main (sync, commands); the renderer must hear the same id, or "mine" is nobody's
   // Local mode has no sign-in: the local human IS the user, named by the stack's /v1/me once it

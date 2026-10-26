@@ -27,8 +27,8 @@ test('every IPC module takes the workspace and the replica as GETTERS, never as 
   for (const f of ipcFiles()) {
     const src = read(join('sync', 'ipc', f));
     assert.ok(!/\bWS: string;/.test(src), `${f} still declares WS: string`);
-    assert.ok(!/\bdb: PowerSyncDatabase;/.test(src), `${f} still declares db: PowerSyncDatabase`);
-    assert.ok(!/\{ db: PowerSyncDatabase \}/.test(src), `${f} still takes a captured db`);
+    assert.ok(!/\bdb: ReplicaDatabase;/.test(src), `${f} still declares db: ReplicaDatabase`);
+    assert.ok(!/\{ db: ReplicaDatabase \}/.test(src), `${f} still takes a captured db`);
     // no module imports a workspace or url VALUE from sync — only functions
     const imp = /import \{([^}]*)\} from '\.\.\/\.\.\/sync';/.exec(src)?.[1] ?? '';
     for (const bad of ['WS', 'API_URL', 'activeDb']) assert.ok(!imp.split(',').map((s) => s.trim()).includes(bad), `${f} imports ${bad} from sync`);
@@ -39,7 +39,7 @@ test('AUTH_MODE is read per api url, and the only load-time read is the environm
   const api = read('apiauth.ts');
   assert.ok(/export function authModeFor\(apiUrl: string\)/.test(api), 'authModeFor exists');
   assert.ok(/connections\.byApiUrl\(apiUrl\)\?\.authMode \?\? AUTH_MODE/.test(api), 'the connection decides, the environment is the fallback');
-  for (const f of ['sync.ts', 'index.ts', 'relayipc.ts', 'sync/boot.ts', 'sync/connector.ts']) {
+  for (const f of ['sync.ts', 'index.ts', 'relayipc.ts', 'sync/boot.ts']) {
     const src = read(f);
     assert.ok(!/\bAUTH_MODE\b/.test(src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), `${f} still reads the process-wide AUTH_MODE`);
   }

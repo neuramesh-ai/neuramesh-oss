@@ -47,8 +47,17 @@ export class EngineeringConversation {
   excludeSecret(secret?: string): void { this.brain.excludeSecret(secret); }
 
   checkpoint(core: ClineCore, sessionId: string, metadata: Record<string, unknown>): Promise<void> {
+    return this.seal(() => readRuntimeMessages(core, sessionId), metadata);
+  }
+
+  /** a lane with no Cline core (the agy lane) seals the messages it keeps itself */
+  checkpointMessages(messages: RuntimeMessages, metadata: Record<string, unknown>): Promise<void> {
+    return this.seal(async () => messages, metadata);
+  }
+
+  private seal(read: () => Promise<RuntimeMessages>, metadata: Record<string, unknown>): Promise<void> {
     const next = this.boundary.catch(() => {}).then(async () => {
-      const messages = await readRuntimeMessages(core, sessionId);
+      const messages = await read();
       let artifactError: unknown;
       try { await this.uploadArtifacts(); } catch (error) { artifactError = error; }
       this.brain.setRuntime(messages, { ...metadata, recordedEventCount: this.brain.events().length });

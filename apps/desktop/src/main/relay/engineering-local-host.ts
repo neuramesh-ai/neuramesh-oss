@@ -8,7 +8,7 @@ import { resolveEngineeringDisplayContext } from './engineering-display-context'
 // local checkout on this Mac when it has one, the workspace's policy rules. Sessions are kept here
 // keyed by the renderer's subId, under the same per-thread lease the relay edge holds, so one Code
 // thread cannot run twice on one machine whichever lane opened it.
-import type { AbstractPowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { EngineeringMachineOpenMeta, EngineeringOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { resolveEngineeringBrain } from './engineering-brain';
 import { createClineEngineeringHost, type ClineEngineeringHostOptions, type EngineeringMachineHost, type EngineeringMachineSession } from './engineering-host';
@@ -18,7 +18,7 @@ import { EngineeringSessionLeases } from './engineering-session-leases';
 import { ensureEngineeringWorkspace } from './engineering-workspace';
 
 export interface LocalEngineeringHostOptions {
-  db: Pick<AbstractPowerSyncDatabase, 'get' | 'getAll'>;
+  db: Pick<ReplicaDatabase, 'get' | 'getAll'>;
   apiUrl: string;
   workspaceId: string;
   /** the signed-in member's /v1 headers — the identity this host speaks with */

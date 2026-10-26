@@ -1,3 +1,4 @@
+import { STARTER_MODEL } from '@neuramesh/shared';
 import { bindConversationCallback } from '../harness/brain-sync';
 // CHAT MODE (docs/34) — the turn an agent runs when the composer's Tasks toggle is OFF.
 //
@@ -20,6 +21,7 @@ import { type WhiteboardToolClosures } from '../harness/toolbus';
 
 import { runtimeFor, stageConnections, xPublishConnectedFor, xResearchNote } from '../agents';
 import { brandNote } from './brandnote';
+import { projectNote } from './projectnote';
 import type { HostedAgent, SkillRef } from '../agents';
 // `chatSystemPrompt` is already taken by the BOARD's chat prompt (runtime/adapter), which says
 // the opposite thing ("work moves through the board"), so this one is aliased, not shadowed.
@@ -28,20 +30,24 @@ import type { LogFn } from '../agentlog';
 import type { RunHandle } from './runs';
 import type { HostCtx } from './ctx';
 import type { DraftRow } from './orchtools';
+import type { DrawOutcome } from './drawdraft';
 import { makeChatSupport } from './chatsupport';
 import { makeChatTools } from './chattools';
+import { chatTransportTools } from './chattools-transport';
+import { codexSdkOrchestratorTurn, geminiDispatch } from './orchturn';
 import { WEB_TOOL_NAMES } from '../runtime/nmtools-web';
 import { browserService } from '../browser/registry';
 import { conversationInput } from '../runtime/brain-recording';
 
 export function makeChatTurn(ctx: HostCtx & {
+  apiUrl: string; ownerActorId: string;
   db: import('@neuramesh/client-core/replica').ReplicaDatabase;
   agents: Map<string, HostedAgent>;
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
   ensureChatWorkspace: (threadId: string) => string;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
+  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
   libraryDocs: import('./grounding').LibraryReader;
   narrate: (run: RunHandle, log: LogFn) => LogFn;
@@ -61,8 +67,8 @@ const { defaultResponder, threadModeFor, recallFor, loadSkillBody, chatProtected
 // (the second is the server's CHAT_THREAD floor).
 //
 // Any agent woken in a chat thread runs this — orchestrator or not — because the mode belongs
-// to the thread. Only a Claude runtime gets the tool loop; codex/gemini degrade honestly to a
-// conversational turn (logged, never silently passed off as the full thing).
+// to the thread. Claude, Codex and Gemini share the same project tools; unsupported runtimes
+// explicitly report their conversational-only capability.
 async function chatTurn(args: {
   agent: HostedAgent;
   ch: { id: string; slug: string; workspace_id: string };
@@ -78,16 +84,17 @@ async function chatTurn(args: {
   const { mkdirSync } = await import('node:fs');
   // the thread's brain workspace, with any pre-merge `chats/` directory adopted on first use
   const dir = ensureChatWorkspace(threadId);
-  const canUseTools = providerFor(agent.runtime) === 'anthropic';
+  const provider = providerFor(agent.runtime);
+  const canUseTools = provider === 'anthropic' || provider === 'openai' || provider === 'gemini';
   const system = chatModeSystemPrompt(
     { id: agent.id, name: agent.name, role: agent.role, brief: agent.brief, runtime: agent.runtime },
     ch.slug,
-    { canUseTools, workspaceDir: dir },
-  ) + await (async () => {
+    { canUseTools, workspaceDir: dir, canWriteFiles: provider === 'anthropic' },
+  ) + await projectNote(db, ch.id, { threadId }) + await (async () => {
     // the connected account is the read capability (search_x rides the nm registry below)
-    const xConn = await xPublishConnectedFor(db, ch);
+    const xConn = await xPublishConnectedFor(db, ch, { threadId });
     return xResearchNote(xConn);
-  })() + await stageConnections(db, ch.id).catch(() => '') + await brandNote(db, ch.id).catch(() => '');
+  })() + await stageConnections(db, ch.id, { threadId }).catch(() => '') + await brandNote(db, ch.id, { threadId }).catch(() => '');
   // ^ the room's connected accounts, the same note a content task gets: a marketer asked for
   // creator scripts drafted TikTok for a room whose accounts were X and LinkedIn (live, 2026-09-18),
   // because nothing in a chat turn said which networks this room can reach. And the room's shelf
@@ -120,8 +127,18 @@ async function chatTurn(args: {
   const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 
   // The conversation registry (host/chattools.ts) — turn-scoped, so it takes the turn.
-  const nm = makeChatTools({ z, tool: (name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(handler), extras), createSdkMcpServer, text, agent, ch, threadId, log,
-    db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs });
+  const toolContext = { z, tool: ((name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(handler), extras)) as typeof tool, createSdkMcpServer, text, agent, ch, threadId, log,
+    db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs: (id: string, limit?: number, scope?: 'room' | 'project' | 'workspace', _at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => libraryDocs(id, limit, scope, { threadId }, name, offset) };
+  if (provider === 'gemini') {
+    return geminiDispatch({ model: agent.model, thinking: agent.thinking, token, systemPrompt: system + skillsNote, transcript,
+      tools: chatTransportTools(toolContext), attachments, cwd: dir, log: narrate(run, log), onDelta },
+      { houseModel: agent.model === STARTER_MODEL, apiUrl: ctx.apiUrl, workspace: ch.workspace_id, actorId: ctx.ownerActorId });
+  }
+  if (provider === 'openai') {
+    return codexSdkOrchestratorTurn({ model: agent.model, thinking: agent.thinking, token, systemPrompt: system + skillsNote, transcript,
+      tools: chatTransportTools(toolContext), attachments, cwd: dir, log: narrate(run, log), onDelta });
+  }
+  const nm = makeChatTools(toolContext);
 
   const jail = sandboxFsEnabled()
     ? claudeSandboxOptions(computeFsJail({

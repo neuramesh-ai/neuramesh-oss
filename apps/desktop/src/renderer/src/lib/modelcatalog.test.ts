@@ -26,7 +26,7 @@ test('the picker offers exactly what the catalog offers', () => {
 
 test('a brain still holding a RETIRED id keeps it, under Legacy', () => {
   // the exact case the 2026-09 reseat created for anyone with a custom brain
-  const roles = { orchestrator: 'gpt-5.5', architect: 'claude-opus-4-8', developer: 'gemini-3.5-flash', reviewer: 'claude-sonnet-5' };
+  const roles = { orchestrator: 'gpt-5.5', architect: 'claude-opus-4-8', developer: 'gemini-3.5-flash', reviewer: 'claude-sonnet-5-5' };
   const opts = optionsFor(roles);
   for (const dead of ['gpt-5.5', 'claude-opus-4-8', 'gemini-3.5-flash']) {
     const o = opts.find((x) => x.value === dead);
@@ -34,7 +34,7 @@ test('a brain still holding a RETIRED id keeps it, under Legacy', () => {
     assert.equal(o.group, 'Legacy');
   }
   // the seat that is still current stays in its provider group, not Legacy
-  assert.equal(opts.find((x) => x.value === 'claude-sonnet-5')?.group, 'Anthropic');
+  assert.equal(opts.find((x) => x.value === 'claude-sonnet-5-5')?.group, 'Anthropic');
 });
 
 test('every retired id still renders a human label, never a raw id', () => {
@@ -45,8 +45,17 @@ test('every retired id still renders a human label, never a raw id', () => {
 });
 
 test('a legacy id is never duplicated into the offered list', () => {
-  const roles = { developer: 'claude-sonnet-5' }; // all current
+  const roles = { developer: 'claude-sonnet-5-5' }; // all current
   const opts = optionsFor(roles);
   assert.equal(opts.filter((o) => o.group === 'Legacy').length, 0);
   assert.equal(new Set(opts.map((o) => o.value)).size, opts.length);
+});
+
+test('saved Claude 5 and Haiku 4.5 seats remain editable under Legacy', () => {
+  const roles = { architect: 'claude-opus-5', developer: 'claude-sonnet-5', reviewer: 'claude-haiku-4-5' };
+  const opts = optionsFor(roles);
+  for (const id of Object.values(roles)) {
+    assert.equal(opts.filter((option) => option.value === id).length, 1);
+    assert.equal(opts.find((option) => option.value === id)?.group, 'Legacy');
+  }
 });

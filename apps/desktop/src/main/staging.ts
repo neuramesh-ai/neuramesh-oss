@@ -1,3 +1,4 @@
+import { projectContext, type ProjectAnchor } from './host/project-context';
 import { readArtifactText, type ArtifactContentRow } from './host/artifact-content';
 // STAGING — putting the right files in an agent's workspace before it starts.
 //
@@ -229,9 +230,9 @@ export async function stagePriorDesignRound(
 // materialize the brand docs into .nm-evidence/brand/ (git-excluded, never in a commit)
 // and return a binding prompt note. Returns '' for non-marketing rooms, so #build fan-out
 // stays byte-identical.
-export async function stageBrandContext(db: AttDbLike, channelId: string, dir: string): Promise<string> {
+export async function stageBrandContext(db: AttDbLike, channelId: string, dir: string, at: ProjectAnchor = {}): Promise<string> {
   // one reader with the conversation note (host/brandnote.ts), so the two never disagree on the shelf
-  const b = await readBrand(db, channelId);
+  const b = await readBrand(db, channelId, at);
   if (!b.marketing) return '';
   const picked = b.docs;
   const conns = b.conns;
@@ -258,7 +259,7 @@ export async function stageBrandContext(db: AttDbLike, channelId: string, dir: s
   if (staged.length) lines.push(`Brand docs saved to ./.nm-evidence/brand/ (${staged.join(', ')}) — READ brand-guidelines.md for voice, palette and what-to-avoid BEFORE drafting, and match it.`);
 
   if (!lines.length) return '';
-  return `\n\n[MARKETING CONTEXT — this content task runs in a marketing room, so you already know the product and brand:\n- ${lines.join('\n- ')}]`;
+  return `\n\n[MARKETING CONTEXT — this task uses its project's brand:\n- ${lines.join('\n- ')}]`;
 }
 
 /**
@@ -273,11 +274,13 @@ export async function stageBrandContext(db: AttDbLike, channelId: string, dir: s
  * moment the turn starts. Silent when the room has no connectors at all — a marketing room
  * mid-setup should not read as a broken one.
  */
-export async function stageConnections(db: AttDbLike, channelId: string): Promise<string> {
+export async function stageConnections(db: AttDbLike, channelId: string, at: ProjectAnchor = {}): Promise<string> {
+  const project = await projectContext(db, channelId, at);
+  if (!project) return '';
   const rows = await db.getAll<{ provider: string; status: string; handle: string | null }>(
     `select k.provider, k.status, k.handle from connectors k
-       join channels c on c.id = ? and c.project_id = k.project_id order by k.provider`,
-    [channelId],
+       where k.workspace_id = ? and (k.project_id is null or k.project_id = ?) order by k.provider`,
+    [project.workspace_id, project.id],
   ).catch(() => [] as Array<{ provider: string; status: string; handle: string | null }>);
   if (!rows.length) return '';
   const live = rows.filter((r) => r.status === 'connected');
@@ -287,7 +290,7 @@ export async function stageConnections(db: AttDbLike, channelId: string): Promis
     ...dead.map((r) => `- ${r.provider}${r.handle ? ` (${r.handle})` : ''} — AUTHORIZATION EXPIRED: unusable until a human reconnects it. Do not plan around it; say so.`),
   ];
   if (!lines.length) return '';
-  return `\n\n[CONNECTED ACCOUNTS — what this room can actually reach right now:\n${lines.join('\n')}\nUse what is here. If the work needs something that is NOT here, say so plainly in your deliverable and hand back what you could establish — never build a pipeline that would work once somebody connects it, and never invent numbers for a source you could not read.]`;
+  return `\n\n[CONNECTED ACCOUNTS — what this project can actually reach right now:\n${lines.join('\n')}\nUse what is here. If the work needs something that is NOT here, say so plainly in your deliverable and hand back what you could establish — never build a pipeline that would work once somebody connects it, and never invent numbers for a source you could not read.]`;
 }
 
 /**

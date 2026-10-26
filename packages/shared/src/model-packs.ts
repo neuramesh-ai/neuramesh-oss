@@ -4,7 +4,7 @@
 // Consumed by control-api (curator + hired-later resolution, the model allow-list) and the
 // desktop app (onboarding defaults, the settings/onboarding pack pickers).
 //
-// Model ids are VERIFIED CURRENT as of 2026-09-07 (see docs/10-model-packs.md). Re-verify the
+// Model ids are VERIFIED CURRENT as of 2026-10-16 (see docs/10-model-packs.md). Re-verify the
 // newest GA model per provider before each release and update CURRENT_MODELS + the packs.
 
 import { AGENT_ROLES, type AgentRole } from './states';
@@ -18,12 +18,9 @@ export type Runtime = 'claude-code' | 'codex' | 'gemini';
 // The models we OFFER today, per runtime — the current generation, GA-first. This is the
 // catalog the renderer's RUNTIME_OPTS mirrors and the packs draw from.
 export const CURRENT_MODELS: Record<Runtime, readonly string[]> = {
-  // 2026-09-07 catalog pass. fable-5-1: Anthropic's most capable ($10/$50/MTok, always-on
-  // thinking, needs 30-day retention — not ZDR-compatible), successor to fable-5 at the same
-  // price. opus-5: the default recommendation for most work ($5/$25), successor to opus-4-8.
-  // sonnet-5: near-Opus coding at $2/$10 (the scheduled rise to $3/$15 was cancelled), and the
-  // 2026-09 run's developer seat in four packs — the fastest of the seven models that tied at 100%.
-  'claude-code': ['claude-fable-5-1', 'claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
+  // Verified against Anthropic's model overview, 2026-10-16. Opus, Sonnet and Haiku
+  // 5.5 replace the previous generation in new picks. Existing IDs remain routable below.
+  'claude-code': ['claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
   // gpt-6-astra: OpenAI's flagship (2026-09, $10/$50/MTok). It needs codex-cli >= 0.153.0 —
   // CODEX_MIN_VERSION in apps/desktop/src/main/runtime/cli.ts upgrades the CLI rather than let
   // runResilient silently downgrade the turn to the account default (the gpt-5.6-luna lesson).
@@ -36,16 +33,16 @@ export const CURRENT_MODELS: Record<Runtime, readonly string[]> = {
   // the one id in this catalog a workspace can run without connecting anything. It is catalogued
   // like any other model — the server allow-list, the packs and the pickers all derive from here —
   // and what makes it free to the user is the metered proxy, not a special case in the catalog.
-  // gemini-3.8-flash: Google's most capable Flash (GA, $0.75/$3.75 introductory through
-  // 2026-12-31), successor to 3.5 Flash, which Google now lists as legacy. There is still NO
-  // Gemini 3.5 Pro or 3.8 Pro in the API, and no Flash-Lite past 3.5, so the Pro tier remains the
-  // 3.1 preview and the house brain remains 3.5 Flash-Lite.
-  gemini: ['gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', STARTER_MODEL],
+  // Argon is Google's stable Gemini 4 model (October 2026). Keep the existing Gemini
+  // choices and house brain: adding a model does not change the platform's metered model.
+  gemini: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', STARTER_MODEL],
 };
 
 // Retired-but-still-routable ids that may already be stored on agents from earlier onboarding.
 // Accepted by the server allow-list (so existing agents stay editable) but no longer offered.
 export const LEGACY_MODELS: readonly string[] = [
+  // October 2026 replacements. Saved conversations and personal picks keep their exact IDs.
+  'claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5',
   'gemini-2.5-pro', 'gemini-2.5-flash', 'gpt-5', 'gpt-5.1-codex', 'gpt-5-codex',
   // Superseded 2026-09-08 by the generation that replaced them, each at the same price or less.
   // They stay routable so an agent already seated on one keeps working and stays editable; they
@@ -130,10 +127,12 @@ export const PACK_SUPPORT_ROLES: readonly AgentRole[] = ['shipper', 'sales', 'cu
 // orchestrator (routing) and reviewer (bounded DoD gating) → fast-strong; sales/curator are light
 // → cheap. ultracode/balanced/fast put the reviewer on a different family for independent judgment.
 //
-// SEATS ARE MEASURED — suite v1.1, 2026-09-08, 13 models over 5 roles at commit ee7195f1. See
+// The role allocation was measured in suite v1.1, 2026-09-08, 13 models over 5 roles at commit ee7195f1. See
 // docs/11-model-benchmarks.md, neuramesh.app/model-benchmarks, and the seat write-up in
 // docs/design/model-benchmarks-2026-09/seat-recommendation.md. Quality scores in the notes below
-// are that run's, out of 100.
+// are that run's, out of 100. The October 16 catalog refresh upgrades Claude seats
+// to 5.5 at the user's request. Those successors have not run that benchmark; old latency
+// measurements must not be displayed for them.
 //
 // What the 2026-09 run changed, and why:
 //  - developer: SEVEN models tied at exactly 100%, so the seat breaks on cost and speed rather
@@ -175,34 +174,34 @@ export const PACKS: Record<string, ModelPack> = {
   ultracode: {
     id: 'ultracode', name: 'Ultracode', tagline: 'Best-in-market brain per role, mixing providers',
     roles: {
-      orchestrator: 'gpt-5.6-sol', architect: 'gpt-6-astra', developer: 'claude-sonnet-5', worker: 'claude-sonnet-5',
-      reviewer: 'gpt-6-astra', designer: 'claude-opus-5', shipper: 'claude-fable-5-1', sales: 'claude-sonnet-5', curator: 'claude-haiku-4-5', marketer: 'claude-opus-5',
+      orchestrator: 'gpt-5.6-sol', architect: 'gpt-6-astra', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
+      reviewer: 'gpt-6-astra', designer: 'claude-opus-5-5', shipper: 'claude-fable-5-1', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-opus-5-5',
     },
   },
   balanced: {
     id: 'balanced', name: 'Balanced', tagline: 'Cost + performance across providers',
     roles: {
-      orchestrator: 'claude-sonnet-5', architect: 'gemini-3.8-flash', developer: 'claude-sonnet-5', worker: 'claude-sonnet-5',
-      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5', shipper: 'claude-sonnet-5', sales: 'claude-haiku-4-5', curator: 'claude-haiku-4-5', marketer: 'claude-sonnet-5',
+      orchestrator: 'claude-sonnet-5-5', architect: 'gemini-3.8-flash', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
+      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5-5', shipper: 'claude-sonnet-5-5', sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
     },
   },
   fast: {
     id: 'fast', name: 'Fast', tagline: 'Fastest full-strength brain per role, mixing providers',
     roles: {
       orchestrator: 'gemini-3.8-flash', architect: 'gemini-3.8-flash',
-      developer: 'claude-sonnet-5', worker: 'claude-sonnet-5',
-      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5', shipper: 'claude-sonnet-5',
-      sales: 'claude-haiku-4-5', curator: 'claude-haiku-4-5', marketer: 'claude-sonnet-5',
+      developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
+      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5-5', shipper: 'claude-sonnet-5-5',
+      sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
     },
     latency: {
-      orchestrator: '5.4s', architect: '15.0s', developer: '11.8s', worker: '11.8s', reviewer: '2.5s',
+      orchestrator: '5.4s', architect: '15.0s', reviewer: '2.5s',
     },
   },
   'claude-core': {
     id: 'claude-core', name: 'Claude Core', tagline: 'Best per role on Anthropic',
     roles: {
-      orchestrator: 'claude-sonnet-5', architect: 'claude-fable-5-1', developer: 'claude-sonnet-5', worker: 'claude-sonnet-5',
-      reviewer: 'claude-fable-5-1', designer: 'claude-sonnet-5', shipper: 'claude-opus-5', sales: 'claude-sonnet-5', curator: 'claude-haiku-4-5', marketer: 'claude-sonnet-5',
+      orchestrator: 'claude-sonnet-5-5', architect: 'claude-fable-5-1', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
+      reviewer: 'claude-fable-5-1', designer: 'claude-sonnet-5-5', shipper: 'claude-opus-5-5', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
     },
   },
   'openai-core': {

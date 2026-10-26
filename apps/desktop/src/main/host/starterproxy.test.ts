@@ -29,13 +29,14 @@ function ndjson(lines: object[], step = 5): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({ pull(ctl) { if (at >= bytes.length) { ctl.close(); return; } ctl.enqueue(bytes.subarray(at, at + step)); at += step; } });
 }
 
-type Reply = { status?: number; lines?: object[]; json?: unknown; step?: number };
+type Reply = { status?: number; lines?: object[]; json?: unknown; sse?: object[]; step?: number };
 function stubFetch(replies: Reply[]) {
   const calls: Array<{ url: string; headers: Record<string, string>; body: any }> = [];
   const real = globalThis.fetch;
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     calls.push({ url: String(url), headers: init.headers as Record<string, string>, body: JSON.parse(String(init.body)) });
     const r = replies.shift() ?? { status: 500, json: {} };
+    if (r.sse) return new Response(r.sse.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
     if (r.lines) return new Response(ndjson(r.lines, r.step), { status: r.status ?? 200, headers: { 'content-type': 'application/x-ndjson' } });
     return new Response(JSON.stringify(r.json ?? {}), { status: r.status ?? 200, headers: { 'content-type': 'application/json' } });
   }) as typeof globalThis.fetch;
@@ -292,22 +293,23 @@ describe('a watched house turn shows its thoughts (starterthoughts.ts)', () => {
     assert.deepEqual(ran, [{ state: 'todo' }]);
   });
 
-  test('the person\'s own Gemini key goes through the SDK: no thoughts asked, no steps, nothing typed', async () => {
+  test('the person\'s Gemini key streams provider thoughts, tool steps and answer through the SDK', async () => {
     const ran: unknown[] = [];
     const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: { state: z.string() }, run: async (i) => { ran.push(i); return 'two tasks'; } };
     const google = (parts: unknown[]) => ({ candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP', index: 0 }] });
     const f = stubFetch([
-      { json: google([{ functionCall: { name: 'list_tasks', args: { state: 'todo' } } }]) },
-      { json: google([{ text: 'Pondering.', thought: true }, { text: 'You have two tasks.' }]) },
+      { sse: [google([{ functionCall: { name: 'list_tasks', args: { state: 'todo' } } }])] },
+      { sse: [google([{ text: 'Pondering.', thought: true }]), google([{ text: 'You have ' }]), google([{ text: 'two tasks.' }])] },
     ]);
     undo = f.restore;
     const fed: unknown[] = [];
     const out = await geminiOrchestratorTurn({ ...BASE, token: 'AIza-own-key', tools: [tool], onDelta: (t, th) => { fed.push([t, th]); } });
     assert.equal(out, 'You have two tasks.');
     assert.deepEqual(ran, [{ state: 'todo' }]);
-    assert.deepEqual(fed, [], 'the SDK branch types nothing: no words, no thoughts, no steps');
+    assert.deepEqual(fed.at(-1), ['You have two tasks.', '› checks the board · todo\n\nPondering.']);
+    assert.ok(fed.some(entry => (entry as string[])[0] === 'You have '), 'tokens arrive before the completed answer');
     assert.match(f.calls[0]!.url, /generativelanguage\.googleapis\.com/);
-    assert.ok(f.calls.every((c) => !JSON.stringify(c.body).includes('includeThoughts') && !('thoughts' in c.body)));
+    assert.ok(f.calls.every((c) => c.body.generationConfig.thinkingConfig.includeThoughts === true));
   });
 
   test('a turn nobody watches (a worker, a sweep) asks for no thoughts', async () => {
