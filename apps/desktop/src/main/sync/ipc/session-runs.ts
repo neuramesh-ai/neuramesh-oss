@@ -15,7 +15,7 @@ type ReadDb = { getAll<T>(sql: string, params?: unknown[]): Promise<T[]> };
 // opened before the column existed
 export const RUNS_SQL = `select m.id, m.thread_id, m.created_at, t.channel_id, c.slug as channel_slug, t.title, t.settled_at
      from messages m join threads t on t.id = m.thread_id left join channels c on c.id = t.channel_id
-    where t.schedule_id = ? and t.workspace_id = ? and t.archived_at is null
+    where coalesce(t.schedule_id,m.schedule_id) = ? and t.workspace_id = ? and t.archived_at is null
       and (m.schedule_id = ? or m.id = (select f.id from messages f where f.thread_id = t.id order by f.created_at asc, f.id asc limit 1))
     order by m.created_at desc limit ?`;
 

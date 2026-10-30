@@ -16,6 +16,8 @@ import { HQ_URL } from './mail';
 import { queueAndSend } from './onauth';
 import { applyPlanPatch } from './plan-flip';
 import type { Store } from './store';
+import { activationEnabled, needsActivation } from './activation';
+import { workspaceTrialSession } from './trial-session';
 
 /** one trial a workspace: offered while it is on the trial plan and has never had a subscription.
  *  a workspace that had Pro and cancelled sees the plain price instead (hq's older sheet). */
@@ -43,14 +45,23 @@ export function trialRoutes<E extends Env & { Variables: { actor: Actor } }>(app
     const publishableKey = billingPublishableKey();
     if (!publishableKey) return c.json({ error: 'billing not configured', code: 'NOT_FOUND' }, 404);
     const info = await store.workspaceForBilling(who.workspace);
-    if (!info || !trialOffered(info)) return c.json({ trial: false, plan: info?.plan ?? 'free' });
+    if (!info || !trialOffered(info)) return c.json({ trial: false, plan: info?.plan ?? 'free', required: needsActivation(info?.plan ?? 'free') });
     const email = (await store.userIdentity(actor.id))?.email ?? null;
-    const session = await createTrialSession({
+    const input = {
       workspace: who.workspace, quantity: info.memberCount, customerId: info.stripeCustomerId, email,
       returnUrl: `${trialReturnBase(c.req.header('origin'))}/?pro_session={CHECKOUT_SESSION_ID}`,
-    });
+    };
+    const sql = sqlOf(store);
+    const session = activationEnabled() && sql ? await workspaceTrialSession(sql, input) : await createTrialSession(input);
+    // A previous tab may have completed checkout before its confirmation reached this API.
+    if ('status' in session && session.status === 'complete') {
+      const mapped = session.subscription && planPatchFromEvent({ type: 'customer.subscription.updated', data: { object: session.subscription } });
+      if (!mapped || mapped.workspace !== who.workspace || await applyPlanPatch(store, mapped) !== 'ok')
+        return c.json({ error: 'Activation is still being confirmed. Try again.', code: 'ACTIVATION_PENDING' }, 503);
+      return c.json({ trial: false, plan: mapped.patch.plan ?? 'free', required: needsActivation(mapped.patch.plan ?? 'free') });
+    }
     return c.json({
-      trial: true, session: session.id, clientSecret: session.clientSecret, publishableKey,
+      trial: true, required: activationEnabled(), session: session.id, clientSecret: session.clientSecret, publishableKey,
       days: PRO_TRIAL_DAYS, seatUsd: PRO_SEAT_USD, endsAt: new Date(Date.now() + PRO_TRIAL_DAYS * 86_400_000).toISOString(),
     });
   });

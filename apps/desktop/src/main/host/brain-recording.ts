@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ConversationBrain, withConversationBrain, type BrainSyncOptions } from '../harness/brain-sync';
 import type { QueuedWork } from '../harness/hostqueue';
 
@@ -31,19 +32,20 @@ export function hostConversationRecorder(options: Omit<BrainSyncOptions, 'thread
     const messages = await options.db.getAll<{ id: string; body: string; author_kind: string; author_id: string; created_at: string }>(
       'select id, body, author_kind, author_id, created_at from messages where workspace_id = ? and thread_id = ? order by created_at, id', [options.workspace, threadId]);
     for (const message of messages) brain.record(message.author_kind === 'human' ? 'user.message' : 'assistant.message', { text: message.body, actorId: message.author_id, timestamp: message.created_at }, `message:${message.id}`);
-    brain.record('turn.open', { turnId: work.key, agentId: work.agentId, kind: work.kind });
+    const turnId = randomUUID();
+    brain.record('turn.open', { turnId, agentId: work.agentId, kind: work.kind });
     return withConversationBrain(brain, async () => {
       try {
         const result = await run();
-        brain.record('turn.settle', { turnId: work.key, state: 'done' });
+        brain.record('turn.settle', { turnId, state: 'done' });
         return result;
       } catch (error) {
-        brain.record('turn.settle', { turnId: work.key, state: 'failed', error: error instanceof Error ? error.message : String(error) });
+        brain.record('turn.settle', { turnId, state: 'failed', error: error instanceof Error ? error.message : String(error) });
         throw error;
       } finally {
         // The local journal is durable even offline. A retry timer keeps its outbox live.
         await brain.flush().catch((error: unknown) => options.log?.(`brain_sync_pending: ${error instanceof Error ? error.message : 'upload failed'}`));
       }
-    });
+    }, turnId);
   };
 }

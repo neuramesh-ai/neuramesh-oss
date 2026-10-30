@@ -273,8 +273,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('nm:local-stack-start', async () => {
     if (!local) return { ok: false as const, error: 'no local connection on this launch' };
     startLocal();
-    await bootDormant(local.id);
+    // The replica opens synchronously; show Local's setup/progress card while its engine boots.
+    // Waiting first would leave cloud users on the activation screen with no setup controls.
+    const booting = bootDormant(local.id);
     setForeground(local.id);
+    await booting;
     return { ok: true as const };
   });
   const authMode = () => connections.current().authMode;

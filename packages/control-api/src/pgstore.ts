@@ -1,4 +1,5 @@
 import { startProjectMarketing } from './store/project-marketing';
+import { seedStartupTeamSql } from './store/startup-team';
 import { memoryViewSql } from './store/project-memory';
 import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, isGitHubNeedQuestion, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
 import { taskFacts, trackDomainEvent, type EventFacts } from './analytics';
@@ -17,7 +18,7 @@ import { sessionTitleSql } from './store/session-title';
 import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './store/thread-settle';
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
 import { runScheduleNowSql } from './store/schedule-now';
-import { linkRoutineSessionSql } from './store/routine-session';
+import { linkRoutineSessionSql, existingHomeRoutineSql, routineAgentSql } from './store/routine-session';
 import { seedBundledPacksSql } from './store/skillpack-seed';   import { addMarketersToChannelSql } from './store/marketing-crew';
 import { PgAnnounceStore } from './store/announce';
 import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';   import { PgGitHubProofStore } from './store/github-proofs';
@@ -1770,11 +1771,11 @@ export class PostgresStore implements Store {
       if (!(await sql`select 1 from channels where project_id = ${projectId}::uuid limit 1`).length) {
         await sql`insert into channels(workspace_id, project_id, slug) values (${input.workspace}::uuid, ${projectId}::uuid, 'general')`;
       }
-      // a new project's rooms start with just the orchestrator (a marketing room also gets the
-      // marketers, above) — the team is brought in per-channel (workspace-scoped agents,
-      // channel-scoped membership). Isolation by default.
+      // Keep orchestrators available in each room, then staff the project's context channel
+      // with its three startup roles. Other specialists are added explicitly.
       await this.addOrchestratorsToChannels(sql, input.workspace);
       await sql`update projects set context_channel_id = (select id from channels where project_id = ${projectId}::uuid order by (slug = 'general') desc, id limit 1) where id = ${projectId}::uuid`;
+      await seedStartupTeamSql(sql, input.workspace, projectId);
       await this.insertEvent(sql, { ...event, workspace: input.workspace }, null);
       return { id: projectId, slug };
     }) as Promise<{ id: string; slug: string }>;
@@ -2198,12 +2199,9 @@ export class PostgresStore implements Store {
       if (!ch) throw new DomainError('NOT_FOUND', 'channel not found');
       const ws = ch['workspace_id'] as string;
       // agent by name, never a retired one (every selection pool filters retired_at)
-      let agentId: string | null = null;
-      if (input.agentName) {
-        const [a] = await sql`select id from agents where workspace_id = ${ws}::uuid and name = ${input.agentName} and retired_at is null`;
-        if (!a) throw new DomainError('NOT_FOUND', `no active agent named "${input.agentName}"`);
-        agentId = a['id'] as string;
-      }
+      const existing = await existingHomeRoutineSql(sql, ws, input);
+      if (existing) return existing;
+      const agentId = await routineAgentSql(sql, ws, input.agentName);
       const [row] = await sql`insert into schedules (workspace_id, channel_id, title, cadence, at_time, tz, weekday, next_run_at, agent_id, payload, created_by_kind, created_by)
         values (${ws}::uuid, ${input.channelId}::uuid, ${input.title}, ${input.cadence}, ${input.atTime}, ${input.tz}, ${input.weekday}, ${input.nextRunAt}, ${agentId}, ${sql.json({ prompt: input.prompt, ...(input.payloadExtra ?? {}) } as never)}, ${input.createdByKind}, ${input.createdBy})
         returning id`;

@@ -559,6 +559,7 @@ contextBridge.exposeInMainWorld('nm', {
   showInFolder: (path: string) => ipcRenderer.invoke('nm:show-in-folder', { path }),
   localStackInfo: () => ipcRenderer.invoke('nm:local-stack-info'),
   localStackRestart: () => ipcRenderer.invoke('nm:local-stack-restart'),
+  localStackStart: () => ipcRenderer.invoke('nm:local-stack-start'),
   workspaceExport: () => ipcRenderer.invoke('nm:workspace-export'),
   // Move to Cloud (main/moveipc.ts): the plan's numbers, the start, the cancel, the phase, and Open in <target>
   movePlan: (targetWorkspaceId?: string) => ipcRenderer.invoke('nm:move-plan', { targetWorkspaceId }),

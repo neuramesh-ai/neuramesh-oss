@@ -87,6 +87,7 @@ export interface MemberRow {
 /** A workspace this identity belongs to (0113). Membership is a SET — the replica streams every
  *  one of them — and which you are standing in is a persisted choice, not the oldest by accident. */
 export interface WorkspaceMembership {
+  activationRequired?: boolean;
   id: string;
   name: string;
   slug: string;

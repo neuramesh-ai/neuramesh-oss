@@ -78,7 +78,7 @@ export async function createCheckoutSession(input: { workspace: string; quantity
  */
 export async function createTrialSession(input: {
   workspace: string; quantity: number; customerId: string | null; email: string | null; returnUrl: string;
-}): Promise<{ id: string; clientSecret: string }> {
+}, idempotencyKey?: string): Promise<{ id: string; clientSecret: string }> {
   if (!PRICE_ID) throw new Error('billing not configured (STRIPE_PRICE_ID unset)');
   const session = await stripe().checkout.sessions.create({
     ui_mode: 'custom',
@@ -90,9 +90,16 @@ export async function createTrialSession(input: {
     subscription_data: { trial_period_days: PRO_TRIAL_DAYS, metadata: { workspace_id: input.workspace } },
     payment_method_collection: 'always',
     return_url: input.returnUrl,
-  });
+  }, idempotencyKey ? { idempotencyKey } : undefined);
   if (!session.client_secret) throw new Error('stripe returned no client secret');
   return { id: session.id, clientSecret: session.client_secret };
+}
+
+export async function readTrialSession(sessionId: string) {
+  const session = await stripe().checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
+  return { id: session.id, clientSecret: session.client_secret, status: session.status,
+    subscription: session.subscription && typeof session.subscription === 'object'
+      ? session.subscription as unknown as Record<string, unknown> : null };
 }
 
 /** a trial session as Stripe holds it now: whose it is, whether the person finished, and the

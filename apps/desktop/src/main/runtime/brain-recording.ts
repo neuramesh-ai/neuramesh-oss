@@ -16,7 +16,7 @@ export function recordRuntimeEvent(provider: string, event: any): void {
   recordConversationEvent('runtime.event', { provider, event });
   if (provider === 'claude') {
     for (const block of event.message?.content ?? []) {
-      if (block.type === 'text') recordConversationEvent('assistant.message', { text: block.text });
+      if (event.type === 'assistant' && block.type === 'text' && !event.parent_tool_use_id) recordConversationEvent('assistant.message', { text: block.text });
       if (block.type === 'tool_use') recordConversationEvent('tool.call', { id: block.id, name: block.name, input: block.input });
       if (block.type === 'tool_result') recordConversationEvent('tool.result', { id: block.tool_use_id, output: block.content, isError: block.is_error });
     }

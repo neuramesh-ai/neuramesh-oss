@@ -1,26 +1,28 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ConversationBrain } from './brain-sync';
 
-const context = new AsyncLocalStorage<ConversationBrain>();
+const context = new AsyncLocalStorage<{ brain: ConversationBrain; turnId?: string }>();
 export const bindConversationCallback = AsyncLocalStorage.bind;
-export const withConversationBrain = <T>(brain: ConversationBrain, run: () => Promise<T>): Promise<T> => context.run(brain, run);
-export const recordConversationEvent = (type: string, payload: unknown, id?: string): void => context.getStore()?.record(type, payload, id);
-export const excludeConversationSecret = (secret: string | undefined): void => context.getStore()?.excludeSecret(secret);
+export const withConversationBrain = <T>(brain: ConversationBrain, run: () => Promise<T>, turnId?: string): Promise<T> => context.run({ brain, turnId }, run);
+const attributed = (payload: unknown, turnId?: string): unknown => turnId && payload && typeof payload === 'object' && !Array.isArray(payload) ? { ...payload, turnId } : payload;
+export const recordConversationEvent = (type: string, payload: unknown, id?: string): void => captureConversationRecorder()(type, payload, id);
+export const excludeConversationSecret = (secret: string | undefined): void => context.getStore()?.brain.excludeSecret(secret);
 export function publishConversationArtifact(path: string, body: unknown, actor: { kind: string; id: string; role?: string }): Promise<Response> | null {
-  const brain = context.getStore();
+  const brain = context.getStore()?.brain;
   if (!brain || !body || typeof body !== 'object') return null;
   const command = body as Record<string, unknown>;
   if ((path !== '/v1/artifacts' && !(path === '/v1/commands' && command['type'] === 'artifact.create')) || typeof command['inlineContent'] !== 'string') return null;
   return brain.artifact(command, actor);
 }
 export function captureConversationRecorder(): typeof recordConversationEvent {
-  const brain = context.getStore();
-  return (type, payload, id) => brain?.record(type, payload, id);
+  const brain = context.getStore()?.brain;
+  const turnId = context.getStore()?.turnId;
+  return (type, payload, id) => brain?.record(type, attributed(payload, turnId), id);
 }
 
 /** Provider-neutral history. Tool outputs remain labelled data, never executable approvals. */
 export function conversationContext(currentPrompt = ''): string {
-  const events = context.getStore()?.events() ?? [];
+  const events = context.getStore()?.brain.events() ?? [];
   if (!events.length) return '';
   const seen = new Set<string>();
   const portable = events.filter((event) => {

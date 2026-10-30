@@ -25,6 +25,7 @@ export async function readBrainEvents(objects: Pick<BrainObjectStore, 'get'>, co
       for (const line of lines) {
         const value: unknown = JSON.parse(line);
         const event = project ? project(value) : value;
+        if (event === undefined) continue; // An explicit display projection may omit unrelated events.
         size += Buffer.byteLength(project ? JSON.stringify(event) : line);
         if (size > limit) throw oversized();
         events.push(event);

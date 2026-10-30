@@ -111,6 +111,7 @@ import { AttachButton, AttachTray, consumeWbAttach, setWbAttach, useAttachments 
 
 
 
+import { HostedActivation } from './views/HostedActivation';
 import { Onboarding } from './views/Onboarding';
 import { WorkspaceSettings } from './settings/WorkspaceSettings';
 import { InviteTeammate, RevokeShare } from './settings/panels-people';
@@ -2330,7 +2331,7 @@ export function App() {
   const introDraft = `@${orchName} introduce yourself. What can you do for this team?`;
   useEffect(() => {
     // survives relaunches: as long as they've NEVER sent, the draft re-appears
-    if (needsFirstSend && !draft && current) setDraft(introDraft);
+    if (needsFirstSend && !chatDraft && current) { setChatDraft(introDraft); setHomeCompose((n) => n + 1); }
   }, [needsFirstSend, current?.id]);
   useEffect(() => {
     // fresh machine, existing workspace: the human's history syncs in after
@@ -2537,6 +2538,10 @@ export function App() {
     );
   }
 
+  if (boot?.connection?.kind !== 'local' && wsList.find((w) => w.id === boot?.workspaceId)?.activationRequired) {
+    return <HostedActivation name={boot?.workspace.name ?? 'Workspace'} slug={boot?.workspace.slug ?? ''} />;
+  }
+
   if (boot && (boot.needsOnboarding || onboardingActive)) {
     return (
       <Onboarding
@@ -2546,10 +2551,12 @@ export function App() {
         onDone={(orchestrator, goal) => {
           // Seed the composer so they land one click from the loop: an explicit goal wins; otherwise
           // the orchestrator intro. A fresh workspace always gets it (no machine-level "welcomed" gate).
-          if (orchestrator) setDraft(goal ? `@${orchestrator} ${goal}` : `@${orchestrator} introduce yourself. What can you do for this team?`);
-          // land ON the seeded composer — a wizard exit anywhere else buries the intro moment
+          if (orchestrator) setChatDraft(goal ? `@${orchestrator} ${goal}` : `@${orchestrator} introduce yourself. What can you do for this team?`);
+          setChatTarget(null); setChatRepo(null); setOpenTaskId(null); setOpenThreadId(null);
+          setHomeCompose((n) => n + 1);
+          // New session owns the editable draft; sending is the human's choice.
           setNav('home');
-          setView('chat');
+          setView('dashboard');
           setOnboardingActive(false); // release the latch — the wizard owns this exit
           setBoot({ ...boot, needsOnboarding: false });
         }}
@@ -3580,6 +3587,7 @@ export function App() {
             composeSignal={homeCompose}
             initialTarget={chatTarget}
             initialDraft={chatDraft}
+            firstSendHint={needsFirstSend}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} initialRepo={chatRepo} onConnectRepo={() => setAddRepoOpen(true)}
             onCodingBirth={(id, repoId, selection) => setCodingRepoPicks((m) => new Map(m).set(id, { repo: repoId, selection }))}
             onSend={(channelId, text, opts) => {
@@ -3587,7 +3595,7 @@ export function App() {
               // conversation watch, history and the session surface all read the room addressed
               const c = chans.find((x) => x.id === channelId);
               if (c && current?.id !== c.id) { setCurrent(c); markRead(c.id); }
-              return nm!.send(channelId, text, opts);
+              return nm!.send(channelId, text, opts).then((result) => { markWelcomed(); setChatDraft(null); return result; });
             }}
             machineChip={(value, onPick) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null}
               origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} />}

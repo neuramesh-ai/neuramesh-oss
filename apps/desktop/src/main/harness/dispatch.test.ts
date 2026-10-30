@@ -78,6 +78,14 @@ test('defaultCaps derives slots from the machine and never returns zero', () => 
   assert.equal(defaultCaps(64).slots, 4, 'capped — slots are memory-bound, not core-bound');
 });
 
+test('headless runners admit concurrent teammates without reserving renderer cores', () => {
+  assert.deepEqual(defaultCaps(2, true), { slots: 2, perAgent: 2 });
+  assert.equal(defaultCaps(4, true).slots, 4);
+  assert.equal(defaultCaps(64, true).slots, 4);
+  assert.equal(defaultCaps(1, true).slots, 1);
+  assert.equal(defaultCaps(2).slots, 1, 'desktop renderer reservation is unchanged');
+});
+
 // ── Shedding ─────────────────────────────────────────────────────────────────────────────────
 test('an overgrown queue sheds BACKGROUND work only, and reports what it dropped', () => {
   n = 0;
@@ -239,4 +247,17 @@ test('SQLite prune and clear behave like the memory store', { skip: sqliteSkip }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('one thread runs serially while independent agent threads remain concurrent', () => {
+  const d = new Dispatcher(new MemorySeenStore(), { slots: 4, perAgent: 2 });
+  const first = trig({ id:'home-first', agentId:'rex', subject:{threadId:'home'} });
+  const followup = trig({ id:'home-next', agentId:'iris', subject:{threadId:'home'} });
+  const other = trig({ id:'other-home', agentId:'rex', subject:{threadId:'other'} });
+  for (const t of [first,followup,other]) d.offer(t);
+  assert.equal(d.admit()?.id,first.id);
+  assert.equal(d.admit()?.id,other.id);
+  assert.equal(d.admit(),null);
+  d.settle(first.id,'done');
+  assert.equal(d.admit()?.id,followup.id);
 });

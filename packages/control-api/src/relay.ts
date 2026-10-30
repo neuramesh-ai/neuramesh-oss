@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { verifyClerkToken } from './clerk';
 import { hashMachineToken } from './machine-auth';
 import type { Store } from './store';
+import { needsActivation } from './activation';
 
 const ValidateMachineSchema = z.object({ token: z.string().min(1) });
 const ValidateClientSchema = z.object({ clerkToken: z.string().min(1), machineId: z.string().uuid() });
@@ -79,6 +80,7 @@ export function relayRoutes<E extends Env>(app: Hono<E>, store: Store, deps: Rel
     if (!machine) return c.json({ allowed: false });
     const member = (await store.listWorkspaces(userId)).some((w) => w.id === machine.workspaceId);
     if (!member) return c.json({ allowed: false });
+    if (needsActivation(await store.workspacePlan(machine.workspaceId))) return c.json({ allowed: false });
     // A MEMBER MACHINE IS ITS OWNER'S SHELL AND NOBODY ELSE'S (member-machines plan §3): the vendor
     // logins live on it. The runner stays open to every member — it is where `gh` lives.
     if (machine.kind === 'member' && machine.ownerUserId !== userId) return c.json({ allowed: false });

@@ -46,7 +46,8 @@ export function CreditsView() {
   // THE PRO TRIAL NEVER REFILLS (George, 2026-09-25): its grant is the 500 it started with, and the
   // server says so with monthlyGrant 0. Read against 0, the row printed "480 of 0" and the arc drew
   // empty with 480 credits left. So the trial measures against what it was granted.
-  const grantBase = isCloud ? c.monthlyGrant : c.granted;
+  const refills = c.monthlyGrant > 0;
+  const grantBase = refills ? c.monthlyGrant : c.granted;
   // the arc: fraction of the grant still available (purchases push it past full, which is honest:
   // you have more than the plan gives). Clamp the visual at one turn.
   const frac = grantBase > 0 ? Math.min(1, total / grantBase) : 0;
@@ -90,7 +91,7 @@ export function CreditsView() {
     <div className="credv">
       <div className="credv-head">
         <h1>Credits</h1>
-        <span>{isCloud ? `${hostedPlanLabel('cloud')}${c.periodStart ? ` · resets ${refillLabel(c.periodStart)}` : ''}` : hostedPlanLabel('free')}</span>
+        <span>{isCloud ? `${hostedPlanLabel('cloud')}${refills && c.periodStart ? ` · resets ${refillLabel(c.periodStart)}` : ''}` : hostedPlanLabel('free')}</span>
       </div>
 
       <div className="credv-top">
@@ -105,7 +106,7 @@ export function CreditsView() {
             <div className="credv-arcn"><b>{fmt(total)}</b><small>credits left</small></div>
           </div>
           <div className="credv-split">
-            <div><span>{isCloud ? 'Monthly grant' : 'Trial credits'}</span><b>{fmt(c.grantRemaining)} of {fmt(grantBase)}</b></div>
+            <div><span>{refills ? 'Monthly grant' : 'Trial credits'}</span><b>{fmt(c.grantRemaining)} of {fmt(grantBase)}</b></div>
             <div><span className="credv-keeps">Purchased · never expires</span><b className="credv-keeps">{fmt(c.purchasedRemaining)}</b></div>
           </div>
           <div className="credv-note">Grant spends first, so what you bought keeps.</div>

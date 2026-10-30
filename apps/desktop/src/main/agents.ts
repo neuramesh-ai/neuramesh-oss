@@ -130,6 +130,7 @@ export interface HostedAgent {
 export type SkillRef = { name: string; description: string; body: string; pack_name?: string | null };
 
 interface HostOpts {
+  headless?: boolean;
   db: ReplicaDatabase;
   machineId: string;
   /** the workspace this host is standing in — agents are workspace-level resources now (0114),
@@ -737,7 +738,7 @@ export type ImportPack = { id: string; name: string; channel_id: string; source_
 export { collectFiles, runCoding, worktreeRun } from './execution';
 export { RESEARCH_OUTPUT_CONTRACT, loadMessageAttachments, openPlanningWorkspace, stageApprovedDesigns, stageBrandContext, stageConnections, stagePriorDesignRound, stageTaskAttachments } from './staging';
 
-export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys }: HostOpts) {
+export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless }: HostOpts) {
   const hostKey = `${apiUrl}|${workspace}`;
   if (hostsStarted.has(hostKey)) {
     console.warn(`agent_host already running for ${workspace.slice(0, 8)} — second start ignored (one host per backend and workspace)`);
@@ -915,6 +916,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // that cannot be written must degrade the RECORD, never the work.
   const brain = new Brain();
   const execQueue = new HostQueue({
+    headless,
     log: (line) => console.log(`agent_host ${line}`),
     around: hostConversationRecorder({ db, workspace, actorId: ownerActorId, apiUrl, headers: () => apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }), headersForActor: (actor) => apiAuthHeaders(apiUrl, actor as Actor), log: (line) => console.warn(`agent_host ${line}`) }),
     turns: {

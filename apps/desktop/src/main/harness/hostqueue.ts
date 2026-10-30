@@ -27,6 +27,7 @@ import type { LogFn } from '../agentlog';
 
 export interface HostQueueOpts {
   caps?: Caps;
+  headless?: boolean;
   seen?: SeenStore;
   /** surfaced so a shed batch is named, never silent */
   onShed?: (ids: string[]) => void;
@@ -84,7 +85,7 @@ export class HostQueue {
   private meta = new Map<string, QueuedWork>();
 
   constructor(opts: HostQueueOpts = {}) {
-    const caps = opts.caps ?? defaultCaps(cpuCount());
+    const caps = opts.caps ?? defaultCaps(cpuCount(), opts.headless);
     this.log = opts.log;
     this.turns = opts.turns;
     this.around = opts.around;
@@ -100,7 +101,7 @@ export class HostQueue {
    * simply not run the flow.
    */
   run(work: QueuedWork, fn: () => Promise<unknown>): boolean {
-    const offered = this.d.offer({ id: work.key, kind: work.kind, cause: work.cause, agentId: work.agentId, subject: {} });
+    const offered = this.d.offer({ id: work.key, kind: work.kind, cause: work.cause, agentId: work.agentId, subject: work.subject?.kind === 'thread' ? { threadId: work.subject.id } : {} });
     if (!offered) return false;
     this.pending.set(work.key, fn);
     this.meta.set(work.key, work);

@@ -31,4 +31,9 @@ export function approvalCommands(text) {
 }
 export function allowedPath(path) { return /^(?:README\.md|(?:src|public|test)\/[\w./-]+)$/.test(path) && !path.split('/').includes('..') && !path.includes('//'); }
 export function statusOf(checks, error) { return !error && checks.length > 0 && checks.every(c=>c.passed) ? 'passed' : 'failed'; }
-export function safeEnv() { return Object.fromEntries(['PATH','HOME','TMPDIR','LANG'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])); }
+export function safeEnv(node) {
+  const env = Object.fromEntries(['PATH','HOME','TMPDIR','LANG'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
+  // Ego's embedded process does not inherit the invoking shell's Node installation.
+  if (node) env.PATH = `${dirname(node)}:${env.PATH || '/usr/bin:/bin'}`;
+  return env;
+}

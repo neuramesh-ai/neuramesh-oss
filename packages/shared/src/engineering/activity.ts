@@ -60,6 +60,16 @@ interface ToolCopy {
 }
 
 const TOOL_COPY: Record<string, ToolCopy> = {
+  read_agent_thread: { kind: 'read', done: 'Read a teammate’s thread', active: 'Reading a teammate’s thread' },
+  list_team: { kind: 'search', done: 'Checked the team', active: 'Checking the team' },
+  list_library: { kind: 'search', done: 'Checked project documents', active: 'Checking project documents' },
+  recall: { kind: 'search', done: 'Searched project memory', active: 'Searching project memory' },
+  search_x: { kind: 'web', done: 'Searched X', active: 'Searching X' },
+  search_web: { kind: 'web', done: 'Searched the web', active: 'Searching the web' },
+  read_repo_file: { kind: 'read', done: 'Read a file', active: 'Reading a file' },
+  read_library_doc: { kind: 'read', done: 'Read a document', active: 'Reading a document' },
+  list_repo_files: { kind: 'search', done: 'Listed repository files', active: 'Listing repository files' },
+  search_repo: { kind: 'search', done: 'Searched the repository', active: 'Searching the repository' },
   read_files: { kind: 'read', done: 'Read repository files', active: 'Reading repository files' },
   search_codebase: { kind: 'search', done: 'Searched the codebase', active: 'Searching the codebase' },
   editor: { kind: 'edit', done: 'Edited a file', active: 'Editing a file' },
@@ -169,4 +179,17 @@ export function groupEngineeringTranscript(messages: EngineeringMessage[]): Engi
     else blocks.push({ kind: 'activity', messages: [message] });
   }
   return blocks;
+}
+
+/** A compact, truthful label for consecutive receipts; never manufacture an agent update. */
+export function engineeringActivityGroup(messages: readonly EngineeringMessage[]): { label: string; running: boolean; failed: number; interrupted: number } {
+  const running = messages.some(m => m.tool?.state === 'running');
+  const labels: Partial<Record<EngineeringActivityKind, [string, string]>> = {
+    read: ['Read files', 'Reading files'], search: ['Searched', 'Searching'],
+    web: ['Browsed sources', 'Browsing sources'], edit: ['Edited files', 'Editing files'],
+    command: ['Ran commands', 'Running commands'], image: ['Viewed images', 'Viewing images'],
+  };
+  const kinds = [...new Set(messages.map(m => engineeringActivityPresentation(m).kind))];
+  const label = kinds.map(kind => (labels[kind] ?? ['Used tools', 'Using tools'])[messages.some(m => engineeringActivityPresentation(m).kind === kind && m.tool?.state === 'running') ? 1 : 0]).filter((part, index, all) => all.indexOf(part) === index).map((part, index) => index ? part[0]!.toLowerCase() + part.slice(1) : part).join(', ');
+  return { label, running, failed: messages.filter(m => m.tool?.state === 'failed' || (!m.tool && m.tone === 'warning')).length, interrupted: messages.filter(m => m.tool?.state === 'interrupted').length };
 }

@@ -12,6 +12,7 @@
 // on the person's own Mac. best effort, like the sign-in it rides: a workspace is never refused
 // because a ledger row or a machine row did not land.
 import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
+import { activationEnabled } from './activation';
 import { grantCredits } from './credit-ledger';
 import { sqlOf } from './credits';
 import { localMode } from './localmode';
@@ -40,6 +41,13 @@ export async function isFirstWorkspace(store: Store, userId: string, workspaceId
 /** the trial's starting credits and cloud machine, for the person's first workspace */
 export async function birthFirstWorkspace(store: Store, userId: string, workspaceId: string): Promise<void> {
   if (localMode()) return;
+  if (activationEnabled()) {
+    // Save the machine/crew setup before billing. Fleet keeps this runner at zero replicas
+    // until verified activation; no credits or compute are provisioned here.
+    const sql = sqlOf(store);
+    if (sql) await mintWorkspaceRunner(store, sql, workspaceId, 'signup');
+    return;
+  }
   try {
     if (!(await isFirstWorkspace(store, userId, workspaceId))) return;
   } catch (e) {

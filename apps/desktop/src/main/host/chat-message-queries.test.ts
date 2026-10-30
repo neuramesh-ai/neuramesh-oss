@@ -5,9 +5,9 @@ import { feedMessagesQuery, sweepMessagesQuery } from './chat-message-queries';
 
 function fixture() {
   const db = new DatabaseSync(':memory:');
-  db.exec(`create table messages (id text, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, author_id text, body text, created_at text);
+  db.exec(`create table messages (id text, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, author_id text, body text, created_at text, team_source_thread_id text);
     create table threads (id text, workspace_id text, kind text);`);
-  const message = (id: string, thread: string | null, task: string | null = null) => db.prepare('insert into messages values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  const message = (id: string, thread: string | null, task: string | null = null) => db.prepare('insert into messages(id,workspace_id,channel_id,task_id,thread_id,author_kind,author_id,body,created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(id, 'workspace', 'general', task, thread, 'human', 'owner', '@rex please help', '2026-10-12T01:00:00Z');
   const ids = (query: string) => db.prepare(query).all('2026-10-12T00:00:00Z').map(row => row['id']).sort();
   return { db, message, ids };

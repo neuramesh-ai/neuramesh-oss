@@ -157,6 +157,8 @@ const explicit: Record<string, any> = {
   firstRunReopen: async () => firstRunFixture(),
   firstRunCancel: async () => firstRunFixture(),
   localStackState: async () => localStackFixture(),
+  // The browser preview has no native engine; do not pretend startup succeeded.
+  localStackStart: async () => ({ ok: false, error: 'Starting the local engine requires the desktop app.' }),
   onLocalStack: () => noop,
   localStackPick: async () => localStackFixture(),
   localStackInstall: async () => localStackFixture(),

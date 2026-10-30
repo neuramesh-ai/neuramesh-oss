@@ -32,7 +32,7 @@ export interface ConnectionSummary {
 
 /** the memberships and invitations this session resolved — one object, shared by reference */
 export type Session = {
-  wsMemberships: Array<{ id: string; name: string; slug: string; role?: string; memberCount?: number; plan?: string }>;
+  wsMemberships: Array<{ id: string; name: string; slug: string; role?: string; memberCount?: number; plan?: string; activationRequired?: boolean }>;
   pendingInvites: Array<{ inviteId: string; workspaceId: string; workspaceName: string; role: string; inviterEmail: string | null; inviterName: string | null; createdAt: string; expiresAt: string }>;
 };
 

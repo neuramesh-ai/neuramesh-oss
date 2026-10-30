@@ -43,6 +43,10 @@ function fixture() {
   ins('content_items', { id: 'ci1', thread_id: 'th', body: 'post', status: 'draft', created_at: '2026-09-27T09:02' });
   ins('artifacts', { id: 'f1', message_id: 'a1', name: 'audit.md', created_at: '2026-09-26T09:05' });
   ins('runs', { id: 'run1', thread_id: 'th', state: 'running', started_at: '2026-09-28T09:00' });
+  ins('threads', { id: 'home', workspace_id: 'w', channel_id: 'c1', title: 'Agent thread', schedule_id: null });
+  ins('messages', { id: 'home-chat', thread_id: 'home', author_kind: 'human', body: 'Ordinary chat', created_at: '2026-09-28T08:00' });
+  ins('messages', { id: 'home-run', thread_id: 'home', author_kind: 'human', body: 'Routine · brief', created_at: '2026-09-28T09:00', schedule_id: 's-home' });
+  ins('messages', { id: 'home-other', thread_id: 'home', author_kind: 'human', body: 'Routine · review', created_at: '2026-09-28T10:00', schedule_id: 's-other' });
   return { getAll: async <T,>(sql: string, params: unknown[] = []) => db.prepare(sql).all(...(params as never[])) as T[] };
 }
 
@@ -67,4 +71,9 @@ test('the strips\' rows are read for those sessions, back to the oldest listed r
 test('a schedule with no runs reads nothing else', { skip }, async () => {
   const out = await scheduleRunsFor(fixture(), 'w', 's-none');
   assert.deepEqual(out, { runs: [], messages: [], units: [], cards: [], drafts: [], files: [], openRuns: [] });
+});
+
+test('agent homes expose only the selected automation openers without claiming their ordinary chat', { skip }, async () => {
+  const out = await scheduleRunsFor(fixture(), 'w', 's-home');
+  assert.deepEqual(out.runs.map(r => r.id), ['home-run']);
 });

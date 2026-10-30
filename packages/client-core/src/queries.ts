@@ -158,7 +158,7 @@ export const CODE_SESSIONS_FOR_WORKSPACE =
 
 // Routines — every armed or paused schedule with its room. params: [workspaceId]
 export const SCHEDULES_FOR_WORKSPACE =
-  `select s.id, s.title, s.cadence, s.at_time, s.tz, s.weekday, s.next_run_at, s.run_count, s.agent_id, s.status, s.last_run_at, s.last_error, s.payload, s.channel_id, c.slug as channel_slug, s.created_at
+  `select s.id, s.owner_home_thread_id, s.title, s.cadence, s.at_time, s.tz, s.weekday, s.next_run_at, s.run_count, s.agent_id, s.status, s.last_run_at, s.last_error, s.payload, s.channel_id, c.slug as channel_slug, s.created_at
      from schedules s join channels c on c.id = s.channel_id where s.workspace_id = ? order by s.next_run_at nulls last, s.title`;
 
 // One member's queued replies (the reply queue, 0146): the reply card's slots and the web's reminders. params: [workspaceId, memberId]
@@ -168,7 +168,7 @@ export const REPLY_REMINDERS_FOR_MEMBER =
 
 // One schedule's row, the routine card's in a session (routine sessions). params: [scheduleId]
 export const SCHEDULE_BY_ID =
-  `select s.id, s.title, s.cadence, s.at_time, s.tz, s.weekday, s.next_run_at, s.run_count, s.agent_id, s.status, s.last_run_at, s.last_error, s.payload, s.channel_id, c.slug as channel_slug, s.created_at
+  `select s.id, s.owner_home_thread_id, s.title, s.cadence, s.at_time, s.tz, s.weekday, s.next_run_at, s.run_count, s.agent_id, s.status, s.last_run_at, s.last_error, s.payload, s.channel_id, c.slug as channel_slug, s.created_at
      from schedules s join channels c on c.id = s.channel_id where s.id = ? limit 1`;
 
 // A routine's RUNS, newest first (routine sessions, docs/design/routine-sessions-2026-09): each run

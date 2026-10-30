@@ -175,6 +175,29 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
     gets.mockRestore();
   });
 
+  it('serves activity without model context, preserves revision checks and rejects foreign readers', async () => {
+    const { id } = await thread();
+    const turn = randomUUID();
+    const events = [
+      { ...event({ turnId: turn, agentId: 'rex' }), type: 'turn.open' },
+      { ...event({ id: 'call', name: 'read_repo_file', input: { path: 'README.md' }, turnId: turn }), type: 'tool.call' },
+      { ...event({ id: 'call', name: 'read_repo_file', output: 'Saved file', ok: true, turnId: turn }), type: 'tool.result' },
+      event({ systemPrompt: 'Do not return model context' }),
+    ];
+    expect((await put(id, { ...commit(events), runtimeMessages: [{ private: 'runtime snapshot' }], metadata: { private: 'provider state' } })).status).toBe(200);
+    const path = `/v1/brain/threads/${id}?workspace=${workspace}&format=activity`;
+    const response = await request(owner, path);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await json(response)).toEqual({ workspace, threadId: id, revision: 1, events: events.slice(0, 3) });
+    const gets = vi.spyOn(objects, 'get');
+    expect(await json(await request(owner, `${path}&since=1`))).toMatchObject({ revision: 1, unchanged: true, events: [] });
+    expect(gets).not.toHaveBeenCalled();
+    expect((await request(stranger, path)).status).toBe(404);
+    expect((await request(stranger, `${path}&since=1`)).status).toBe(404);
+    gets.mockRestore();
+  });
+
   it('makes a lost-response retry idempotent and refuses changed content or reused event IDs', async () => {
     const { id } = await thread();
     const body = commit();

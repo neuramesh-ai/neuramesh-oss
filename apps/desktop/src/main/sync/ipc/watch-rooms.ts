@@ -159,7 +159,7 @@ const { db, watchers, watchFailed, ws } = d;
     const sender: WebContents = event.sender;
     db().watch(
       // root_* (docs/31): the room message this thread hangs off, so the sheet can pin it
-      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.kind, t.brain_override, t.schedule_id, t.settled_at,
+      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.kind, t.brain_override, t.home_agent_id, t.home_thinking, t.schedule_id, t.settled_at,
               (select count(*) from messages m where m.thread_id = t.id) as msg_count,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
               (select m.body from messages m where m.id = t.root_message_id) as root_body,

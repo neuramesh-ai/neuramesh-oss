@@ -3,6 +3,7 @@
 // never-refusing activity charge, today's usage, and the refill worklist. No Hono, no routes —
 // just the SQL that moves µUSD, so the money math is testable and readable on its own.
 import type postgres from 'postgres';
+import { activationEnabled } from './activation';
 import {
   RATE_VERSION,
   creditsToMicros,
@@ -216,6 +217,7 @@ export async function workspacesDueRefill(sql: postgres.Sql): Promise<Array<{ wo
     select c.workspace_id, w.plan, w.seats from workspace_credits c
       join workspaces w on w.id = c.workspace_id
      where w.plan = 'cloud'
+       and (not ${activationEnabled()} or w.subscription_status is distinct from 'trialing')
        and c.period_start < date_trunc('month', (now() at time zone 'utc')::date)`;
   return rows.map((r) => ({ workspaceId: r.workspace_id, plan: r.plan, seats: Math.max(1, Number(r.seats ?? 1)) }));
 }

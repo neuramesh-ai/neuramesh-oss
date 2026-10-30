@@ -2,7 +2,7 @@
 // lookup, and the client verdict that keeps the relay dumb (200 { allowed } always —
 // non-200 only for misconfiguration).
 import { Hono } from 'hono';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { hashMachineToken } from './machine-auth.js';
 import { relayRoutes, type RelayRouteDeps } from './relay.js';
 import type { Store } from './store';
@@ -25,6 +25,7 @@ afterAll(() => {
   if (prevDevRelay === undefined) delete process.env['NM_ALLOW_DEV_RELAY'];
   else process.env['NM_ALLOW_DEV_RELAY'] = prevDevRelay;
 });
+afterEach(() => vi.unstubAllEnvs());
 
 const mkApp = (store: Partial<Store>, deps?: RelayRouteDeps): Hono => {
   const app = new Hono();
@@ -107,6 +108,7 @@ describe('POST /internal/relay/validate-client', () => {
     userIdForClerkId: async (clerkId) => (clerkId === 'ck1' ? 'u1' : null),
     machineWorkspace: async (id) => (id === MID ? { workspaceId: WS, kind: 'runner', ownerUserId: 'u9' } : null),
     listWorkspaces: async () => workspaces([WS]),
+    workspacePlan: async () => 'free',
   };
 
   it('refuses without the relay secret; 501s a store without machines; 400s a bad machine id', async () => {
@@ -144,6 +146,19 @@ describe('POST /internal/relay/validate-client', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ allowed: true, userId: 'u1' });
   });
+  it.each([
+    { plan: 'free' as const, local: '0', enabled: '1', allowed: false },
+    { plan: 'cloud' as const, local: '0', enabled: '1', allowed: true },
+    { plan: 'free' as const, local: '1', enabled: '1', allowed: true },
+    { plan: 'free' as const, local: '0', enabled: '0', allowed: true },
+  ])('gates relay access for $plan, local=$local, activation=$enabled', async ({ plan, local, enabled, allowed }) => {
+    vi.stubEnv('NM_LOCAL', local);
+    vi.stubEnv('NM_REQUIRE_TRIAL_ACTIVATION', enabled);
+    const app = mkApp({ ...memberStore, workspacePlan: async () => plan }, goodClerk);
+    const res = await post(app, 'validate-client', { clerkToken: 't', machineId: MID }, SECRET);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(allowed ? { allowed: true, userId: 'u1' } : { allowed: false });
+  });
   // A MEMBER MACHINE IS ITS OWNER'S SHELL (member-machines round): the vendor logins live on it,
   // so membership alone never opens it. The runner stays open to every member.
   it('a member machine attaches for its owner only; the runner for any member', async () => {
@@ -160,6 +175,7 @@ describe('POST /internal/relay/validate-client', () => {
       userIdForClerkId: async () => { throw new Error('dev identity must not hit Clerk mapping'); },
       machineWorkspace: async (id) => (id === MID ? { workspaceId: WS, kind: 'runner', ownerUserId: 'u9' } : null),
       listWorkspaces: async (id) => id === userId ? workspaces([WS]) : [],
+      workspacePlan: async () => 'free',
     };
     const token = 'nmdev_16a2973f06ca66472bc6f888725d346614584d2635966625784812880c52c157';
     const rejectClerk: RelayRouteDeps = { verifyClerk: async () => { throw new Error('not Clerk'); } };

@@ -47,6 +47,8 @@ export const messages = new Table({
   // Local-only project intent, validated by the server before a thread is born.
   birth_project: column.text,
   author_kind: column.text,
+  team_source_thread_id: column.text,
+  team_depth: column.integer,
   author_id: column.text,
   body: column.text,
   created_at: column.text,
@@ -97,6 +99,8 @@ export const threads = new Table({
   // docs/10 §15: role → model, for THIS conversation. jsonb server-side, text here (PowerSync
   // has no json type) — `parseBrainOverride` is the one reader. Null = the project's brain.
   brain_override: column.text,
+  home_agent_id: column.text,
+  home_thinking: column.text,
   created_at: column.text,
   updated_at: column.text,
 }, {

@@ -42,7 +42,7 @@ import { useCompute } from '../compute/useCompute';
 // (the report line George deleted from Home was exactly that mistake). The project name inside it
 // IS the project switcher — the chips-row pill, promoted into the sentence: one control, one
 // fact. Picking it moves the active project so the tree follows, and retargets the room chip.
-export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onChannelCreated, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, onRoutine, machineChip, sessionBirth, hostedGate , repos = [], initialRepo = null, onConnectRepo, onCodingBirth }: {
+export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, firstSendHint = false, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onChannelCreated, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, onRoutine, machineChip, sessionBirth, hostedGate , repos = [], initialRepo = null, onConnectRepo, onCodingBirth }: {
   agents: AgentRow[];
   projects: WorkspaceProjectRow[];
   activeProjectId: string;
@@ -62,6 +62,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   /** a pre-written ask the next focus signal drops into the composer (a playbook pill is a
    * PRE-DRAFTED MESSAGE, never a command — the human still sends). null leaves the draft alone */
   initialDraft?: string | null;
+  firstSendHint?: boolean;
   onSend: (channelId: string, text: string, opts: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: SessionOrigin | null; threadKind?: ThreadKind }) => Promise<unknown>;
   /** WHERE this session runs (rule D9): the shell draws the chip (it owns the fleet) and says what the birth message writes — `threads.machine_id` + `threads.origin` (0134) */
   machineChip?: (value: string | null, onPick: (machineId: string | null) => void) => ReactNode;
@@ -210,6 +211,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
               <button className="skillattachx" title="remove" onClick={() => setAttachedSkill(null)}><IconClose s={12} /></button>
             </div>
           )}
+          {firstSendHint && <p className="welcomehint">Your first message is ready. Edit it if you like, then click Send to meet your agent.</p>}
           <AttachTray items={atts.items} onRemove={atts.remove} />
           <SessionComposer rowClass="hrow" input={<SessionComposer.Input
             value={draft}
