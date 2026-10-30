@@ -4,6 +4,7 @@ import { artifactPreview } from './artifact-preview';
 import { createEvent, type Actor } from '@neuramesh/shared';
 import type postgres from 'postgres';
 import { brainHash, type BrainObjectRef, type BrainObjectStore } from './brain-objects';
+import { brainActivityProjection } from './brain-activity-projection';
 import { readBrainEvents } from './brain-read-events';
 import { brainRestoreProjection } from './brain-restore-projection';
 
@@ -110,7 +111,7 @@ export class BrainStore {
     });
   }
 
-  async read(actor: Actor, workspace: string, threadId: string, compact = false, since?: number) {
+  async read(actor: Actor, workspace: string, threadId: string, compact: boolean | 'activity' = false, since?: number) {
     await brainThreadAccess(this.sql, actor, workspace, threadId);
     // a reader that already holds the head says so with `since`, and nothing else is read: no segment, no snapshot.
     // A phone asks again on each focus, and a long recording takes many seconds to read in full
@@ -121,7 +122,12 @@ export class BrainStore {
     }
     // One query takes a consistent committed prefix. Later uploads cannot enter this restore.
     const commits = await this.sql<CommitRow[]>`select revision, commit_id, segment, snapshot, event_count from brain_commits where thread_id = ${threadId}::uuid order by revision`;
-    const events = await readBrainEvents(this.objects, commits, compact ? brainRestoreProjection() : undefined);
+    const events = await readBrainEvents(this.objects, commits, compact === 'activity' ? brainActivityProjection : compact ? brainRestoreProjection() : undefined);
+    if (compact === 'activity') {
+      await brainThreadAccess(this.sql, actor, workspace, threadId);
+      const head = commits.at(-1);
+      return { workspace, threadId, revision: Number(head?.revision ?? 0), events };
+    }
     let runtimeMessages: unknown[] | undefined;
     let metadata: Record<string, unknown> | undefined;
     // Read only the latest value for each optional snapshot field.

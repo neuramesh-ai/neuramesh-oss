@@ -1,4 +1,5 @@
 export type DomainErrorCode =
+  | 'ACTIVATION_REQUIRED'
   | 'ILLEGAL_TRANSITION'
   | 'NOT_PERMITTED'
   | 'EVIDENCE_REQUIRED'
@@ -54,6 +55,7 @@ export type DomainErrorCode =
   | 'NOT_FOUND';
 
 const STATUS: Record<DomainErrorCode, number> = {
+  ACTIVATION_REQUIRED: 402,
   ILLEGAL_TRANSITION: 409,
   ALREADY_CLAIMED: 409,
   NOT_PERMITTED: 403,

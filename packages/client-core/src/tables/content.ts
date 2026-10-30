@@ -8,6 +8,7 @@ import { column, Table } from '../table';
 // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive —
 // the daemon minute-tick claims due rows by run_count CAS; the HQ rail + calendar read them
 export const schedules = new Table({
+  owner_home_thread_id: column.text,
   project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,

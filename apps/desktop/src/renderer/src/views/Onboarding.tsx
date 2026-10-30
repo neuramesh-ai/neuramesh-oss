@@ -330,7 +330,7 @@ export function Onboarding({ machineName, onDone, resumeWorkspaceId, resumeWorks
               {!local && <span className="obslugpre">{workspaceHost()}</span>}
               <input className="obsluginput" value={slug} onChange={(e) => onSlug(e.target.value)} placeholder="workspace" spellCheck={false} />
             </label>
-            <div className="obhint" style={{ paddingLeft: 0 }}>Edit the address freely · seeds #general #build #research #marketing</div>
+            <div className="obhint" style={{ paddingLeft: 0 }}>Edit the address freely · your projects and sessions live here</div>
         {anyReady && activePack && (
           <OnboardingPacks activePack={activePack} packsExpanded={packsExpanded} setPacksExpanded={setPacksExpanded}
             choosePack={choosePack} enabledList={enabledList} recommendedPack={recommendedPack} setStep={setStep} />
@@ -349,7 +349,7 @@ export function Onboarding({ machineName, onDone, resumeWorkspaceId, resumeWorks
           {isLast && err && <button className="btn" onClick={() => { launchedRef.current = false; setErr(''); setReady(false); setStep(ORDER.length - 1); }}>← Back</button>}
           {!isLast && <span style={{ flex: 1 }} />}
           {!isLast && <button className={`btn ${at === 'keys' ? keysStepFor({ local, anyReady }).continueKind : 'primary'}`} disabled={!canContinue} onClick={() => void advance()}>{creatingWs ? 'Please wait…' : 'Continue →'}</button>}
-          {isLast && <button className={`btn primary obcta${ready ? '' : ' assembling'}`} disabled={!ready} onClick={() => onDone(agent, '')}>{ready ? `Meet @${agent} and start your first fan-out →` : 'Please wait…'}</button>}
+          {isLast && <button className={`btn primary obcta${ready ? '' : ' assembling'}`} disabled={!ready} onClick={() => onDone(agent, '')}>{ready ? 'Start a new session →' : 'Please wait…'}</button>}
         </div>
       </div>
     </div>

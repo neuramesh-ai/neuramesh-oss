@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, hostSpeaksForOrigin, isCodingThread, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, hostSpeaksForOrigin, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { afterMessageSync } from './message-commit-gate';
 import { sweepMessagesQuery } from './chat-message-queries';
@@ -26,6 +26,7 @@ import type { makeStaffing } from './staffing';
 import type { makeMarketing } from './marketing';
 import type { makeSchedules } from './schedules';
 import type { makeWake } from './wake';
+import { routeTeamRequest, routeOwnedThread } from './team-routing';
 import { makeSleeperWake } from './sleepers';
 import { noComputeNotice, noComputeReasonOf, sleeperNotice } from '../computenotice';
 import { PROVIDER_LABEL, resolveToken } from '../agents';
@@ -167,12 +168,10 @@ export function makeWakeRouting(ctx: {
   // One human feed message → the wake decision. Shared verbatim by the live watch
   // below and the boot dead-letter sweep (sweepDeadLetters) — same rules, one path.
   const handleFeedMessage = afterMessageSync(db, handleCommittedFeedMessage);
-  function handleCommittedFeedMessage(m: { id: string; channel_id: string; thread_id?: string | null; author_kind: string; author_id: string; body: string }): void {
+  function handleCommittedFeedMessage(m: { id: string; channel_id: string; thread_id?: string | null; author_kind: string; author_id: string; team_source_thread_id?: string | null; body: string }): void {
     if (processed.has(m.id)) return;
-    // human-authored only — same law as threads: agent messages never
-    // wake agents (a digest mentioning @tracy is information, not a
-    // summons; work moves agent→agent through board offers)
-    if (m.author_kind !== 'human') return;
+    // Ordinary agent posts never wake teammates. Explicit, scoped team requests do.
+    if (routeTeamRequest({ db, agents, processed, queueWake }, m)) return;
     const orch = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(m.channel_id));
     const live = process.env['NM_AGENT_MODE'] !== 'echo';
     // B3: the human clicked "Add @agent" on the orchestrator's add-to-channel card. The
@@ -212,12 +211,13 @@ export function makeWakeRouting(ctx: {
     // round 9: "nudge me here" is WIRED — a human reply in a marketing room's bootstrap
     // thread finishes any MISSING brand docs instead of a generic chat turn. With the set
     // complete, the reply falls through to the ordinary wake (post-bootstrap Q&A).
-    if (m.thread_id && live && orch) {
+    if (m.thread_id && live) {
       processed.add(m.id);
       void (async () => {
         // a CODING thread (0144): the coding runtime owns every turn in it, and no room agent
         // answers there — by construction, never by prompt (ruling 2, 2026-09-26)
-        if (isCodingThread((await db.getAll<{ kind: string | null }>(`select kind from threads where id = ? limit 1`, [m.thread_id]).catch(() => [] as Array<{ kind: string | null }>))[0]?.kind)) return;
+        if (await routeOwnedThread({ db, agents, processed, queueWake }, m)) return;
+        if (!orch) { processed.delete(m.id); return; }
         try {
           const [mkch] = await db.getAll<{ workspace_id: string; marketing: string | null }>(
             `select workspace_id, marketing from channels where id = ? and marketing is not null limit 1`, [m.channel_id],
@@ -241,7 +241,7 @@ export function makeWakeRouting(ctx: {
         const addressed = [...agents.values()].filter((a) => a.id !== orch.id && a.channels.has(m.channel_id) && addressedIn(m.body, a.name));
         if (addressed.length) { for (const a of addressed) queueWake(a, m); }
         else queueWake(await defaultResponder(orch, m.channel_id, m.thread_id!), m);
-      })();
+      })().catch(e => { processed.delete(m.id); console.error('thread routing failed', e); });
       return;
     }
     const orchMentioned = orch ? addressedIn(m.body, orch.name) : false;
@@ -352,7 +352,7 @@ export function makeWakeRouting(ctx: {
     // OLDER than the window can never clear a candidate, so the same cutoff bounds it.
     const agentRows = await db.getAll<{ k: string; at: string }>(
       `select coalesce(task_id, thread_id, channel_id) as k, max(created_at) as at from messages
-       where author_kind = 'agent' and created_at > ? group by coalesce(task_id, thread_id, channel_id)`,
+       where author_kind = 'agent' and team_source_thread_id is null and created_at > ? group by coalesce(task_id, thread_id, channel_id)`,
       [cutoff],
     ).catch(() => [] as Array<{ k: string; at: string }>);
     const letters = pickDeadLetters(humans, new Map(agentRows.map((r) => [r.k, r.at])));

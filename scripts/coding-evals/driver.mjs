@@ -113,10 +113,10 @@ export async function drive(taskSpace,config) {
         check('file review approvals occurred',result.events.some(e=>e.type==='review'));
         check('agent requested test execution',result.events.some(e=>e.type==='command'&&/test/.test(e.command)));
         check('applied change cards remain in transcript',s.cards.some(c=>c.status==='applied'));
-        const suiteResult=await exec('npm',['test'],{cwd:result.cwd,env:safeEnv(),timeout:30000,maxBuffer:2e6});
+        const suiteResult=await exec('npm',['test'],{cwd:result.cwd,env:safeEnv(config.node),timeout:30000,maxBuffer:2e6});
         await writeFile(join(dir,'agent-tests.log'),suiteResult.stdout+suiteResult.stderr);
         check('generated project tests pass independently',true);
-        const oracle=await exec(config.node,[resolve(root,'scripts/coding-evals/oracle.mjs'),spec.id,result.cwd],{env:safeEnv(),timeout:30000,maxBuffer:2e6});
+        const oracle=await exec(config.node,[resolve(root,'scripts/coding-evals/oracle.mjs'),spec.id,result.cwd],{env:safeEnv(config.node),timeout:30000,maxBuffer:2e6});
         result.oracle=JSON.parse(oracle.stdout.trim());
         check('independent acceptance oracle passes',result.oracle.passed);
         const diff=await exec('git',['diff','--stat'],{cwd:result.cwd});await writeFile(join(dir,'diff-stat.txt'),diff.stdout);

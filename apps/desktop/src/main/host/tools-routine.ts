@@ -67,7 +67,7 @@ export function routineNote(defaults: string, said: string): string {
   return kept.length === clauses.length ? defaults.trim() : kept.join(', ');
 }
 
-export function routineTools(tc: ToolCtx): OrchTool[] {
+export function routineTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'ch' | 'actor' | 'thread' | 'convoThreadId' | 'here' | 'log'>): OrchTool[] {
   const { z, db, post, ch, actor, thread, convoThreadId, here, log } = tc;
   /** has rex asked a question card in this session: a guess is asked before it is drafted */
   const askedHere = async () => (await db.getAll<{ n: number }>(`select count(*) as n from messages where thread_id = ? and author_kind = 'agent' and body like '%\`\`\`nmq%'`, [convoThreadId]).catch(() => [{ n: 0 }]))[0]?.n ? true : false;

@@ -46,7 +46,7 @@ export function priorityOf(t: Pick<Trigger, 'cause' | 'kind'>): Priority {
   return 2; // board
 }
 
-export interface RunningTurn { triggerId: string; agentId: string; kind: TurnKind }
+export interface RunningTurn { triggerId: string; agentId: string; kind: TurnKind; threadId?: string | null }
 
 export interface Caps {
   /** total concurrent turns on this machine — a machine resource, not a per-feature constant */
@@ -62,8 +62,10 @@ export interface Caps {
  * derive from the box rather than from a literal. Two cores are left for the app itself — the
  * renderer must stay at 60fps while agents work, which is the whole point of a ceiling.
  */
-export function defaultCaps(cpuCount: number): Caps {
-  return { slots: Math.max(1, Math.min(4, cpuCount - 2)), perAgent: 2 };
+export function defaultCaps(cpuCount: number, headless = false): Caps {
+  // Cloud daemons have no renderer to reserve two cores for. Keep the same
+  // memory ceiling while allowing a two-core runner to serve two teammates.
+  return { slots: Math.max(1, Math.min(4, cpuCount - (headless ? 0 : 2))), perAgent: 2 };
 }
 
 // ── The pure admission decision ───────────────────────────────────────────────────────────────
@@ -86,9 +88,10 @@ export function nextTurn(
   const perAgent = new Map<string, number>();
   for (const r of running) perAgent.set(r.agentId, (perAgent.get(r.agentId) ?? 0) + 1);
   const live = new Set(running.map((r) => r.triggerId));
+  const threads = new Set(running.flatMap(r => r.threadId ? [r.threadId] : []));
 
   const eligible = queue.filter(
-    (t) => !seen.has(t.id) && !live.has(t.id) && (perAgent.get(t.agentId) ?? 0) < caps.perAgent,
+    (t) => !seen.has(t.id) && !live.has(t.id) && (perAgent.get(t.agentId) ?? 0) < caps.perAgent && (!t.subject.threadId || !threads.has(t.subject.threadId)),
   );
   if (!eligible.length) return null;
 
@@ -249,7 +252,7 @@ export class Dispatcher {
     const t = nextTurn([...this.queue.values()], [...this.running.values()], this.caps, this.seen.snapshot());
     if (!t) return null;
     this.queue.delete(t.id);
-    this.running.set(t.id, { triggerId: t.id, agentId: t.agentId, kind: t.kind });
+    this.running.set(t.id, { triggerId: t.id, agentId: t.agentId, kind: t.kind, threadId: t.subject.threadId });
     return t;
   }
 

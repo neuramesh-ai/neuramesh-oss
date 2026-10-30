@@ -164,15 +164,18 @@ describe('rendered email holds the line on docs/28', () => {
   });
 });
 
-// THE PRO TRIAL'S DOOR (2026-10-03): a hosted account's workspace runs in the browser with its
-// cloud machine and 500 credits, so no email sends that person to the Mac download. day 7's Get
-// Pro went to /billing, which the site does not serve, and showed the homepage.
+// The workspace CTA lets hosted signups choose a cloud trial or skip billing for free desktop
+// use. Day 7's Get Pro must not return to the site's unserved /billing route.
 describe('the emails open the workspace, not the Mac download', () => {
-  it('the welcome opens hq, names the machine and the credits, and asks for no download', () => {
+  it('the welcome opens hq and explains optional cloud activation and the free desktop path', () => {
     const w = renderWelcome({ openUrl: 'https://hq.x', unsubscribeUrl: 'https://x/u/t' });
     expect(w.html).toContain('href="https://hq.x"');
     expect(w.text).toContain('Open your workspace');
-    expect(w.text).toMatch(/own cloud machine and 500 credits/);
+    expect(w.text).toContain('cloud trial with 500 credits');
+    expect(w.text).toContain('free desktop app with your own subscriptions');
+    expect(w.text).toContain('Payment details are only needed to activate cloud work');
+    expect(w.text).toContain('activate the cloud trial or skip billing');
+    expect(w.text).toContain('Open New session, edit your first message, and click Send');
     expect(w.text + w.subject + w.preheader).not.toMatch(/download|this Mac|notarized/i);
     expect(w.text + w.subject + w.preheader).not.toMatch(/[—;]/);
   });

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localUrl, allowedCommand, allowedPath, approvalCommands, statusOf, exec, root, suite, save } from './support.mjs';
+import { localUrl, allowedCommand, allowedPath, approvalCommands, statusOf, exec, root, suite, save, safeEnv } from './support.mjs';
 import { resolve } from 'node:path';
 import { agentVerification, agentPlanProgress, verifyRecording } from './recording.mjs';
 import { report } from './report.mjs';
@@ -176,4 +176,10 @@ test('a hidden completed dial still requires explicit successful recorded plan s
   assert.deepEqual(agentPlanProgress(proposed), { done: 1, total: 2 });
   assert.deepEqual(agentPlanProgress([...proposed, ...receipt('update_plan_progress', 'done', { ...progress, statuses: ['completed', 'completed'] })]), { done: 2, total: 2 });
   for (const update of [receipt('update_plan_progress', 'failed', { ...progress, statuses: ['completed', 'completed'] }, true), receipt('update_plan_progress', 'other', { ...progress, id: 'other', statuses: ['completed', 'completed'] })]) assert.deepEqual(agentPlanProgress([...proposed, ...update]), { done: 1, total: 2 });
+});
+
+test('independent checks use the selected Node installation without inheriting provider secrets', () => {
+  const env=safeEnv('/opt/test-node/bin/node');
+  assert.ok(env.PATH.startsWith('/opt/test-node/bin:'));
+  assert.ok(Object.keys(env).every(k=>['PATH','HOME','TMPDIR','LANG'].includes(k)));
 });

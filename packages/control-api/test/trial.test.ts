@@ -61,7 +61,7 @@ describe('who is offered the card trial', () => {
 
   it('a workspace on Pro gets no session (a past subscription: trial.pg.test.ts)', async () => {
     await store.setWorkspacePlan(workspace, { plan: 'cloud' });
-    expect(await (await post('/v1/billing/trial', { workspace })).json()).toEqual({ trial: false, plan: 'cloud' });
+    expect(await (await post('/v1/billing/trial', { workspace })).json()).toEqual({ trial: false, plan: 'cloud', required: false });
     expect(stripe.created).toHaveLength(0);
   });
 

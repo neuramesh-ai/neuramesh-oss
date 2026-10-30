@@ -24,6 +24,12 @@ const { post, db, agents, discoverSkills } = ctx;
 
 async function defaultResponder(orch: HostedAgent, channelId: string, threadId: string): Promise<HostedAgent> {
   if (!isChatThread(await threadModeFor(threadId))) return orch;
+  const home = await db.get<{ home_agent_id: string | null }>('select home_agent_id from threads where id = ?', [threadId]);
+  if (home?.home_agent_id) {
+    const owner = agents.get(home.home_agent_id);
+    if (!owner || !owner.channels.has(channelId)) throw new Error('The owning agent is unavailable in this project.');
+    return owner;
+  }
   const rows = await db
     .getAll<{ author_kind: string; author_id: string }>(
       `select author_kind, author_id from messages where thread_id = ? order by created_at desc limit 30`,

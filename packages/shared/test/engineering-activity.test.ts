@@ -2,6 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   engineeringActivePresentation,
+  engineeringActivityGroup,
   engineeringActivityPresentation,
   engineeringPlanItems,
   engineeringReasoningSeconds,
@@ -27,6 +28,18 @@ test('consecutive machine receipts form one activity run without swallowing conv
   assert.equal(blocks[0]?.kind === 'activity' ? blocks[0].messages.length : 0, 2);
   assert.equal(blocks[1]?.kind, 'message');
   assert.equal(blocks[2]?.kind, 'activity');
+});
+
+test('a compact tool group preserves active, failed and incomplete outcomes', () => {
+  const receipts: EngineeringMessage[] = [
+    {...message('read','tool',''),tool:{callId:'read',name:'read_library_doc',state:'succeeded'}},
+    {...message('fail','tool',''),tool:{callId:'fail',name:'read_repo_file',state:'failed'}},
+    {...message('run','tool',''),tool:{callId:'run',name:'run_commands',state:'running'}},
+    {...message('missing','tool',''),tool:{callId:'missing',name:'read_repo_file',state:'interrupted'}},
+  ];
+  assert.deepEqual(engineeringActivityGroup(receipts),{label:'Read files, running commands',running:true,failed:1,interrupted:1});
+  receipts[2]!.tool!.state='succeeded';
+  assert.deepEqual(engineeringActivityGroup(receipts),{label:'Read files, ran commands',running:false,failed:1,interrupted:1});
 });
 
 test('tool receipts use product language and preserve warning detail', () => {

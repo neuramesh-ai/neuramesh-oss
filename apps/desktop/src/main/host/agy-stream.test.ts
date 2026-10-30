@@ -38,3 +38,43 @@ test('a closed live bubble does not lose the completed reply or its recording', 
   assert.equal(stream.finish(), 'Complete.');
   assert.equal(recorded.length, 1);
 });
+
+test('complete public updates are recorded separately from reasoning and final output', () => {
+  const messages: string[] = [];
+  const stream = agyConversationStream(['list_library'], undefined, undefined, text => messages.push(text));
+  const frame = (step: Record<string, unknown>) => JSON.stringify({event:'step_update',step_update:{conversation_id:'a',step_index:1,step_type:'agent_response',state:'ACTIVE',...step}})+'\n';
+  stream.push(frame({thinking_delta:'private analysis'}));
+  stream.push(frame({text_delta:'I’ll review '}));
+  stream.push(frame({text_delta:'the project documents.',state:'DONE'}));
+  stream.push(frame({step_index:2,step_type:'tool',tool_name:'list_library'}));
+  stream.push(frame({step_index:3,text_delta:'The brief is clear.',state:'DONE'}));
+  stream.push(JSON.stringify({event:'result',result:{status:'SUCCESS',response:'The brief is clear.'}}));
+  assert.equal(stream.finish(),'The brief is clear.');
+  assert.deepEqual(messages,['I’ll review the project documents.','The brief is clear.']);
+});
+
+test('a cumulative Gemini result does not repeat progress and keeps earlier cards', () => {
+  const stream = agyConversationStream(['list_library']);
+  const progress = 'I’ll check the library.\n```nms\n["Review the brief"]\n```\n';
+  const answer = 'The launch brief is ready.';
+  for (const step of [
+    {step_index:1,step_type:'agent_response',state:'DONE',text_delta:progress},
+    {step_index:2,step_type:'tool',state:'ACTIVE',tool_name:'list_library'},
+    {step_index:3,step_type:'agent_response',state:'DONE',text_delta:answer},
+  ]) stream.push(JSON.stringify({event:'step_update',step_update:{conversation_id:'a',...step}})+'\n');
+  stream.push(JSON.stringify({event:'result',result:{status:'SUCCESS',response:progress+answer}}));
+  const result = stream.finish();
+  assert.ok(result.includes(answer));
+  assert.ok(result.includes('["Review the brief"]'));
+  assert.ok(!result.includes('I’ll check the library.'));
+});
+
+test('malformed reasoning-as-text never streams, becomes public progress or a final reply', () => {
+  const visible: string[] = [], messages: string[] = [];
+  const stream = agyConversationStream([], text => visible.push(text), undefined, text => messages.push(text));
+  for (const [index, text_delta] of ['th', 'ought\n', 'internal reasoning'].entries()) stream.push(JSON.stringify({event:'step_update',step_update:{conversation_id:'a',step_index:1,step_type:'agent_response',state:index===2?'DONE':'ACTIVE',text_delta}})+'\n');
+  stream.push(JSON.stringify({event:'result',result:{status:'SUCCESS',response:'thought\ninternal reasoning'}}));
+  assert.throws(() => stream.finish(), /incorrectly formatted response/);
+  assert.deepEqual(messages, []);
+  assert.ok(visible.every(text => text === ''));
+});

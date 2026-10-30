@@ -2,7 +2,7 @@
   "name": "neuramesh",
   "private": true,
   "license": "Elastic-2.0",
-  "version": "0.156.2",
+  "version": "0.157.0",
   "engines": {
     "node": ">=22"
   },
@@ -22,6 +22,10 @@
     "app:local": "bash scripts/dev-app.sh",
     "eval:coding": "node scripts/coding-evals/cli.mjs",
     "eval:coding:test": "node --test scripts/coding-evals/*.test.mjs",
+    "eval:agent-desk": "node scripts/team-desk-evals/cli.mjs",
+    "eval:agent-desk:test": "node --test scripts/team-desk-evals/*.test.mjs",
+    "eval:team-desk": "node scripts/team-desk-evals/cli.mjs",
+    "eval:team-desk:test": "node --test scripts/team-desk-evals/*.test.mjs",
     "db:dev-migrate": "bash scripts/dev-migrate.sh",
     "db:cloud-migrate": "bash scripts/cloud-migrate.sh",
     "prepare": "husky",

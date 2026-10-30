@@ -1,3 +1,5 @@
+import { teamChatTools } from './chattools-team';
+import { routineTools } from './tools-routine';
 import { redrawDraftImages } from './draft-redraw';
 import type { DrawOutcome } from './drawdraft';
 // THE TOOLS A CONVERSATION GETS (docs/34).
@@ -72,6 +74,8 @@ export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai
 // pipeline" is exactly a conversation's ask — so the four board tools ride along.
 const wb = whiteboardClosures({ kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, ch, { threadId });
 return [
+    ...teamChatTools(t),
+    ...routineTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, here: () => ch.id, log }).map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))),
     tool(
       'recall',
       'Search this workspace\'s memory — past decisions, people, and work in this project. Use it whenever the question touches something the team has already settled, so you answer from the record instead of from guesswork.',

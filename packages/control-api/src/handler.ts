@@ -24,6 +24,7 @@ import {
 } from '@neuramesh/shared';
 import type { Command } from './commands';
 import { DomainError } from './errors';
+import { requireCommandActivation } from './activation';
 
 import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
@@ -86,6 +87,7 @@ export async function executeCommand(
   actor: Actor,
   cmd: Command,
 ): Promise<CommandOutcome | { machineId: string }> {
+  await requireCommandActivation(store, cmd);
   // Domain branches (handler/<domain>.ts). Delegated in one place, before the FSM tail:
   // command types are unique, so matching here is identical to matching where they were.
   { const r = await machineCommands(store, actor, cmd); if (r !== undefined) return r; }

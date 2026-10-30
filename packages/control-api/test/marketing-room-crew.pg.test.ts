@@ -54,8 +54,9 @@ describe.skipIf(!DB)('a marketing room gets the workspace marketers', () => {
     const marketing = await roomOf(proj.projectId, 'marketing');
     expect(marketing['kind']).toBe('marketing');
     expect(await crew(marketing['id'] as string)).toEqual(['plume', 'rex']);
-    // the other new rooms keep the isolation rule: the orchestrator only
-    expect(await crew((await roomOf(proj.projectId, 'general'))['id'] as string)).toEqual(['rex']);
+    // Agent Desk staffs the context channel with the three startup roles. Other rooms
+    // retain their existing remit; engineering is not added implicitly.
+    expect(await crew((await roomOf(proj.projectId, 'general'))['id'] as string)).toEqual(['echo', 'plume', 'rex']);
     expect(await crew((await roomOf(proj.projectId, 'build'))['id'] as string)).toEqual(['rex']);
   });
 
@@ -65,10 +66,11 @@ describe.skipIf(!DB)('a marketing room gets the workspace marketers', () => {
     const research = row!['id'] as string;
     expect(await crew(research)).toEqual(['rex']);
     expect((await send(george, { type: 'channel.set_kind', channel: research, kind: 'marketing' })).status).toBe(200);
-    expect(await crew(research)).toEqual(['plume', 'rex']);
+    // Creating Launch also introduced Echo, the workspace's social media marketer.
+    expect(await crew(research)).toEqual(['echo', 'plume', 'rex']);
     // a person takes plume out of the room, and a second flip to marketing leaves that choice standing
     expect((await send(george, { type: 'channel.remove_agent', workspace: WS, channel: research, agent: 'plume' })).status).toBe(200);
     expect((await send(george, { type: 'channel.set_kind', channel: research, kind: 'marketing' })).status).toBe(200);
-    expect(await crew(research)).toEqual(['rex']);
+    expect(await crew(research)).toEqual(['echo', 'rex']);
   });
 });

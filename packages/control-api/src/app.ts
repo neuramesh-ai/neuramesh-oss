@@ -26,11 +26,13 @@ import { actorMayReadCredentials } from './credentials-authz';
 import { onAuthArrival } from './onauth';
 import { ActorSchema, CommandSchema } from './commands';
 import { DomainError } from './errors';
+import { activationRoutes } from './activation';
 import { exportRoutes } from './export';
 import { importRoutes } from './import';
 import { contentMediaRoute, publicContentMediaRoute } from './content-media-route';
 import { brainRoutes } from './brain-routes';
-import { BrainError } from './brain-store';
+import { teamRoutes } from './team-routes';
+import { apiError } from './api-error';
 import { taskDetailRoute } from './store/artifact-content';
 import { localSyncRoutes } from './local-sync';
 import { webFrameRoute } from './web-frame';
@@ -140,18 +142,7 @@ const webOrigin = (origin: string): string | null =>
 export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2]; brain?: Parameters<typeof brainRoutes>[2] } = {}) {
   const app = new Hono<Env>();
 
-  // errors NEVER leave as text/html: clients parse JSON envelopes. P0001 is
-  // the DB state-guard raising (defense-in-depth, e.g. an app/schema version
-  // skew) — same 409 contract as the app-level FSM verdict.
-  app.onError((err, c) => {
-    if (err instanceof BrainError) return c.json({ error: err.message, code: err.code }, err.status);
-    const pgCode = (err as { code?: string }).code;
-    if (pgCode === 'P0001') {
-      return c.json({ error: err.message, code: 'ILLEGAL_TRANSITION' }, 409);
-    }
-    console.error('unhandled api error:', err);
-    return c.json({ error: 'internal error', code: 'INTERNAL' }, 500);
-  });
+  app.onError(apiError);
 
   app.get('/healthz', (c) => c.json({ ok: true }));
 
@@ -551,6 +542,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     }
     return c.json({ error: 'missing credentials', code: 'AUTH_REQUIRED' }, 401);
   });
+  activationRoutes(app, store);
   // machine lifecycle: the machine-sweep cron + the usage meter (fleet-lifecycle.ts).
   // registered AFTER the /v1 gate — /v1/machines/usage reads the actor it sets. So is /v1/me.
   lifecycleRoutes(app, store);
@@ -562,6 +554,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   announceClaimRoute(app, store, opts.announce); // POST /v1/announce/:id/claim — the signed-in save, plus the GitHub connector's /v1 lane (announce.ts → github-connect.ts)
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
   brainRoutes(app, store, opts.brain);
+  teamRoutes(app, store);
   localSyncRoutes(app, store);
   webFrameRoute(app); // GET /v1/web/frame: may the web client frame this page? (web-frame.ts)
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
@@ -906,7 +899,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     return c.json({ credentials: await store.listCredentials(workspace) });
   });
 
-  app.get('/v1/workspaces', async (c) => c.json({ workspaces: await store.listWorkspaces(c.get('actor').id) }));
+
 
   // Pending invitations for the Members tab — not PowerSync-replicated (same doctrine as
   // /v1/workspaces): an invite is operator state, and it carries addresses of people who are

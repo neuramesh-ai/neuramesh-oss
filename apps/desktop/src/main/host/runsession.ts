@@ -25,6 +25,8 @@ export interface ScheduleSession { id: string; channel_id: string; workspace_id:
 
 /** the session the next run continues, or null. `room` keeps it to one room: a draft run posts as its agent, which the room registers */
 export async function scheduleSession(db: ReadDb, scheduleId: string, room?: string): Promise<ScheduleSession | null> {
+  const [home] = await db.getAll<ScheduleSession>(`select t.id,t.channel_id,t.workspace_id,t.brain_override from schedules s join threads t on t.id=s.owner_home_thread_id where s.id=? and t.home_agent_id is not null and t.archived_at is null${room ? ' and t.channel_id=?' : ''}`, room ? [scheduleId,room] : [scheduleId]).catch(() => [] as ScheduleSession[]);
+  if (home) return home;
   const [s] = await db.getAll<ScheduleSession>(
     `select id, channel_id, workspace_id, brain_override from threads
       where schedule_id = ? and archived_at is null and task_id is null and coalesce(kind, 'chat') <> 'coding'${room ? ' and channel_id = ?' : ''}

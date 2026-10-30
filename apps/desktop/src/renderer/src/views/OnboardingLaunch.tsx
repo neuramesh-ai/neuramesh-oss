@@ -5,7 +5,6 @@
 // registered, the browser counts the workspace's CLOUD machine (cloud-first round 4) —
 // which is the machine every agent here will actually run on.
 import { AgentAvatar } from '../components/AgentAvatar';
-import { DEFAULT_CHANNELS } from '../lib/defaults';
 import { IS_WEB } from '../lib/platform';
 
 export function OnboardingLaunch({ name, crew, ready, err }: {
@@ -29,7 +28,7 @@ export function OnboardingLaunch({ name, crew, ready, err }: {
       <div className="obassemstats">
         <span><b>{crew.length}</b> agents</span>
         <span><b>1</b> {IS_WEB ? 'cloud machine' : 'machine'} online</span>
-        <span><b>{DEFAULT_CHANNELS.length}</b> channels</span>
+        <span>Projects and sessions</span>
       </div>
       {!ready && <p className="obassemcopy">Your workspace and your agents start{IS_WEB ? ' on your cloud machine' : ' on this machine'}. Please wait…</p>}
       {err && <div className="loginerr" style={{ textAlign: 'center', marginTop: 8 }}>{err}</div>}

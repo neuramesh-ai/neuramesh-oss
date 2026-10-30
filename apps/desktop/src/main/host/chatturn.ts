@@ -1,3 +1,4 @@
+import { agentHomeTranscript } from './team-context';
 import { STARTER_MODEL } from '@neuramesh/shared';
 import { bindConversationCallback } from '../harness/brain-sync';
 // CHAT MODE (docs/34) — the turn an agent runs when the composer's Tasks toggle is OFF.
@@ -80,7 +81,19 @@ async function chatTurn(args: {
   attachments: AgentAttachment[];
   run: RunHandle;
 }): Promise<string> {
-  const { agent, ch, threadId, transcript, token, log, onDelta, attachments, run } = args;
+  const { agent, ch, threadId, token, log, onDelta, attachments, run } = args;
+  let transcript = args.transcript;
+  const home = await db.get<{ home_agent_id: string | null }>('select home_agent_id from threads where id = ?', [threadId]);
+  if (home?.home_agent_id) {
+    const actor = { kind: 'agent', id: agent.id, role: agent.role };
+    const continued = await agentHomeTranscript({
+      read: async () => { const res: Response = await apiGet(`/v1/team/context?workspace=${ch.workspace_id}&threadId=${threadId}`, actor); if (!res.ok) throw new Error(`Could not restore the agent thread (${res.status}).`); return res.json(); },
+      compact: async (revision, through, summary) => { const res = await post('/v1/team/compact', actor, { workspace: ch.workspace_id, threadId, revision, through, summary }); if (!res.ok) throw new Error('Could not save the context summary. Retry to continue safely.'); },
+      summarize: (system, input) => runtimeFor(agent.runtime).complete(system, input, token, agent.model, 3500),
+      status: summary => log({ kind: 'tool', phase: 'inject', summary }),
+    });
+    if (continued) transcript = continued;
+  }
   const { mkdirSync } = await import('node:fs');
   // the thread's brain workspace, with any pre-merge `chats/` directory adopted on first use
   const dir = ensureChatWorkspace(threadId);
@@ -128,7 +141,11 @@ async function chatTurn(args: {
 
   // The conversation registry (host/chattools.ts) — turn-scoped, so it takes the turn.
   const toolContext = { z, tool: ((name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(handler), extras)) as typeof tool, createSdkMcpServer, text, agent, ch, threadId, log,
-    db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs: (id: string, limit?: number, scope?: 'room' | 'project' | 'workspace', _at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => libraryDocs(id, limit, scope, { threadId }, name, offset) };
+    db, post, apiGet, recallFor: home?.home_agent_id ? async (_ws: string, _ch: string, query: string) => {
+      const response: Response = await apiGet(`/v1/team/recall?workspace=${ch.workspace_id}&threadId=${threadId}&query=${encodeURIComponent(query)}`, { kind: 'agent', id: agent.id, role: agent.role });
+      if (!response.ok) throw new Error('Project recall is unavailable.');
+      return JSON.stringify(await response.json());
+    } : recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs: (id: string, limit?: number, scope?: 'room' | 'project' | 'workspace', _at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => libraryDocs(id, limit, scope, { threadId }, name, offset) };
   if (provider === 'gemini') {
     return geminiDispatch({ model: agent.model, thinking: agent.thinking, token, systemPrompt: system + skillsNote, transcript,
       tools: chatTransportTools(toolContext), attachments, cwd: dir, log: narrate(run, log), onDelta },
@@ -162,7 +179,7 @@ async function chatTurn(args: {
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits). The
         // preset pins the standard toolset; the allowlist is what runs without a prompt.
         tools: { type: 'preset' as const, preset: 'claude_code' as const },
-        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
+        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__propose_routine', 'mcp__nm__offer_routine_session', 'mcp__nm__list_team', 'mcp__nm__read_agent_thread', 'mcp__nm__message_agent', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
         permissionMode: 'bypassPermissions',
         // the same policy engine a worker runs under — PreToolUse fires even under
         // bypassPermissions, so a shell call in a chat is gated exactly as one in a task

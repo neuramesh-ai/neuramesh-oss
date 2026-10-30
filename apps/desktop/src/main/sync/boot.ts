@@ -11,7 +11,6 @@ import type { UploadIdentity } from '@neuramesh/client-core/crud-upload';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { app, BrowserWindow, Notification } from 'electron';
-import { startAgentHost } from '../agents';
 import type { AgentLog } from '../agentlog';
 import { clerkLogout, clearClerkApiToken } from '../auth-clerk';
 import { connections, type Connection } from '../connections';
@@ -28,9 +27,8 @@ export interface BootDeps {
   waitUntilReachable?: (conn: Connection) => Promise<void>;
 }
 
-type WsRow = { id: string; name: string; slug: string; onboarded?: boolean };
-// on THIS connection, never the foreground's: two connections boot side by side (sync.ts apiOn)
-const listWorkspaces = async (conn: Connection): Promise<WsRow[]> => ((await apiOn(conn, '/v1/workspaces')) as { workspaces: WsRow[] }).workspaces;
+import { listWorkspaces, startHost, waitForActivation, type WsRow } from './activation';
+export { resumeActivatedWorkspace } from './activation';
 
 // The connection's marker — the workspace identity this replica last synced as (id + display
 // name/slug, see wsident.ts). The name/slug make offline-first boots honest: a boot that can't
@@ -143,11 +141,6 @@ export function openReplica(conn: Connection): ReplicaDatabase {
 }
 
 
-function startHost(conn: Connection, db: ReplicaDatabase, machineId: string, deps: BootDeps): void {
-  startAgentHost({ db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(conn), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
-  conn.agentHostStarted = true;
-}
-
 // Resolution FAILURE is not a license to do anything destructive: keep the marker identity
 // (cached data stays readable offline), retry in the background, and only a definitive 401 sends
 // the user back to sign-in.
@@ -246,9 +239,12 @@ function armCloudWatches(conn: Connection): void {
     void (async () => {
       try {
         const workspaces = await listWorkspaces(conn);
-        if (!membershipChanged(conn.session.wsMemberships.map((w) => w.id), workspaces.map((w) => w.id))) return;
-        console.log(`sync_membership: changed (${conn.session.wsMemberships.length} → ${workspaces.length}) — re-resolving and reconnecting`);
+        const changed = membershipChanged(conn.session.wsMemberships.map((w) => w.id), workspaces.map((w) => w.id));
+        // Plan/activation changes matter even when the member set stays the same.
+        const previousCount = conn.session.wsMemberships.length;
         conn.session.wsMemberships = workspaces;
+        if (!changed) return;
+        console.log(`sync_membership: changed (${previousCount} → ${workspaces.length}) — re-resolving and reconnecting`);
         if (workspaces.length) {
           const pick = pickBootWorkspace({ resolved: workspaces, marker: readWorkspaceMarker(conn), current: { ws: conn.ws, info: conn.wsInfo } });
           conn.ws = pick.ws;
@@ -316,6 +312,11 @@ export async function bootConnection(conn: Connection, deps: BootDeps): Promise<
     },
   });
   armCloudWatches(conn);
+  if (conn.session.wsMemberships.find((w) => w.id === conn.ws)?.activationRequired) {
+    armNotifications(db);
+    waitForActivation(conn, deps);
+    return;
+  }
   // presence v0: this machine registers itself and heartbeats (docs/03 §4); the AgentHost starts
   // once the machine id is known. A workspace still to be created means the wizard runs first.
   if (process.env['NM_FORCE_ONBOARDING'] === '1') { conn.needsOnboarding = true; return; }

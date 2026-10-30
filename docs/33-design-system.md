@@ -368,11 +368,17 @@ The colored background disappears, the head uses a 4.5-unit stroke, and the eyes
 A CSS mask applies that ink. Rex alone uses the Porch outline.
 The icon shapes remain distinct. No agent uses a letter fallback.
 
-The rail uses **12px / 18px** for main labels and **11px / 16.5px** for section labels, status, counts, and timestamps.
+**HQ readability update, approved 2026-10-25:** The rail uses **14px / 21px** for main labels and **12px / 18px** for section labels, counts, and timestamps. Project filters use 12px.
 Thread titles keep weight 450. Main controls keep weight 500. Row heights and the 320px default width stay the same.
-The transcript uses **12px / 1.55**, matching the rail conversation labels through `--text-conversation`.
-Human replies, agent replies, and live replies share that size. The composer and its highlight layer use **12px / 1.5**.
-Transcript headings use 16px, 14px, and 13px. Code and tables use 12px. Author names use 12px and timestamps use 11px.
+The HQ transcript uses **14px / 1.55**, matching the rail conversation labels through `--text-conversation`.
+Human replies, agent replies, and live replies share that size. The composer and its highlight layer use **14px / 1.5**.
+Transcript headings use 18px, 16px, and 15px. Code and tables use 14px. Author names use 14px and timestamps use 11px. Question text uses 14px, with 13px descriptions.
+
+Recorded activity uses 13px muted NeuraMesh Sans with a small action icon and a native disclosure.
+The summary names the action and target. Expanding reveals the actual input, output, status, and duration in 12px Geist Mono.
+Stable event IDs preserve open disclosures while results arrive. A final reply continues below its activity without repeating the agent heading.
+Failures remain visible and unfinished historical actions say “No result recorded”. The durable journal supplies these rows after reload, independently of runner availability.
+Details use the existing 120ms rise animation and respect reduced motion.
 New Session retains its 29px greeting. The project switcher inherits that size and uses 700 weight. Composer guidance uses 11px.
 Other screen headings retain their existing hierarchy.
 Thread icons use muted state colors in both Recents and Projects: purple for Idle, blue for Working, and green for Settled.

@@ -450,6 +450,7 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   showInFolder?(path: string): Promise<void>;
   localStackInfo?(): Promise<LocalStackInfo>;
   localStackRestart?(): Promise<LocalStackPayload>;
+  localStackStart?(): Promise<{ ok: boolean; error?: string }>;
   workspaceExport?(): Promise<WorkspaceExportResult>;
   // ── Move to Cloud (main/moveipc.ts) — desktop only: the local workspace lives here ──
   movePlan?(targetWorkspaceId?: string): Promise<MovePlanResult>;

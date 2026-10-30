@@ -151,13 +151,14 @@ export async function geminiOrchestratorTurn(args: {
     // live on the candidate's parts. normalize so the loop below cannot tell them apart.
     const calls = (r.functionCalls ?? (r.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p?.functionCall).filter(Boolean)) as Array<{ name: string; args?: any; id?: string }>;
+    const publicText = stripPseudoToolCalls((r.candidates ? replyText(r) : r.text ?? '').trim(), byName.keys()).text;
+    if (publicText) recordConversationEvent('assistant.message', { text: publicText, provider: 'gemini', model: args.model });
     if (!calls.length) {
-      const raw = (r.text ?? replyText(r)).trim();
+      const raw = (r.candidates ? replyText(r) : r.text ?? '').trim();
       // a call the model NARRATED instead of making never reaches the room (host/pseudocalls.ts)
       const clean = stripPseudoToolCalls(raw, byName.keys());
       if (clean.stripped) args.log?.({ kind: 'result', phase: 'warn', summary: `dropped ${clean.stripped} narrated tool call${clean.stripped === 1 ? '' : 's'} from the reply`, level: 'warn' });
       lastText = clean.text;
-      recordConversationEvent('assistant.message', { text: lastText, provider: 'gemini', model: args.model });
       args.log?.({ kind: 'result', phase: 'success', summary: `replied · gemini (${args.model})` });
       return lastText || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder
     }
@@ -268,7 +269,7 @@ export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<stri
   const runAgy = (promptText: string) => new Promise<string>((resolve, reject) => {
     const model = agyModelFor(args.model, args.thinking);
     const child = spawn(bin, ['--output-format', 'stream-json', ...(model ? ['--model', model] : []), '--print', promptText], { stdio: ['ignore', 'pipe', 'pipe'], env, cwd: args.cwd });
-    const stream = agyConversationStream(args.tools.map(t => t.name), args.onDelta, event => recordRuntimeEvent('agy', event));
+    const stream = agyConversationStream(args.tools.map(t => t.name), args.onDelta, event => recordRuntimeEvent('agy', event), text => recordConversationEvent('assistant.message', { text, provider: 'agy', model: args.model }));
     let errTail = '';
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (data: string) => { try { stream.push(data); } catch (error) { child.kill(); reject(error); } });

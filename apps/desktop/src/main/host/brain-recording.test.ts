@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { hostConversationRecorder } from './brain-recording';
 import { recordConversationEvent } from '../harness/brain-sync';
+import { recordRuntimeEvent } from '../runtime/brain-recording';
 import type { BrainConversationEvent } from '@neuramesh/shared';
 
 test('concurrent generic turns share one hydrated writer and retain both complete outputs', async () => {
@@ -28,4 +29,32 @@ test('concurrent generic turns share one hydrated writer and retain both complet
     assert.deepEqual(events.filter((event) => event.type === 'assistant.message').map((event) => (event.payload as { text: string }).text).sort(), ['First complete answer', 'Second complete answer']);
     assert.equal(new Set(events.map((event) => event.id)).size, events.length);
   } finally { release(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('interleaved tool calls retain their own turn attribution', async () => {
+  const { withConversationBrain, captureConversationRecorder } = await import('../harness/brain-sync');
+  const events: Array<{type:string;payload:any}> = [];
+  const brain = { record(type:string,payload:unknown){ events.push({type,payload}); } } as any;
+  let finish!:()=>void;
+  const wait=new Promise<void>(resolve=>finish=resolve);
+  const first=withConversationBrain(brain,async()=>{
+    const record=captureConversationRecorder();record('tool.call',{id:'a',name:'read_repo_file'});
+    await wait;record('tool.result',{id:'a',output:'first'});
+  },'turn-a');
+  await withConversationBrain(brain,async()=>{recordConversationEvent('tool.call',{id:'b',name:'list_repos'});},'turn-b');
+  finish();await first;
+  assert.deepEqual(events.map(e=>[e.payload.id,e.payload.turnId]),[['a','turn-a'],['b','turn-b'],['a','turn-a']]);
+});
+
+test('only the parent assistant public text becomes attributed conversation progress', async () => {
+  const { withConversationBrain } = await import('../harness/brain-sync');
+  const events: Array<{type:string;payload:any}> = [];
+  const brain = { record(type:string,payload:unknown){ events.push({type,payload}); } } as any;
+  await withConversationBrain(brain, async () => {
+    recordRuntimeEvent('claude', {type:'user',message:{content:[{type:'text',text:'User input'}]}});
+    recordRuntimeEvent('claude', {type:'assistant',parent_tool_use_id:'child',message:{content:[{type:'text',text:'Child agent output'}]}});
+    recordRuntimeEvent('claude', {type:'assistant',message:{content:[{type:'thinking',thinking:'Private'},{type:'text',text:'I found the launch brief.'}]}});
+  }, 'parent');
+  assert.deepEqual(events.filter(e=>e.type==='assistant.message').map(e=>e.payload),[{text:'I found the launch brief.',turnId:'parent'}]);
+  assert.equal(events.filter(e=>e.type==='runtime.event').length,3);
 });

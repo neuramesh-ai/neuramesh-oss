@@ -12,7 +12,7 @@ export const welcomeMeta: TemplateMeta = {
   claims: [
     ['The six default agents and their roles', 'onboarding-wizard.ts STARTER_CREW'],
     ['Any of them can be renamed before launch', 'hq OnboardingCrew.tsx; mobile wizard.tsx crew step'],
-    ['The first workspace starts with its cloud machine and 500 credits', 'control-api workspace-birth.ts birthFirstWorkspace; rates.ts SIGNUP_GRANT_CREDITS'],
+    ['Cloud trial activation unlocks 500 credits; desktop works with your own subscriptions', 'control-api activation-credits.ts; rates.ts SIGNUP_GRANT_CREDITS'],
     ['Agents work on the cloud machine after the tab closes', 'hq OnboardingMachine.tsx; machines idle-stop after 48 h (docs/07)'],
     ['Setup resumes at the machine: four screens to launch', 'onboarding-wizard.ts initialWizard step 2; hq webnm-boot.ts resumeWorkspaceId'],
     ['The same workspace opens in the iPhone app', 'mobile sign-in.tsx; the desktop-signin hand-off'],
@@ -51,13 +51,13 @@ export function renderWelcome(v: { openUrl: string; unsubscribeUrl: string }): R
       p('Rename any of them before they start. The roster is yours.'),
 
       h2('Your workspace is ready'),
-      p(`It has its own cloud machine and ${SIGNUP_GRANT_CREDITS.toLocaleString('en-US')} credits to start. Your agents work there after you close the tab.`),
-      p('Four short screens remain: the machine, a model provider, the crew, and launch. The same workspace also opens in the NeuraMesh iPhone app.'),
+      p(`Choose a cloud trial with ${SIGNUP_GRANT_CREDITS.toLocaleString('en-US')} credits, or use the free desktop app with your own subscriptions. Payment details are only needed to activate cloud work.`),
+      p('Finish setup, choose your crew, and activate the cloud trial or skip billing. The same workspace also opens in the NeuraMesh iPhone app.'),
 
       button('Open your workspace', v.openUrl),
 
       rule(),
-      small(`Then say what you want in ${b('#general')}, in a plain sentence. rex makes board tasks from it and gives them to the crew.`),
+      small(`Open ${b('New session')}, edit your first message, and click Send when you are ready. rex makes board tasks from it and gives them to the crew.`),
     ].join(''),
   }));
 }

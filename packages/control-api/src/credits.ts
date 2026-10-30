@@ -26,6 +26,7 @@ import { billingEnabled } from './billing';
 import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalance, type UsageToday, spendCreditsForFilm, refundFilm } from './credit-ledger';
 import { planDiskGb } from './fleet';
 import { localMode } from './localmode';
+import { activationEnabled } from './activation';
 import { starterStreamRoute } from './starter-stream';
 import { VIDEO_MODELS, houseModel } from './video-registry';
 import type { Store } from './store';
@@ -246,6 +247,9 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
       return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     }
     const [bal, used, plan] = await Promise.all([ledger.balance(workspace), ledger.usage(workspace), store.workspacePlan(workspace)]);
+    const billing = activationEnabled() ? await sqlOf(store)!<{ subscription_status: string | null }[]>`
+      select subscription_status from workspaces where id = ${workspace}::uuid` : [];
+    const trial = billing[0]?.subscription_status === 'trialing';
     // the machine line carries its own DENOMINATOR. without it a client can only print "23 min
     // today", which is a number nobody can act on — and the only honest alternative, inventing a
     // limit client-side, would print a cap the server does not enforce. `null` means UNCAPPED
@@ -264,7 +268,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
         // 0 on Free: nothing refills there since the source release. A number, not null, because
         // the shipped phone formats this field unguarded (compute.tsx) and the refill worklist
         // (plan = 'cloud') is the promise that matters
-        monthlyGrant: plan === 'cloud' ? CLOUD_SEAT_MONTHLY_CREDITS : 0,
+        monthlyGrant: plan === 'cloud' && !trial ? CLOUD_SEAT_MONTHLY_CREDITS : 0,
       },
       // capMinutes is ALWAYS null now — the daily minute cap died with the credits round;
       // minutes stay as telemetry and activeSeconds is the number that bills.

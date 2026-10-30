@@ -189,6 +189,7 @@ export async function main(): Promise<void> {
 
   if (agentLog) {
     startAgentHost({
+      headless: true,
       db,
       machineId: cfg.machineId,
       workspace: cfg.workspaceId,

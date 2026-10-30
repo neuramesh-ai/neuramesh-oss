@@ -15,6 +15,8 @@
 // Its own module, not credits.ts: it needs `fleetOn` from member-machines, which imports
 // credits.ts for `sqlOf` — and this codebase does not close import cycles.
 import { CLOUD_SEAT_MONTHLY_CREDITS } from '@neuramesh/shared';
+import { activationEnabled } from './activation';
+import { grantActivationCredits } from './activation-credits';
 import type postgres from 'postgres';
 import type { PlanPatch } from './billing';
 import { grantCredits, sqlOf, type WebhookOutcome } from './credits';
@@ -30,6 +32,29 @@ import type { Store } from './store';
  */
 export async function applyPlanPatch(store: Store, mapped: { workspace: string; patch: PlanPatch }): Promise<WebhookOutcome> {
   const { workspace, patch } = mapped;
+  if (activationEnabled() && patch.plan === 'cloud') {
+    // Checkout completion has no subscription status. The subscription event (or sync read)
+    // owns activation, so event order cannot turn a trial into a paid credit allocation.
+    if (!patch.subscriptionStatus) {
+      const { plan: _plan, ...identity } = patch;
+      await store.setWorkspacePlan(workspace, identity);
+      return 'ok';
+    }
+    const sql = sqlOf(store);
+    if (!sql) return 'unavailable';
+    try {
+      if (patch.subscriptionStatus === 'trialing' || patch.subscriptionStatus === 'active') {
+        await grantActivationCredits(sql, workspace, patch.stripeSubscriptionId ?? workspace,
+          patch.subscriptionStatus === 'trialing', Math.max(1, patch.seats ?? 1));
+      }
+      await store.setWorkspacePlan(workspace, patch);
+      await mintWorkspaceRunner(store, sql, workspace, 'plan_flip');
+      return 'ok';
+    } catch (e) {
+      console.error('activation_failed', e);
+      return 'failed';
+    }
+  }
   const flips = patch.plan === 'cloud' && (await store.workspacePlan(workspace)) !== 'cloud';
   if (!flips) { await store.setWorkspacePlan(workspace, patch); return 'ok'; }
   const sql = sqlOf(store);

@@ -107,6 +107,7 @@ export type DesktopAuthPoll =
 
 /** A workspace this identity belongs to (0113). Membership is a SET, not a single value. */
 export interface WorkspaceMembership {
+  activationRequired?: boolean;
   id: string;
   name: string;
   slug: string;

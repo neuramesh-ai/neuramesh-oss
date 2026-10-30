@@ -759,13 +759,13 @@ var require_encoder = __commonJS({
           tmp11 = tmp5 + tmp6;
           tmp12 = tmp6 + tmp7;
           var z52 = (tmp10 - tmp12) * 0.382683433;
-          var z26 = 0.5411961 * tmp10 + z52;
+          var z27 = 0.5411961 * tmp10 + z52;
           var z42 = 1.306562965 * tmp12 + z52;
           var z32 = tmp11 * 0.707106781;
           var z112 = tmp7 + z32;
           var z132 = tmp7 - z32;
-          data[dataOff + 5] = z132 + z26;
-          data[dataOff + 3] = z132 - z26;
+          data[dataOff + 5] = z132 + z27;
+          data[dataOff + 3] = z132 - z27;
           data[dataOff + 1] = z112 + z42;
           data[dataOff + 7] = z112 - z42;
           dataOff += 8;
@@ -1295,8 +1295,8 @@ var require_decoder = __commonJS({
               continue;
             }
             k2 += r;
-            var z26 = dctZigZag[k2];
-            zz[z26] = receiveAndExtend(s);
+            var z27 = dctZigZag[k2];
+            zz[z27] = receiveAndExtend(s);
             k2++;
           }
         }
@@ -1327,8 +1327,8 @@ var require_decoder = __commonJS({
               continue;
             }
             k2 += r;
-            var z26 = dctZigZag[k2];
-            zz[z26] = receiveAndExtend(s) * (1 << successive);
+            var z27 = dctZigZag[k2];
+            zz[z27] = receiveAndExtend(s) * (1 << successive);
             k2++;
           }
         }
@@ -1336,8 +1336,8 @@ var require_decoder = __commonJS({
         function decodeACSuccessive(component2, zz) {
           var k2 = spectralStart, e = spectralEnd, r = 0;
           while (k2 <= e) {
-            var z26 = dctZigZag[k2];
-            var direction = zz[z26] < 0 ? -1 : 1;
+            var z27 = dctZigZag[k2];
+            var direction = zz[z27] < 0 ? -1 : 1;
             switch (successiveACState) {
               case 0:
                 var rs = decodeHuffman(component2.huffmanTableAC);
@@ -1360,8 +1360,8 @@ var require_decoder = __commonJS({
               case 1:
               // skipping r zero items
               case 2:
-                if (zz[z26])
-                  zz[z26] += (readBit() << successive) * direction;
+                if (zz[z27])
+                  zz[z27] += (readBit() << successive) * direction;
                 else {
                   r--;
                   if (r === 0)
@@ -1369,16 +1369,16 @@ var require_decoder = __commonJS({
                 }
                 break;
               case 3:
-                if (zz[z26])
-                  zz[z26] += (readBit() << successive) * direction;
+                if (zz[z27])
+                  zz[z27] += (readBit() << successive) * direction;
                 else {
-                  zz[z26] = successiveACNextValue << successive;
+                  zz[z27] = successiveACNextValue << successive;
                   successiveACState = 0;
                 }
                 break;
               case 4:
-                if (zz[z26])
-                  zz[z26] += (readBit() << successive) * direction;
+                if (zz[z27])
+                  zz[z27] += (readBit() << successive) * direction;
                 break;
             }
             k2++;
@@ -1781,13 +1781,13 @@ var require_decoder = __commonJS({
                   var tableData = new Int32Array(64);
                   if (quantizationTableSpec >> 4 === 0) {
                     for (j = 0; j < 64; j++) {
-                      var z26 = dctZigZag[j];
-                      tableData[z26] = data[offset++];
+                      var z27 = dctZigZag[j];
+                      tableData[z27] = data[offset++];
                     }
                   } else if (quantizationTableSpec >> 4 === 1) {
                     for (j = 0; j < 64; j++) {
-                      var z26 = dctZigZag[j];
-                      tableData[z26] = readUint16();
+                      var z27 = dctZigZag[j];
+                      tableData[z27] = readUint16();
                     }
                   } else
                     throw new Error("DQT: invalid table spec");
@@ -2432,41 +2432,41 @@ function stripFenced(body, lang) {
     rest = rest.slice(b2.end);
   }
 }
-function dotLines(text2) {
-  return text2.split(LINE_END);
+function dotLines(text3) {
+  return text3.split(LINE_END);
 }
-function lineHas(text2, first, then) {
-  return dotLines(text2).some((line) => {
+function lineHas(text3, first, then) {
+  return dotLines(text3).some((line) => {
     const at = line.indexOf(first);
     return at !== -1 && line.indexOf(then, at + first.length) !== -1;
   });
 }
-function firstSentence(text2) {
-  const m = /[.!?]/.exec(text2);
-  return m ? text2.slice(0, m.index) : text2;
+function firstSentence(text3) {
+  const m = /[.!?]/.exec(text3);
+  return m ? text3.slice(0, m.index) : text3;
 }
-function markerSpans(text2, open, close) {
+function markerSpans(text3, open, close) {
   const out = [];
   let from = 0;
   for (; ; ) {
-    const start = text2.indexOf(open, from);
+    const start = text3.indexOf(open, from);
     if (start === -1) return out;
-    const stop = text2.indexOf(close, start + open.length);
+    const stop = text3.indexOf(close, start + open.length);
     if (stop === -1) return out;
-    out.push({ start, end: stop + close.length, inner: text2.slice(start + open.length, stop) });
+    out.push({ start, end: stop + close.length, inner: text3.slice(start + open.length, stop) });
     from = stop + close.length;
   }
 }
-function stripMarkers(text2, open, close) {
-  const spans = markerSpans(text2, open, close);
-  if (!spans.length) return text2;
+function stripMarkers(text3, open, close) {
+  const spans = markerSpans(text3, open, close);
+  if (!spans.length) return text3;
   let out = "";
   let at = 0;
   for (const sp of spans) {
-    out += text2.slice(at, sp.start);
+    out += text3.slice(at, sp.start);
     at = sp.end;
   }
-  return out + text2.slice(at);
+  return out + text3.slice(at);
 }
 var LINE_END;
 var init_linear = __esm({
@@ -4324,11 +4324,11 @@ function isStandDown(reply) {
 function fenceWork(tag) {
   return /^(revise|cards|posts)$/i.test(tag) ? "drafts" : "card";
 }
-function visibleStream(text2) {
-  if (isStandDown(text2)) return { text: "", forming: null };
-  const lines = text2.trimEnd().split("\n");
-  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text2 = lines.slice(0, -1).join("\n");
-  const closed = text2.replace(CLOSED_RE, "");
+function visibleStream(text3) {
+  if (isStandDown(text3)) return { text: "", forming: null };
+  const lines = text3.trimEnd().split("\n");
+  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text3 = lines.slice(0, -1).join("\n");
+  const closed = text3.replace(CLOSED_RE, "");
   const open = OPEN_RE.exec(closed);
   const visible = (open ? closed.slice(0, open.index) : closed).replace(/\n{3,}/g, "\n\n").trimEnd();
   return { text: visible, forming: open ? fenceWork(open[1] ?? "") : null };
@@ -4696,22 +4696,22 @@ function humanHandles(labels, reserved = []) {
   }
   return out;
 }
-function tokenizeDraft(text2, people) {
-  if (!text2) return [];
+function tokenizeDraft(text3, people) {
+  if (!text3) return [];
   const byName = new Map(people.map((p2) => [p2.name.toLowerCase(), p2]));
   const spans = [];
   let bare = null;
   for (const p2 of people) {
     if (p2.kind !== "agent" || !p2.here) continue;
-    const m = bareAddressRe(p2.name).exec(text2);
+    const m = bareAddressRe(p2.name).exec(text3);
     if (m && (!bare || p2.name.length > bare.name.length)) {
       const start = m[0].length - p2.name.length;
       bare = { name: p2.name, start, end: m[0].length };
     }
   }
-  if (bare) spans.push({ kind: "bare", text: text2.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
+  if (bare) spans.push({ kind: "bare", text: text3.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
   const at = /@([\w-]+)/g;
-  for (let m = at.exec(text2); m; m = at.exec(text2)) {
+  for (let m = at.exec(text3); m; m = at.exec(text3)) {
     const p2 = byName.get(m[1].toLowerCase());
     if (!p2) continue;
     spans.push({ kind: "mention", text: m[0], name: p2.name, here: p2.here, who: p2.kind, start: m.index, end: m.index + m[0].length });
@@ -4720,12 +4720,12 @@ function tokenizeDraft(text2, people) {
   const out = [];
   let pos = 0;
   for (const s of spans) {
-    if (s.start > pos) out.push({ kind: "text", text: text2.slice(pos, s.start) });
+    if (s.start > pos) out.push({ kind: "text", text: text3.slice(pos, s.start) });
     const { start: _s, end: _e, ...seg } = s;
     out.push(seg);
     pos = s.end;
   }
-  if (pos < text2.length) out.push({ kind: "text", text: text2.slice(pos) });
+  if (pos < text3.length) out.push({ kind: "text", text: text3.slice(pos) });
   return out;
 }
 var escapeRe, slugWord, slugName;
@@ -5239,8 +5239,8 @@ function designProviderFromEvents(events) {
   }
   return null;
 }
-function claudeDesignUrlFromText(text2) {
-  const candidates = (text2 ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
+function claudeDesignUrlFromText(text3) {
+  const candidates = (text3 ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
   for (const raw of candidates) {
     try {
       const url = new URL(trimEndChars(raw, "),.;"));
@@ -5310,10 +5310,10 @@ function shipItemsPending(plan) {
 function shipPlanName(round) {
   return `ship-plan-v${round}.md`;
 }
-function parseWorkPlanLegs(text2) {
-  if (!text2) return null;
+function parseWorkPlanLegs(text3) {
+  if (!text3) return null;
   try {
-    return JSON.parse(text2).legs ?? null;
+    return JSON.parse(text3).legs ?? null;
   } catch {
     return null;
   }
@@ -5682,9 +5682,9 @@ function cleanReplies(raw) {
     const t2 = o["target"] ?? {};
     const handle = typeof t2["handle"] === "string" ? t2["handle"].trim().replace(/^@+/, "").slice(0, 40) : "";
     const url = typeof t2["url"] === "string" && /^https?:\/\//.test(t2["url"].trim()) ? t2["url"].trim().slice(0, 500) : "";
-    const text2 = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
+    const text3 = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
     const draft = typeof o["draft"] === "string" ? o["draft"].trim().slice(0, 1e3) : "";
-    if (!handle || !url || !text2 || !draft) continue;
+    if (!handle || !url || !text3 || !draft) continue;
     const m = t2["metrics"] ?? {};
     const metrics = { impressions: num2(m["impressions"]), likes: num2(m["likes"]), reposts: num2(m["reposts"]), replies: num2(m["replies"]) };
     const platform = REPLY_PLATFORMS.includes(t2["platform"]) ? t2["platform"] : "x";
@@ -5694,7 +5694,7 @@ function cleanReplies(raw) {
       target: {
         handle,
         url,
-        text: text2,
+        text: text3,
         platform,
         source,
         ...typeof t2["name"] === "string" && t2["name"].trim() ? { name: t2["name"].trim().slice(0, 60) } : {},
@@ -7298,7 +7298,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.156.1", "0.155.1"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.156.2", "0.156.1"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -7444,8 +7444,8 @@ function planBatches(exp, opts) {
   batches[batches.length - 1].last = true;
   return { batches, totalBytes, tooLarge, ids };
 }
-function rewriteTaskRefs(text2, numberMap) {
-  return text2.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
+function rewriteTaskRefs(text3, numberMap) {
+  return text3.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
     const to = numberMap[n];
     return to === void 0 ? whole : `${before}#${to}`;
   });
@@ -8412,12 +8412,12 @@ function opensWithVerb(clause) {
 }
 function isAcceptWord(body) {
   if (isCardOrMarker(body)) return false;
-  const text2 = body.toLowerCase().replace(/[’`]/g, "'").replace(/(^|\s)@[\w.-]+/g, " ").replace(/[ \t]+/g, " ").trim();
-  if (!new RegExp(`\\b${VERB}\\b`).test(text2) || HOLD.test(text2)) return false;
-  const clauses = text2.split(/[.!?;,:\n—–]+|\s-\s/).map((c) => c.trim()).filter(Boolean);
+  const text3 = body.toLowerCase().replace(/[’`]/g, "'").replace(/(^|\s)@[\w.-]+/g, " ").replace(/[ \t]+/g, " ").trim();
+  if (!new RegExp(`\\b${VERB}\\b`).test(text3) || HOLD.test(text3)) return false;
+  const clauses = text3.split(/[.!?;,:\n—–]+|\s-\s/).map((c) => c.trim()).filter(Boolean);
   const said = clauses.find(opensWithVerb);
   if (!said) return false;
-  return !text2.includes("?") || POLITE_ASK.test(said);
+  return !text3.includes("?") || POLITE_ASK.test(said);
 }
 var CARD_ANSWER, VERB, VERB_FIRST, ONE_WORD_FIRST, LEAD, NOT_A_NAME, HOLD, POLITE_ASK;
 var init_acceptword = __esm({
@@ -8997,32 +8997,32 @@ function withHouseStyle(system, block) {
 
 ${block}` : system;
 }
-function dashPass(text2, capitals) {
+function dashPass(text3, capitals) {
   let out = "";
   let from = 0;
   let i = 0;
-  while (i < text2.length) {
-    if (!isDash(text2[i])) {
+  while (i < text3.length) {
+    if (!isDash(text3[i])) {
       i++;
       continue;
     }
     let end = i + 1;
-    while (end < text2.length && isBlank(text2[end])) end++;
-    const next = text2[end];
+    while (end < text3.length && isBlank(text3[end])) end++;
+    const next = text3[end];
     if (capitals !== (next !== void 0 && next >= "A" && next <= "Z")) {
       i++;
       continue;
     }
     let start = i;
-    while (start > from && isBlank(text2[start - 1])) start--;
-    out += text2.slice(from, start) + (capitals ? ". " : ", ");
+    while (start > from && isBlank(text3[start - 1])) start--;
+    out += text3.slice(from, start) + (capitals ? ". " : ", ");
     from = end;
     i = end;
   }
-  return out + text2.slice(from);
+  return out + text3.slice(from);
 }
-function scrubEmdash(text2) {
-  const parts = text2.split(/(```[\s\S]*?```|`[^`\n]*`)/);
+function scrubEmdash(text3) {
+  const parts = text3.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   for (let i = 0; i < parts.length; i += 2) {
     parts[i] = dashPass(dashPass(parts[i], true), false);
   }
@@ -9207,10 +9207,10 @@ var init_review_reminder = __esm({
 function whiteboardSource(kind, value) {
   return JSON.stringify({ kind, value });
 }
-function parseWhiteboardSource(text2) {
-  if (!text2) return null;
+function parseWhiteboardSource(text3) {
+  if (!text3) return null;
   try {
-    const v = JSON.parse(text2);
+    const v = JSON.parse(text3);
     if ((v.kind === "mermaid" || v.kind === "elements") && typeof v.value === "string" && v.value.length > 0) {
       return { kind: v.kind, value: v.value };
     }
@@ -9218,10 +9218,10 @@ function parseWhiteboardSource(text2) {
   }
   return null;
 }
-function parseWhiteboardScene(text2) {
-  if (!text2) return null;
+function parseWhiteboardScene(text3) {
+  if (!text3) return null;
   try {
-    const v = JSON.parse(text2);
+    const v = JSON.parse(text3);
     if (!Array.isArray(v.elements)) return null;
     const appState = v.appState && typeof v.appState === "object" ? v.appState : void 0;
     return { elements: v.elements, appState };
@@ -9289,13 +9289,13 @@ function splitBody(raw) {
     imageBrief: brief.join(" ").trim() || void 0
   };
 }
-function liftScript(text2) {
-  const lines = text2.split("\n");
+function liftScript(text3) {
+  const lines = text3.split("\n");
   const at = lines.findIndex(isScriptHead);
-  if (at === -1) return { rest: text2 };
+  if (at === -1) return { rest: text3 };
   const script = lines.slice(at + 1).join("\n").trim();
   const rest = lines.slice(0, at).join("\n").trim();
-  return script ? { rest, script } : { rest: text2 };
+  return script ? { rest, script } : { rest: text3 };
 }
 function normalizeDraft(input) {
   const platform = String(input.platform ?? "x").toLowerCase().trim();
@@ -9978,11 +9978,11 @@ function renderWelcome(v) {
       ),
       p("Rename any of them before they start. The roster is yours."),
       h2("Your workspace is ready"),
-      p(`It has its own cloud machine and ${SIGNUP_GRANT_CREDITS.toLocaleString("en-US")} credits to start. Your agents work there after you close the tab.`),
-      p("Four short screens remain: the machine, a model provider, the crew, and launch. The same workspace also opens in the NeuraMesh iPhone app."),
+      p(`Choose a cloud trial with ${SIGNUP_GRANT_CREDITS.toLocaleString("en-US")} credits, or use the free desktop app with your own subscriptions. Payment details are only needed to activate cloud work.`),
+      p("Finish setup, choose your crew, and activate the cloud trial or skip billing. The same workspace also opens in the NeuraMesh iPhone app."),
       button("Open your workspace", v.openUrl),
       rule(),
-      small(`Then say what you want in ${b("#general")}, in a plain sentence. rex makes board tasks from it and gives them to the crew.`)
+      small(`Open ${b("New session")}, edit your first message, and click Send when you are ready. rex makes board tasks from it and gives them to the crew.`)
     ].join("")
   }));
 }
@@ -10050,7 +10050,7 @@ var init_templates_lifecycle = __esm({
       claims: [
         ["The six default agents and their roles", "onboarding-wizard.ts STARTER_CREW"],
         ["Any of them can be renamed before launch", "hq OnboardingCrew.tsx; mobile wizard.tsx crew step"],
-        ["The first workspace starts with its cloud machine and 500 credits", "control-api workspace-birth.ts birthFirstWorkspace; rates.ts SIGNUP_GRANT_CREDITS"],
+        ["Cloud trial activation unlocks 500 credits; desktop works with your own subscriptions", "control-api activation-credits.ts; rates.ts SIGNUP_GRANT_CREDITS"],
         ["Agents work on the cloud machine after the tab closes", "hq OnboardingMachine.tsx; machines idle-stop after 48 h (docs/07)"],
         ["Setup resumes at the machine: four screens to launch", "onboarding-wizard.ts initialWizard step 2; hq webnm-boot.ts resumeWorkspaceId"],
         ["The same workspace opens in the iPhone app", "mobile sign-in.tsx; the desktop-signin hand-off"],
@@ -10573,7 +10573,7 @@ function canContinueEngineering(session) {
 function isEngineeringPlanReport(value) {
   if (!value || typeof value !== "object") return false;
   const report = value;
-  const line = (text2, max) => typeof text2 === "string" && !!text2.trim() && text2.length <= max && !/[\r\n]/.test(text2);
+  const line = (text3, max) => typeof text3 === "string" && !!text3.trim() && text3.length <= max && !/[\r\n]/.test(text3);
   return line(report.investigation, 600) && line(report.nextStep, 300) && Array.isArray(report.decisions) && report.decisions.length >= 1 && report.decisions.length <= 4 && report.decisions.every((point2) => line(point2, 300));
 }
 function isEngineeringWorkPlan(value) {
@@ -11003,9 +11003,9 @@ function createTwoFilesPatch(oldFileName, newFileName, oldStr, newStr, oldHeader
     } }));
   }
 }
-function splitLines(text2) {
-  const hasTrailingNl = text2.endsWith("\n");
-  const result = text2.split("\n").map((line) => line + "\n");
+function splitLines(text3) {
+  const hasTrailingNl = text3.endsWith("\n");
+  const result = text3.split("\n").map((line) => line + "\n");
   if (hasTrailingNl) {
     result.pop();
   } else {
@@ -11297,9 +11297,9 @@ function toolDisplayOutput(value) {
     if (remaining <= 0 || depth > 4) return;
     if (typeof item === "string") {
       if (item.startsWith("data:")) return;
-      const text2 = item.slice(0, remaining);
-      remaining -= text2.length;
-      parts.push(text2 + (text2.length < item.length ? "\n[truncated]" : ""));
+      const text3 = item.slice(0, remaining);
+      remaining -= text3.length;
+      parts.push(text3 + (text3.length < item.length ? "\n[truncated]" : ""));
       return;
     }
     if (Array.isArray(item)) {
@@ -11516,9 +11516,9 @@ function mergeChanges(current, incoming) {
   return [...current.filter((change) => !paths.has(change.path)), ...incoming];
 }
 function beginRemoteEngineeringPrompt(session, prompt, attachments = []) {
-  const text2 = prompt.trim();
-  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
+  const text3 = prompt.trim();
+  if (!text3 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text3).slice(0, 64) || session.title : session.title;
   return {
     ...session,
     title,
@@ -11528,7 +11528,7 @@ function beginRemoteEngineeringPrompt(session, prompt, attachments = []) {
     pendingModeHandoff: null,
     pendingApproval: null,
     proposedChanges: [],
-    messages: [...interruptReviews(engineeringReviewMessages(session)), { ...message("user", text2), ...attachments.length ? { attachments } : {} }],
+    messages: [...interruptReviews(engineeringReviewMessages(session)), { ...message("user", text3), ...attachments.length ? { attachments } : {} }],
     updatedAt: stamp()
   };
 }
@@ -12157,9 +12157,9 @@ function finishVerification(session) {
   return { ...session, messages: messages2, pendingApproval: null, state: "completed", activeActivity: null, checkpoints: [...session.checkpoints, checkpoint], updatedAt: stamp2() };
 }
 function submitEngineeringPrompt(session, prompt) {
-  const text2 = prompt.trim();
-  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
+  const text3 = prompt.trim();
+  if (!text3 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text3).slice(0, 64) || session.title : session.title;
   const started = {
     ...session,
     title,
@@ -12168,7 +12168,7 @@ function submitEngineeringPrompt(session, prompt) {
     pendingModeHandoff: null,
     pendingApproval: null,
     proposedChanges: [],
-    messages: [...session.messages, msg("user", text2)],
+    messages: [...session.messages, msg("user", text3)],
     updatedAt: stamp2()
   };
   const decision = effectivePermission(started.mode, "read", started.permissions, started.policy);
@@ -12299,10 +12299,10 @@ function engineeringPlanItems(value) {
     const numbered = line.match(/^\s*\d+[.)]\s+(\S.*)$/);
     if (!checkbox && !numbered) return [];
     const marker = checkbox?.[1]?.toLowerCase();
-    const text2 = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
-    if (!text2) return [];
+    const text3 = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
+    if (!text3) return [];
     return [{
-      text: text2,
+      text: text3,
       status: marker === "x" ? "complete" : marker && marker !== " " ? "active" : "pending"
     }];
   }).slice(0, 30);
@@ -12368,11 +12368,35 @@ function groupEngineeringTranscript(messages2) {
   }
   return blocks;
 }
+function engineeringActivityGroup(messages2) {
+  const running = messages2.some((m) => m.tool?.state === "running");
+  const labels = {
+    read: ["Read files", "Reading files"],
+    search: ["Searched", "Searching"],
+    web: ["Browsed sources", "Browsing sources"],
+    edit: ["Edited files", "Editing files"],
+    command: ["Ran commands", "Running commands"],
+    image: ["Viewed images", "Viewing images"]
+  };
+  const kinds2 = [...new Set(messages2.map((m) => engineeringActivityPresentation(m).kind))];
+  const label = kinds2.map((kind) => (labels[kind] ?? ["Used tools", "Using tools"])[messages2.some((m) => engineeringActivityPresentation(m).kind === kind && m.tool?.state === "running") ? 1 : 0]).filter((part, index, all) => all.indexOf(part) === index).map((part, index) => index ? part[0].toLowerCase() + part.slice(1) : part).join(", ");
+  return { label, running, failed: messages2.filter((m) => m.tool?.state === "failed" || !m.tool && m.tone === "warning").length, interrupted: messages2.filter((m) => m.tool?.state === "interrupted").length };
+}
 var TOOL_COPY, providerLabel2, titleCase, streamingEngineeringText;
 var init_activity = __esm({
   "../shared/src/engineering/activity.ts"() {
     "use strict";
     TOOL_COPY = {
+      read_agent_thread: { kind: "read", done: "Read a teammate\u2019s thread", active: "Reading a teammate\u2019s thread" },
+      list_team: { kind: "search", done: "Checked the team", active: "Checking the team" },
+      list_library: { kind: "search", done: "Checked project documents", active: "Checking project documents" },
+      recall: { kind: "search", done: "Searched project memory", active: "Searching project memory" },
+      search_x: { kind: "web", done: "Searched X", active: "Searching X" },
+      search_web: { kind: "web", done: "Searched the web", active: "Searching the web" },
+      read_repo_file: { kind: "read", done: "Read a file", active: "Reading a file" },
+      read_library_doc: { kind: "read", done: "Read a document", active: "Reading a document" },
+      list_repo_files: { kind: "search", done: "Listed repository files", active: "Listing repository files" },
+      search_repo: { kind: "search", done: "Searched the repository", active: "Searching the repository" },
       read_files: { kind: "read", done: "Read repository files", active: "Reading repository files" },
       search_codebase: { kind: "search", done: "Searched the codebase", active: "Searching the codebase" },
       editor: { kind: "edit", done: "Edited a file", active: "Editing a file" },
@@ -12420,18 +12444,18 @@ function reviewLines(diff) {
   let oldLine = null;
   let newLine = null;
   let inHunk = false;
-  for (const text2 of diff.replace(/\r\n/g, "\n").split("\n")) {
-    if (text2.startsWith("@@")) {
-      const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text2);
+  for (const text3 of diff.replace(/\r\n/g, "\n").split("\n")) {
+    if (text3.startsWith("@@")) {
+      const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text3);
       oldLine = hunk ? Number(hunk[1]) : null;
       newLine = hunk ? Number(hunk[2]) : null;
       inHunk = true;
-      rows2.push({ kind: "hunk", oldLine: null, newLine: null, text: text2 });
-    } else if (inHunk && text2.startsWith("\\")) {
-      rows2.push({ kind: "note", oldLine: null, newLine: null, text: text2.slice(2) });
-    } else if (inHunk && /^[ +\-]/.test(text2)) {
-      const kind = text2[0] === "+" ? "added" : text2[0] === "-" ? "removed" : "context";
-      rows2.push({ kind, oldLine: kind === "added" ? null : oldLine, newLine: kind === "removed" ? null : newLine, text: text2.slice(1) });
+      rows2.push({ kind: "hunk", oldLine: null, newLine: null, text: text3 });
+    } else if (inHunk && text3.startsWith("\\")) {
+      rows2.push({ kind: "note", oldLine: null, newLine: null, text: text3.slice(2) });
+    } else if (inHunk && /^[ +\-]/.test(text3)) {
+      const kind = text3[0] === "+" ? "added" : text3[0] === "-" ? "removed" : "context";
+      rows2.push({ kind, oldLine: kind === "added" ? null : oldLine, newLine: kind === "removed" ? null : newLine, text: text3.slice(1) });
       if (kind !== "added" && oldLine !== null) oldLine++;
       if (kind !== "removed" && newLine !== null) newLine++;
     }
@@ -12458,11 +12482,11 @@ function reviewSource(file) {
   if (/^\[(?:file too large|preview omitted)/.test(file.change.before + file.change.after)) return { text: "", notice: "This file exceeds the available preview size. Open it in the repository to review it." };
   if (file.change.previewError) return { text: "", notice: file.change.previewError };
   if (file.binary) return { text: "", notice: "This is a binary file. A text preview is not available." };
-  const text2 = file.change.kind === "deleted" ? file.change.before : file.change.after;
-  if (/^(?:\*\*\* Begin Patch|diff --git |@@ )/m.test(text2) && text2 === file.change.diff) {
+  const text3 = file.change.kind === "deleted" ? file.change.before : file.change.after;
+  if (/^(?:\*\*\* Begin Patch|diff --git |@@ )/m.test(text3) && text3 === file.change.diff) {
     return { text: "", notice: "The full file content is not available. Use Changes to review the patch." };
   }
-  return { text: text2 };
+  return { text: text3 };
 }
 var init_change_review = __esm({
   "../shared/src/engineering/change-review.ts"() {
@@ -12673,10 +12697,10 @@ function briefMarker(artifactId) {
   return `\u2039brief:${artifactId}\u203A`;
 }
 function parseBriefRef(body) {
-  const text2 = body ?? "";
-  const hit = markerSpans(text2, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
+  const text3 = body ?? "";
+  const hit = markerSpans(text3, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
   if (!hit) return null;
-  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text2, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
+  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text3, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
 }
 var HEAD_RE, VERDICT_RE, VERDICTS;
 var init_releasebrief = __esm({
@@ -12908,6 +12932,96 @@ var init_brain_endpoint = __esm({
   }
 });
 
+// ../shared/src/conversation-activity.ts
+function conversationActivity(events, liveSince) {
+  const turns = /* @__PURE__ */ new Map();
+  const current = /* @__PURE__ */ new Map();
+  const open = /* @__PURE__ */ new Set();
+  const prose2 = /* @__PURE__ */ new Map();
+  const calls = /* @__PURE__ */ new Map();
+  for (const event of events) {
+    const p2 = object3(event.payload);
+    const turnId = typeof p2.turnId === "string" ? p2.turnId : void 0;
+    if (event.type === "turn.open" && turnId) {
+      const turn = { id: event.id, agentId: typeof p2.agentId === "string" ? p2.agentId : void 0, startedAt: event.timestamp, state: "running", messages: [] };
+      turns.set(event.id, turn);
+      current.set(turnId, turn);
+      open.add(turnId);
+    } else if (event.type === "turn.settle" && turnId) {
+      const turn = current.get(turnId);
+      if (turn) {
+        turn.state = p2.state === "failed" ? "failed" : "done";
+        turn.endedAt = event.timestamp;
+      }
+      open.delete(turnId);
+    } else if (event.type === "assistant.message" && typeof p2.text === "string" && !p2.actorId) {
+      const turn = current.get(turnId ?? (open.size === 1 ? [...open][0] : ""));
+      const body = p2.text.trim();
+      if (turn && body && !/^(?:NO_REPLY|HEARTBEAT_OK)$/.test(body)) {
+        const pending = prose2.get(turn) ?? [];
+        if (pending.at(-1)?.body !== body) pending.push({ id: `progress-${event.id}`, role: "assistant", body, createdAt: event.timestamp });
+        prose2.set(turn, pending);
+      }
+    } else if (event.type === "tool.call" && typeof p2.id === "string" && typeof p2.name === "string" && !p2.name.startsWith("mcp__")) {
+      if (calls.has(p2.id)) continue;
+      const key2 = turnId ?? (open.size === 1 ? [...open][0] : `unattributed-${event.id}`);
+      let turn = current.get(key2);
+      if (!turn) {
+        turn = { id: key2, startedAt: event.timestamp, state: "unknown", messages: [] };
+        turns.set(key2, turn);
+      }
+      turn.messages.push(...prose2.get(turn) ?? []);
+      prose2.delete(turn);
+      const message2 = { id: `activity-${event.id}`, role: "tool", body: "", createdAt: event.timestamp, tool: { callId: p2.id, name: p2.name, input: p2.input, state: "running" } };
+      turn.messages.push(message2);
+      calls.set(p2.id, { turn, message: message2, turnId });
+    } else if (event.type === "tool.result" && typeof p2.id === "string") {
+      const call = calls.get(p2.id);
+      if (!call || turnId && call.turnId !== turnId) continue;
+      const output = text2(p2.output);
+      const failed = p2.ok === false || p2.isError === true || object3(p2.output).ok === false || /^error\s*:/i.test(output);
+      const duration = Date.parse(event.timestamp) - Date.parse(call.message.createdAt);
+      call.message.tool = { ...call.message.tool, output, state: failed ? "failed" : "succeeded", ...failed ? { error: "This action failed." } : {}, ...duration >= 0 ? { durationMs: duration } : {} };
+    }
+  }
+  return [...turns.values()].filter((turn) => turn.messages.length).map((turn) => ({
+    ...turn,
+    messages: turn.messages.map((message2) => message2.tool?.state === "running" && (turn.state !== "running" || !liveSince || Date.parse(turn.startedAt) < Date.parse(liveSince)) ? { ...message2, tool: { ...message2.tool, state: "interrupted" } } : message2)
+  }));
+}
+var object3, text2;
+var init_conversation_activity = __esm({
+  "../shared/src/conversation-activity.ts"() {
+    "use strict";
+    object3 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    text2 = (value) => typeof value === "string" ? value : value === void 0 ? "" : JSON.stringify(value, null, 2);
+  }
+});
+
+// ../shared/src/team-desk.ts
+var TEAM_TEMPLATES;
+var init_team_desk = __esm({
+  "../shared/src/team-desk.ts"() {
+    "use strict";
+    TEAM_TEMPLATES = [
+      { name: "Rex", role: "orchestrator", specialty: "Chief of staff", description: "Coordinate goals, decisions, priorities and follow-through across the startup." },
+      { name: "Plume", role: "marketer", specialty: "Marketing", description: "Positioning, content, campaigns and growth experiments." },
+      { name: "Echo", role: "marketer", specialty: "Social media", description: "Social media strategy, platform-specific drafts, content calendars and community engagement. Prepare drafts for approval; never publish without permission." },
+      { name: "Patch", role: "developer", specialty: "Engineering", description: "Build and maintain software, investigate bugs and implement reviewed plans." },
+      { name: "Iris", role: "designer", specialty: "Design", description: "Product experience, research synthesis, visual design and accessible interfaces." },
+      { name: "Atlas", role: "architect", specialty: "Architecture", description: "Technical direction, system design and engineering tradeoffs." },
+      { name: "Scout", role: "reviewer", specialty: "Quality", description: "Review changes, test workflows and identify reliability and security risks." },
+      { name: "Bosun", role: "shipper", specialty: "Delivery", description: "Release coordination, rollout plans and operational follow-through." },
+      { name: "Piper", role: "sales", specialty: "Sales", description: "Customer discovery, pipeline, outreach drafts and sales follow-up." },
+      { name: "Milo", role: "worker", specialty: "Product", description: "Customer problems, product strategy, specifications and roadmap prioritization." },
+      { name: "Sage", role: "worker", specialty: "Research", description: "Market and competitor research with verifiable evidence and explicit uncertainty." },
+      { name: "Remy", role: "worker", specialty: "Customer success", description: "Support triage, onboarding, customer feedback and retention." },
+      { name: "Ledger", role: "worker", specialty: "Finance", description: "Budgets, runway scenarios, metrics and financial operations; flag assumptions and decisions requiring qualified advice." },
+      { name: "Olive", role: "worker", specialty: "Operations", description: "People operations, internal processes, vendor coordination and operating checklists." }
+    ];
+  }
+});
+
 // ../shared/src/index.ts
 var src_exports = {};
 __export(src_exports, {
@@ -13094,6 +13208,7 @@ __export(src_exports, {
   ShipPlanSchema: () => ShipPlanSchema,
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
+  TEAM_TEMPLATES: () => TEAM_TEMPLATES,
   TEMPLATE_META: () => TEMPLATE_META,
   THINKING_LABEL: () => THINKING_LABEL,
   THINKING_LEVELS: () => THINKING_LEVELS,
@@ -13246,6 +13361,7 @@ __export(src_exports, {
   continueEngineeringInAct: () => continueEngineeringInAct,
   contrast: () => contrast,
   controlApiRequestUrl: () => controlApiRequestUrl,
+  conversationActivity: () => conversationActivity,
   coverageNote: () => coverageNote,
   createEngineeringPlanProgress: () => createEngineeringPlanProgress,
   createEngineeringSession: () => createEngineeringSession,
@@ -13284,6 +13400,7 @@ __export(src_exports, {
   drawAsk: () => drawAsk,
   effectivePermission: () => effectivePermission,
   engineeringActivePresentation: () => engineeringActivePresentation,
+  engineeringActivityGroup: () => engineeringActivityGroup,
   engineeringActivityPresentation: () => engineeringActivityPresentation,
   engineeringApprovalCommands: () => engineeringApprovalCommands,
   engineeringEffort: () => engineeringEffort,
@@ -13876,6 +13993,8 @@ var init_src = __esm({
     init_brain_sync();
     init_web_preview();
     init_brain_endpoint();
+    init_conversation_activity();
+    init_team_desk();
   }
 });
 
@@ -13992,15 +14111,15 @@ function releaseCardSvg(input) {
   const lineH = Math.round(size * LEADING);
   const blockTop = d.h - d.pad - lines.length * lineH;
   const mark = d.small * 2;
-  const text2 = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
-  const title = lines.map((l, i) => text2(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
+  const text3 = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
+  const title = lines.map((l, i) => text3(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${d.w}" height="${d.h}" viewBox="0 0 ${d.w} ${d.h}">
 <defs><radialGradient id="wash" cx="100%" cy="0%" r="80%"><stop offset="0" stop-color="${accent}" stop-opacity="0.1"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
 <rect width="${d.w}" height="${d.h}" fill="${bg}"/>
 <rect width="${d.w}" height="${d.h}" fill="url(#wash)"/>
 <rect x="${d.pad}" y="${d.pad}" width="${mark}" height="${mark}" rx="3" fill="${accent}"/>
-${text2(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
-${text2(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
+${text3(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
+${text3(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
 ${title}
 </svg>`;
 }
@@ -14886,6 +15005,7 @@ init_src();
 
 // src/errors.ts
 var STATUS = {
+  ACTIVATION_REQUIRED: 402,
   ILLEGAL_TRANSITION: 409,
   ALREADY_CLAIMED: 409,
   NOT_PERMITTED: 403,
@@ -14967,6 +15087,53 @@ var DomainError = class extends Error {
 
 // src/handler.ts
 init_src();
+
+// src/localmode.ts
+var localMode = () => process.env["NM_LOCAL"] === "1";
+
+// src/activation.ts
+var activationEnabled = () => !localMode() && process.env["NM_REQUIRE_TRIAL_ACTIVATION"] === "1";
+var needsActivation = (plan) => activationEnabled() && plan !== "cloud";
+var ACTIVATION_MESSAGE = "Add payment details in NeuraMesh HQ to activate cloud work. No charge during the trial.";
+async function requireActivation(store2, workspace) {
+  if (activationEnabled() && needsActivation(await store2.workspacePlan(workspace))) {
+    throw new DomainError("ACTIVATION_REQUIRED", ACTIVATION_MESSAGE);
+  }
+}
+var SETUP = /* @__PURE__ */ new Set([
+  "agent.register",
+  "workspace.create",
+  "workspace.update",
+  "workspace.delete",
+  "workspace.leave",
+  "workspace.accept_invite",
+  "workspace.decline_invite",
+  "workspace.revoke_invite",
+  "workspace.remove_member",
+  "credential.set",
+  "account.delete",
+  "member.update_profile",
+  "task.cancel",
+  "thread.settle",
+  "run.settle",
+  "schedule.delete"
+]);
+async function requireCommandActivation(store2, cmd) {
+  if (!activationEnabled() || SETUP.has(cmd.type)) return;
+  if (cmd.type === "schedule.set_status" && cmd.status === "paused") return;
+  const workspace = "workspace" in cmd && typeof cmd.workspace === "string" ? cmd.workspace : "taskId" in cmd && typeof cmd.taskId === "string" ? (await store2.getTask(cmd.taskId))?.workspace : null;
+  if (workspace) await requireActivation(store2, workspace);
+}
+function activationRoutes(app, store2) {
+  app.use("/v1/*", async (c, next) => {
+    if (activationEnabled() && c.req.method === "POST" && /^\/v1\/(messages|starter(?:\/.*)?|machines\/wake)$/.test(c.req.path)) {
+      const body = await c.req.raw.clone().json().catch(() => null);
+      if (typeof body?.workspace === "string") await requireActivation(store2, body.workspace);
+    }
+    return next();
+  });
+  app.get("/v1/workspaces", async (c) => c.json({ workspaces: (await store2.listWorkspaces(c.get("actor").id)).map((w) => ({ ...w, activationRequired: needsActivation(w.plan) })) }));
+}
 
 // src/store/types.ts
 init_src();
@@ -15093,9 +15260,24 @@ async function sessionTitleSql(sql, workspace, scheduleId, body) {
 
 // src/store/routine-session.ts
 var ROUTINE_TAKEN = "This session already holds a routine. Open a new session for another one.";
+async function existingHomeRoutineSql(sql, ws, input) {
+  if (!input.session) return null;
+  const [home] = await sql`select home_agent_id from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
+  if (!home?.["home_agent_id"]) return null;
+  const [existing] = await sql`select id from schedules where owner_home_thread_id=${input.session.threadId}::uuid and title=${input.title} and payload->>'prompt'=${input.prompt} and cadence=${input.cadence} and at_time=${input.atTime} and tz=${input.tz} and weekday is not distinct from ${input.weekday}::integer`;
+  return existing ? { id: existing["id"] } : null;
+}
 async function linkRoutineSessionSql(sql, ws, scheduleId, input, insertEvent) {
   const s = input.session;
   if (!s) return;
+  const [home] = await sql`select home_agent_id from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
+  if (home?.["home_agent_id"]) {
+    await sql`update schedules set owner_home_thread_id=${s.threadId}::uuid, agent_id=${home["home_agent_id"]}::uuid where id=${scheduleId}::uuid`;
+    await sql`insert into messages(id,workspace_id,channel_id,thread_id,author_kind,author_id,body)
+      values(${s.dividerId}::uuid,${ws}::uuid,${input.channelId}::uuid,${s.threadId}::uuid,${s.author.kind}::actor_kind,${s.author.id}::uuid,${ROUTINE_SCHEDULED_MARKER})`;
+    await insertEvent(sql, s.makeEvent(ws));
+    return;
+  }
   const [th] = await sql`update threads
       set schedule_id = ${scheduleId}::uuid, updated_at = now(),
           title = case when titled_at is null then ${sessionTitle(input.title, input.title)} else title end
@@ -15118,6 +15300,12 @@ function routineSessionMem(w, ws, input) {
     w.messages.push({ id: s.dividerId, workspace: ws, channel: input.channelId, taskId: null, threadId: s.threadId, author: s.author, body: ROUTINE_SCHEDULED_MARKER, createdAt: (/* @__PURE__ */ new Date()).toISOString(), scheduleId: null });
     w.events.push(s.makeEvent(ws));
   };
+}
+async function routineAgentSql(sql, ws, name) {
+  if (!name) return null;
+  const [agent] = await sql`select id from agents where workspace_id=${ws}::uuid and name=${name} and retired_at is null`;
+  if (!agent) throw new DomainError("NOT_FOUND", `no active agent named "${name}"`);
+  return agent["id"];
 }
 
 // src/store/announce.ts
@@ -18361,6 +18549,7 @@ async function workspacesDueRefill(sql) {
     select c.workspace_id, w.plan, w.seats from workspace_credits c
       join workspaces w on w.id = c.workspace_id
      where w.plan = 'cloud'
+       and (not ${activationEnabled()} or w.subscription_status is distinct from 'trialing')
        and c.period_start < date_trunc('month', (now() at time zone 'utc')::date)`;
   return rows2.map((r) => ({ workspaceId: r.workspace_id, plan: r.plan, seats: Math.max(1, Number(r.seats ?? 1)) }));
 }
@@ -18450,7 +18639,7 @@ async function createCheckoutSession(input) {
   if (!session.url) throw new Error("stripe returned no checkout url");
   return session.url;
 }
-async function createTrialSession(input) {
+async function createTrialSession(input, idempotencyKey) {
   if (!PRICE_ID) throw new Error("billing not configured (STRIPE_PRICE_ID unset)");
   const session = await stripe().checkout.sessions.create({
     ui_mode: "custom",
@@ -18462,9 +18651,18 @@ async function createTrialSession(input) {
     subscription_data: { trial_period_days: PRO_TRIAL_DAYS, metadata: { workspace_id: input.workspace } },
     payment_method_collection: "always",
     return_url: input.returnUrl
-  });
+  }, idempotencyKey ? { idempotencyKey } : void 0);
   if (!session.client_secret) throw new Error("stripe returned no client secret");
   return { id: session.id, clientSecret: session.client_secret };
+}
+async function readTrialSession(sessionId) {
+  const session = await stripe().checkout.sessions.retrieve(sessionId, { expand: ["subscription"] });
+  return {
+    id: session.id,
+    clientSecret: session.client_secret,
+    status: session.status,
+    subscription: session.subscription && typeof session.subscription === "object" ? session.subscription : null
+  };
 }
 async function trialSessionState(sessionId) {
   const s = await stripe().checkout.sessions.retrieve(sessionId, { expand: ["subscription"] });
@@ -18693,9 +18891,6 @@ function claimRoutes(app, store2) {
   });
 }
 
-// src/localmode.ts
-var localMode = () => process.env["NM_LOCAL"] === "1";
-
 // src/fleet.ts
 var QUOTAS = {
   free: { cpu: "4", memory: "8Gi", pvc: "2" },
@@ -18742,7 +18937,7 @@ function rowsToDesired(rows2) {
       // (machined refuses to boot without one; the live roll proved it)
       ...r.owner_user_id ? { ownerUserId: r.owner_user_id } : {},
       ...r.substrate === "claim" ? { substrate: "claim" } : {},
-      replicas: r.desired_replicas === 1 ? 1 : 0,
+      replicas: !needsActivation(r.workspace_plan) && r.desired_replicas === 1 ? 1 : 0,
       cpu: str2("cpu"),
       memory: str2("memory"),
       cpuLimit: str2("cpuLimit"),
@@ -18896,17 +19091,17 @@ function starterAssembly() {
       if (!first) return { text: "", thought: "" };
       const { content, ...fields } = first;
       cand = { ...cand, ...fields };
-      let text2 = "";
+      let text3 = "";
       let thought = "";
       for (const p2 of content?.parts ?? []) {
-        if (typeof p2.text === "string" && !p2.thought) text2 += p2.text;
+        if (typeof p2.text === "string" && !p2.thought) text3 += p2.text;
         if (typeof p2.text === "string" && p2.thought) thought += p2.text;
         if (plainText(p2) && !p2.text) continue;
         const last = parts[parts.length - 1];
         if (last && plainText(p2) && plainText(last)) last.text = `${last.text ?? ""}${p2.text ?? ""}`;
         else parts.push({ ...p2 });
       }
-      return { text: text2, thought };
+      return { text: text3, thought };
     },
     usage: () => usage,
     response: () => ({
@@ -18939,14 +19134,14 @@ function starterReplyStream(o) {
           failure = "UPSTREAM";
           break;
         }
-        const { text: text2, thought } = acc.add(chunk2);
+        const { text: text3, thought } = acc.add(chunk2);
         if (gone) {
           o.abortUpstream();
           failure = "CLIENT_GONE";
           break;
         }
         if (thought) send({ t: "thought", text: thought });
-        if (text2) send({ t: "text", text: text2 });
+        if (text3) send({ t: "text", text: text3 });
       }
     } catch {
       failure = gone ? "CLIENT_GONE" : "UPSTREAM";
@@ -19267,6 +19462,9 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
       return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     }
     const [bal, used, plan] = await Promise.all([ledger.balance(workspace), ledger.usage(workspace), store2.workspacePlan(workspace)]);
+    const billing = activationEnabled() ? await sqlOf(store2)`
+      select subscription_status from workspaces where id = ${workspace}::uuid` : [];
+    const trial = billing[0]?.subscription_status === "trialing";
     return c.json({
       credits: {
         remaining: microsToCredits(bal.remainingMicros),
@@ -19280,7 +19478,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
         // 0 on Free: nothing refills there since the source release. A number, not null, because
         // the shipped phone formats this field unguarded (compute.tsx) and the refill worklist
         // (plan = 'cloud') is the promise that matters
-        monthlyGrant: plan === "cloud" ? CLOUD_SEAT_MONTHLY_CREDITS : 0
+        monthlyGrant: plan === "cloud" && !trial ? CLOUD_SEAT_MONTHLY_CREDITS : 0
       },
       // capMinutes is ALWAYS null now — the daily minute cap died with the credits round;
       // minutes stay as telemetry and activeSeconds is the number that bills.
@@ -19443,8 +19641,54 @@ init_src();
 
 // src/plan-flip.ts
 init_src();
+
+// src/activation-credits.ts
+init_src();
+async function grantActivationCredits(sql, workspace, subscription, trial, seats) {
+  await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtextextended(${`activation:${workspace}`}, 0))`;
+    const note = trial ? "trial-activation" : `paid-activation:${subscription}`;
+    const [existing] = await tx`select id from credit_grants where workspace_id = ${workspace}::uuid
+      and (note = ${note} or (${trial} and kind = 'signup')
+        or (not ${trial} and kind = 'promo' and note = ${subscription})) limit 1`;
+    if (existing) return;
+    const micros = creditsToMicros(trial ? SIGNUP_GRANT_CREDITS : CLOUD_SEAT_MONTHLY_CREDITS * seats);
+    await tx`insert into credit_grants (workspace_id, micros, kind, rate_version, note)
+      values (${workspace}::uuid, ${micros}, 'promo', ${RATE_VERSION}, ${note})`;
+    await tx`insert into workspace_credits (workspace_id, granted_micros) values (${workspace}::uuid, ${micros})
+      on conflict (workspace_id) do update set granted_micros = workspace_credits.granted_micros + ${micros}, updated_at = now()`;
+  });
+}
+
+// src/plan-flip.ts
 async function applyPlanPatch(store2, mapped) {
   const { workspace, patch } = mapped;
+  if (activationEnabled() && patch.plan === "cloud") {
+    if (!patch.subscriptionStatus) {
+      const { plan: _plan, ...identity } = patch;
+      await store2.setWorkspacePlan(workspace, identity);
+      return "ok";
+    }
+    const sql2 = sqlOf(store2);
+    if (!sql2) return "unavailable";
+    try {
+      if (patch.subscriptionStatus === "trialing" || patch.subscriptionStatus === "active") {
+        await grantActivationCredits(
+          sql2,
+          workspace,
+          patch.stripeSubscriptionId ?? workspace,
+          patch.subscriptionStatus === "trialing",
+          Math.max(1, patch.seats ?? 1)
+        );
+      }
+      await store2.setWorkspacePlan(workspace, patch);
+      await mintWorkspaceRunner(store2, sql2, workspace, "plan_flip");
+      return "ok";
+    } catch (e) {
+      console.error("activation_failed", e);
+      return "failed";
+    }
+  }
   const flips = patch.plan === "cloud" && await store2.workspacePlan(workspace) !== "cloud";
   if (!flips) {
     await store2.setWorkspacePlan(workspace, patch);
@@ -19512,6 +19756,11 @@ async function isFirstWorkspace(store2, userId, workspaceId) {
 }
 async function birthFirstWorkspace(store2, userId, workspaceId) {
   if (localMode()) return;
+  if (activationEnabled()) {
+    const sql2 = sqlOf(store2);
+    if (sql2) await mintWorkspaceRunner(store2, sql2, workspaceId, "signup");
+    return;
+  }
   try {
     if (!await isFirstWorkspace(store2, userId, workspaceId)) return;
   } catch (e) {
@@ -20121,34 +20370,6 @@ var artifactPreview = createArtifactPreviewCache();
 // src/brain-store.ts
 init_src();
 
-// src/brain-read-events.ts
-async function readBrainEvents(objects, commits, project) {
-  const events = [];
-  const limit = 64 * 1024 * 1024;
-  const oversized = () => new BrainError("BRAIN_RESTORE_TOO_LARGE", "This conversation needs a compact restore in an updated NeuraMesh client. Its complete archive remains saved.", 413);
-  if (!project && commits.reduce((bytes, commit) => bytes + commit.segment.sizeBytes, 0) > limit) throw oversized();
-  let size = 0;
-  for (let offset = 0; offset < commits.length; offset += 8) {
-    const batch = commits.slice(offset, offset + 8);
-    const downloaded = await Promise.allSettled(batch.map((commit) => objects.get(commit.segment)));
-    const failure = downloaded.find((result) => result.status === "rejected");
-    if (failure?.status === "rejected") throw failure.reason;
-    for (const [index, result] of downloaded.entries()) {
-      if (result.status !== "fulfilled") continue;
-      const lines = result.value.toString("utf8").split("\n").filter(Boolean);
-      if (lines.length !== batch[index].event_count) throw new Error("Brain event count does not match");
-      for (const line of lines) {
-        const value = JSON.parse(line);
-        const event = project ? project(value) : value;
-        size += Buffer.byteLength(project ? JSON.stringify(event) : line);
-        if (size > limit) throw oversized();
-        events.push(event);
-      }
-    }
-  }
-  return events;
-}
-
 // src/brain-decoded.ts
 import { gunzipSync } from "node:zlib";
 function decodedBrainSnapshot(snapshot, limit = 128 * 1024 * 1024) {
@@ -20191,23 +20412,80 @@ function decodedBrainSnapshot(snapshot, limit = 128 * 1024 * 1024) {
   }) };
 }
 
+// src/brain-activity-projection.ts
+var kinds = /* @__PURE__ */ new Set(["turn.open", "turn.settle", "assistant.message", "tool.call", "tool.result"]);
+function bounded(value, depth = 0) {
+  if (typeof value === "string") return value.length > 16e3 ? `${value.slice(0, 16e3)}
+\u2026 Output shortened for display.` : value;
+  if (!value || typeof value !== "object") return value;
+  if (depth >= 5) return "[Nested details omitted]";
+  if (Array.isArray(value)) return [...value.slice(0, 30).map((v) => bounded(v, depth + 1)), ...value.length > 30 ? ["\u2026 Additional items omitted for display."] : []];
+  const entries = Object.entries(value);
+  return Object.fromEntries([...entries.slice(0, 30).map(([key2, v]) => [key2, bounded(v, depth + 1)]), ...entries.length > 30 ? [["\u2026", "Additional fields omitted for display."]] : []]);
+}
+function brainActivityProjection(value) {
+  const event = value;
+  if (!event || !kinds.has(event.type)) return void 0;
+  const decoded = decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [event] }).events[0];
+  const p2 = decoded.payload;
+  if (!p2 || typeof p2 !== "object") return void 0;
+  if (event.type === "assistant.message" && (typeof p2.text !== "string" || typeof p2.turnId !== "string" || p2.actorId)) return void 0;
+  if (event.type === "tool.call" && (typeof p2.name !== "string" || p2.name.startsWith("mcp__"))) return void 0;
+  const fields = event.type === "turn.open" ? ["turnId", "agentId", "kind"] : event.type === "turn.settle" ? ["turnId", "state"] : event.type === "assistant.message" ? ["text", "turnId"] : event.type === "tool.call" ? ["id", "name", "input", "turnId"] : ["id", "name", "output", "ok", "isError", "turnId"];
+  return {
+    id: event.id,
+    type: event.type,
+    timestamp: event.timestamp,
+    payload: Object.fromEntries(fields.filter((key2) => p2[key2] !== void 0).map((key2) => [key2, bounded(p2[key2])]))
+  };
+}
+
+// src/brain-read-events.ts
+async function readBrainEvents(objects, commits, project) {
+  const events = [];
+  const limit = 64 * 1024 * 1024;
+  const oversized = () => new BrainError("BRAIN_RESTORE_TOO_LARGE", "This conversation needs a compact restore in an updated NeuraMesh client. Its complete archive remains saved.", 413);
+  if (!project && commits.reduce((bytes, commit) => bytes + commit.segment.sizeBytes, 0) > limit) throw oversized();
+  let size = 0;
+  for (let offset = 0; offset < commits.length; offset += 8) {
+    const batch = commits.slice(offset, offset + 8);
+    const downloaded = await Promise.allSettled(batch.map((commit) => objects.get(commit.segment)));
+    const failure = downloaded.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    for (const [index, result] of downloaded.entries()) {
+      if (result.status !== "fulfilled") continue;
+      const lines = result.value.toString("utf8").split("\n").filter(Boolean);
+      if (lines.length !== batch[index].event_count) throw new Error("Brain event count does not match");
+      for (const line of lines) {
+        const value = JSON.parse(line);
+        const event = project ? project(value) : value;
+        if (event === void 0) continue;
+        size += Buffer.byteLength(project ? JSON.stringify(event) : line);
+        if (size > limit) throw oversized();
+        events.push(event);
+      }
+    }
+  }
+  return events;
+}
+
 // src/brain-restore-projection.ts
-var object3 = (value) => value && typeof value === "object" ? value : {};
+var object4 = (value) => value && typeof value === "object" ? value : {};
 var textStart = (event) => event.type === "content_start" && event.contentType === "text" && typeof event.text === "string";
 function brainRestoreProjection() {
   const streams = /* @__PURE__ */ new Map();
   return (value) => {
-    const record = object3(value);
+    const record = object4(value);
     if (record.type !== "runtime.event") return value;
-    const raw = object3(record.payload);
-    const core = raw.brainEncoding === "neuramesh.gzip.v1" ? object3(decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [value] }).events[0].payload) : raw;
-    const payload = object3(core.payload);
+    const raw = object4(record.payload);
+    const core = raw.brainEncoding === "neuramesh.gzip.v1" ? object4(decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [value] }).events[0].payload) : raw;
+    const payload = object4(core.payload);
     if (typeof payload.sessionId !== "string") return value;
     const stream2 = streams.get(payload.sessionId) ?? { text: "" };
     streams.set(payload.sessionId, stream2);
     let projected = core;
     if (core.type === "agent_event") {
-      const event = object3(payload.event);
+      const event = object4(payload.event);
       let compact = event;
       if (textStart(event)) {
         if (typeof event.accumulated === "string") {
@@ -20310,7 +20588,12 @@ var BrainStore = class {
       if (revision === since) return { workspace, threadId, revision, commitId: head2?.commit_id ?? null, events: [], unchanged: true };
     }
     const commits = await this.sql`select revision, commit_id, segment, snapshot, event_count from brain_commits where thread_id = ${threadId}::uuid order by revision`;
-    const events = await readBrainEvents(this.objects, commits, compact ? brainRestoreProjection() : void 0);
+    const events = await readBrainEvents(this.objects, commits, compact === "activity" ? brainActivityProjection : compact ? brainRestoreProjection() : void 0);
+    if (compact === "activity") {
+      await brainThreadAccess(this.sql, actor, workspace, threadId);
+      const head2 = commits.at(-1);
+      return { workspace, threadId, revision: Number(head2?.revision ?? 0), events };
+    }
     let runtimeMessages;
     let metadata;
     for (const commit of [...commits].reverse()) {
@@ -22056,6 +22339,7 @@ function isTaskCommand(c) {
   return typeof c.taskId === "string";
 }
 async function executeCommand(store2, actor, cmd) {
+  await requireCommandActivation(store2, cmd);
   {
     const r = await machineCommands(store2, actor, cmd);
     if (r !== void 0) return r;
@@ -22760,12 +23044,12 @@ async function starterText(system, user, fetchFn = fetch, env = process.env) {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`starter brain call failed (${res.status})`);
-  const text2 = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
-  if (!text2.trim()) throw new Error("starter brain answered with no text");
-  return text2;
+  const text3 = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
+  if (!text3.trim()) throw new Error("starter brain answered with no text");
+  return text3;
 }
-function parseDraftAnswer(text2) {
-  const raw = text2.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+function parseDraftAnswer(text3) {
+  const raw = text3.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   let j;
   try {
     j = JSON.parse(raw);
@@ -22816,8 +23100,8 @@ function appJwt(env = process.env, now = Date.now()) {
   return `${head}.${body}.${sig}`;
 }
 var RESERVED = /* @__PURE__ */ new Set(["orgs", "organizations", "apps", "settings", "marketplace", "topics", "explore", "search", "login", "join", "features", "sponsors", "notifications", "issues", "pulls", "new", "about", "pricing", "enterprise", "users", "collections", "trending", "codespaces"]);
-function parseRepoInput(text2) {
-  let s = (text2 ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
+function parseRepoInput(text3) {
+  let s = (text3 ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
   const hosted = /^github\.com\//i.test(s);
   if (hosted) s = s.slice("github.com/".length);
   const parts = s.split(/[/?#]/);
@@ -23053,8 +23337,8 @@ function voiceOf(html) {
   const h12 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(body);
   const headline = h12 ? clean(h12[1]) : "";
   if (h12) body = body.replace(h12[0], " ");
-  const text2 = clean(body);
-  return `${headline}${headline && text2 ? "\n" : ""}${text2}`.slice(0, VOICE_CAP);
+  const text3 = clean(body);
+  return `${headline}${headline && text3 ? "\n" : ""}${text3}`.slice(0, VOICE_CAP);
 }
 async function readSheet(url, fetchFn, signal) {
   try {
@@ -23190,8 +23474,8 @@ async function runAnnounceJob(ann, row, deps) {
     }
     const brand = await deps.site(row.website).catch(() => null);
     await ann.update(row.id, { brand });
-    const text2 = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
-    const answer = parseDraftAnswer(text2);
+    const text3 = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
+    const answer = parseDraftAnswer(text3);
     if (!answer) return fail("The drafts did not come back in a shape I could read. Try again.");
     const posts = answer.verdict === "none" ? [] : doorPosts(answer.posts);
     if (answer.verdict !== "none" && !posts.length) return fail("The drafts came back empty. Try again.");
@@ -24283,9 +24567,9 @@ async function claimAnnouncement(store2, ann, actor, workspace, row) {
 ${releaseDigest(row.repo, scan, { since: null, checkedAt: "on the site" })}` : `Release drafts \xB7 ${tag} \xB7 ${row.repo}
 
 Drafted at neuramesh.app/announce.`;
-  const post = (text2) => store2.postMessage(
-    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text2, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
-    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text2.slice(0, 120) } })
+  const post = (text3) => store2.postMessage(
+    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text3, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
+    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text3.slice(0, 120) } })
   );
   await post(body);
   if (row.brief) {
@@ -24527,8 +24811,8 @@ async function readRepoFile(slug, path, ref, opts) {
   if (size > FILE_SIZE_CAP || b2.encoding !== "base64" || typeof b2.content !== "string") throw new GitHubApiError(`${p2} is larger than 1 MB: read a smaller file`, 413);
   const buf = Buffer.from(b2.content.replace(/\n/g, ""), "base64");
   if (looksBinary(buf)) throw new GitHubApiError(`${p2} is a binary file`, 415);
-  const text2 = buf.toString("utf8");
-  return { path: p2, ref, size, sha: b2.sha ?? "", content: text2.length > FILE_TEXT_CAP ? text2.slice(0, FILE_TEXT_CAP) : text2, truncated: text2.length > FILE_TEXT_CAP };
+  const text3 = buf.toString("utf8");
+  return { path: p2, ref, size, sha: b2.sha ?? "", content: text3.length > FILE_TEXT_CAP ? text3.slice(0, FILE_TEXT_CAP) : text3, truncated: text3.length > FILE_TEXT_CAP };
 }
 var IMAGE_SIZE_CAP = 8e6;
 function sniffShot(b2) {
@@ -25614,6 +25898,7 @@ function relayRoutes(app, store2, deps = {}) {
     if (!machine) return c.json({ allowed: false });
     const member = (await store2.listWorkspaces(userId)).some((w) => w.id === machine.workspaceId);
     if (!member) return c.json({ allowed: false });
+    if (needsActivation(await store2.workspacePlan(machine.workspaceId))) return c.json({ allowed: false });
     if (machine.kind === "member" && machine.ownerUserId !== userId) return c.json({ allowed: false });
     return c.json({ allowed: true, userId });
   });
@@ -25748,10 +26033,29 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z25 } from "zod";
+import { z as z26 } from "zod";
 
 // src/trial.ts
 init_src();
+
+// src/trial-session.ts
+async function workspaceTrialSession(sql, input) {
+  return sql.begin(async (tx) => {
+    const [row] = await tx`
+      select trial_checkout_session_id from workspaces where id = ${input.workspace}::uuid for update`;
+    if (!row) throw new Error("Workspace not found");
+    const previous = row.trial_checkout_session_id;
+    if (previous) {
+      const session2 = await readTrialSession(previous);
+      if (session2.status !== "expired") return session2;
+    }
+    const session = await createTrialSession(input, `trial:${input.workspace}:${previous ?? "first"}`);
+    await tx`update workspaces set trial_checkout_session_id = ${session.id} where id = ${input.workspace}::uuid`;
+    return { ...session, status: "open", subscription: null };
+  });
+}
+
+// src/trial.ts
 function trialOffered(w) {
   return !!w && w.plan !== "cloud" && !w.stripeSubscriptionId;
 }
@@ -25770,17 +26074,26 @@ function trialRoutes(app, store2) {
     const publishableKey = billingPublishableKey();
     if (!publishableKey) return c.json({ error: "billing not configured", code: "NOT_FOUND" }, 404);
     const info = await store2.workspaceForBilling(who.workspace);
-    if (!info || !trialOffered(info)) return c.json({ trial: false, plan: info?.plan ?? "free" });
+    if (!info || !trialOffered(info)) return c.json({ trial: false, plan: info?.plan ?? "free", required: needsActivation(info?.plan ?? "free") });
     const email = (await store2.userIdentity(actor.id))?.email ?? null;
-    const session = await createTrialSession({
+    const input = {
       workspace: who.workspace,
       quantity: info.memberCount,
       customerId: info.stripeCustomerId,
       email,
       returnUrl: `${trialReturnBase(c.req.header("origin"))}/?pro_session={CHECKOUT_SESSION_ID}`
-    });
+    };
+    const sql = sqlOf(store2);
+    const session = activationEnabled() && sql ? await workspaceTrialSession(sql, input) : await createTrialSession(input);
+    if ("status" in session && session.status === "complete") {
+      const mapped = session.subscription && planPatchFromEvent({ type: "customer.subscription.updated", data: { object: session.subscription } });
+      if (!mapped || mapped.workspace !== who.workspace || await applyPlanPatch(store2, mapped) !== "ok")
+        return c.json({ error: "Activation is still being confirmed. Try again.", code: "ACTIVATION_PENDING" }, 503);
+      return c.json({ trial: false, plan: mapped.patch.plan ?? "free", required: needsActivation(mapped.patch.plan ?? "free") });
+    }
     return c.json({
       trial: true,
+      required: activationEnabled(),
       session: session.id,
       clientSecret: session.clientSecret,
       publishableKey,
@@ -26188,11 +26501,11 @@ function importRoutes(app, store2) {
     if (!me) return c.json({ error: "Only the workspace owner can migrate a workspace into it.", code: "NOT_PERMITTED" }, 403);
     const plan = me["plan"] ?? "free";
     if (plan !== "cloud") return c.json({ error: PRO_REFUSAL, code: "PLAN_LIMIT" }, 402);
-    const text2 = await c.req.text();
-    if (Buffer.byteLength(text2, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
+    const text3 = await c.req.text();
+    if (Buffer.byteLength(text3, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
     let raw = null;
     try {
-      raw = JSON.parse(text2);
+      raw = JSON.parse(text3);
     } catch {
       raw = null;
     }
@@ -26355,7 +26668,7 @@ function brainRoutes(app, store2, options = {}) {
     const format = c.req.query("format");
     const held = c.req.query("since");
     const since = held !== void 0 && /^\d{1,12}$/.test(held) ? Number(held) : void 0;
-    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "compact" || format === "compact-decoded", since);
+    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "activity" ? "activity" : format === "compact" || format === "compact-decoded", since);
     if ("unchanged" in snapshot && snapshot.unchanged) return c.json(snapshot);
     return c.json(format === "decoded" || format === "compact-decoded" ? decodedBrainSnapshot(snapshot, format === "compact-decoded" ? 64 * 1024 * 1024 : void 0) : snapshot);
   });
@@ -26410,6 +26723,239 @@ function brainRoutes(app, store2, options = {}) {
   });
 }
 
+// src/team-routes.ts
+init_src();
+import { z as z24 } from "zod";
+
+// src/store/startup-team.ts
+init_src();
+async function seedStartupTeamSql(sql, workspace, projectId) {
+  await sql`select pg_advisory_xact_lock(hashtextextended(${`${workspace}:startup-team`},0))`;
+  const [project] = await sql`select context_channel_id from projects where id=${projectId}::uuid and workspace_id=${workspace}::uuid`;
+  if (!project?.["context_channel_id"]) return;
+  const channel = project["context_channel_id"];
+  const [machine] = await sql`select id from machines where workspace_id=${workspace}::uuid and (lifecycle is null or lifecycle <> 'destroyed') order by (kind='runner') desc,last_seen_at desc nulls last limit 1`;
+  const selected = [];
+  for (const name of ["Rex", "Plume", "Echo"]) {
+    const template = TEAM_TEMPLATES.find((t2) => t2.name === name);
+    const social = name === "Echo";
+    const [existing] = await sql`select id from agents where workspace_id=${workspace}::uuid and retired_at is null and role=${template.role}::agent_role
+      and not (id = any(${selected}::uuid[]))
+      and (${template.role} <> 'marketer' or (lower(name) ~ '^echo(-[0-9]+)?$' or coalesce(description,'') ~* 'social media') = ${social})
+      order by (lower(name)=${name.toLowerCase()}) desc,created_at,id limit 1`;
+    let id = existing?.["id"];
+    if (!id) {
+      const base = name.toLowerCase();
+      let unique = base;
+      for (let n = 2; (await sql`select 1 from agents where workspace_id=${workspace}::uuid and lower(name)=${unique}`).length; n++) unique = `${base}-${n}`;
+      const [peer] = await sql`select model from agents where workspace_id=${workspace}::uuid and retired_at is null order by (role=${template.role}::agent_role) desc,created_at limit 1`;
+      const model2 = peer?.["model"] ?? packModelForRole("openai-core", template.role);
+      const runtime = runtimeForModel(model2);
+      const [created] = await sql`insert into agents(workspace_id,machine_id,name,role,model,runtime,model_source,description,brief,status)
+        values(${workspace}::uuid,${machine?.["id"] ?? null}::uuid,${unique},${template.role}::agent_role,${model2},${runtime},'pack',${template.description},${template.description},'online') returning id`;
+      id = created["id"];
+      if (machine?.["id"]) {
+        const card2 = buildAgentCard({ agentId: id, name: unique, role: template.role, model: model2, runtime, machine: machine["id"], channels: [channel], description: template.description });
+        await sql`update agents set card=${sql.json(card2)} where id=${id}::uuid`;
+      }
+    }
+    selected.push(id);
+    await sql`insert into project_agents(workspace_id,project_id,agent_id) values(${workspace}::uuid,${projectId}::uuid,${id}::uuid) on conflict do nothing`;
+  }
+}
+
+// src/store/team-desk.ts
+async function teamProjectAccess(sql, actor, workspace, project) {
+  const [row] = await sql`select p.id, p.context_channel_id from projects p where p.id = ${project}::uuid and p.workspace_id = ${workspace}::uuid and p.status <> 'archived'
+    and ((${actor.kind} = 'human' and exists(select 1 from workspace_members wm where wm.workspace_id = p.workspace_id and wm.user_id = ${actor.id}::uuid))
+      or (${actor.kind} = 'agent' and exists(select 1 from project_agents pa join agents a on a.id = pa.agent_id where pa.project_id = p.id and a.id = ${actor.id}::uuid and a.retired_at is null)))`;
+  if (!row?.["context_channel_id"]) throw new BrainError("NOT_FOUND", "This project is not available to you.", 404);
+  return row["context_channel_id"];
+}
+async function teamHomes(sql, workspace, project) {
+  const rows2 = await sql`select t.*, s.summary, coalesce(s.revision,0)::int as summary_revision,
+    m.body as last_body, m.author_kind as last_author_kind,
+    (select count(*)::int from messages where thread_id = t.id) as msg_count,
+    (select count(*)::int from schedules where owner_home_thread_id = t.id) as routine_count,
+    (select count(*)::int from tasks where origin_thread_id = t.id and state not in ('accepted','closed')) as work_count
+    from threads t join project_agents pa on pa.project_id = t.project_id and pa.agent_id = t.home_agent_id
+    join agents a on a.id = pa.agent_id and a.retired_at is null
+    left join lateral (select summary,revision from team_context_snapshots where thread_id=t.id order by revision desc limit 1) s on true
+    left join lateral (select body,author_kind from messages where thread_id=t.id order by created_at desc,id desc limit 1) m on true
+    where t.workspace_id=${workspace}::uuid and t.project_id=${project}::uuid and t.home_agent_id is not null and t.archived_at is null
+    order by t.created_at,t.id`;
+  return rows2.map((r) => ({ ...r, brain_override: r["brain_override"] ? JSON.stringify(r["brain_override"]) : null }));
+}
+async function ensureTeamHomes(sql, actor, workspace, project, agentId) {
+  if (actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "Only a person can add an agent to Agent Desk.", 403);
+  await sql.begin(async (tx) => {
+    const q = tx;
+    const channel = await teamProjectAccess(q, actor, workspace, project);
+    await q`select id from projects where id=${project}::uuid for update`;
+    if (!agentId && !(await q`select 1 from threads where project_id=${project}::uuid and home_agent_id is not null limit 1`).length) {
+      await seedStartupTeamSql(q, workspace, project);
+    }
+    if (agentId) {
+      const [a] = await q`select id from agents where id=${agentId}::uuid and workspace_id=${workspace}::uuid and retired_at is null`;
+      if (!a) throw new BrainError("NOT_FOUND", "This agent is not in this workspace.", 404);
+      await q`insert into project_agents(workspace_id,project_id,agent_id) values(${workspace}::uuid,${project}::uuid,${agentId}::uuid) on conflict do nothing`;
+    }
+    await q`insert into threads(workspace_id,project_id,channel_id,home_agent_id,title,description,created_by,mode,kind,titled_at)
+      select pa.workspace_id,pa.project_id,${channel}::uuid,a.id,a.name || ' · Agent thread',coalesce(a.brief,''),${`human:${actor.id}`},'chat','chat',now()
+      from project_agents pa join agents a on a.id=pa.agent_id and a.retired_at is null
+      where pa.project_id=${project}::uuid and (${agentId ?? null}::uuid is null or a.id=${agentId ?? null}::uuid)
+      on conflict(project_id,home_agent_id) where home_agent_id is not null do update set archived_at=null`;
+  });
+}
+async function teamContext(sql, actor, workspace, threadId) {
+  const access = await brainThreadAccess(sql, actor, workspace, threadId);
+  const [thread] = await sql`select home_agent_id from threads where id=${threadId}::uuid`;
+  if (!thread?.["home_agent_id"]) return { home: null, summary: null, revision: 0, messages: [], compactThrough: null };
+  const home = (await teamHomes(sql, workspace, access.project_id)).find((t2) => t2.id === threadId) ?? null;
+  if (!home) throw new BrainError("NOT_FOUND", "This agent is no longer on this project team.", 404);
+  const [snapshot] = await sql`select * from team_context_snapshots where thread_id=${threadId}::uuid order by revision desc limit 1`;
+  const rows2 = await sql`select id,author_kind,author_id,body,created_at from messages where thread_id=${threadId}::uuid
+    and (${snapshot?.["through_message_id"] ?? null}::uuid is null or (created_at,id)>(select created_at,id from messages where id=${snapshot?.["through_message_id"] ?? null}::uuid))
+    order by created_at,id limit 100`;
+  const messages2 = rows2.map((r) => ({ ...r, created_at: new Date(r["created_at"]).toISOString() }));
+  const shouldCompact = messages2.length > 60 || messages2.reduce((n, m) => n + m.body.length, 0) > 6e4;
+  return {
+    home,
+    summary: snapshot?.["summary"] ?? null,
+    revision: snapshot?.["revision"] ?? 0,
+    messages: messages2,
+    compactThrough: shouldCompact && messages2.length > 20 ? messages2[messages2.length - 21].id : null
+  };
+}
+async function publishTeamContext(sql, actor, workspace, threadId, input) {
+  return sql.begin(async (tx) => {
+    const q = tx;
+    await q`select id from threads where id=${threadId}::uuid for update`;
+    const context = await teamContext(q, actor, workspace, threadId);
+    if (actor.kind !== "agent" || actor.id !== context.home?.home_agent_id) throw new BrainError("NOT_PERMITTED", "Only the owning agent can compact its thread.", 403);
+    if (context.revision !== input.revision || context.compactThrough !== input.through) throw new BrainError("CONFLICT", "The context changed; read it again before compacting.", 409);
+    await q`insert into team_context_snapshots(workspace_id,thread_id,revision,through_message_id,summary)
+      values(${workspace}::uuid,${threadId}::uuid,${input.revision + 1},${input.through}::uuid,${input.summary})`;
+    return { revision: input.revision + 1 };
+  });
+}
+
+// src/team-routes.ts
+var Scope = z24.object({ workspace: z24.string().uuid(), projectId: z24.string().uuid() });
+var ThreadScope = z24.object({ workspace: z24.string().uuid(), threadId: z24.string().uuid() });
+function teamRoutes(app, store2) {
+  const db = () => {
+    const sql = sqlOf(store2);
+    if (!sql) throw new BrainError("UNAVAILABLE", "Agent Desk requires the persistent store.", 503);
+    return sql;
+  };
+  app.get("/v1/team", async (c) => {
+    const p2 = Scope.safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply a workspace and project." }, 400);
+    const channelId = await teamProjectAccess(db(), c.get("actor"), p2.data.workspace, p2.data.projectId);
+    return c.json({ projectId: p2.data.projectId, channelId, homes: await teamHomes(db(), p2.data.workspace, p2.data.projectId) });
+  });
+  app.post("/v1/team/open", async (c) => {
+    const p2 = Scope.extend({ agentId: z24.string().uuid().optional() }).safeParse(await c.req.json());
+    if (!p2.success) return c.json({ error: "Supply a valid project and agent." }, 400);
+    const { workspace, projectId, agentId } = p2.data;
+    await ensureTeamHomes(db(), c.get("actor"), workspace, projectId, agentId);
+    return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get("actor"), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
+  });
+  app.get("/v1/team/context", async (c) => {
+    const p2 = ThreadScope.safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply a valid thread." }, 400);
+    return c.json(await teamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId));
+  });
+  app.post("/v1/team/compact", async (c) => {
+    const p2 = ThreadScope.extend({ revision: z24.number().int().nonnegative(), through: z24.string().uuid(), summary: z24.string().min(1).max(16e3) }).safeParse(await c.req.json());
+    if (!p2.success) return c.json({ error: "Supply a valid context snapshot." }, 400);
+    return c.json(await publishTeamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId, p2.data));
+  });
+  app.post("/v1/team/model", async (c) => {
+    const p2 = ThreadScope.extend({ model: z24.string(), thinking: z24.string().nullable() }).safeParse(await c.req.json());
+    if (!p2.success || !MODEL_ID_SET.has(p2.data.model) || p2.data.thinking && !THINKING_LEVELS.includes(p2.data.thinking)) return c.json({ error: "Choose a supported model and effort." }, 400);
+    const actor = c.get("actor");
+    if (actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "The model is a human choice.", 403);
+    const sql = db();
+    await brainThreadAccess(sql, actor, p2.data.workspace, p2.data.threadId);
+    const rows2 = await sql`update threads t set brain_override=jsonb_build_object(a.role,${p2.data.model}::text), home_thinking=${p2.data.thinking}
+      from agents a where t.id=${p2.data.threadId}::uuid and a.id=t.home_agent_id returning t.id`;
+    if (!rows2.length) throw new BrainError("NOT_FOUND", "No agent thread found.", 404);
+    return c.json({ ok: true });
+  });
+  app.get("/v1/team/history", async (c) => {
+    const p2 = ThreadScope.extend({ before: z24.string().uuid().optional(), sourceThreadId: z24.string().uuid().optional() }).safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply a valid thread." }, 400);
+    const sql = db();
+    const actor = c.get("actor");
+    const target = await brainThreadAccess(sql, actor, p2.data.workspace, p2.data.threadId);
+    if (actor.kind === "agent") {
+      if (!p2.data.sourceThreadId) throw new BrainError("NOT_PERMITTED", "Supply the requesting agent thread.", 403);
+      const source = await brainThreadAccess(sql, actor, p2.data.workspace, p2.data.sourceThreadId);
+      const [home] = await sql`select home_agent_id from threads where id=${p2.data.sourceThreadId}::uuid`;
+      if (source.project_id !== target.project_id || home?.["home_agent_id"] !== actor.id) throw new BrainError("NOT_PERMITTED", "Read agent threads within the current project.", 403);
+    }
+    const messages2 = await sql`select id,author_kind,author_id,body,created_at from messages where thread_id=${p2.data.threadId}::uuid
+      and (${p2.data.before ?? null}::uuid is null or (created_at,id)<(select created_at,id from messages where id=${p2.data.before ?? null}::uuid and thread_id=${p2.data.threadId}::uuid))
+      order by created_at desc,id desc limit 50`;
+    return c.json({ messages: messages2, next: messages2.length === 50 ? messages2[49]["id"] : null });
+  });
+  app.get("/v1/team/recall", async (c) => {
+    const p2 = ThreadScope.extend({ query: z24.string().trim().min(1).max(1e3) }).safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply the agent thread and search text." }, 400);
+    const sql = db();
+    const scope = await brainThreadAccess(sql, c.get("actor"), p2.data.workspace, p2.data.threadId);
+    const hits = await sql`select m.id,m.body,m.created_at from messages m join threads t on t.id=m.thread_id
+      where t.workspace_id=${p2.data.workspace}::uuid and t.project_id=${scope.project_id}::uuid
+        and t.kind <> 'coding' and m.fts @@ websearch_to_tsquery('english',${p2.data.query})
+      order by ts_rank(m.fts,websearch_to_tsquery('english',${p2.data.query})) desc,m.created_at desc limit 8`;
+    return c.json({ hits });
+  });
+  app.post("/v1/team/message", async (c) => {
+    const p2 = ThreadScope.extend({ targetThreadId: z24.string().uuid(), id: z24.string().uuid(), body: z24.string().trim().min(1).max(12e3) }).safeParse(await c.req.json());
+    if (!p2.success) return c.json({ error: "Supply an agent thread and a message." }, 400);
+    const actor = c.get("actor");
+    if (actor.kind !== "agent") throw new BrainError("NOT_PERMITTED", "This is the agent collaboration tool.", 403);
+    const sql = db();
+    const { workspace, threadId, targetThreadId, id, body } = p2.data;
+    await sql.begin(async (tx) => {
+      const q = tx;
+      const source = await brainThreadAccess(q, actor, workspace, threadId);
+      const target = await brainThreadAccess(q, actor, workspace, targetThreadId);
+      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid for update`;
+      const [to] = await q`select t.home_agent_id from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id join agents a on a.id=pa.agent_id and a.retired_at is null where t.id=${targetThreadId}::uuid and t.archived_at is null`;
+      if (source.project_id !== target.project_id || own?.["home_agent_id"] !== actor.id || !to?.["home_agent_id"] || threadId === targetThreadId) throw new BrainError("NOT_PERMITTED", "Collaborate with another agent in this project.", 403);
+      const [existing] = await q`select body,thread_id,team_source_thread_id from messages where id=${id}::uuid`;
+      if (existing) {
+        if (existing["body"] !== body || existing["thread_id"] !== targetThreadId || existing["team_source_thread_id"] !== threadId) throw new BrainError("CONFLICT", "This request ID was already used.", 409);
+        return;
+      }
+      const [trigger] = await q`select id,coalesce(team_depth,0)::int as depth from messages where thread_id=${threadId}::uuid and (author_kind='human' or team_source_thread_id is not null) order by created_at desc,id desc limit 1`;
+      if (!trigger || trigger["depth"] >= 3) throw new BrainError("HANDOFF_LIMIT", "This collaboration reached its handoff limit. Report the result to the person.", 409);
+      const [sent] = await q`select count(*)::int as n from messages where team_source_thread_id=${threadId}::uuid and created_at >= (select created_at from messages where id=${trigger["id"]}::uuid)`;
+      if (sent["n"] >= 4) throw new BrainError("HANDOFF_LIMIT", "This request has already contacted four teammates. Wait for their work before asking for more.", 409);
+      await q`insert into messages(id,workspace_id,channel_id,thread_id,author_kind,author_id,body,team_source_thread_id,team_depth)
+        values(${id}::uuid,${workspace}::uuid,${target.channel_id}::uuid,${targetThreadId}::uuid,'agent',${actor.id}::uuid,${body},${threadId}::uuid,${trigger["depth"] + 1})`;
+      await q`update threads set updated_at=now() where id=${targetThreadId}::uuid`;
+    });
+    fireWakeBump(store2, workspace);
+    return c.json({ ok: true, messageId: id, targetThreadId });
+  });
+}
+
+// src/api-error.ts
+var apiError = (err, c) => {
+  if (err instanceof DomainError || err instanceof BrainError) {
+    return c.json({ error: err.message, code: err.code }, err.status);
+  }
+  if (err.code === "P0001") {
+    return c.json({ error: err.message, code: "ILLEGAL_TRANSITION" }, 409);
+  }
+  console.error("unhandled api error:", err);
+  return c.json({ error: "internal error", code: "INTERNAL" }, 500);
+};
+
 // src/local-sync.ts
 import { createHash as createHash9 } from "node:crypto";
 
@@ -26456,6 +27002,8 @@ var messages = new Table({
   // Local-only project intent, validated by the server before a thread is born.
   birth_project: column.text,
   author_kind: column.text,
+  team_source_thread_id: column.text,
+  team_depth: column.integer,
   author_id: column.text,
   body: column.text,
   created_at: column.text,
@@ -26503,6 +27051,8 @@ var threads = new Table({
   // docs/10 §15: role → model, for THIS conversation. jsonb server-side, text here (PowerSync
   // has no json type) — `parseBrainOverride` is the one reader. Null = the project's brain.
   brain_override: column.text,
+  home_agent_id: column.text,
+  home_thinking: column.text,
   created_at: column.text,
   updated_at: column.text
 }, {
@@ -26731,6 +27281,7 @@ var policies = new Table({
 
 // ../client-core/src/tables/content.ts
 var schedules = new Table({
+  owner_home_thread_id: column.text,
   project_id: column.text,
   workspace_id: column.text,
   channel_id: column.text,
@@ -27106,11 +27657,11 @@ function webFrameRoute(app) {
 
 // src/starter-video.ts
 init_src();
-import { z as z24 } from "zod";
+import { z as z25 } from "zod";
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z24.object({ workspace: z24.string().uuid(), item: z24.string().uuid(), prompt: z24.string().min(8).max(2e3) });
+var FilmSchema = z25.object({ workspace: z25.string().uuid(), item: z25.string().uuid(), prompt: z25.string().min(8).max(2e3) });
 var FILM_FAILED = "The film failed. Your credits are back. Try again.";
 var FILM_REFUSED = "NeuraMesh Video refused this script. Change the script, then try again. Your credits are back.";
 var FILM_LOST = "The film did not reach this card. Your credits are back. Try again.";
@@ -27470,98 +28021,90 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z25.object({
+var MessageInputSchema = z26.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z25.string().uuid().optional(),
-  workspace: z25.string().min(1),
-  channel: z25.string().min(1).optional(),
-  project: z25.string().uuid().optional(),
+  id: z26.string().uuid().optional(),
+  workspace: z26.string().min(1),
+  channel: z26.string().min(1).optional(),
+  project: z26.string().uuid().optional(),
   // may be empty when the message carries only attachments (no caption)
-  body: z25.string(),
-  taskId: z25.string().min(1).optional(),
+  body: z26.string(),
+  taskId: z26.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z25.string().uuid().optional(),
+  threadId: z26.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z25.enum(["tasks", "chat"]).optional(),
+  threadMode: z26.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z25.record(z25.string(), z25.string()).nullable().optional(),
+  brainOverride: z26.record(z26.string(), z26.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z25.string().uuid().optional(),
+  rootMessageId: z26.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z25.string().uuid().optional(),
+  scheduleId: z26.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
   // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
   // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
   // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z25.string().uuid().nullable().optional(),
-  threadOrigin: z25.enum(["desktop", "web", "routine"]).optional(),
-  threadKind: z25.enum(["chat", "coding"]).optional(),
+  threadMachineId: z26.string().uuid().nullable().optional(),
+  threadOrigin: z26.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z26.enum(["chat", "coding"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z25.string().uuid().optional(),
+  replyTo: z26.string().uuid().optional(),
   // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
   // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
   // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z25.literal(true).optional(),
-  needCard: z25.literal(true).optional()
+  routineCard: z26.literal(true).optional(),
+  needCard: z26.literal(true).optional()
 }).refine((v) => !!v.channel || !!v.project, { message: "A project is required." });
-var ArtifactCreateSchema = z25.object({
-  id: z25.string().uuid(),
-  workspace: z25.string().min(1),
-  channel: z25.string().min(1),
-  taskId: z25.string().min(1).optional(),
-  messageId: z25.string().uuid(),
-  kind: z25.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z25.string().min(1).max(512),
-  mime: z25.string().max(255).optional(),
-  inlineContent: z25.string().max(4e5).optional(),
-  sizeBytes: z25.number().int().nonnegative().optional(),
-  width: z25.number().int().positive().optional(),
-  height: z25.number().int().positive().optional()
+var ArtifactCreateSchema = z26.object({
+  id: z26.string().uuid(),
+  workspace: z26.string().min(1),
+  channel: z26.string().min(1),
+  taskId: z26.string().min(1).optional(),
+  messageId: z26.string().uuid(),
+  kind: z26.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z26.string().min(1).max(512),
+  mime: z26.string().max(255).optional(),
+  inlineContent: z26.string().max(4e5).optional(),
+  sizeBytes: z26.number().int().nonnegative().optional(),
+  width: z26.number().int().positive().optional(),
+  height: z26.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z25.object({
-  id: z25.string().uuid(),
-  workspace: z25.string().min(1),
-  channel: z25.string().min(1),
-  threadId: z25.string().uuid().optional(),
-  taskId: z25.string().optional(),
-  title: z25.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z25.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z25.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z25.number().int().nonnegative().optional(),
-  rev: z25.number().int().min(1).default(1)
+var WhiteboardPutSchema = z26.object({
+  id: z26.string().uuid(),
+  workspace: z26.string().min(1),
+  channel: z26.string().min(1),
+  threadId: z26.string().uuid().optional(),
+  taskId: z26.string().optional(),
+  title: z26.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z26.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z26.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z26.number().int().nonnegative().optional(),
+  rev: z26.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z25.object({
-  rev: z25.number().int().min(1),
-  title: z25.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z25.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z25.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z25.number().int().nonnegative().optional(),
-  archivedAt: z25.string().nullable().optional()
+var WhiteboardPatchSchema = z26.object({
+  rev: z26.number().int().min(1),
+  title: z26.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z26.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z26.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z26.number().int().nonnegative().optional(),
+  archivedAt: z26.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
   const app = new Hono();
-  app.onError((err, c) => {
-    if (err instanceof BrainError) return c.json({ error: err.message, code: err.code }, err.status);
-    const pgCode = err.code;
-    if (pgCode === "P0001") {
-      return c.json({ error: err.message, code: "ILLEGAL_TRANSITION" }, 409);
-    }
-    console.error("unhandled api error:", err);
-    return c.json({ error: "internal error", code: "INTERNAL" }, 500);
-  });
+  app.onError(apiError);
   app.get("/healthz", (c) => c.json({ ok: true }));
   app.get("/a2a/agents/:agentId/card.json", async (c) => {
     const card2 = await store2.getAgentCard(c.req.param("agentId"));
@@ -27832,6 +28375,7 @@ function createApp(store2, opts = {}) {
     }
     return c.json({ error: "missing credentials", code: "AUTH_REQUIRED" }, 401);
   });
+  activationRoutes(app, store2);
   lifecycleRoutes(app, store2);
   creditRoutes(app, store2);
   trialRoutes(app, store2);
@@ -27841,6 +28385,7 @@ function createApp(store2, opts = {}) {
   announceClaimRoute(app, store2, opts.announce);
   contentMediaRoute(app, store2);
   brainRoutes(app, store2, opts.brain);
+  teamRoutes(app, store2);
   localSyncRoutes(app, store2);
   webFrameRoute(app);
   starterVideoRoutes(app, store2, opts.starterVideo);
@@ -28105,7 +28650,6 @@ function createApp(store2, opts = {}) {
     if (!await actorMayReadCredentials(store2, c.get("actor"), workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     return c.json({ credentials: await store2.listCredentials(workspace) });
   });
-  app.get("/v1/workspaces", async (c) => c.json({ workspaces: await store2.listWorkspaces(c.get("actor").id) }));
   app.get("/v1/invites", async (c) => {
     const { workspace } = c.req.query();
     if (!workspace) return c.json({ error: "workspace required", code: "INVALID_INPUT" }, 400);
@@ -31032,6 +31576,7 @@ var PostgresStore = class {
       }
       await this.addOrchestratorsToChannels(sql, input.workspace);
       await sql`update projects set context_channel_id = (select id from channels where project_id = ${projectId}::uuid order by (slug = 'general') desc, id limit 1) where id = ${projectId}::uuid`;
+      await seedStartupTeamSql(sql, input.workspace, projectId);
       await this.insertEvent(sql, { ...event, workspace: input.workspace }, null);
       return { id: projectId, slug };
     });
@@ -31351,12 +31896,9 @@ var PostgresStore = class {
       const [ch] = await sql`select workspace_id from channels where id = ${input.channelId}::uuid`;
       if (!ch) throw new DomainError("NOT_FOUND", "channel not found");
       const ws = ch["workspace_id"];
-      let agentId = null;
-      if (input.agentName) {
-        const [a] = await sql`select id from agents where workspace_id = ${ws}::uuid and name = ${input.agentName} and retired_at is null`;
-        if (!a) throw new DomainError("NOT_FOUND", `no active agent named "${input.agentName}"`);
-        agentId = a["id"];
-      }
+      const existing = await existingHomeRoutineSql(sql, ws, input);
+      if (existing) return existing;
+      const agentId = await routineAgentSql(sql, ws, input.agentName);
       const [row] = await sql`insert into schedules (workspace_id, channel_id, title, cadence, at_time, tz, weekday, next_run_at, agent_id, payload, created_by_kind, created_by)
         values (${ws}::uuid, ${input.channelId}::uuid, ${input.title}, ${input.cadence}, ${input.atTime}, ${input.tz}, ${input.weekday}, ${input.nextRunAt}, ${agentId}, ${sql.json({ prompt: input.prompt, ...input.payloadExtra ?? {} })}, ${input.createdByKind}, ${input.createdBy})
         returning id`;
@@ -31550,10 +32092,10 @@ var PostgresStore = class {
   // scene/source as jsonb strings, which reads fine on the writing machine (its local row is
   // the source of truth) and arrives DOUBLE-ENCODED on every other device. Parse the validated
   // JSON text and hand postgres.js the real value via sql.json.
-  wbJson(text2, what) {
-    if (text2 == null) return null;
+  wbJson(text3, what) {
+    if (text3 == null) return null;
     try {
-      return this.sql.json(JSON.parse(text2));
+      return this.sql.json(JSON.parse(text3));
     } catch {
       throw new DomainError("INVALID_INPUT", `${what} is not valid JSON`);
     }

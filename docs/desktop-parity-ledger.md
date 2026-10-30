@@ -12,37 +12,37 @@ with the next desktop tag, because the desktop's renderer copy already carries t
   version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** [v0.156.1](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.156.1)
-(published 2026-10-24 at 18:14 UTC, built from `e4705f66`, merged as `4e0327d1`, PR #764).
-It carries the shared SQLite replica, original file previews, coding activity/history recovery and
-the corrected native SQLite driver. Both packaged architectures passed database write/reopen
-and read-only checks. Native Intel validation passed with an 801 ms cold start; dark and
-cream-oak screenshots were inspected. See the [rollout evidence](design/powersync-retirement-2026-10/validation.md).
+**Newest published desktop:** [v0.156.2](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.156.2)
+(published 2026-10-25 at 00:08 UTC, built from `a7eb17bb`, merged in PR #767 as `a592cd33`).
+It adds project library and repository access across thread types and streams Gemini activity.
+Both signed, notarized architectures passed CLI and SQLite write/reopen checks. Native Intel
+validation passed with a 1,521 ms cold start; dark and cream-oak screenshots were inspected.
+See the [release validation](design/powersync-retirement-2026-10/desktop-0.156.2-validation.md).
 
-The previous supported published desktop is v0.155.1. v0.156.0 was briefly published and then
-withdrawn after the native SQLite constructor failure. It remains a draft. v0.154.1 is also an
-unpublished, superseded draft. The legacy service remains a compatibility dependency of
-v0.155.1 until the explicit retirement cutover.
+The previous supported published desktop is v0.156.1. Both supported releases use the API
+replica. v0.155.1 is outside the supported pair. v0.156.0 was withdrawn after its native SQLite
+constructor failure and remains a draft; v0.154.1 is also an unpublished, superseded draft.
+Hosted PowerSync remains available for legacy installed clients until the public iOS upgrade
+and final consumer checks pass.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log 4e0327d1..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log a592cd33..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
 
-The v0.156.2 candidate is the second desktop release with the API replica. It adds
-shared project document/repository access across thread types and streams Gemini tool
-activity in conversational threads. These runtime changes require fresh coding and native
-validation before release. After publication, a separate support update
-will name v0.156.2 and v0.156.1 and remove v0.155.1 from the supported pair. The hosted
-PowerSync service stays active until the public iOS upgrade and final consumer checks pass.
+v0.156.2 is the second published desktop with the API replica. The supported pair is now
+v0.156.2/v0.156.1; earlier desktops receive the existing update notice. The hosted PowerSync
+shutdown remains separate from this support-version change.
 
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
-| 2026-10-24 | Shared project library and all attached repositories in normal, marketing and coding threads; live Gemini reasoning summaries and tool steps. | #767 | Project context parity | after rollout | Shared context resolution, bounded repository reads, Gemini conversation streaming. | v0.156.2 candidate |
+| 2026-10-30 | Optional cloud trial activation, the free-local desktop action, and an editable first message on New session after onboarding. Existing free workspaces retain their data and credits. | #777 | [Activation validation](design/trial-activation-2026-10/validation.md) | HQ, API; desktop candidate | Includes the native activation screen, existing Local startup IPC, activation resume, and New session draft. Enforcement stays off until compatible clients and cancellation validation are ready. | v0.157.0 |
+| 2026-10-28 | **Agent Desk.** Durable project/agent homes, parallel compact conversations, inline automations/connectors, draggable/resizable cards and custom-agent creation. | this PR | [Implementation and validation](design/project-team-2026-10/validation.md) | HQ web + API + cloud after deployment | HQ has a separate renderer. A future desktop UI port needs the Agent Desk view and bridge; shared routing, compaction and collaboration tools reach the desktop runtime with its next tag. No native UI certification is claimed here. | |
+| 2026-10-24 | Shared project library and all attached repositories in normal, marketing and coding threads; live Gemini reasoning summaries and tool steps. | #767 | Project context parity | web, phone update, cloud, desktop | Shared context resolution, bounded repository reads, Gemini conversation streaming. | v0.156.2 |
 | 2026-10-23 | Shared SQLite replica replaces PowerSync; preserves queued edits and cached reads across upgrades. File previews, expandable coding activity, and connection/history recovery. | #762 | [Retirement](design/powersync-retirement-2026-10/plan.md) | web, phone, cloud, desktop after rollout | Shared replica, normal API credentials, legacy cache import, native SQLite packaging. | v0.156.1 |
 | 2026-10-15 | **Elevated default themes.** Fresh profiles follow the OS with Light or Soft Dark. Saved fixed palettes remain unchanged. | this PR | [Validation](design/hq-subscription-2026-10/validation.md) | web, desktop | Theme resolution, first-paint boot and Appearance copy. | v0.155.1 |
 | 2026-10-13 | Saved-model refusals retain an open thread so a new model can be selected. A reload waits for the host recording revision before it restores history. | #722, #723 | [Coding rollout](design/mobile-brain-coding-2026-10/rollout.md) | web, cloud, desktop | Includes the host recovery and renderer restore fixes. The v0.154.1 draft remains unpublished. The replacement also defers the coding runtime probe until Code is requested and includes both native CLI packages. | v0.154.2 |

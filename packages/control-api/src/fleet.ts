@@ -5,6 +5,7 @@
 
 import type { Env, Hono } from 'hono';
 import type postgres from 'postgres';
+import { needsActivation } from './activation';
 import { z } from 'zod';
 import { clerkJwks } from './clerk';
 import { claimRoutes, newMachineSubstrate, type MachineSubstrate } from './fleet-claims';
@@ -124,7 +125,7 @@ export function rowsToDesired(rows: CloudMachineRow[]): FleetDesired {
       // (machined refuses to boot without one; the live roll proved it)
       ...(r.owner_user_id ? { ownerUserId: r.owner_user_id } : {}),
       ...(r.substrate === 'claim' ? { substrate: 'claim' as const } : {}),
-      replicas: r.desired_replicas === 1 ? 1 : 0,
+      replicas: !needsActivation(r.workspace_plan) && r.desired_replicas === 1 ? 1 : 0,
       cpu: str('cpu'),
       memory: str('memory'),
       cpuLimit: str('cpuLimit'),

@@ -55,6 +55,14 @@ service, JWT audience, publication or rule deployment is required. New read-mode
 in `packages/client-core/src/schema.ts`; the server uses that allowlist and forces a fresh snapshot
 when its hash changes. A new table also needs the change-capture trigger and a workspace scope.
 
+The production brain/replica API has its own deployment. A green Vercel control-API deploy
+does not update it. For changes to replica fields or brain routes, wait for CI on the intended
+revision, then run `gh workflow run infra.yml --ref <tested-ref> -f deploy_brain=true`.
+Wait for its production HTTPS and storage canary before rolling the fleet. Verify the fields
+through a freshly loaded authenticated client as well as the machine's image revision.
+Agent Desk requires `home_agent_id` and collaboration metadata to reach that replica; an old
+projection can show the correct card while routing its message to the wrong agent.
+
 During the retirement rollout, the frozen legacy sync-rule file remains a compatibility contract
 for installed clients only. The local stack and CI no longer deploy it. Follow the
 [retirement plan](design/powersync-retirement-2026-10/plan.md) for client releases, the supported

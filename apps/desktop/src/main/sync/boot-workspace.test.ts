@@ -11,7 +11,7 @@ import { onboardTarget } from './onboard-target';
 import { onboardOrderFor } from '../../renderer/src/views/onboard-order';
 
 const root = mkdtempSync(join(tmpdir(), 'nm-boot-resume-'));
-let memberships: Array<{ id: string; name: string; slug: string; onboarded: boolean }> = [];
+let memberships: Array<{ id: string; name: string; slug: string; onboarded: boolean; activationRequired?: boolean }> = [];
 let registrations = 0;
 class Replica {
   async connect() {}
@@ -28,7 +28,7 @@ const fakeSync = {
   },
 };
 const mocks: Record<string, unknown> = {
-  electron: { app: {}, BrowserWindow: { getAllWindows: () => [] }, Notification: {} },
+  electron: { app: { on: () => {} }, BrowserWindow: { getAllWindows: () => [] }, Notification: {} },
   '@neuramesh/client-core/sqlite-replica': { SQLiteReplica: Replica },
   '../apiauth': {}, '../auth': {}, '../auth-clerk': {},
   '../agents': { startAgentHost: () => {} }, '../notify': { startNotifications: () => {} },
@@ -41,12 +41,13 @@ type Loader = { _load: (request: string, parent: { filename?: string }, ...rest:
 const loader = Module as unknown as Loader;
 const realLoad = loader._load;
 let bootConnection: typeof import('./boot')['bootConnection'];
+let resumeActivatedWorkspace: typeof import('./boot')['resumeActivatedWorkspace'];
 before(async () => {
   loader._load = function (request, parent, ...rest) {
-    if (parent?.filename?.endsWith('/sync/boot.ts') && request in mocks) return mocks[request];
+    if ((/\/sync\/(boot|activation)\.ts$/.test(parent?.filename ?? '')) && request in mocks) return mocks[request];
     return realLoad.call(this, request, parent, ...rest);
   };
-  try { ({ bootConnection } = await import('./boot')); } finally { loader._load = realLoad; }
+  try { ({ bootConnection, resumeActivatedWorkspace } = await import('./boot')); } finally { loader._load = realLoad; }
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 const fixture = (name: string, workspace?: string) => {
@@ -94,4 +95,20 @@ test('an account with no workspace still gets the create step and no invented re
   assert.equal(onboardOrderFor({ web: false, resume: !!conn.resumeWorkspaceId }).includes('workspace'), true);
   assert.deepEqual(onboardTarget({ workspaceId: conn.resumeWorkspaceId }, conn.session.wsMemberships), { kind: 'create' });
   assert.equal(registrations, 0);
+});
+
+test('a gated workspace starts its host once after HQ activation without replacing its replica', async () => {
+  memberships = [{ id: 'pending', name: 'Pending', slug: 'pending', onboarded: true, activationRequired: true }];
+  const conn = fixture('pending', 'pending');
+  registrations = 0;
+  await bootConnection(conn, deps);
+  const replica = conn.db;
+  assert.equal(registrations, 0);
+  assert.equal(await resumeActivatedWorkspace(conn, deps), false);
+  memberships[0]!.activationRequired = false;
+  assert.equal(await resumeActivatedWorkspace(conn, deps), true);
+  assert.equal(await resumeActivatedWorkspace(conn, deps), true);
+  assert.equal(registrations, 1);
+  assert.equal(conn.agentHostStarted, true);
+  assert.equal(conn.db, replica);
 });
