@@ -176,7 +176,7 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
       log?.({ kind: 'tool', phase: 'call', summary: `propose_impl_plan #${input.taskNumber} · legs ${input.legs.join('→')}` });
       return `#${input.taskNumber} is in plan_review carrying your plan (journey: ${input.legs.join(' → ')} → accept). The human approves it in the task thread — work is offered only after that; you cannot approve it yourself.`;
     } },
-    { name: 'request_plan', description: 'Route a LEGACY/board-born task to the channel architect for an implementation plan (a plan-first unit already carries its plan — revise_plan is the tool there, and this cannot fire from plan_review). The bar: a genuinely non-obvious APPROACH after requirements are clear — the exception you justify, never the default. Never for finding a bug\'s cause: the architect plans from known requirements, it cannot debug. The drafted plan returns for the human\'s approval before anything builds. Set the task kind.', schema: {
+    { name: 'request_plan', description: 'Ask the selected owner of a LEGACY/board-born task for an implementation plan (a plan-first unit already carries its plan — revise_plan is the tool there, and this cannot fire from plan_review). The bar: a genuinely non-obvious APPROACH after requirements are clear — the exception you justify, never the default. Never for finding a bug\'s cause: the architect plans from known requirements, it cannot debug. The drafted plan returns for the human\'s approval before anything builds. Set the task kind.', schema: {
       taskNumber: z.number().int().describe('the task number to route into planning'),
       checklist: z.array(z.string().min(1)).min(1).describe('the requirement checks resolved in the thread — the architect plans against these'),
       kind: kindField.optional().describe('work-type label (docs/16) — set it so the planned task is categorized; omit only if the task already carries a kind.'),
@@ -184,17 +184,12 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
       const t = await taskByNumber(input.taskNumber);
       if (!t) return `error: no task #${input.taskNumber} in #${ch.slug}`;
       await post('/v1/commands', actor, { type: 'task.confirm_requirements', taskId: t.id, checklist: input.checklist }).catch(() => {});
-      // resolve THIS channel's architect so the task is assigned to a named agent (the board shows
-      // it instead of "unassigned") and we can tell the human exactly who is planning it.
-      const [arch] = await db.getAll<{ id: string; name: string }>(`select a.id, a.name from agents a join agent_channels ac on ac.agent_id = a.id where ac.channel_id = ? and a.role = 'architect' and a.retired_at is null order by a.name limit 1`, [ch.id]); // order by a SYNCED column — the PowerSync replica doesn't carry created_at
-      const res = await post('/v1/commands', actor, { type: 'task.request_plan', taskId: t.id, architect: arch?.id, ...(input.kind ? { kind: input.kind } : {}) });
+      const res = await post('/v1/commands', actor, { type: 'task.request_plan', taskId: t.id, ...(input.kind ? { kind: input.kind } : {}) });
       const body = (await res.json()) as any;
       if (!res.ok) return `error ${res.status}: ${body.error ?? body.code ?? 'task.request_plan failed'}`;
-      return arch
-        ? `routed #${input.taskNumber} to ${arch.name} (the #${ch.slug} architect) — it's assigned to ${arch.name}, who will draft the plan and post it for review. Name ${arch.name} in your reply.`
-        : `routed #${input.taskNumber} into planning, but #${ch.slug} has NO architect registered — the plan can't be drafted until one is. If a workspace architect exists (list_agents), propose ADDING them (the add card); if none exists anywhere, propose HIRING one (the hire card — human approval required).`;
+      return `#${input.taskNumber} is in planning. Its selected owner retains the task and posts the plan for approval. Ask another specialist separately if input is needed.`;
     } },
-    { name: 'request_design', description: 'Route a task to the channel designer for mockups BEFORE the architect plans — when the request CREATES OR CHANGES a user-facing visual surface with no agreed look (new pages, new UI, redesigns, visual modifications). Ask this of ANY kind: a bug or chore whose real fix is a redesign routes here too, not only a feature. The designer studies the repo\'s existing design system, drafts mockups, and they return to the thread for the HUMAN\'s approval (you cannot approve a design); only after approval does the architect plan. Requires resolved requirements, like request_plan. Set the task kind.', schema: {
+    { name: 'request_design', description: 'Route a task to the channel designer for mockups BEFORE the architect plans — when the request CREATES OR CHANGES a user-facing visual surface with no agreed look (new pages, new UI, redesigns, visual modifications). Ask this of ANY kind: a bug or chore whose real fix is a redesign routes here too, not only a feature. The designer studies the repo\'s existing design system, drafts mockups, and they return to the thread for the HUMAN\'s approval (you cannot approve a design); after approval the assigned owner continues planning. Requires resolved requirements, like request_plan. Set the task kind.', schema: {
       taskNumber: z.number().int().describe('the task number to route into design'),
       checklist: z.array(z.string().min(1)).min(1).describe('the requirement checks resolved in the thread — the designer works against these'),
       kind: kindField.optional().describe('work-type label (docs/16) — usually feature or design, but any kind may route to design (a bug whose fix is a redesign); set it so the task is categorized.'),
@@ -214,13 +209,13 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
         if (!res.ok) return `error ${res.status}: ${body.error ?? body.code ?? 'task.request_design failed'}`;
         return `#${input.taskNumber} is in designing and still YOURS. Spawn your designers now — one per direction, each inheriting the #${ch.slug} designer's seat and design flow — then propose_design_round to put what they drew in front of the human. Your reply names no other owner: you are running this round.`;
       }
-      // resolve THIS channel's designer so the task is assigned to a named agent (mirrors request_plan)
+      // Resolve the design contributor without changing the task's accountable owner.
       const [des] = await db.getAll<{ id: string; name: string }>(`select a.id, a.name from agents a join agent_channels ac on ac.agent_id = a.id where ac.channel_id = ? and a.role = 'designer' and a.retired_at is null order by a.name limit 1`, [ch.id]);
       if (!des) return `error: #${ch.slug} has NO designer registered — mockups can't be drafted until one is. If a workspace designer exists (list_agents), propose ADDING them (the add card); if none exists anywhere, propose HIRING one (the hire card — human approval required); or route straight to planning with request_plan if the human prefers to skip design.`;
       const res = await post('/v1/commands', actor, { type: 'task.request_design', taskId: t.id, designer: des.id, ...(input.kind ? { kind: input.kind } : {}), ...(input.provider ? { provider: input.provider } : {}) });
       const body = (await res.json()) as any;
       if (!res.ok) return `error ${res.status}: ${body.error ?? body.code ?? 'task.request_design failed'}`;
-      return `routed #${input.taskNumber} to ${des.name} (the #${ch.slug} designer)${input.provider === 'claude-design' ? ' through Claude Design' : input.provider === 'iris' ? ' for an Iris HTML mockup' : ''} — it's assigned to ${des.name}, who ${input.provider ? 'will use the chosen canvas' : 'will ask the human to choose an Iris HTML mockup or an editable Claude Design project'} and bring the result back for approval. Name ${des.name} in your reply.`;
+      return `requested mockups for #${input.taskNumber} from ${des.name} (the #${ch.slug} designer)${input.provider === 'claude-design' ? ' through Claude Design' : input.provider === 'iris' ? ' for an Iris HTML mockup' : ''} — the task keeps its existing owner. ${des.name} ${input.provider ? 'will use the chosen canvas' : 'will ask the human to choose an Iris HTML mockup or an editable Claude Design project'} and bring the result back for approval.`;
     } },
     { name: 'revise_design', description: 'Send proposed design mockups (a task in design_review) BACK to the designer with the human\'s feedback — use this when a human in the thread describes what to change about the mockups. The designer reworks them and a new round returns for approval. You can NEVER approve a design yourself — approval is the human\'s button in the thread.', schema: {
       taskNumber: z.number().int().describe('the task in design_review to send back'),
@@ -232,7 +227,7 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
       if (!res.ok) { const b = (await res.json().catch(() => ({}))) as any; return `error ${res.status}: ${b.error ?? b.code ?? 'revise_design failed'}`; }
       return `sent #${input.taskNumber} back to the designer with the change notes — a reworked round will return for approval`;
     } },
-    { name: 'revise_plan', description: 'Send a proposed implementation plan (a task in plan_review) BACK to the architect with the human\'s feedback — use this when a human in the thread describes what to change about the plan. The architect redrafts it and a new version returns for approval.', schema: {
+    { name: 'revise_plan', description: 'Send a proposed implementation plan (a task in plan_review) back to its assigned owner with the human\'s feedback — use this when a human in the thread describes what to change about the plan. The same owner redrafts it and a new version returns for approval; coding tasks use their native coding runtime. Request architecture input separately without reassigning the implementation task.', schema: {
       taskNumber: z.number().int().describe('the task in plan_review to send back'),
       feedback: z.string().min(1).describe('what to change — the human\'s plan feedback, stated concretely'),
     }, run: async (input) => {
@@ -240,7 +235,7 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
       if (!t) return `error: no task #${input.taskNumber} in #${ch.slug}`;
       const res = await post('/v1/commands', actor, { type: 'task.revise_plan', taskId: t.id, feedback: input.feedback });
       if (!res.ok) { const b = (await res.json().catch(() => ({}))) as any; return `error ${res.status}: ${b.error ?? b.code ?? 'revise_plan failed'}`; }
-      return `sent #${input.taskNumber} back to the architect with the review notes — a redrafted plan will return for approval`;
+      return `sent #${input.taskNumber} back to its assigned owner with the review notes — a redrafted plan will return for approval`;
     } },
     { name: 'revise_ship_plan', description: 'Send a proposed release plan (a task in ship_review) BACK to the shipper with the human\'s feedback — use this when a human in the thread describes what to change about the release plan or its checklist. The shipper redrafts it and a new round returns for approval. You can NEVER approve a release plan yourself — approval is the human\'s button in the thread (docs/23).', schema: {
       taskNumber: z.number().int().describe('the task in ship_review to send back'),

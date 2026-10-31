@@ -60,7 +60,8 @@ export function setDefinitionOfDone(task: Task, actor: Actor, dod: string): Muta
   // humans + the orchestrator own the acceptance contract; the architect may set
   // the DoD it derived from its own implementation plan (which the human reviews
   // as part of plan approval before any work starts). Workers/reviewers never do.
-  const mayEdit = actor.kind === 'human' || actor.role === 'orchestrator' || actor.role === 'architect';
+  const ownsPlan = (task.state === 'planning' || task.state === 'plan_review') && !task.planApprovedAt && (sameActor(task.assignee, actor) || (!task.assignee && actor.kind === 'agent' && task.offeredAgentId === actor.id));
+  const mayEdit = actor.kind === 'human' || actor.role === 'orchestrator' || actor.role === 'architect' || ownsPlan;
   if (!mayEdit) throw new DomainError('NOT_PERMITTED', 'the Definition of Done is set by humans, the orchestrator, or the architect');
   if (!DOD_EDITABLE_STATES.has(task.state)) {
     throw new DomainError('ILLEGAL_TRANSITION', `the Definition of Done is frozen once a task is ${task.state}`);
@@ -308,12 +309,16 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
       ? 'todo'
       : target.to;
 
+  const owner = task.assignee ?? (task.offeredAgentId ? { kind: 'agent' as const, id: task.offeredAgentId } : null);
+  if (cmd.type === 'task.propose_plan' && owner && actor.kind !== 'human' && !sameActor(owner, actor)) {
+    throw new DomainError('NOT_PERMITTED', 'The assigned agent revises this plan. Request specialist input separately; do not take over the task.');
+  }
   const claiming = cmd.type === 'task.claim';
   const ctx: TransitionContext = {
     actor,
     isAssignee: claiming
-      ? task.assignee === null || sameActor(task.assignee, actor)
-      : sameActor(task.assignee, actor),
+      ? owner === null || sameActor(owner, actor)
+      : sameActor(owner, actor),
     isCreator: sameActor(task.creator, actor),
     // Reviewer-pool membership comes from the channel registry once the DB
     // layer lands (week 2); until then the agent's role is the pool.
@@ -350,16 +355,9 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
   if (verdict.spec.name === 'unblock') next.blockedFrom = null;
 
   if (verdict.spec.name === 'claim') next.assignee = { kind: actor.kind, id: actor.id };
-  // request_plan assigns the task to the named architect, so the board/thread show who's planning
-  // it (not "unassigned") from the moment it enters planning. `architect` is the resolved architect
-  // agent id (the orchestrator's request_plan tool looks it up for the channel).
-  if (verdict.spec.name === 'request_plan' && cmd.type === 'task.request_plan' && cmd.architect) next.assignee = { kind: 'agent', id: cmd.architect };
-  // request_design mirrors request_plan: the resolved channel designer becomes the assignee
-  // while the mockups are drafted. approve_design hands off to planning with the assignee
-  // CLEARED — the human's button can't know the architect; the architect watch self-selects
-  // by role and announces itself in the thread.
-  if (verdict.spec.name === 'request_design' && cmd.type === 'task.request_design' && cmd.designer) next.assignee = { kind: 'agent', id: cmd.designer };
-  if (verdict.spec.name === 'approve_design') next.assignee = null;
+  // Planning and design are phases, never implicit reassignment. The selected
+  // owner stays accountable; specialist input is a separate consultation.
+  if (verdict.spec.name === 'revise_plan' || verdict.spec.name === 'request_plan') next.planApprovedAt = null;
   // routing must categorize the task (docs/16): use the command's kind, else one already
   // set; refuse if still null. NEVER a route gate — any kind may take either route; we
   // only require that the label exists so no task is routed uncategorized.

@@ -65,6 +65,8 @@ export interface EngineeringAttachmentRef {
 }
 
 export type EngineeringRuntimeEvent =
+  /** Authenticated attachment to a task already executing on this host. Public UI state only. */
+  | { type: 'task_state'; session: import('./domain').EngineeringSession }
   /** Client transport lifecycle, never an agent reply or a recorded host event. */
   | { type: 'disconnected'; message: string }
   | { type: 'file_preview'; requestId: string; path: string; content?: string; error?: string }

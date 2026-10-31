@@ -109,15 +109,13 @@ export const TRANSITIONS: readonly TransitionSpec[] = [
   { name: 'approve_design', from: 'design_review', to: 'planning', by: ['human'] },
   { name: 'cancel', from: 'designing', to: 'closed', by: ['orchestrator', 'human'] },
   { name: 'cancel', from: 'design_review', to: 'closed', by: ['orchestrator', 'human'] },
-  // Plan lifecycle — an implementation-quality gate before execution. The
-  // orchestrator routes a non-trivial task into planning; the architect (the
-  // assignee while planning) proposes a plan; once approved it's offered to a
-  // developer who claims from plan_review. There is deliberately NO
-  // planning -> in_progress edge: a dev cannot start while the plan is unsettled.
+  // Plan lifecycle: the selected owner drafts and revises its own plan. A phase
+  // never assigns another specialist. Separate consultations can inform the plan;
+  // only human approval releases implementation.
   { name: 'request_plan', from: 'todo', to: 'planning', by: ['orchestrator', 'human'] },
   // Same reason as propose_design: under ownership the plan is drafted by an architect SUBAGENT
   // with no board identity, and the owner is the one that answers for it.
-  { name: 'propose_plan', from: 'planning', to: 'plan_review', by: ['architect', 'orchestrator'] },
+  { name: 'propose_plan', from: 'planning', to: 'plan_review', by: ['assignee', 'architect', 'orchestrator'] },
   { name: 'revise_plan', from: 'plan_review', to: 'planning', by: ['orchestrator', 'human'] },
   { name: 'claim', from: 'plan_review', to: 'in_progress', by: ['assignee'] },
   // Plan-first units (2026-08-17): a unit born WITH its work plan sits in plan_review from

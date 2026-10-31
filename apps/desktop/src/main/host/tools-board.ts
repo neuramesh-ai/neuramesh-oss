@@ -1,3 +1,4 @@
+import { TASK_HANDOFF_SKILL } from '@neuramesh/shared';
 // The BOARD tools — everything that files, routes or moves work, plus the fan-out (docs/harness/04).
 //
 // Routing is the judgment these support: offer_task is the lightest path, request_plan the
@@ -77,7 +78,7 @@ export function boardTools(tc: ToolCtx): OrchTool[] {
       const rows = await db.getAll(`select t.number, t.title, t.state, t.branch, (select name from agents where id = t.offered_agent_id) as offered_to, (select name from agents a where a.id = t.assignee_id) as assignee from tasks t where ${where.join(' and ')} order by t.number desc limit 8`, args);
       return rows.length ? JSON.stringify(rows) : 'no matching task on this board — say so; do NOT guess from memory';
     } },
-    { name: 'create_task', description: 'CREATE a board task directly: the unit is born in PLAN REVIEW carrying your implementation plan, its ‹task:id› card lands in this conversation, and the human approves the plan in the task\'s thread before any work starts — creating is never starting. The server refuses a plan-less agent create and bounces same-title duplicates. Work riding an OPEN task is add_subtask; an idea nobody is starting is add_backlog_item.', schema: {
+    { name: 'create_task', description: 'CREATE a board task directly: the unit is born in PLAN REVIEW carrying your implementation plan, its ‹task:id› card lands in this conversation, and the human approves the plan in the task\'s thread before any work starts — creating is never starting. The server refuses a plan-less agent create and bounces same-title duplicates. Work riding an OPEN task is add_subtask; an idea nobody is starting is add_backlog_item.\n\n' + TASK_HANDOFF_SKILL, schema: {
       title: z.string().min(1).max(72).describe('SHORT imperative task title, 72 chars max — the smallest shippable unit. NOT the human\'s ask restated: the ask belongs in description.'),
       description: z.string().min(1).describe('the request as stated plus key details extracted — this becomes the unit\'s intake record'),
       kind: z.enum(TASK_KINDS).describe('the work type (docs/16) — required: a created unit is routed work'),

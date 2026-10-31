@@ -47,7 +47,11 @@ export class EngineeringConversation {
   excludeSecret(secret?: string): void { this.brain.excludeSecret(secret); }
 
   checkpoint(core: ClineCore, sessionId: string, metadata: Record<string, unknown>): Promise<void> {
-    return this.seal(() => readRuntimeMessages(core, sessionId), metadata);
+    return this.seal(async () => {
+      const messages = await readRuntimeMessages(core, sessionId);
+      metadata['compactionState'] = typeof core.readSessionCompactionState === 'function' ? await core.readSessionCompactionState(sessionId) : undefined;
+      return messages;
+    }, metadata);
   }
 
   /** a lane with no Cline core (the agy lane) seals the messages it keeps itself */
@@ -60,7 +64,7 @@ export class EngineeringConversation {
       const messages = await read();
       let artifactError: unknown;
       try { await this.uploadArtifacts(); } catch (error) { artifactError = error; }
-      this.brain.setRuntime(messages, { ...metadata, recordedEventCount: this.brain.events().length });
+      this.brain.setRuntime(messages, { ...this.brain.metadata(), ...metadata, recordedEventCount: this.brain.events().length });
       await this.brain.flush();
       if (artifactError) throw artifactError;
     });

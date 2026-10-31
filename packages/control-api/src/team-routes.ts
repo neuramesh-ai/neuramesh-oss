@@ -6,6 +6,7 @@ import { sqlOf } from './credits';
 import type { Store } from './store';
 import { BrainError, brainThreadAccess } from './brain-store';
 import { ensureTeamHomes, teamHomes, teamProjectAccess, teamContext, publishTeamContext } from './store/team-desk';
+import { freshTeamThread } from './store/team-thread';
 import { fireWakeBump } from './fleet-lifecycle';
 
 const Scope = z.object({ workspace: z.string().uuid(), projectId: z.string().uuid() });
@@ -23,12 +24,25 @@ export function teamRoutes<E extends Env & { Variables: { actor: Actor } }>(app:
     await ensureTeamHomes(db(), c.get('actor'), workspace, projectId, agentId);
     return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get('actor'), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
   });
+  app.post('/v1/team/fresh', async c => {
+    const p = Scope.extend({ threadId: z.string().uuid() }).safeParse(await c.req.json());
+    if (!p.success) return c.json({ error: 'Supply the current agent thread and project.' }, 400);
+    const { workspace, projectId, threadId } = p.data;
+    await freshTeamThread(db(), c.get('actor'), workspace, projectId, threadId);
+    return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get('actor'), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
+  });
+  app.get('/v1/team/threads', async c => {
+    const p = Scope.extend({ agentId: z.string().uuid() }).safeParse(c.req.query());
+    if (!p.success) return c.json({ error: 'Supply the agent and project.' }, 400);
+    await teamProjectAccess(db(), c.get('actor'), p.data.workspace, p.data.projectId);
+    return c.json(await teamHomes(db(), p.data.workspace, p.data.projectId, p.data.agentId));
+  });
   app.get('/v1/team/context', async c => {
-    const p = ThreadScope.safeParse(c.req.query()); if (!p.success) return c.json({ error: 'Supply a valid thread.' }, 400);
-    return c.json(await teamContext(db(), c.get('actor'), p.data.workspace, p.data.threadId));
+    const p = ThreadScope.extend({ mode: z.enum(['auto', 'manual']).optional() }).safeParse(c.req.query()); if (!p.success) return c.json({ error: 'Supply a valid thread.' }, 400);
+    return c.json(await teamContext(db(), c.get('actor'), p.data.workspace, p.data.threadId, p.data.mode));
   });
   app.post('/v1/team/compact', async c => {
-    const p = ThreadScope.extend({ revision: z.number().int().nonnegative(), through: z.string().uuid(), summary: z.string().min(1).max(16000) }).safeParse(await c.req.json());
+    const p = ThreadScope.extend({ mode: z.enum(['auto', 'manual']).optional(), revision: z.number().int().nonnegative(), through: z.string().uuid(), summary: z.string().min(1).max(16000) }).safeParse(await c.req.json());
     if (!p.success) return c.json({ error: 'Supply a valid context snapshot.' }, 400);
     return c.json(await publishTeamContext(db(), c.get('actor'), p.data.workspace, p.data.threadId, p.data));
   });
@@ -38,7 +52,7 @@ export function teamRoutes<E extends Env & { Variables: { actor: Actor } }>(app:
     const actor = c.get('actor'); if (actor.kind !== 'human') throw new BrainError('HUMAN_ONLY', 'The model is a human choice.', 403);
     const sql = db(); await brainThreadAccess(sql, actor, p.data.workspace, p.data.threadId);
     const rows = await sql`update threads t set brain_override=jsonb_build_object(a.role,${p.data.model}::text), home_thinking=${p.data.thinking}
-      from agents a where t.id=${p.data.threadId}::uuid and a.id=t.home_agent_id returning t.id`;
+      from agents a where t.id=${p.data.threadId}::uuid and a.id=t.home_agent_id and t.archived_at is null returning t.id`;
     if (!rows.length) throw new BrainError('NOT_FOUND', 'No agent thread found.', 404);
     return c.json({ ok: true });
   });
@@ -75,8 +89,10 @@ export function teamRoutes<E extends Env & { Variables: { actor: Actor } }>(app:
       const q = tx as unknown as typeof sql;
       const source = await brainThreadAccess(q, actor, workspace, threadId);
       const target = await brainThreadAccess(q, actor, workspace, targetThreadId);
-      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid for update`;
+      await q`select id from threads where id in (${threadId}::uuid,${targetThreadId}::uuid) order by id for update`;
+      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid and archived_at is null`;
       const [to] = await q`select t.home_agent_id from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id join agents a on a.id=pa.agent_id and a.retired_at is null where t.id=${targetThreadId}::uuid and t.archived_at is null`;
+      if (!to) throw new BrainError('CONFLICT', 'This teammate has a fresh thread. Read list_team and use its current thread ID.', 409);
       if (source.project_id !== target.project_id || own?.['home_agent_id'] !== actor.id || !to?.['home_agent_id'] || threadId === targetThreadId) throw new BrainError('NOT_PERMITTED', 'Collaborate with another agent in this project.', 403);
       const [existing] = await q`select body,thread_id,team_source_thread_id from messages where id=${id}::uuid`;
       if (existing) { if (existing['body'] !== body || existing['thread_id'] !== targetThreadId || existing['team_source_thread_id'] !== threadId) throw new BrainError('CONFLICT', 'This request ID was already used.', 409); return; }

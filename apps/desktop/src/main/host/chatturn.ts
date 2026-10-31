@@ -1,3 +1,5 @@
+import { isCompactCommand } from './compact-command';
+import { conversationContext, conversationToolsThrough, setConversationHistoryBoundary, withoutConversationBrain } from '../harness/brain-sync';
 import { agentHomeTranscript } from './team-context';
 import { STARTER_MODEL } from '@neuramesh/shared';
 import { bindConversationCallback } from '../harness/brain-sync';
@@ -75,6 +77,7 @@ async function chatTurn(args: {
   ch: { id: string; slug: string; workspace_id: string };
   threadId: string;
   transcript: string;
+  request?: { body: string; author_kind: string };
   token: string;
   log: LogFn;
   onDelta: (text: string, thinking?: string) => void;
@@ -84,16 +87,32 @@ async function chatTurn(args: {
   const { agent, ch, threadId, token, log, onDelta, attachments, run } = args;
   let transcript = args.transcript;
   const home = await db.get<{ home_agent_id: string | null }>('select home_agent_id from threads where id = ?', [threadId]);
-  if (home?.home_agent_id) {
+  const manualCompact = !!args.request && isCompactCommand(args.request.body, args.request.author_kind, agent.name);
+  if (manualCompact && attachments.length) return 'Send /compact on its own, without attachments. Your conversation has not been changed.';
+  let compactMode: 'manual' | 'auto' = manualCompact ? 'manual' : 'auto';
+  let checkedPressure = false;
+  let compacted = false;
+  {
     const actor = { kind: 'agent', id: agent.id, role: agent.role };
     const continued = await agentHomeTranscript({
-      read: async () => { const res: Response = await apiGet(`/v1/team/context?workspace=${ch.workspace_id}&threadId=${threadId}`, actor); if (!res.ok) throw new Error(`Could not restore the agent thread (${res.status}).`); return res.json(); },
-      compact: async (revision, through, summary) => { const res = await post('/v1/team/compact', actor, { workspace: ch.workspace_id, threadId, revision, through, summary }); if (!res.ok) throw new Error('Could not save the context summary. Retry to continue safely.'); },
-      summarize: (system, input) => runtimeFor(agent.runtime).complete(system, input, token, agent.model, 3500),
+      read: async () => {
+        const read = async () => { const res: Response = await apiGet(`/v1/team/context?workspace=${ch.workspace_id}&threadId=${threadId}&mode=${compactMode}`, actor); if (!res.ok) throw new Error(`Could not restore the agent thread (${res.status}).`); return res.json() as Promise<import('@neuramesh/shared').TeamContext>; };
+        const context = await read();
+        setConversationHistoryBoundary(context.compactedThroughAt);
+        if (!checkedPressure && !manualCompact) {
+          checkedPressure = true;
+          if (conversationContext().length > 128000) { compactMode = 'manual'; return read(); }
+        }
+        return context;
+      },
+      compact: async (revision, through, summary) => { const res = await post('/v1/team/compact', actor, { workspace: ch.workspace_id, threadId, revision, through, summary, mode: compactMode }); if (!res.ok) throw new Error('Could not save the context summary. Retry to continue safely.'); compacted = true; },
+      summarize: (system, input) => withoutConversationBrain(() => runtimeFor(agent.runtime).complete(system, input, token, agent.model, 3500)),
+      toolsThrough: conversationToolsThrough, boundary: setConversationHistoryBoundary,
       status: summary => log({ kind: 'tool', phase: 'inject', summary }),
     });
     if (continued) transcript = continued;
   }
+  if (manualCompact) return compacted ? 'Compacted the earlier conversation. Decisions, constraints and unfinished work are retained in a working summary; the complete history stays available.' : 'This conversation is already compact. Its complete history is unchanged.';
   const { mkdirSync } = await import('node:fs');
   // the thread's brain workspace, with any pre-merge `chats/` directory adopted on first use
   const dir = ensureChatWorkspace(threadId);
@@ -179,7 +198,7 @@ async function chatTurn(args: {
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits). The
         // preset pins the standard toolset; the allowlist is what runs without a prompt.
         tools: { type: 'preset' as const, preset: 'claude_code' as const },
-        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__propose_routine', 'mcp__nm__offer_routine_session', 'mcp__nm__list_team', 'mcp__nm__read_agent_thread', 'mcp__nm__message_agent', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
+        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__propose_routine', 'mcp__nm__offer_routine_session', 'mcp__nm__create_coding_task', 'mcp__nm__read_coding_tasks', 'mcp__nm__list_team', 'mcp__nm__read_agent_thread', 'mcp__nm__message_agent', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
         permissionMode: 'bypassPermissions',
         // the same policy engine a worker runs under — PreToolUse fires even under
         // bypassPermissions, so a shell call in a chat is gated exactly as one in a task

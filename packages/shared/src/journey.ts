@@ -139,7 +139,7 @@ export function journeyFor(task: JourneyTask, roster: JourneyRoster, beats?: { d
   const ownerOf = (k: JourneyKey): string | null => {
     switch (k) {
       case 'design': return roster.designer ?? null;
-      case 'plan': return roster.architect ?? null;
+      case 'plan': return task.assigneeName ?? roster.architect ?? null;
       case 'build': return task.assigneeName ?? roster.developer ?? null;
       case 'review': return roster.reviewer ?? null;
       case 'ship': return roster.shipper ?? null;

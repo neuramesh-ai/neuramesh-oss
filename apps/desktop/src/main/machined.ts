@@ -168,6 +168,7 @@ export async function main(): Promise<void> {
     workspaceId: cfg.workspaceId,
     // a login-less machine clones a private repository through the App (host/repocred.ts, docs/design/repo-connect-2026-10)
     resolveCwd: (meta) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta, { credFor: (slug, channel) => engineeringCred.forRepo(slug, channel) }),
+    isTaskThread: async meta => { const [task] = await db.getAll<{state:string}>("select k.state from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.kind='coding'", [meta.threadId, cfg.workspaceId]); return task?.state === 'planning' || task?.state === 'in_progress' ? task.state : !!task; },
     resolveDisplayContext: meta => resolveEngineeringDisplayContext(db, cfg.apiUrl, cfg.workspaceId, meta),
     resolveBrain: (meta) => resolveEngineeringBrain(db, {
       apiUrl: cfg.apiUrl,
@@ -190,6 +191,7 @@ export async function main(): Promise<void> {
   if (agentLog) {
     startAgentHost({
       headless: true,
+      engineering: () => engineering,
       db,
       machineId: cfg.machineId,
       workspace: cfg.workspaceId,

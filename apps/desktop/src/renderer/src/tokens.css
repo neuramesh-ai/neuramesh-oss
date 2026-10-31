@@ -6675,6 +6675,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* the code face in the side panel (the side-panel round, 2026-10-03): the coding thread's own tabs are
    the panel's strip, so the pane holds the editor on the picked tab, and the branch in the foot */
 .codepane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.coding-inline-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.coding-inline-panel > .btn { flex: none; align-self: flex-start; margin: 6px 12px; }
 .codepane .codeface { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .codepane .codeface > .engeditor { flex: 1; min-height: 0; }
 .codepane .codeface .engeditor .engworktabs { display: none; }
@@ -9307,3 +9309,11 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .stagemark .pk-lookg { animation: pk-look 1.15s var(--ease) .6s both, lsg-glance 9s var(--ease) 4s infinite; }
 .stagemark.still .pk-lookg { animation: none; }
 @media (prefers-reduced-motion: reduce) { .stagemark .pk-lookg { animation: none; } }
+
+/* Coding work stays within the task tab when opened beside Agent Desk. */
+.coding-task-tabs { display:flex; flex:none; gap:4px; overflow-x:auto; padding:6px 12px; border-bottom:1px solid var(--line); }
+.coding-task-tabs button { flex:none; border:0; border-radius:4px; background:transparent; color:var(--muted); font:inherit; font-size:11px; padding:5px 8px; cursor:pointer; }
+.coding-task-tabs button[aria-selected="true"] { color:var(--text); background:var(--hover); }
+.task-approval-card { border:1px solid var(--line); border-radius:8px; padding:12px; display:grid; gap:10px; min-width:0; }
+.task-approval-card > b { font-size:12px; }
+.task-approval-card > p { margin:0; color:var(--muted); font-size:12px; line-height:1.6; white-space:pre-line; overflow-wrap:anywhere; }

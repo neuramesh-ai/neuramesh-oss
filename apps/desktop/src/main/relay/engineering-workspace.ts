@@ -147,6 +147,15 @@ export async function ensureEngineeringWorkspace(
   ).catch(() => null);
   // a late replica, or another project's repository: no grant and no pick adds the row, so no GitHub card
   if (!repo) throw new Error(`${meta.repoName} is not in this project on this machine.`);
+  const task = await db.get<{number:number;repo_id:string;base_ref:string|null}>(`select k.number,k.repo_id,k.base_ref from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.created_by=? and t.kind='coding'`,[meta.threadId,workspaceId,`human:${meta.actorId}`]).catch(()=>null);
+  if (task && task.repo_id === meta.repoId) {
+    const cwd = cachePath('worktrees',`nm-${task.number}`);
+    const repoRoot = engineeringRepoRoot(meta.repoId);
+    if (existsSync(cwd)) { validatedEngineeringGitMounts(cwd,repoRoot); return {cwd,repoRoot}; }
+    // A planning/blocked task has no implementation branch yet. Its inactive
+    // history pane may read the base; only the dispatcher creates the task worktree.
+    meta = {...meta, branch:task.base_ref || repo.default_branch || 'main'};
+  }
   const local = opts.preferLocal && repo.local_path && existsSync(repo.local_path) ? repo.local_path : null;
   const earlier = earlierWorktree(meta, local);
   if (earlier) return earlier;

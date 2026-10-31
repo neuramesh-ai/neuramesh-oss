@@ -36,6 +36,7 @@ export * from './dial';
 export * from './onboarding';
 export * from './onboarding-wizard';
 export * from './planmd';
+export * from './task-handoff';
 export * from './skill-parse';
 export * from './agentcard';
 export * from './model-packs';

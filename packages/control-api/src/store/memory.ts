@@ -15,6 +15,7 @@ import { anchorContentItemMem } from './content-anchor';
 import { threadRoutineIdMem } from './routine-rule';   import { sessionTitle } from './session-title';
 import type { LifecycleRow } from '../lifecycle';
 import { normalizeTaskTitle } from './types';
+import { requireTaskOwner } from './task-owner';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
 import type { Store } from './contract';   import type { VideoMeta } from './films';
 
@@ -487,10 +488,11 @@ export class MemoryStore implements Store {
     if (!task) throw new DomainError('NOT_FOUND', `task ${taskId} not found`);
     if (task.state !== 'todo' && task.state !== 'plan_review') throw new DomainError('ILLEGAL_TRANSITION', 'only todo or plan_review tasks can be offered');
     const agentId = await this.resolveOffer(task.workspace, task.channel, agentName);
+    requireTaskOwner(task.assignee?.id ?? task.offeredAgentId, agentId);
     const boundRepo = repo ? { id: repo.id, baseRef: repo.baseRef, branch: taskBranch(task.number, task.title) } : task.repo;
     this.tasks.set(taskId, {
       ...task,
-      offeredAgentId: agentId,
+      offeredAgentId: agentId, assignee: { kind: 'agent', id: agentId },
       repo: boundRepo,
       ...(checklist?.length ? { requirements: checklist, requirementsConfirmed: true } : {}),
       ...(dod ? { definitionOfDone: dod } : {}),

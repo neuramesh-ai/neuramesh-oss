@@ -28,7 +28,7 @@ import { requireCommandActivation } from './activation';
 
 import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
-import { actorAddress, verifiedEmailFor, taskTarget } from './handler/guards';
+import { actorAddress, verifiedEmailFor, taskTarget, sameActor } from './handler/guards';
 import { SUBTASK_GATED, setDefinitionOfDone, checkShipItem, addShipItem, updateDetails, selectDesignProvider, confirmRequirements, approvePlan, transition, nextPlanVersion } from './handler/fsm';
 import { planRevisionFollowup, routineAcceptFollowup, routineDesignFollowup, routinePlanFollowup } from './handler/planfollowup';
 import { channelCommands } from './handler/channel';
@@ -154,7 +154,8 @@ export async function executeCommand(
     const task = await store.getTask(cmd.taskId);
     if (!task) throw new DomainError('NOT_FOUND', `task ${cmd.taskId} not found`);
     const owners = BEAT_PHASE_ROLES[task.state] ?? [];
-    if (!actor.role || !owners.includes(actor.role)) {
+    const ownsPhase = sameActor(task.assignee, actor) || (!task.assignee && task.offeredAgentId === actor.id);
+    if (!actor.role || (!owners.includes(actor.role) && !ownsPhase)) {
       throw new DomainError('NOT_PERMITTED', `only the ${owners.join('/') || 'assigned agent'} may set beats while a task is ${task.state}`);
     }
     if (cmd.type === 'beats.declare') {

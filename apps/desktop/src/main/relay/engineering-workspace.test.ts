@@ -110,6 +110,16 @@ test('Engineering rejects a repository outside the machine workspace', async () 
   }
 });
 
+test('an inactive planning task reads its base before the implementation branch exists', () => inBrain(async root => {
+  const clone = remote(root, 'qa/plan-history');
+  const db = {get: async (sql: string) => sql.includes('join tasks')
+    ? {number:42,repo_id:'repo-plan',base_ref:'main'}
+    : {clone_url:clone,default_branch:'main'}} as Db;
+  const where = await ensureEngineeringWorkspace(db, 'workspace', session({repoId:'repo-plan',threadId:'task-plan',branch:'nm/42-not-created'}));
+  assert.equal(git(['show','HEAD:README.md'],where.cwd),'# qa/plan-history');
+  assert.equal(existsSync(join(root,'brain/cache/worktrees/nm-42')),false,'a history view cannot create the task execution worktree');
+}));
+
 test('Engineering preserves slash-delimited default branch names', () => inBrain(async (root) => {
   const source = join(root, 'source'); const remote = join(root, 'remote.git');
   mkdirSync(source); git(['init', '-b', 'release/2026'], source);

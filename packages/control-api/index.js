@@ -2877,15 +2877,13 @@ var init_states = __esm({
       { name: "approve_design", from: "design_review", to: "planning", by: ["human"] },
       { name: "cancel", from: "designing", to: "closed", by: ["orchestrator", "human"] },
       { name: "cancel", from: "design_review", to: "closed", by: ["orchestrator", "human"] },
-      // Plan lifecycle — an implementation-quality gate before execution. The
-      // orchestrator routes a non-trivial task into planning; the architect (the
-      // assignee while planning) proposes a plan; once approved it's offered to a
-      // developer who claims from plan_review. There is deliberately NO
-      // planning -> in_progress edge: a dev cannot start while the plan is unsettled.
+      // Plan lifecycle: the selected owner drafts and revises its own plan. A phase
+      // never assigns another specialist. Separate consultations can inform the plan;
+      // only human approval releases implementation.
       { name: "request_plan", from: "todo", to: "planning", by: ["orchestrator", "human"] },
       // Same reason as propose_design: under ownership the plan is drafted by an architect SUBAGENT
       // with no board identity, and the owner is the one that answers for it.
-      { name: "propose_plan", from: "planning", to: "plan_review", by: ["architect", "orchestrator"] },
+      { name: "propose_plan", from: "planning", to: "plan_review", by: ["assignee", "architect", "orchestrator"] },
       { name: "revise_plan", from: "plan_review", to: "planning", by: ["orchestrator", "human"] },
       { name: "claim", from: "plan_review", to: "in_progress", by: ["assignee"] },
       // Plan-first units (2026-08-17): a unit born WITH its work plan sits in plan_review from
@@ -5524,7 +5522,7 @@ function journeyFor(task, roster, beats2) {
       case "design":
         return roster.designer ?? null;
       case "plan":
-        return roster.architect ?? null;
+        return task.assigneeName ?? roster.architect ?? null;
       case "build":
         return task.assigneeName ?? roster.developer ?? null;
       case "review":
@@ -6913,6 +6911,63 @@ var init_onboarding_wizard = __esm({
   }
 });
 
+// ../shared/src/task-handoff.ts
+function normalizeTaskMarkdown(text3) {
+  return text3.split(/(`{3}[\s\S]*?`{3}|`[^`\n]*`)/g).map((part, i) => i % 2 ? part : part.replace(/\\n\\n/g, "\n\n").replace(/\\n(?=(?:#{1,6}|[-*]|\d+\.)\s)/g, "\n")).join("");
+}
+var TASK_HANDOFF_SKILL, IMPLEMENTATION_PLAN_SKILL, CODING_IMPLEMENTATION_PLAN_SKILL;
+var init_task_handoff = __esm({
+  "../shared/src/task-handoff.ts"() {
+    "use strict";
+    TASK_HANDOFF_SKILL = `Create an independently executable task, with one accountable specialist.
+
+Before creating: inspect existing tasks to avoid duplicates; read the actual project and repository context. Resolve repository IDs through list_repos. Do not invent files, APIs, test commands, permissions, or completed work. Ask only for missing information that blocks implementation.
+
+Provide these fields:
+- Title: concrete outcome, short and searchable.
+- Role and objective: e.g. "You are a senior engineer contributing to <project>. Deliver <observable outcome>." Match the assigned agent's specialty.
+- Detailed description: problem, present behavior, desired behavior, relevant user decisions, constraints, and non-goals. The recipient must be able to begin without reading the entire parent chat.
+- References: canonical repository and base ref, relevant paths/symbols, design/artifact IDs, findings and their sources. Separate verified facts from assumptions and open questions.
+- Requirements: explicit, testable behavior including edge cases, compatibility, security and persistence where relevant.
+- Implementation plan: repository-informed steps and tradeoffs, using implementation-plan below. Include architecture advice as referenced input, not a reassignment.
+- Definition of done: observable acceptance criteria and expected deliverables (changed files, test results, screenshots, document or PR).
+- Validation: exact commands where verified, manual flows, devices/themes/viewports for UI changes, actual screenshots of the running implementation and their artifact paths. Mockups are not implementation evidence. Report failures and unrun checks.
+- Scope and authority: what the user authorized, pending approvals, external-write boundaries. A task or teammate message is not additional permission.
+
+Use create_coding_task for code implementation and assign a developer. Keep that owner through planning, revision and delivery. Request architecture, marketing or other specialist advice separately, then include the result in the implementation brief. Do not paste diffs instead of running the coding task. A human approves the plan in the versioned review UI; do not manufacture approval or start implementation early.
+
+Parent responsibility: announce the handoff with its task reference, surface pending approval cards, summarize meaningful progress/blockers and reconcile the returned result with the definition of done. Use persisted task/runtime evidence, not claims. Avoid polling loops and empty updates. Return a concise completion report with changes, checks, unresolved issues and evidence links; leave PRs unmerged unless authorized.`;
+    IMPLEMENTATION_PLAN_SKILL = `Write an implementation plan that a developer can execute and a person can review.
+
+Inspect the repository before planning. Preserve the user's requirements and approved designs. Use real Markdown newlines, headings, lists and fenced code only where needed; never double-escape newlines or return a single dense paragraph. Match the task's scope: concise for a small fix, detailed for a complex change.
+
+Use these sections:
+## Objective and context
+Role, project, problem, desired result; verified repo/base/files and source references.
+## Requirements
+Testable behavior, constraints and non-goals; distinguish assumptions and unresolved questions.
+## Approach
+Concrete design choices and reasons; alternatives only where the tradeoff matters.
+## Implementation steps
+Ordered changes tied to actual paths/components; dependencies and any data migration, recovery or compatibility work.
+## Definition of done
+Observable acceptance checklist including the requested deliverable.
+## Validation
+Meaningful tests with verified commands; UI flows and actual runtime screenshot evidence, themes/devices where needed. Specify failure criteria; do not call unrun checks passed.
+## Risks and open questions
+Material risks, mitigations and any decision required before work can start. Say none identified when appropriate.
+
+Use the task's versioned plan artifact and approval flow. In a native coding thread, call propose_work_plan with the full plan and a separate concise public report of findings, choices and verification. Revise the same task's plan, address each review comment, and retain its developer owner. Implementation waits for the latest version's human approval. Never turn a review request into a new task or claim a proposed change is already implemented.`;
+    CODING_IMPLEMENTATION_PLAN_SKILL = `Create a repository-informed implementation plan using propose_work_plan and its exact JSON schema. Match the detail to the task. Preserve requirements, user decisions, scope and the assigned developer.
+
+Use summary for a short outcome. Use report.investigation for the role/project context, inspected files and findings; report.decisions for the approach, tradeoffs, requirements and verification choices; report.nextStep for the actual next user decision. Use considerations for material risks, prerequisites and unresolved questions.
+
+Each steps entry must describe one concrete edit or verification command, with a real target path or command. Its label is a short action such as "Validate expense amounts" or "Test storage migration". Its description explains the intended change, relevant requirements and observable acceptance criteria. Include meaningful test commands and actual running-UI screenshot validation where authorized. Report unrun checks honestly. Document sections such as "Objective", "Requirements", "Approach" and "Definition of done" are not implementation steps: never use section headings or Markdown heading syntax as step labels. Do not turn the plan document's outline into a progress checklist.
+
+Keep the separate public report conversational and concise. The UI renders the structured plan and approval controls. Revise the same task's plan, address review comments and keep its developer owner. Wait for the latest version's human approval before implementation; a proposed plan is not completed work.`;
+  }
+});
+
 // ../shared/src/planmd.ts
 function planArtifactName(version) {
   return `implementation-plan-v${version}.md`;
@@ -6928,7 +6983,7 @@ function parsePlanRef(body) {
   const m = PLAN_REF_RE.exec(body);
   if (!m) return null;
   const prose2 = trimLineEnds(body.replace(PLAN_REF_RE, "")).replace(/\n{3,}/g, "\n\n").trim();
-  return { version: Number(m[1]), prose: prose2 };
+  return { version: Number(m[2]), prose: prose2, ...m[1] ? { taskId: m[1] } : {} };
 }
 function planPostLine(version, kind = "birth") {
   const name = planArtifactName(version);
@@ -6958,7 +7013,7 @@ function renderPlanMarkdown(p2) {
   if (p2.subtasks.length) {
     lines.push("", "## Subtasks (minted on approval)", ...p2.subtasks.map((s) => `- ${s}`));
   }
-  lines.push("", "## Approach", "", p2.approach.trim(), "");
+  lines.push("", "## Approach", "", normalizeTaskMarkdown(p2.approach).trim(), "");
   return lines.join("\n");
 }
 var PLAN_REF_RE, LEG_RANK;
@@ -6966,8 +7021,9 @@ var init_planmd = __esm({
   "../shared/src/planmd.ts"() {
     "use strict";
     init_journey();
+    init_task_handoff();
     init_linear();
-    PLAN_REF_RE = /‹plan:v(\d+)›/;
+    PLAN_REF_RE = /‹plan:(?:([0-9a-f-]{36}):)?v(\d+)›/i;
     LEG_RANK = { design: 0, build: 1, review: 2 };
   }
 });
@@ -7298,7 +7354,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.156.2", "0.156.1"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.157.0", "0.156.2"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -7870,7 +7926,9 @@ var init_commands = __esm({
       // Thread-owned work (2026-08-17): the conversation that OWNS this unit — sets
       // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
       // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
-      originThread: z8.string().uuid().optional()
+      originThread: z8.string().uuid().optional(),
+      /** Agent Desk's explicit implementation handoff; home ownership is checked by the server. */
+      codingHandoff: z8.object({ requestId: z8.string().uuid(), taskId: z8.string().uuid().optional() }).optional()
     });
     taskAcceptCommand = z8.object({ type: z8.literal("task.accept"), taskId });
     taskApproveCommand = z8.object({ type: z8.literal("task.approve"), taskId });
@@ -11424,6 +11482,10 @@ function failRemoteEngineeringTransport(session, error) {
   };
   return { ...session, state: "resumable", activeActivity: null, pendingApproval: null, messages: [...interruptReviews(messages2), warning], updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
 }
+function applyTaskEngineeringState(session, value) {
+  const live = value;
+  return live?.id === session.id && live.repo?.id === session.repo.id && Array.isArray(live.messages) ? { ...live, project: session.project, machineId: session.machineId } : session;
+}
 var withEngineeringWarning;
 var init_transport_state = __esm({
   "../shared/src/engineering/transport-state.ts"() {
@@ -11630,6 +11692,7 @@ function applyContentEvent(session, event) {
 }
 function reduceRemoteEngineeringEvent(session, wire) {
   const type = wire["type"];
+  if (type === "task_state") return applyTaskEngineeringState(session, wire["session"]);
   if (type === "disconnected") return session.state === "streaming" || session.state === "awaiting_approval" ? failRemoteEngineeringTransport(session, wire["message"]) : session;
   session = applyEngineeringSelection(session, wire);
   if (type === "ready") {
@@ -13053,6 +13116,7 @@ __export(src_exports, {
   CODE_SESSION_COMMANDS: () => CODE_SESSION_COMMANDS,
   CODE_SESSION_MODES: () => CODE_SESSION_MODES,
   CODE_SESSION_STATES: () => CODE_SESSION_STATES,
+  CODING_IMPLEMENTATION_PLAN_SKILL: () => CODING_IMPLEMENTATION_PLAN_SKILL,
   COMM_RULE_CAPS: () => COMM_RULE_CAPS,
   CONNECT_PROVIDERS: () => CONNECT_PROVIDERS,
   CONTENT_PLATFORMS: () => CONTENT_PLATFORMS,
@@ -13097,6 +13161,7 @@ __export(src_exports, {
   GITHUB_WAIT_REASON: () => GITHUB_WAIT_REASON,
   HUMAN_ONLY_SIGN_OFFS: () => HUMAN_ONLY_SIGN_OFFS,
   HumanCommandSchema: () => HumanCommandSchema,
+  IMPLEMENTATION_PLAN_SKILL: () => IMPLEMENTATION_PLAN_SKILL,
   IMPORT_BATCH_MAX_BYTES: () => IMPORT_BATCH_MAX_BYTES,
   IMPORT_COLUMNS: () => IMPORT_COLUMNS,
   IMPORT_ENVELOPE_BYTES: () => IMPORT_ENVELOPE_BYTES,
@@ -13206,6 +13271,7 @@ __export(src_exports, {
   SUPPORTED_DESKTOP_VERSIONS: () => SUPPORTED_DESKTOP_VERSIONS,
   ShipItemSchema: () => ShipItemSchema,
   ShipPlanSchema: () => ShipPlanSchema,
+  TASK_HANDOFF_SKILL: () => TASK_HANDOFF_SKILL,
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
   TEAM_TEMPLATES: () => TEAM_TEMPLATES,
@@ -13262,6 +13328,7 @@ __export(src_exports, {
   applyRemoteEngineeringEvent: () => applyRemoteEngineeringEvent,
   applyReplyRevision: () => applyReplyRevision,
   applyShare: () => applyShare,
+  applyTaskEngineeringState: () => applyTaskEngineeringState,
   articleFacts: () => articleFacts,
   articleFrom: () => articleFrom,
   artifactMime: () => artifactMime,
@@ -13571,6 +13638,7 @@ __export(src_exports, {
   normalizeDraft: () => normalizeDraft,
   normalizeEngineeringChanges: () => normalizeEngineeringChanges,
   normalizeHex: () => normalizeHex,
+  normalizeTaskMarkdown: () => normalizeTaskMarkdown,
   normalizeUrlInput: () => normalizeUrlInput,
   noticeProvider: () => noticeProvider,
   noticeWhy: () => noticeWhy,
@@ -13934,6 +14002,7 @@ var init_src = __esm({
     init_onboarding();
     init_onboarding_wizard();
     init_planmd();
+    init_task_handoff();
     init_skill_parse();
     init_agentcard();
     init_model_packs();
@@ -15262,16 +15331,18 @@ async function sessionTitleSql(sql, workspace, scheduleId, body) {
 var ROUTINE_TAKEN = "This session already holds a routine. Open a new session for another one.";
 async function existingHomeRoutineSql(sql, ws, input) {
   if (!input.session) return null;
-  const [home] = await sql`select home_agent_id from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
   if (!home?.["home_agent_id"]) return null;
+  if (home["archived_at"]) throw new DomainError("CONFLICT", "Create this routine in the agent\u2019s current conversation.");
   const [existing] = await sql`select id from schedules where owner_home_thread_id=${input.session.threadId}::uuid and title=${input.title} and payload->>'prompt'=${input.prompt} and cadence=${input.cadence} and at_time=${input.atTime} and tz=${input.tz} and weekday is not distinct from ${input.weekday}::integer`;
   return existing ? { id: existing["id"] } : null;
 }
 async function linkRoutineSessionSql(sql, ws, scheduleId, input, insertEvent) {
   const s = input.session;
   if (!s) return;
-  const [home] = await sql`select home_agent_id from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
   if (home?.["home_agent_id"]) {
+    if (home["archived_at"]) throw new DomainError("CONFLICT", "Create this routine in the agent\u2019s current conversation.");
     await sql`update schedules set owner_home_thread_id=${s.threadId}::uuid, agent_id=${home["home_agent_id"]}::uuid where id=${scheduleId}::uuid`;
     await sql`insert into messages(id,workspace_id,channel_id,thread_id,author_kind,author_id,body)
       values(${s.dividerId}::uuid,${ws}::uuid,${input.channelId}::uuid,${s.threadId}::uuid,${s.author.kind}::actor_kind,${s.author.id}::uuid,${ROUTINE_SCHEDULED_MARKER})`;
@@ -15908,6 +15979,13 @@ function threadRoutineIdMem(threads2, schedules2, channels3, workspace, threadId
   return s && isRoutineSchedule(s.payload, channels3.find((c) => c.id === s.channelId)?.kind) ? s.id : null;
 }
 
+// src/store/task-owner.ts
+function requireTaskOwner(ownerId, agentId) {
+  if (ownerId && ownerId !== agentId) {
+    throw new DomainError("NOT_PERMITTED", "This task already has an owner. Create a separate task for another specialist.");
+  }
+}
+
 // src/store/memory.ts
 var MemoryStore = class {
   announcements = new MemAnnounceStore(() => ({ decisions: this.decisionRows, messages: this.messages, channels: this.channels, connectors: this.connectors, events: this.events, tasks: this.tasks }));
@@ -16340,10 +16418,12 @@ var MemoryStore = class {
     if (!task) throw new DomainError("NOT_FOUND", `task ${taskId3} not found`);
     if (task.state !== "todo" && task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", "only todo or plan_review tasks can be offered");
     const agentId = await this.resolveOffer(task.workspace, task.channel, agentName);
+    requireTaskOwner(task.assignee?.id ?? task.offeredAgentId, agentId);
     const boundRepo = repo ? { id: repo.id, baseRef: repo.baseRef, branch: taskBranch(task.number, task.title) } : task.repo;
     this.tasks.set(taskId3, {
       ...task,
       offeredAgentId: agentId,
+      assignee: { kind: "agent", id: agentId },
       repo: boundRepo,
       ...checklist?.length ? { requirements: checklist, requirementsConfirmed: true } : {},
       ...dod ? { definitionOfDone: dod } : {},
@@ -17795,7 +17875,8 @@ var TRANSITION_OF = {
 var SUBTASK_GATED = /* @__PURE__ */ new Set(["task.submit", "task.accept", "task.approve_ship_plan", "task.execute_ship", "task.confirm_release"]);
 var DOD_EDITABLE_STATES = /* @__PURE__ */ new Set(["backlog", "todo", "designing", "design_review", "planning", "plan_review", "in_progress", "in_review", "blocked"]);
 function setDefinitionOfDone(task, actor, dod) {
-  const mayEdit = actor.kind === "human" || actor.role === "orchestrator" || actor.role === "architect";
+  const ownsPlan = (task.state === "planning" || task.state === "plan_review") && !task.planApprovedAt && (sameActor(task.assignee, actor) || !task.assignee && actor.kind === "agent" && task.offeredAgentId === actor.id);
+  const mayEdit = actor.kind === "human" || actor.role === "orchestrator" || actor.role === "architect" || ownsPlan;
   if (!mayEdit) throw new DomainError("NOT_PERMITTED", "the Definition of Done is set by humans, the orchestrator, or the architect");
   if (!DOD_EDITABLE_STATES.has(task.state)) {
     throw new DomainError("ILLEGAL_TRANSITION", `the Definition of Done is frozen once a task is ${task.state}`);
@@ -17969,10 +18050,14 @@ function transition(task, actor, cmd, subtasksPending = 0, planVersion = 0, onHu
     throw new DomainError("REQUIREMENTS_NOT_CONFIRMED", "confirm requirements before submitting");
   }
   const to = cmd.type === "task.unblock" ? task.blockedFrom ?? target.to : cmd.type === "task.approve_design" && task.workPlan ? "todo" : target.to;
+  const owner = task.assignee ?? (task.offeredAgentId ? { kind: "agent", id: task.offeredAgentId } : null);
+  if (cmd.type === "task.propose_plan" && owner && actor.kind !== "human" && !sameActor(owner, actor)) {
+    throw new DomainError("NOT_PERMITTED", "The assigned agent revises this plan. Request specialist input separately; do not take over the task.");
+  }
   const claiming = cmd.type === "task.claim";
   const ctx = {
     actor,
-    isAssignee: claiming ? task.assignee === null || sameActor(task.assignee, actor) : sameActor(task.assignee, actor),
+    isAssignee: claiming ? owner === null || sameActor(owner, actor) : sameActor(owner, actor),
     isCreator: sameActor(task.creator, actor),
     // Reviewer-pool membership comes from the channel registry once the DB
     // layer lands (week 2); until then the agent's role is the pool.
@@ -18004,9 +18089,7 @@ function transition(task, actor, cmd, subtasksPending = 0, planVersion = 0, onHu
   if (verdict.spec.name === "block") next.blockedFrom = task.state;
   if (verdict.spec.name === "unblock") next.blockedFrom = null;
   if (verdict.spec.name === "claim") next.assignee = { kind: actor.kind, id: actor.id };
-  if (verdict.spec.name === "request_plan" && cmd.type === "task.request_plan" && cmd.architect) next.assignee = { kind: "agent", id: cmd.architect };
-  if (verdict.spec.name === "request_design" && cmd.type === "task.request_design" && cmd.designer) next.assignee = { kind: "agent", id: cmd.designer };
-  if (verdict.spec.name === "approve_design") next.assignee = null;
+  if (verdict.spec.name === "revise_plan" || verdict.spec.name === "request_plan") next.planApprovedAt = null;
   if (cmd.type === "task.request_plan" || cmd.type === "task.request_design") {
     const k = cmd.kind ?? task.kind;
     if (!k) throw new DomainError("INVALID_INPUT", `categorize #${task.number} (set a kind: bug/feature/\u2026) before routing it`);
@@ -22155,17 +22238,145 @@ async function codeSessionCommands(store2, actor, cmd) {
 
 // src/handler/createtask.ts
 init_src();
+
+// src/handler/coding-handoff.ts
+init_src();
+
+// src/store/coding-task-thread.ts
+async function taskMessageAddress(sql, message2) {
+  if (!message2.taskId) return message2.channel;
+  const [task] = await sql`select t.channel_id,c.slug from tasks t join channels c on c.id=t.channel_id
+    where t.id=${message2.taskId}::uuid and t.workspace_id=${message2.workspace}::uuid`;
+  if (!task) throw new DomainError("NOT_FOUND", "Task not found in this workspace.");
+  if (message2.channel && message2.channel !== task["channel_id"] && message2.channel !== task["slug"]) {
+    throw new DomainError("CONFLICT", "The task belongs to another conversation context.");
+  }
+  return String(task["channel_id"]);
+}
+async function createCodingTaskThread(sql, taskId3, owner) {
+  const [task] = await sql`select * from tasks where id=${taskId3}::uuid`;
+  if (!task) throw new Error("Coding task not found.");
+  if (task["offered_agent_id"]) {
+    await sql`insert into project_agents(workspace_id,project_id,agent_id) values(${task["workspace_id"]}::uuid,${task["project_id"]}::uuid,${task["offered_agent_id"]}::uuid) on conflict do nothing`;
+    await sql`insert into agent_channels(agent_id,channel_id) values(${task["offered_agent_id"]}::uuid,${task["channel_id"]}::uuid) on conflict do nothing`;
+  }
+  const [home] = await sql`select brain_override,origin,machine_id,home_thinking from threads
+    where workspace_id=${task["workspace_id"]}::uuid and project_id=${task["project_id"]}::uuid
+      and home_agent_id=${task["offered_agent_id"]}::uuid and created_by=${`human:${owner}`} and archived_at is null
+    order by created_at limit 1`;
+  const [thread] = await sql`insert into threads(workspace_id,channel_id,project_id,task_id,title,description,created_by,kind,mode,titled_at,brain_override,origin,machine_id,home_thinking)
+    values(${task["workspace_id"]}::uuid,${task["channel_id"]}::uuid,${task["project_id"]}::uuid,${taskId3}::uuid,${task["title"]},${task["description"]},${`human:${owner}`},'coding','tasks',now(),${home?.["brain_override"] ? sql.json(home["brain_override"]) : null},${home?.["origin"] ?? null},${home?.["machine_id"] ?? null}::uuid,${home?.["home_thinking"] ?? null})
+    on conflict(task_id) where task_id is not null do update set kind='coding',mode='tasks',created_by=excluded.created_by returning id,root_message_id`;
+  await sql`update messages set thread_id=${thread["id"]}::uuid where task_id=${taskId3}::uuid and thread_id is null`;
+  if (!thread["root_message_id"]) {
+    const [message2] = await sql`insert into messages(workspace_id,channel_id,task_id,thread_id,author_kind,author_id,body)
+      values(${task["workspace_id"]}::uuid,${task["channel_id"]}::uuid,${taskId3}::uuid,${thread["id"]}::uuid,${task["creator_kind"]}::actor_kind,${task["creator_id"]}::uuid,
+        ${`Implementation handoff: ${task["title"]}
+
+${task["description"]}
+
+The coding agent picks this up after the implementation plan is approved here. Progress and the result are also reported to the parent agent thread.`}) returning id`;
+    await sql`update threads set root_message_id=${message2["id"]}::uuid where id=${thread["id"]}::uuid`;
+  }
+  return String(thread["id"]);
+}
+async function bindCodingTaskMessage(sql, message2) {
+  if (!message2.taskId || message2.threadId) return message2;
+  const [thread] = await sql`select id from threads where task_id=${message2.taskId}::uuid and workspace_id=${message2.workspace}::uuid and channel_id=${message2.channel}::uuid and kind='coding'`;
+  return thread ? { ...message2, threadId: String(thread["id"]) } : message2;
+}
+
+// src/handler/coding-handoff.ts
+async function validateCodingHandoff(store2, actor, cmd) {
+  if (!cmd.codingHandoff) return null;
+  const sql = sqlOf(store2);
+  if (!sql || actor.kind !== "agent" || !cmd.originThread || !cmd.repo || cmd.thread || cmd.parent || cmd.backlog || !cmd.plan || !["bug", "feature", "refactor", "chore"].includes(cmd.kind ?? "")) {
+    throw new DomainError("INVALID_INPUT", "A coding handoff needs an agent home, project repository, implementation plan and code task kind.");
+  }
+  const invalidPlan = validateWorkPlanLegs(cmd.plan.legs, true);
+  if (invalidPlan) throw new DomainError("INVALID_INPUT", invalidPlan);
+  const [home] = await sql`select t.project_id,t.channel_id,t.created_by from threads t
+    join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id
+    join agents a on a.id=pa.agent_id and a.retired_at is null
+    join channels c on c.id=t.channel_id
+    where t.id=${cmd.originThread}::uuid and t.workspace_id=${cmd.workspace}::uuid
+      and t.home_agent_id=${actor.id}::uuid and t.archived_at is null
+      and (c.id::text=${cmd.channel} or c.slug=${cmd.channel})`;
+  if (!home || !String(home["created_by"]).startsWith("human:")) throw new DomainError("NOT_PERMITTED", "Create coding work from your own active agent thread.");
+  const owner = String(home["created_by"]).slice(6);
+  const [member] = await sql`select 1 from workspace_members where workspace_id=${cmd.workspace}::uuid and user_id=${owner}::uuid`;
+  const [repo] = await sql`select r.id from repos r join project_repos pr on pr.repo_id=r.id
+    where r.id=${cmd.repo.id}::uuid and pr.project_id=${home["project_id"]}::uuid and r.workspace_id=${cmd.workspace}::uuid`;
+  if (!member || !repo) throw new DomainError("NOT_PERMITTED", "Use a repository attached to this project and an active workspace member.");
+  if (cmd.project && cmd.project !== home["project_id"]) throw new DomainError("NOT_PERMITTED", "A coding task belongs to its parent agent project.");
+  const [coder] = await sql`select a.id from agents a
+    where a.workspace_id=${cmd.workspace}::uuid and a.retired_at is null and a.role='developer'
+      and (${cmd.offerTo ?? null}::text is null or a.id::text=${cmd.offerTo ?? null} or a.name=${cmd.offerTo ?? null})
+    order by exists(select 1 from project_agents pa where pa.project_id=${home["project_id"]}::uuid and pa.agent_id=a.id) desc,
+      (a.role='developer') desc, (lower(a.name)='patch') desc, a.created_at limit 1`;
+  if (!coder) throw new DomainError("NOT_FOUND", "Add a developer agent to this workspace before handing off implementation.");
+  return { owner, agentId: String(coder["id"]), project: String(home["project_id"]), channel: String(home["channel_id"]) };
+}
+async function adoptCodingTask(store2, actor, cmd, scope) {
+  const taskId3 = cmd.codingHandoff?.taskId;
+  if (!taskId3) return null;
+  const sql = sqlOf(store2);
+  const changed = await sql.begin(async (tx) => {
+    const q = tx;
+    const [task2] = await q`select t.*,th.kind as thread_kind,th.created_by as thread_owner from tasks t left join threads th on th.task_id=t.id where t.id=${taskId3}::uuid for update of t`;
+    if (!task2 || task2["workspace_id"] !== cmd.workspace || task2["project_id"] !== scope.project || task2["origin_thread_id"] && task2["origin_thread_id"] !== cmd.originThread) throw new DomainError("NOT_PERMITTED", "Choose an unstarted task owned by this agent thread or unowned in this project.");
+    if (task2["thread_owner"] && String(task2["thread_owner"]).startsWith("human:") && task2["thread_owner"] !== `human:${scope.owner}`) throw new DomainError("NOT_PERMITTED", "Keep this task with its existing conversation owner.");
+    if (task2["thread_kind"] === "coding" && task2["origin_thread_id"] === cmd.originThread) return false;
+    if (!["backlog", "todo", "planning", "plan_review"].includes(task2["state"]) || task2["assignee_id"] || task2["submitted_sha"] || task2["pr_number"]) throw new DomainError("INVALID_INPUT", "This task already has implementation work. Stop or finish that run before changing its runtime.");
+    if (task2["repo_id"] && task2["repo_id"] !== cmd.repo.id) throw new DomainError("INVALID_INPUT", "Keep the existing task repository.");
+    if (task2["state"] === "backlog") await q`update tasks set state='todo' where id=${taskId3}::uuid`;
+    if (["backlog", "todo"].includes(task2["state"])) await q`update tasks set state='planning' where id=${taskId3}::uuid`;
+    const version = (task2["work_plan"]?.version ?? 0) + 1;
+    await q`update tasks set origin_thread_id=${cmd.originThread}::uuid,repo_id=${cmd.repo.id}::uuid,base_ref=${cmd.repo.baseRef},
+      branch=${task2["branch"] ?? taskBranch(task2["number"], task2["title"])},state='plan_review',kind=${cmd.kind}::task_kind,plan_approved_at=null,assignee_kind='agent',assignee_id=${scope.agentId}::uuid,offered_agent_id=${scope.agentId}::uuid,requirements=${q.json(cmd.checklist ?? [])},requirements_confirmed=true,
+      work_plan=${q.json({ ...cmd.plan, version, proposedAt: (/* @__PURE__ */ new Date()).toISOString() })},updated_at=now(),version=version+1 where id=${taskId3}::uuid`;
+    await q`insert into project_agents(workspace_id,project_id,agent_id) values(${cmd.workspace}::uuid,${scope.project}::uuid,${scope.agentId}::uuid) on conflict do nothing`;
+    await q`insert into agent_channels(agent_id,channel_id) values(${scope.agentId}::uuid,${scope.channel}::uuid) on conflict do nothing`;
+    await createCodingTaskThread(q, taskId3, scope.owner);
+    await q`select nm_coding_task_report(${taskId3}::uuid,'task','plan_review')`;
+    await q`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body) values(${cmd.workspace}::uuid,${scope.channel}::uuid,${cmd.originThread}::uuid,'agent',${actor.id}::uuid,${`\u2039task:${taskId3}\u203A`})`;
+    const event = createEvent({ type: "task.plan_proposed", source: formatAddress(actor), target: `task:${task2["number"]}`, workspace: cmd.workspace, payload: { codingHandoff: true, originThread: cmd.originThread, version } });
+    await q`insert into events(id,workspace_id,type,source,target,channel_id,task_id,payload) values(${event.id},${cmd.workspace}::uuid,${event.type},${event.source},${event.target},${scope.channel}::uuid,${taskId3}::uuid,${q.json(event.payload)})`;
+    return true;
+  });
+  const task = await store2.getTask(taskId3);
+  if (!task) throw new DomainError("NOT_FOUND", "Coding task not found.");
+  if (changed && task.workPlan) {
+    const p2 = task.workPlan;
+    await store2.mutate(task.id, async (current) => ({ task: current, events: [], artifacts: [{ kind: "doc", name: planArtifactName(p2.version), content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: p2.legs, subtasks: p2.subtasks, approach: p2.approach, version: p2.version, repo: true }) }] }));
+    await postPlanMessage(store2, task, actor, p2.version, "birth");
+  }
+  return { task, events: [] };
+}
+
+// src/handler/createtask.ts
 var CODE_KINDS = /* @__PURE__ */ new Set(["bug", "feature", "refactor", "chore"]);
 async function createTask(store2, actor, cmd) {
-  const mayCreate = actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
-  if (!mayCreate) {
-    throw new DomainError("NOT_PERMITTED", "only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)");
-  }
   if (actor.kind === "agent") {
     const rules = commRulesFrom(await store2.getCommRules(cmd.workspace).catch(() => null));
     if (rules.noEmdash) {
       cmd = { ...cmd, title: scrubEmdash(cmd.title), description: scrubEmdash(cmd.description) };
     }
+  }
+  const coding = await validateCodingHandoff(store2, actor, cmd);
+  if (coding) {
+    cmd = { ...cmd, project: coding.project, channel: coding.channel };
+    const adopted = await adoptCodingTask(store2, actor, cmd, coding);
+    if (adopted) return adopted;
+    const prior = await store2.getTask(cmd.codingHandoff.requestId);
+    if (prior) {
+      if (prior.workspace !== cmd.workspace || prior.originThreadId !== cmd.originThread || prior.creator.id !== actor.id || prior.title !== cmd.title || prior.description !== cmd.description || prior.repo?.id !== cmd.repo?.id) throw new DomainError("INVALID_INPUT", "This coding request ID was already used for different work.");
+      return { task: prior, events: [] };
+    }
+  }
+  const mayCreate = !!coding || actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
+  if (!mayCreate) {
+    throw new DomainError("NOT_PERMITTED", "only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)");
   }
   if (cmd.backlog && cmd.offerTo) {
     throw new DomainError("INVALID_INPUT", "a backlog item cannot be offered \u2014 promote it to todo first");
@@ -22176,7 +22387,7 @@ async function createTask(store2, actor, cmd) {
   if (cmd.thread && await store2.getThreadMode(cmd.workspace, cmd.thread) === "chat") {
     throw new DomainError("CHAT_THREAD", "this conversation has Tasks turned off \u2014 turn it on in the thread's composer, then ask again");
   }
-  if (cmd.originThread && await store2.getThreadMode(cmd.workspace, cmd.originThread) === "chat") {
+  if (!coding && cmd.originThread && await store2.getThreadMode(cmd.workspace, cmd.originThread) === "chat") {
     throw new DomainError("CHAT_THREAD", "this conversation has Tasks turned off \u2014 a chat thread cannot own board work");
   }
   const workPlanInput = !cmd.backlog && !cmd.parent && cmd.plan ? cmd.plan : null;
@@ -22230,11 +22441,11 @@ async function createTask(store2, actor, cmd) {
   if (actor.kind === "agent" && !cmd.backlog && !cmd.parent && !workPlanInput) {
     throw new DomainError("INVALID_INPUT", "PLAN_FIRST: a live task starts with its implementation plan \u2014 pass plan:{legs, subtasks, approach} so the human reviews it in the unit's thread before work begins");
   }
-  const offeredAgentId = cmd.offerTo ? await store2.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
+  const offeredAgentId = coding ? coding.agentId : cmd.offerTo ? await store2.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
   const number = await store2.nextTaskNumber(cmd.workspace);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const task = {
-    id: crypto.randomUUID(),
+    id: coding ? cmd.codingHandoff.requestId : crypto.randomUUID(),
     workspace: cmd.workspace,
     // a subtask lives in its parent's channel BY CONSTRUCTION — inherited, not
     // validated (callers pass channel ids or slugs; the parent's slug is truth)
@@ -22246,7 +22457,7 @@ async function createTask(store2, actor, cmd) {
     state: cmd.backlog ? "backlog" : workPlanInput ? "plan_review" : "todo",
     kind: cmd.kind ?? null,
     creator: { kind: actor.kind, id: actor.id },
-    assignee: null,
+    assignee: offeredAgentId ? { kind: "agent", id: offeredAgentId } : null,
     offeredAgentId,
     requirements: cmd.checklist ?? null,
     definitionOfDone: cmd.definitionOfDone ?? "",
@@ -22275,7 +22486,7 @@ async function createTask(store2, actor, cmd) {
     source: actorAddress(actor),
     target: taskTarget(task),
     workspace: task.workspace,
-    payload: { title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...task.kind ? { kind: task.kind } : {}, ...cmd.backlog ? { backlog: true } : {}, ...parent ? { parent: parent.id, parentNumber: parent.number } : {}, ...task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}, ...task.originThreadId ? { originThread: task.originThreadId } : {}, ...routine ? { routine: true, scheduleId: routineScheduleId } : {}, ...playbookRun ? { playbook: cmd.playbook } : {} }
+    payload: { ...coding ? { codingOwner: coding.owner } : {}, title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...task.kind ? { kind: task.kind } : {}, ...cmd.backlog ? { backlog: true } : {}, ...parent ? { parent: parent.id, parentNumber: parent.number } : {}, ...task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}, ...task.originThreadId ? { originThread: task.originThreadId } : {}, ...routine ? { routine: true, scheduleId: routineScheduleId } : {}, ...playbookRun ? { playbook: cmd.playbook } : {} }
   });
   await store2.createTask(task, event);
   if (cmd.thread) await store2.linkThreadTask(cmd.workspace, cmd.thread, task.id).catch(() => {
@@ -22475,7 +22686,8 @@ async function executeCommand(store2, actor, cmd) {
     const task = await store2.getTask(cmd.taskId);
     if (!task) throw new DomainError("NOT_FOUND", `task ${cmd.taskId} not found`);
     const owners = BEAT_PHASE_ROLES[task.state] ?? [];
-    if (!actor.role || !owners.includes(actor.role)) {
+    const ownsPhase = sameActor(task.assignee, actor) || !task.assignee && task.offeredAgentId === actor.id;
+    if (!actor.role || !owners.includes(actor.role) && !ownsPhase) {
       throw new DomainError("NOT_PERMITTED", `only the ${owners.join("/") || "assigned agent"} may set beats while a task is ${task.state}`);
     }
     if (cmd.type === "beats.declare") {
@@ -26772,17 +26984,18 @@ async function teamProjectAccess(sql, actor, workspace, project) {
   if (!row?.["context_channel_id"]) throw new BrainError("NOT_FOUND", "This project is not available to you.", 404);
   return row["context_channel_id"];
 }
-async function teamHomes(sql, workspace, project) {
-  const rows2 = await sql`select t.*, s.summary, coalesce(s.revision,0)::int as summary_revision,
+async function teamHomes(sql, workspace, project, historyAgentId) {
+  const rows2 = await sql`select t.*, coalesce(t.home_root_thread_id,t.id) as card_id, s.summary, coalesce(s.revision,0)::int as summary_revision,
     m.body as last_body, m.author_kind as last_author_kind,
     (select count(*)::int from messages where thread_id = t.id) as msg_count,
     (select count(*)::int from schedules where owner_home_thread_id = t.id) as routine_count,
-    (select count(*)::int from tasks where origin_thread_id = t.id and state not in ('accepted','closed')) as work_count
+    (select count(*)::int from tasks k join threads origin on origin.id=k.origin_thread_id where origin.project_id=t.project_id and origin.home_agent_id=t.home_agent_id and k.state not in ('accepted','closed')) as work_count
     from threads t join project_agents pa on pa.project_id = t.project_id and pa.agent_id = t.home_agent_id
     join agents a on a.id = pa.agent_id and a.retired_at is null
     left join lateral (select summary,revision from team_context_snapshots where thread_id=t.id order by revision desc limit 1) s on true
     left join lateral (select body,author_kind from messages where thread_id=t.id order by created_at desc,id desc limit 1) m on true
-    where t.workspace_id=${workspace}::uuid and t.project_id=${project}::uuid and t.home_agent_id is not null and t.archived_at is null
+    where t.workspace_id=${workspace}::uuid and t.project_id=${project}::uuid and t.home_agent_id is not null
+      and ((${historyAgentId ?? null}::uuid is null and t.archived_at is null) or (t.home_agent_id=${historyAgentId ?? null}::uuid and t.archived_at is not null))
     order by t.created_at,t.id`;
   return rows2.map((r) => ({ ...r, brain_override: r["brain_override"] ? JSON.stringify(r["brain_override"]) : null }));
 }
@@ -26804,39 +27017,81 @@ async function ensureTeamHomes(sql, actor, workspace, project, agentId) {
       select pa.workspace_id,pa.project_id,${channel}::uuid,a.id,a.name || ' · Agent thread',coalesce(a.brief,''),${`human:${actor.id}`},'chat','chat',now()
       from project_agents pa join agents a on a.id=pa.agent_id and a.retired_at is null
       where pa.project_id=${project}::uuid and (${agentId ?? null}::uuid is null or a.id=${agentId ?? null}::uuid)
-      on conflict(project_id,home_agent_id) where home_agent_id is not null do update set archived_at=null`;
+      on conflict(project_id,home_agent_id) where home_agent_id is not null and archived_at is null do nothing`;
   });
 }
-async function teamContext(sql, actor, workspace, threadId) {
+async function teamContext(sql, actor, workspace, threadId, mode = "auto") {
   const access = await brainThreadAccess(sql, actor, workspace, threadId);
-  const [thread] = await sql`select home_agent_id from threads where id=${threadId}::uuid`;
-  if (!thread?.["home_agent_id"]) return { home: null, summary: null, revision: 0, messages: [], compactThrough: null };
-  const home = (await teamHomes(sql, workspace, access.project_id)).find((t2) => t2.id === threadId) ?? null;
-  if (!home) throw new BrainError("NOT_FOUND", "This agent is no longer on this project team.", 404);
-  const [snapshot] = await sql`select * from team_context_snapshots where thread_id=${threadId}::uuid order by revision desc limit 1`;
+  const [thread] = await sql`select home_agent_id,kind,archived_at from threads where id=${threadId}::uuid`;
+  if (!thread || thread["kind"] === "coding") return { home: null, summary: null, revision: 0, messages: [], compactThrough: null };
+  if (thread["archived_at"]) throw new BrainError("CONFLICT", "This conversation is in history. Continue in the current agent thread.", 409);
+  const home = thread["home_agent_id"] ? (await teamHomes(sql, workspace, access.project_id)).find((t2) => t2.id === threadId) ?? null : null;
+  if (thread["home_agent_id"] && !home) throw new BrainError("NOT_FOUND", "This agent is no longer on this project team.", 404);
+  const [snapshot] = await sql`select s.*,m.created_at as through_at from team_context_snapshots s join messages m on m.id=s.through_message_id where s.thread_id=${threadId}::uuid order by s.revision desc limit 1`;
   const rows2 = await sql`select id,author_kind,author_id,body,created_at from messages where thread_id=${threadId}::uuid
     and (${snapshot?.["through_message_id"] ?? null}::uuid is null or (created_at,id)>(select created_at,id from messages where id=${snapshot?.["through_message_id"] ?? null}::uuid))
     order by created_at,id limit 100`;
   const messages2 = rows2.map((r) => ({ ...r, created_at: new Date(r["created_at"]).toISOString() }));
-  const shouldCompact = messages2.length > 60 || messages2.reduce((n, m) => n + m.body.length, 0) > 6e4;
+  const preserve = mode === "manual" ? 1 : 20;
+  const shouldCompact = mode === "manual" || messages2.length > 60 || messages2.reduce((n, m) => n + m.body.length, 0) > 6e4;
   return {
     home,
+    threadId,
+    projectId: access.project_id ?? void 0,
+    compactedThroughAt: snapshot?.["through_at"] ? new Date(snapshot["through_at"]).toISOString() : null,
     summary: snapshot?.["summary"] ?? null,
     revision: snapshot?.["revision"] ?? 0,
     messages: messages2,
-    compactThrough: shouldCompact && messages2.length > 20 ? messages2[messages2.length - 21].id : null
+    compactThrough: shouldCompact && messages2.length > preserve ? messages2[messages2.length - preserve - 1].id : null
   };
 }
 async function publishTeamContext(sql, actor, workspace, threadId, input) {
   return sql.begin(async (tx) => {
     const q = tx;
     await q`select id from threads where id=${threadId}::uuid for update`;
-    const context = await teamContext(q, actor, workspace, threadId);
-    if (actor.kind !== "agent" || actor.id !== context.home?.home_agent_id) throw new BrainError("NOT_PERMITTED", "Only the owning agent can compact its thread.", 403);
+    const context = await teamContext(q, actor, workspace, threadId, input.mode);
+    if (actor.kind !== "agent" || !context.threadId || context.home && actor.id !== context.home.home_agent_id) throw new BrainError("NOT_PERMITTED", "Only the owning agent can compact its thread.", 403);
     if (context.revision !== input.revision || context.compactThrough !== input.through) throw new BrainError("CONFLICT", "The context changed; read it again before compacting.", 409);
     await q`insert into team_context_snapshots(workspace_id,thread_id,revision,through_message_id,summary)
       values(${workspace}::uuid,${threadId}::uuid,${input.revision + 1},${input.through}::uuid,${input.summary})`;
     return { revision: input.revision + 1 };
+  });
+}
+
+// src/store/team-thread.ts
+init_src();
+async function freshTeamThread(sql, actor, workspace, project, threadId) {
+  if (actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "Only a person can start a fresh agent thread.", 403);
+  return sql.begin(async (tx) => {
+    const q = tx;
+    await teamProjectAccess(q, actor, workspace, project);
+    const [identity] = await q`select home_agent_id from threads where id=${threadId}::uuid and project_id=${project}::uuid`;
+    if (!identity?.["home_agent_id"]) throw new BrainError("NOT_FOUND", "This agent thread is not available.", 404);
+    await q`select pg_advisory_xact_lock(hashtextextended(${"team-home:" + project + ":" + identity["home_agent_id"]},0))`;
+    await q`select pg_advisory_xact_lock(hashtextextended(${threadId}, 0))`;
+    await q`select id from projects where id=${project}::uuid for update`;
+    const [old] = await q`select t.* from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id
+      join agents a on a.id=pa.agent_id and a.retired_at is null
+      where t.id=${threadId}::uuid and t.project_id=${project}::uuid and t.workspace_id=${workspace}::uuid for update of t`;
+    if (!old) throw new BrainError("NOT_FOUND", "This agent thread is not available.", 404);
+    if (old["archived_at"]) {
+      const [current] = await q`select id from threads where project_id=${project}::uuid and home_agent_id=${old["home_agent_id"]}::uuid and archived_at is null`;
+      if (!current) throw new BrainError("CONFLICT", "Reopen Agent Desk before starting a fresh thread.", 409);
+      return current["id"];
+    }
+    const [run2] = await q`select id from runs where thread_id=${threadId}::uuid and state in ('running','parked') limit 1`;
+    const [last] = await q`select author_kind,body from messages where thread_id=${threadId}::uuid order by created_at desc,id desc limit 1`;
+    const [decision] = await q`select d.id from decisions d join messages m on m.id=d.message_id where m.thread_id=${threadId}::uuid and d.status='open' limit 1`;
+    if (run2 || decision || last?.["author_kind"] === "human" && last["body"] !== ROUTINE_SCHEDULED_MARKER) {
+      throw new BrainError("CONFLICT", "Wait for this agent\u2019s current reply before starting a fresh thread. Coding tasks can continue separately.", 409);
+    }
+    if (!last) return threadId;
+    await q`update threads set archived_at=now() where id=${threadId}::uuid`;
+    const [next] = await q`insert into threads(workspace_id,project_id,channel_id,home_agent_id,home_root_thread_id,title,description,created_by,mode,kind,titled_at,brain_override,home_thinking,origin,machine_id)
+      select workspace_id,project_id,channel_id,home_agent_id,coalesce(home_root_thread_id,id),title,description,created_by,'chat','chat',now(),brain_override,home_thinking,origin,machine_id
+      from threads where id=${threadId}::uuid returning id`;
+    await q`update schedules set owner_home_thread_id=${next["id"]}::uuid where owner_home_thread_id=${threadId}::uuid`;
+    return next["id"];
   });
 }
 
@@ -26862,13 +27117,26 @@ function teamRoutes(app, store2) {
     await ensureTeamHomes(db(), c.get("actor"), workspace, projectId, agentId);
     return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get("actor"), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
   });
+  app.post("/v1/team/fresh", async (c) => {
+    const p2 = Scope.extend({ threadId: z24.string().uuid() }).safeParse(await c.req.json());
+    if (!p2.success) return c.json({ error: "Supply the current agent thread and project." }, 400);
+    const { workspace, projectId, threadId } = p2.data;
+    await freshTeamThread(db(), c.get("actor"), workspace, projectId, threadId);
+    return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get("actor"), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
+  });
+  app.get("/v1/team/threads", async (c) => {
+    const p2 = Scope.extend({ agentId: z24.string().uuid() }).safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply the agent and project." }, 400);
+    await teamProjectAccess(db(), c.get("actor"), p2.data.workspace, p2.data.projectId);
+    return c.json(await teamHomes(db(), p2.data.workspace, p2.data.projectId, p2.data.agentId));
+  });
   app.get("/v1/team/context", async (c) => {
-    const p2 = ThreadScope.safeParse(c.req.query());
+    const p2 = ThreadScope.extend({ mode: z24.enum(["auto", "manual"]).optional() }).safeParse(c.req.query());
     if (!p2.success) return c.json({ error: "Supply a valid thread." }, 400);
-    return c.json(await teamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId));
+    return c.json(await teamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId, p2.data.mode));
   });
   app.post("/v1/team/compact", async (c) => {
-    const p2 = ThreadScope.extend({ revision: z24.number().int().nonnegative(), through: z24.string().uuid(), summary: z24.string().min(1).max(16e3) }).safeParse(await c.req.json());
+    const p2 = ThreadScope.extend({ mode: z24.enum(["auto", "manual"]).optional(), revision: z24.number().int().nonnegative(), through: z24.string().uuid(), summary: z24.string().min(1).max(16e3) }).safeParse(await c.req.json());
     if (!p2.success) return c.json({ error: "Supply a valid context snapshot." }, 400);
     return c.json(await publishTeamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId, p2.data));
   });
@@ -26880,7 +27148,7 @@ function teamRoutes(app, store2) {
     const sql = db();
     await brainThreadAccess(sql, actor, p2.data.workspace, p2.data.threadId);
     const rows2 = await sql`update threads t set brain_override=jsonb_build_object(a.role,${p2.data.model}::text), home_thinking=${p2.data.thinking}
-      from agents a where t.id=${p2.data.threadId}::uuid and a.id=t.home_agent_id returning t.id`;
+      from agents a where t.id=${p2.data.threadId}::uuid and a.id=t.home_agent_id and t.archived_at is null returning t.id`;
     if (!rows2.length) throw new BrainError("NOT_FOUND", "No agent thread found.", 404);
     return c.json({ ok: true });
   });
@@ -26923,8 +27191,10 @@ function teamRoutes(app, store2) {
       const q = tx;
       const source = await brainThreadAccess(q, actor, workspace, threadId);
       const target = await brainThreadAccess(q, actor, workspace, targetThreadId);
-      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid for update`;
+      await q`select id from threads where id in (${threadId}::uuid,${targetThreadId}::uuid) order by id for update`;
+      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid and archived_at is null`;
       const [to] = await q`select t.home_agent_id from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id join agents a on a.id=pa.agent_id and a.retired_at is null where t.id=${targetThreadId}::uuid and t.archived_at is null`;
+      if (!to) throw new BrainError("CONFLICT", "This teammate has a fresh thread. Read list_team and use its current thread ID.", 409);
       if (source.project_id !== target.project_id || own?.["home_agent_id"] !== actor.id || !to?.["home_agent_id"] || threadId === targetThreadId) throw new BrainError("NOT_PERMITTED", "Collaborate with another agent in this project.", 403);
       const [existing] = await q`select body,thread_id,team_source_thread_id from messages where id=${id}::uuid`;
       if (existing) {
@@ -28729,6 +28999,18 @@ function safeJson2(raw) {
   }
 }
 
+// src/store/message-thread-scope.ts
+async function messageThreadScope(sql, msg2) {
+  if (!msg2.threadId) return void 0;
+  const [thread] = await sql`select t.workspace_id,t.channel_id,t.home_agent_id,t.archived_at,coalesce(t.project_id,c.project_id) as project_id
+    from threads t join channels c on c.id=t.channel_id where t.id=${msg2.threadId}::uuid for update of t`;
+  if (thread && thread["workspace_id"] !== msg2.workspace) throw new DomainError("NOT_FOUND", "Thread not found in this workspace.");
+  if (thread?.["home_agent_id"] && thread["archived_at"] && msg2.author.kind === "human") {
+    throw new DomainError("CONFLICT", "This conversation is in history. Continue in the agent\u2019s current Agent Desk thread.");
+  }
+  return thread;
+}
+
 // src/store/project-marketing.ts
 init_src();
 
@@ -29842,6 +30124,16 @@ After applying interview-me:
   }
 ];
 
+// src/seed/task-skill-seed.ts
+init_src();
+var TASK_SKILL_SEED = [{
+  pack: { name: "neuramesh-work", description: "Context-rich task handoffs and reviewable implementation plans for every agent.", source_url: "https://github.com/alonge-dev/neuramesh", source_ref: "main", version: "1" },
+  skills: [
+    { name: "task-handoff", description: "Create a task with role, context, requirements, done criteria and validation evidence.", body: TASK_HANDOFF_SKILL },
+    { name: "implementation-plan", description: "Write or revise a repository-informed implementation plan with the shared review standard.", body: IMPLEMENTATION_PLAN_SKILL }
+  ]
+}];
+
 // src/seed/marketing-os-skill-seed.ts
 var MARKETING_OS_SKILL_SEED = [
   {
@@ -30283,11 +30575,12 @@ var PostgresStore = class {
       const [ch] = await sql`select project_id from channels where id = ${chId}`;
       const projectId = ch?.["project_id"] ?? null;
       await sql`insert into tasks (id, workspace_id, channel_id, project_id, number, title, description, state, kind,
-          creator_kind, creator_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
+          creator_kind, creator_id, assignee_kind, assignee_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
         values (${task.id}, ${task.workspace}::uuid, ${chId}, ${projectId}, ${task.number}, ${task.title},
-          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid,
+          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid, ${task.assignee?.kind ?? null}::actor_kind, ${task.assignee?.id ?? null}::uuid,
           ${task.repo?.id ?? null}, ${task.repo?.baseRef ?? null}, ${task.repo?.branch ?? null},
           ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt})`;
+      if (typeof event.payload["codingOwner"] === "string") await createCodingTaskThread(sql, task.id, event.payload["codingOwner"]);
       await this.insertEvent(sql, event, task.id);
     });
     return task;
@@ -30407,7 +30700,7 @@ var PostgresStore = class {
         if (kind === "marketing") await this.ensureSetupTask(sql, workspaceId, ch["id"]);
       }
       await sql`update projects set context_channel_id = ${generalId}::uuid where id = ${defaultProjectId}::uuid`;
-      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, SKILL_SEED);
+      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, [...TASK_SKILL_SEED, ...SKILL_SEED]);
       await this.insertEvent(sql, { ...event, workspace: workspaceId }, null);
       return { workspaceId, channelId: generalId };
     });
@@ -30454,7 +30747,7 @@ var PostgresStore = class {
   async offerTask(taskId3, agentName, repo, checklist, dod, kind, event) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
-      const [t2] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, c.slug as channel_slug
+      const [t2] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, t.assignee_id, t.offered_agent_id, c.slug as channel_slug
         from tasks t join channels c on c.id = t.channel_id where t.id = ${taskId3} for update of t`;
       if (!t2) throw new DomainError("NOT_FOUND", `task ${taskId3} not found`);
       if (t2["state"] !== "todo" && t2["state"] !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", "only todo or plan_review tasks can be offered");
@@ -30463,12 +30756,11 @@ var PostgresStore = class {
         where a.workspace_id = ${t2["workspace_id"]} and a.name = ${agentName} and ac.channel_id = ${t2["channel_id"]}`;
       if (!agent) throw new DomainError("NOT_FOUND", `agent ${agentName} is not registered to #${t2["channel_slug"]}`);
       if (agent["retired_at"]) throw new DomainError("NOT_PERMITTED", `agent ${agentName} is retired \u2014 rehire it or offer to someone else`);
+      requireTaskOwner(t2["assignee_id"] ?? t2["offered_agent_id"], agent["id"]);
       if (repo) {
         const branch = taskBranch(Number(t2["number"]), t2["title"]);
-        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = null, assignee_kind = null, repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId3}`;
-      } else {
-        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = null, assignee_kind = null where id = ${taskId3}`;
-      }
+        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = ${agent["id"]}, assignee_kind = 'agent', repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId3}`;
+      } else await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = ${agent["id"]}, assignee_kind = 'agent' where id = ${taskId3}`;
       if (checklist?.length) {
         await sql`update tasks set requirements = ${sql.json(checklist)}, requirements_confirmed = true where id = ${taskId3}`;
       }
@@ -31470,7 +31762,7 @@ var PostgresStore = class {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
       const chId = await resolveChannelId(sql, workspace, channel);
-      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, kind === "marketing" ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
+      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, [...TASK_SKILL_SEED, ...kind === "marketing" ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED]);
       if (added > 0 || refreshed > 0) await this.insertEvent(sql, { ...event, workspace }, null);
       return { added, refreshed };
     });
@@ -32574,11 +32866,8 @@ var PostgresStore = class {
       await this.sql.begin(async (_tx) => {
         const sql = asSql2(_tx);
         if (msg2.threadId) await sql`select pg_advisory_xact_lock(hashtextextended(${msg2.threadId}, 0))`;
-        const [existingThread] = msg2.threadId ? await sql`select t.workspace_id, t.channel_id, coalesce(t.project_id, c.project_id) as project_id
-          from threads t join channels c on c.id = t.channel_id
-          where t.id = ${msg2.threadId}::uuid for update of t` : [];
-        if (existingThread && existingThread["workspace_id"] !== msg2.workspace) throw new DomainError("NOT_FOUND", "Thread not found in this workspace.");
-        let address = msg2.channel;
+        const existingThread = await messageThreadScope(sql, msg2);
+        let address = await taskMessageAddress(sql, msg2);
         if (msg2.projectId) {
           const [project] = await sql`select id, context_channel_id from projects where id = ${msg2.projectId}::uuid and workspace_id = ${msg2.workspace}::uuid for share`;
           if (!project) throw new DomainError("NOT_FOUND", "Project not found in this workspace.");
@@ -32600,7 +32889,7 @@ var PostgresStore = class {
           if (task["project_id"] !== msg2.projectId || task["channel_id"] !== chId) throw new DomainError("CONFLICT", "The task belongs to another conversation context.");
         }
         if (!msg2.channel && !msg2.taskId) event = { ...event, target: `channel/${chId}` };
-        msg2 = { ...msg2, channel: chId, projectId: scope["project_id"] };
+        msg2 = await bindCodingTaskMessage(sql, { ...msg2, channel: chId, projectId: scope["project_id"] });
         if (msg2.threadId) {
           const bornBrain = parseBrainOverride(msg2.brainOverride);
           await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind, project_id)

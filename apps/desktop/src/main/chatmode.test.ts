@@ -213,6 +213,7 @@ test('a mode marker round-trips and nothing else parses as one', () => {
 test('GPT chat advertises draft tools without promising local file writes', () => {
   const prompt = chatSystemPrompt(REX, 'general', { canUseTools: true, canWriteFiles: false });
   assert.match(prompt, /draft_posts/);
-  assert.match(prompt, /Files and commands are read-only/);
+  assert.match(prompt, /implementation runs in a delegated coding task through create_coding_task/);
+  assert.match(prompt, /Do not paste a proposed diff as a completed implementation/);
   assert.doesNotMatch(prompt, /\*\*Write files\.\*\*/);
 });

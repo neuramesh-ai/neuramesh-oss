@@ -39,6 +39,7 @@ export function createLocalEngineeringHost(o: LocalEngineeringHostOptions): Engi
   return createClineEngineeringHost({
     ...auth,
     resolveCwd: o.resolveCwd ?? ((meta) => ensureEngineeringWorkspace(o.db, o.workspaceId, meta, { preferLocal: true })),
+    isTaskThread: async meta => { const [task] = await o.db.getAll<{state:string}>("select k.state from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.kind='coding'", [meta.threadId, o.workspaceId]); return task?.state === 'planning' || task?.state === 'in_progress' ? task.state : !!task; },
     resolveDisplayContext: meta => resolveEngineeringDisplayContext(o.db, o.apiUrl, o.workspaceId, meta),
     resolveBrain: o.resolveBrain ?? ((meta) => resolveEngineeringBrain(o.db, auth, meta)),
     resolvePolicyRules: (meta) => loadEngineeringPolicyRules(o.db, o.workspaceId, meta.projectId ?? null),
@@ -48,6 +49,15 @@ export function createLocalEngineeringHost(o: LocalEngineeringHostOptions): Engi
     ...(o.createCore ? { createCore: o.createCore } : {}),
     ...(o.createDefaultExecutors ? { createDefaultExecutors: o.createDefaultExecutors } : {}),
   });
+}
+
+// The task dispatcher and renderer must attach to the same host, including background work.
+const localHosts = new Map<string, EngineeringMachineHost>();
+export function sharedLocalEngineeringHost(o: LocalEngineeringHostOptions): EngineeringMachineHost {
+  const key = JSON.stringify([o.apiUrl,o.workspaceId,o.machineId]);
+  let host = localHosts.get(key);
+  if (!host) { host = createLocalEngineeringHost(o); localHosts.set(key,host); }
+  return host;
 }
 
 /** the open sessions of the local lane, by the renderer's subId */

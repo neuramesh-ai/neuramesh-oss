@@ -1,3 +1,7 @@
+import { useTaskReference } from './thread/useTaskReference';
+import { isPlanDoc, normalizeTaskMarkdown } from '@neuramesh/shared';
+import { TaskApprovalEnvironment } from './thread/TaskApprovalCard';
+import { CodingTaskSurface, codingTaskReady } from './thread/task/CodingTaskSurface';
 import { ThreadOverviewEnvironment } from './thread/ThreadOverview'; import { openLink } from './lib/links';
 import type { EngineeringSelection } from '@neuramesh/shared';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -62,7 +66,6 @@ import { ProjectChip } from './projects/ProjectChip';
 import { Modal } from './ui/Modal';
 
 
-import { type TaskRefInfo } from './cards/parse';
 import { FailoverBannerContext } from './context/FailoverBanner';
 import { CLAUDE_DESIGN_TERMINAL_EVENT, type ClaudeDesignLaunch } from './cards/terminal';
 import { FailoverFlyup } from './cards/FailoverCard';
@@ -831,7 +834,7 @@ export function App() {
       ?? live
       ?? [...arts].sort((x, y) => rank[previewType(x.name, x.kind, x.content ?? '')] - rank[previewType(y.name, y.kind, y.content ?? '')])[0];
     if (!pick) return;
-    const one = { id: pick.id, kind: pick.kind, name: pick.name, content: pick.content ?? '' };
+    const one = { id: pick.id, kind: pick.kind, name: pick.name, content: isPlanDoc(pick.name) ? normalizeTaskMarkdown(pick.content ?? '') : pick.content ?? '' };
     const kind = reviewKind(one.name, one.kind);
     if (kind) openReviewTab(kind, one, kind === 'design' ? roundMockupsOf(arts, designVer(one.name)) : [], name ? one.name : null, rounds, task, owned);
     else openArtifactTab(one, task, owned);
@@ -1937,7 +1940,7 @@ export function App() {
   const panelSession = panelSessionOf({
     taskId: openTask?.id ?? null,
     threadId: openTask ? null : openThreadId,
-    coding: openCodingThread,
+    coding: openCodingThread || !!(openTask && codingTaskReady(openTask, chanThreads, codeSessionsAll)),
     roomId: roomHome ? current!.id : null,
     roomSections,
     // a task's worktree is a Files tab only where this client can browse it (never on the web)
@@ -2080,16 +2083,17 @@ export function App() {
   // markdown `components` map below can be memoized on it — that keeps react-markdown from giving
   // each inline TaskRefLink a fresh identity every sync, which was remounting it (wiping the hover
   // card mid-hover) and replaying its entry animation (the blip).
-  const mdTaskRef = useCallback((n: number): TaskRefInfo | null => {
-    const t = tasks.find((x) => x.number === n) ?? tasksAll.find((x) => x.number === n);
-    if (!t) return null;
-    const ag = t.assignee_kind === 'agent' ? roster.agents.find((x) => x.id === t.assignee_id)?.name ?? null : null;
-    return { id: t.id, number: n, title: t.title, state: t.state, assignee: ag, branch: t.branch, pr: t.pr_number };
-  }, [tasks, tasksAll, roster.agents]);
+  const mdTaskRef = useTaskReference(tasks, tasksAll, roster.agents);
 
   // ── THE TASK TAB's body (the side-panel round, 2026-10-03, §3.7) ─────────────────────────
   // The SAME TaskThread the full surface renders, in a tab of the session's side panel, with
   // `peek` swapping the back crumb for `Open the task ›`. The tab strip's ✕ closes it.
+  const codingTaskSurface = (task: NonNullable<typeof openTask>, full = false) => !codingTaskReady(task, chanThreads, codeSessionsAll) ? null : <CodingTaskSurface task={task} threads={chanThreads} sessions={codeSessionsAll} channels={chans} tasks={tasksAll}
+    back={sessionBack} repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} workspaceId={boot?.workspaceId ?? 'workspace'}
+    onReposChanged={() => { if (nm) void nm.channelMeta(task.channel_id).then(r => setMeta({projects:r?.projects ?? [],repos:r?.repos ?? [],reposAll:r?.reposAll ?? []})); }}
+    defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} agents={roster.agents} decisions={decisionsAll.filter(d => d.task_id === task.id)}
+    onOpenTask={peekTask} onOpenDoc={openDocTab} onOpenArticle={openArticleTab} onOpenWhiteboard={openWhiteboardTab}
+      {...(full ? { codeSlot: panelCodeSlot, codeTab: sessionTabKeyOf(front) as EngineeringWorkspaceTab | null, onCodeTab, onCodeCounts: setCodeCounts } : {})} />;
   const taskTab = (tabId: string, pt: NonNullable<typeof openTask>) => {
     const chan = chans.find((c) => c.id === pt.channel_id) ?? null;
     const row = tasksAll.find((x) => x.id === pt.id);
@@ -2099,10 +2103,11 @@ export function App() {
       <TaskThread
         key={pt.id}
         task={pt}
+        codingSurface={codingTaskSurface(pt)}
         back={sessionBack}
         // the promotion: the task takes the whole sheet with a back crumb, as a click on a task does everywhere else
-        peek={{ onFull: () => { closeWTab(tabId); setOpenTaskId(pt.id); } }}
-        convoThreadId={convo?.id ?? pt.origin_thread_id ?? null}
+        peek={{ onFull: () => { closeWTab(tabId); openTaskFromAnywhere(pt.id); } }}
+        convoThreadId={convo?.id ?? null}
         convoThread={convo}
         threadBrain={(convo ?? chanThreads.find((t) => t.id === pt.origin_thread_id))?.brain_override ?? null}
         brainProject={proj ? { id: proj.id, name: proj.name, pack: proj.model_pack ?? null } : null}
@@ -3369,6 +3374,7 @@ export function App() {
       )}
       <div className="shellbody">
       {/* what the side panel shows in front, so a thread's one-row card can say "In the panel" */}
+      <TaskApprovalEnvironment.Provider value={(task, name) => { void openTaskArtifact(task, name); }}>
       <PanelShownContext.Provider value={panelShown}>
       <ThreadOverviewEnvironment.Provider value={{ workspace: boot?.workspaceId ?? 'workspace', owner: panelSession.key, paneOpen: dockOpen, expanded: panelExpanded, openLink: (url: string) => openLink(url),
         processes: procsView.terminals.flatMap((proc) => { const tab = wtabs.find((t) => t.id === subIdToTab[proc.subId] && t.owner === panelSession.key && t.kind === 'terminal'); return tab ? [{ id: tab.id, label: proc.title, detail: 'Terminal', open: () => { activateWTab(tab.id); openDock(true); } }] : []; }),
@@ -4068,7 +4074,7 @@ export function App() {
           // the header's toggle: opening it lands on Details, because that is what the button in
           // a TASK's action row promises — not whatever face you last left the panel on
 
-          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? openTask.origin_thread_id ?? null}
+          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? null}
           convoThread={chanThreads.find((t) => t.task_id === openTask.id) ?? null}
           threadBrain={(chanThreads.find((t) => t.task_id === openTask.id) ?? chanThreads.find((t) => t.id === openTask.origin_thread_id))?.brain_override ?? null}
           brainProject={(() => {
@@ -4087,6 +4093,7 @@ export function App() {
           onOpenWhiteboard={openWhiteboardTab} onOpenDoc={openDocTab} onOpenArticle={openArticleTab}
           back={sessionBack}
           task={openTask}
+          codingSurface={codingTaskSurface(openTask, true)}
           agents={roster.agents}
           machines={roster.machines}
           members={members}
@@ -4224,6 +4231,7 @@ export function App() {
       )}
       </ThreadOverviewEnvironment.Provider>
       </PanelShownContext.Provider>
+      </TaskApprovalEnvironment.Provider>
       </div>
       {cmdkOpen && <CmdKPalette items={buildCmdkItems()} onClose={() => setCmdkOpen(false)} />}
       <LinkChoiceHost openInApp={openBrowserTab} />

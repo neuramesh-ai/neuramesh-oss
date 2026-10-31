@@ -1,6 +1,7 @@
 /** Agent Desk shares ordinary threads; these are the server's small card projections. */
 export interface TeamHome {
   id: string; project_id: string; channel_id: string; home_agent_id: string;
+  card_id?: string; archived_at?: string | null;
   title: string; description: string; created_by: string; created_at: string; updated_at: string;
   task_id: null; mode: 'chat'; kind: 'chat'; brain_override: string | null; home_thinking: string | null;
   summary: string | null; summary_revision: number; last_body: string | null; last_author_kind: string | null;
@@ -9,6 +10,7 @@ export interface TeamHome {
 export interface TeamDeskState { projectId: string; channelId: string; homes: TeamHome[] }
 export interface TeamContextMessage { id: string; author_kind: string; author_id: string; body: string; created_at: string }
 export interface TeamContext {
+  threadId?: string; projectId?: string; compactedThroughAt?: string | null;
   home: TeamHome | null; summary: string | null; revision: number;
   messages: TeamContextMessage[]; compactThrough: string | null;
 }

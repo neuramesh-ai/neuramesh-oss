@@ -1,3 +1,4 @@
+import { runTaskCoding } from './coding-task-run';
 // THE ROLE FLOWS — what each teammate actually does when it holds a task (track B2).
 //
 // architect → designer → developer → reviewer → shipper, plus the claim/own/resume paths and
@@ -66,7 +67,7 @@ export const workspaceFor = (t: ExecTask): string => claimWorkspace({ repo: !!t.
 /** the shape the ship + verify flows read a task in — shared with host/releasedocs.ts */
 export type ShipTask = { id: string; number: number; title: string; channel_id: string; pr_number: number | null; ship_plan: string | null };
 
-export function makeFlows(ctx: HostCtx & { repoCred: import('./repocred').RepoCred } & {
+export function makeFlows(ctx: HostCtx & { engineering?: () => import('../relay/engineering-host').EngineeringMachineHost; repoCred: import('./repocred').RepoCred } & {
   db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
@@ -320,7 +321,8 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     //    the same model) produces the ordered plan up front; the daemon declares it here,
     //    injects it into the run, and settles it on a clean finish.
     let planNote = ''; // the non-Claude plan carried into the coding prompt
-    if (!isAnthropic && mode === 'claude') {
+    const nativeCoding = (await db.getAll("select id from threads where task_id=? and kind='coding'", [t.id])).length > 0;
+    if (!nativeCoding && !isAnthropic && mode === 'claude') {
       coarsePlan = await generateBeatPlan(adapter, agent.model, token, t);
       if (coarsePlan.length) {
         await beatsFns.declare(coarsePlan);
@@ -358,10 +360,10 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
           // each child takes a slice, and the slices are what terminate depth.
           const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, dir, t, TURN_BUDGETS.work, log, 0);
           const parkTurn = parkFor(agent, t, ch);
-          let run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
+          let run = await runTaskCoding({db,engineering:ctx.engineering,task:t,agent,dir,context:[attNote,reworkNotes,memoryNote].filter(Boolean).join('\n\n'),log,onProgress:workRun.step}) ?? await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
           if (!run.stopped && claimsPendingWork(run.note)) {
             log({ kind: 'exec', phase: 'held', summary: 'turn ended still waiting on background work — one nudge to finish here', level: 'warn' });
-            run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
+            run = await runTaskCoding({db,engineering:ctx.engineering,task:t,agent,dir,context:[attNote,reworkNotes,memoryNote,FINISH_NOW_NOTE].filter(Boolean).join('\n\n'),log,onProgress:workRun.step}) ?? await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
             if (!run.stopped && claimsPendingWork(run.note)) heldReason = run.note.replace(/\s+/g, ' ').trim().slice(0, 400);
           }
           note = run.stopped ? stoppedNote : run.note;

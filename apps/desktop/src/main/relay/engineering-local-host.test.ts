@@ -14,7 +14,14 @@ const fakeCore = {
   restore: async () => ({ messages: [], checkpoint: { ref: 'x', createdAt: Date.now(), runCount: 1 } }),
 } as unknown as ClineCore;
 const createCore = (async () => fakeCore) as typeof import('@cline/sdk').ClineCore.create;
-const db = { get: async () => null, getAll: async () => [] } as unknown as Parameters<typeof createLocalEngineeringHost>[0]['db'];
+const db = {
+  get: async (sql: string) => {
+    // Replica.get throws for an absent row; ordinary coding threads have no task_id.
+    if (sql.includes('task_id is not null')) throw new Error('No row found');
+    return null;
+  },
+  getAll: async () => [],
+} as unknown as Parameters<typeof createLocalEngineeringHost>[0]['db'];
 const meta = (threadId = 'e1', machineId?: string): EngineeringOpenMeta => ({
   threadId, repoId: 'r1', repoName: 'app', branch: 'main', mode: 'plan',
   permissions: { read: true, edit: false, command: false, web: false, mcp: false },

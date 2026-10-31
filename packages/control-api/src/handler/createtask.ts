@@ -38,6 +38,7 @@ import { DomainError } from '../errors';
 import { normalizeTaskTitle, type Store } from '../store';
 import { actorAddress, taskTarget } from './guards';
 import { postPlanMessage } from './planfollowup';
+import { validateCodingHandoff, adoptCodingTask } from './coding-handoff';
 
 
 
@@ -73,15 +74,6 @@ export async function createTask(
   actor: Actor,
   cmd: Extract<Command, { type: 'task.create' }>,
 ): Promise<CommandOutcome> {
-  // any teammate may PARK an idea (backlog:true — docs/15) or spin up companion
-  // work UNDER a task (parent: — docs/24); creating live top-level todo work
-  // stays human/orchestrator-only. A backlog item can't be born offered:
-  // offering rides the promote-then-offer path, and promotion is a
-  // human/orchestrator call — so an agent can never route top-level work.
-  const mayCreate = actor.kind === 'human' || actor.role === 'orchestrator' || cmd.backlog || !!cmd.parent;
-  if (!mayCreate) {
-    throw new DomainError('NOT_PERMITTED', 'only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)');
-  }
   // the workspace voice, enforced at the row's birth (docs/design/agent-comm-rules-2026-08
   // slice 3): agent-authored titles/descriptions are scrubbed fence-aware when noEmdash is
   // on. Humans are never rewritten; a failed rules read fails open.
@@ -90,6 +82,26 @@ export async function createTask(
     if (rules.noEmdash) {
       cmd = { ...cmd, title: scrubEmdash(cmd.title), description: scrubEmdash(cmd.description) };
     }
+  }
+  const coding = await validateCodingHandoff(store, actor, cmd);
+  if (coding) {
+    cmd = { ...cmd, project: coding.project, channel: coding.channel };
+    const adopted = await adoptCodingTask(store, actor, cmd, coding);
+    if (adopted) return adopted;
+    const prior = await store.getTask(cmd.codingHandoff!.requestId);
+    if (prior) {
+      if (prior.workspace !== cmd.workspace || prior.originThreadId !== cmd.originThread || prior.creator.id !== actor.id || prior.title !== cmd.title || prior.description !== cmd.description || prior.repo?.id !== cmd.repo?.id) throw new DomainError('INVALID_INPUT', 'This coding request ID was already used for different work.');
+      return { task: prior, events: [] };
+    }
+  }
+  // any teammate may PARK an idea (backlog:true — docs/15) or spin up companion
+  // work UNDER a task (parent: — docs/24); creating live top-level todo work
+  // stays human/orchestrator-only. A backlog item can't be born offered:
+  // offering rides the promote-then-offer path, and promotion is a
+  // human/orchestrator call — so an agent can never route top-level work.
+  const mayCreate = !!coding || actor.kind === 'human' || actor.role === 'orchestrator' || cmd.backlog || !!cmd.parent;
+  if (!mayCreate) {
+    throw new DomainError('NOT_PERMITTED', 'only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)');
   }
   if (cmd.backlog && cmd.offerTo) {
     throw new DomainError('INVALID_INPUT', 'a backlog item cannot be offered — promote it to todo first');
@@ -105,7 +117,7 @@ export async function createTask(
   if (cmd.thread && (await store.getThreadMode(cmd.workspace, cmd.thread)) === 'chat') {
     throw new DomainError('CHAT_THREAD', 'this conversation has Tasks turned off — turn it on in the thread\'s composer, then ask again');
   }
-  if (cmd.originThread && (await store.getThreadMode(cmd.workspace, cmd.originThread)) === 'chat') {
+  if (!coding && cmd.originThread && (await store.getThreadMode(cmd.workspace, cmd.originThread)) === 'chat') {
     throw new DomainError('CHAT_THREAD', 'this conversation has Tasks turned off — a chat thread cannot own board work');
   }
   // ── Plan-first units (2026-08-17) ──
@@ -210,11 +222,11 @@ export async function createTask(
     throw new DomainError('INVALID_INPUT', 'PLAN_FIRST: a live task starts with its implementation plan — pass plan:{legs, subtasks, approach} so the human reviews it in the unit\'s thread before work begins');
   }
 
-  const offeredAgentId = cmd.offerTo ? await store.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
+  const offeredAgentId = coding ? coding.agentId : cmd.offerTo ? await store.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
   const number = await store.nextTaskNumber(cmd.workspace);
   const now = new Date().toISOString();
   const task: Task = {
-    id: crypto.randomUUID(),
+    id: coding ? cmd.codingHandoff!.requestId : crypto.randomUUID(),
     workspace: cmd.workspace,
     // a subtask lives in its parent's channel BY CONSTRUCTION — inherited, not
     // validated (callers pass channel ids or slugs; the parent's slug is truth)
@@ -226,7 +238,7 @@ export async function createTask(
     state: cmd.backlog ? 'backlog' : workPlanInput ? 'plan_review' : 'todo',
     kind: cmd.kind ?? null,
     creator: { kind: actor.kind, id: actor.id },
-    assignee: null,
+    assignee: offeredAgentId ? { kind: 'agent', id: offeredAgentId } : null,
     offeredAgentId,
     requirements: cmd.checklist ?? null,
     definitionOfDone: cmd.definitionOfDone ?? '',
@@ -258,7 +270,7 @@ export async function createTask(
     source: actorAddress(actor),
     target: taskTarget(task),
     workspace: task.workspace,
-    payload: { title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...(task.kind ? { kind: task.kind } : {}), ...(cmd.backlog ? { backlog: true } : {}), ...(parent ? { parent: parent.id, parentNumber: parent.number } : {}), ...(task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}), ...(task.originThreadId ? { originThread: task.originThreadId } : {}), ...(routine ? { routine: true, scheduleId: routineScheduleId } : {}), ...(playbookRun ? { playbook: cmd.playbook } : {}) },
+    payload: { ...(coding ? { codingOwner: coding.owner } : {}), title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...(task.kind ? { kind: task.kind } : {}), ...(cmd.backlog ? { backlog: true } : {}), ...(parent ? { parent: parent.id, parentNumber: parent.number } : {}), ...(task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}), ...(task.originThreadId ? { originThread: task.originThreadId } : {}), ...(routine ? { routine: true, scheduleId: routineScheduleId } : {}), ...(playbookRun ? { playbook: cmd.playbook } : {}) },
   });
 
   await store.createTask(task, event);
