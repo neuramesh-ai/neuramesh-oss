@@ -1,6 +1,6 @@
 // An OWNED design round (docs/29 §4d). The orchestrator owns the whole deliverable, and a design
 // phase is a leg of that flow — not a handoff. The server rule this rests on is narrow: only a
-// request_design that CARRIES a `designer` reassigns the task. Omit it and ownership survives.
+// request_design never reassigns the task, even if an older client carries a `designer` hint.
 //
 // This is a regression guard with a live failure behind it. The daemon's request_design tool used to
 // resolve the seated designer unconditionally and always send `designer:`, so a task rex had just
@@ -43,6 +43,7 @@ beforeEach(async () => {
   app = createApp(store);
   await send(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'rex', role: 'orchestrator', channels: ['dev'] });
   await send(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'iris', role: 'designer', channels: ['dev'] });
+  rex.id = await store.resolveOffer('ws_acme', 'dev', 'rex');
 });
 
 describe('an owned design round keeps its owner (docs/29 §4d)', () => {
@@ -53,14 +54,14 @@ describe('an owned design round keeps its owner (docs/29 §4d)', () => {
     const task = (await j(res)).task;
     expect(task.state).toBe('designing');
     // the assertion the live bug violated: the phase moved, the owner did not change
-    expect(task.assignee).toMatchObject({ id: 'rex' });
+    expect(task.assignee).toMatchObject({ id: rex.id });
   });
 
-  it('request_design WITH a designer still hands the task over — delegation stays legal', async () => {
+  it('request_design WITH a legacy designer hint still preserves the assigned owner', async () => {
     const t = await taken();
     const task = (await j(await send(rex, { type: 'task.request_design', taskId: t.id, designer: 'iris', kind: 'feature' }))).task;
     expect(task.state).toBe('designing');
-    expect(task.assignee).toMatchObject({ id: 'iris' });
+    expect(task.assignee).toMatchObject({ id: rex.id });
   });
 
   it('the owner can propose the round it drew, and still cannot approve it', async () => {

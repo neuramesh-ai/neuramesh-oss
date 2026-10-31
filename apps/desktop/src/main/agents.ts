@@ -130,6 +130,7 @@ export interface HostedAgent {
 export type SkillRef = { name: string; description: string; body: string; pack_name?: string | null };
 
 interface HostOpts {
+  engineering?: () => import('./relay/engineering-host').EngineeringMachineHost;
   headless?: boolean;
   db: ReplicaDatabase;
   machineId: string;
@@ -727,7 +728,7 @@ export async function generateBrandImage(cred: ImageCred, reviewSeat: string, br
 const hostsStarted = new Set<string>();
 // The two task shapes the plan/design flows read. Declared at module level so the flows
 // module (host/flows.ts) shares the SAME shape rather than restating it.
-export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null };
+export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null; offered_agent_id?: string | null };
 export type DesignTask = PlanTask & { repo_id: string | null; base_ref: string | null; updated_at: string };
 
 /** a skill pack mid-import — the curator watch and the flow that runs it share the shape */
@@ -738,7 +739,7 @@ export type ImportPack = { id: string; name: string; channel_id: string; source_
 export { collectFiles, runCoding, worktreeRun } from './execution';
 export { RESEARCH_OUTPUT_CONTRACT, loadMessageAttachments, openPlanningWorkspace, stageApprovedDesigns, stageBrandContext, stageConnections, stagePriorDesignRound, stageTaskAttachments } from './staging';
 
-export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless }: HostOpts) {
+export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless, engineering }: HostOpts) {
   const hostKey = `${apiUrl}|${workspace}`;
   if (hostsStarted.has(hostKey)) {
     console.warn(`agent_host already running for ${workspace.slice(0, 8)} — second start ignored (one host per backend and workspace)`);
@@ -1656,7 +1657,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
 
   db.watch(
-    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id from tasks where state = 'planning'`,
+    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id, offered_agent_id from tasks where state = 'planning'`,
     [],
     {
       onResult: (r) => {
@@ -1933,7 +1934,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     orchPlanDecision, ownFlow,
     remoteDelegate, resumeFlow,
   } = makeFlows({
-    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
+    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed, engineering,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
     handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,

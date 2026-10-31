@@ -107,8 +107,9 @@ export function TaskThread({
   onBrainConnect,
   railSlot, detailsShown, onDetails, onArrive, drafts,
   marks, onSettle,
-  peek,
+  peek, codingSurface,
 }: {
+  codingSurface?: React.ReactNode;
   task: TaskRow;
   /** the thread's word and its settle act, for the head (shell/rowstatus.ts) */
   marks?: HeadStatus | null;
@@ -362,7 +363,7 @@ export function TaskThread({
         hasPlanDoc: arts.some((a) => isPlanDoc(a.name)),
         repoBacked: !!task.repo_id || !!task.pr_number,
         shipGate: shipGate ?? true,
-        assigneeName: agents.find((a) => a.id === task.assignee_id)?.name ?? null,
+        assigneeName: agents.find((a) => a.id === (task.assignee_id ?? task.offered_agent_id))?.name ?? null,
         // plan-first units (docs/41): the DECLARED legs drive the journey; legacy rows keep
         // the evidence derivation (null → journeyFor's old branch, byte for byte)
         workPlanLegs: parseWorkPlanLegs(task.work_plan),
@@ -370,7 +371,7 @@ export function TaskThread({
       { designer: rosterByRole('designer'), architect: rosterByRole('architect'), developer: rosterByRole('developer') ?? rosterByRole('worker'), reviewer: rosterByRole('reviewer'), shipper: rosterByRole('shipper') },
       liveBeats.length ? { done: doneBeats, total: liveBeats.length } : undefined,
     );
-  }, [task.parent_task_id, task.state, task.repo_id, task.pr_number, task.assignee_id, task.work_plan, arts, beats, agents, channelId, shipGate]);
+  }, [task.parent_task_id, task.state, task.repo_id, task.pr_number, task.assignee_id, task.offered_agent_id, task.work_plan, arts, beats, agents, channelId, shipGate]);
 
   const { shipActions, shipCard, verifyingActions } = useShipGate({ task, busy, setBusy, actErr, setActErr, act, agentName, openSubs, composerMode, setComposerMode, canReview, latestShipPlan, openPlan, onPreview });
 
@@ -631,8 +632,8 @@ export function TaskThread({
           {actErr && <div className="acterr" style={{ padding: '4px 16px 0' }}>{actErr}</div>}
           {/* same bar as the conversation thread: a task worked on someone else's machine reads
               as messages appearing from nowhere unless the surface says who and where */}
-          <ThreadLiveBar trees={runTrees_} agents={agents} />
-          <ThreadOverviewBody overview={overview} label={crumbProject?.name ?? `Task #${task.number}`}>
+          {!codingSurface && <ThreadLiveBar trees={runTrees_} agents={agents} />}
+          {codingSurface && !composerMode && !editDetails ? codingSurface : <ThreadOverviewBody overview={overview} label={crumbProject?.name ?? `Task #${task.number}`}>
           <div className="jumpwrap">
           <div className="tmsgs" ref={listRef} data-streamkey={`${channelId}:${task.id}`}>
       <ThreadRootPin thread={convoThread ?? null} rows={rows} agents={agents} members={members} />
@@ -893,7 +894,7 @@ export function TaskThread({
         )}
       </div>
       </div>
-      </ThreadOverviewBody>
+      </ThreadOverviewBody>}
       {/* the brain notice leads the dock (docs/10 §15.7): a seat that cannot run is the thing no
           gate below it can move past. It reads the OWNING conversation's brain, and Reset returns it. */}
       <BrainNotice rows={rows} override={parseBrainOverride(threadBrain ?? null)} onReset={convoThreadId ? async () => { await nm?.threadSetBrain(convoThreadId, null); } : undefined} />
@@ -904,7 +905,7 @@ export function TaskThread({
           {gate}
         </div>
       )}
-      <div className="tcompose">
+      {(!codingSurface || composerMode || editDetails) && <div className="tcompose">
         {/* A CLOSED TASK HAS NO REPLY FIELD (2026-08-11, George live). Replying into it asks
             nobody for anything: no agent watches a terminal task, and until this round the FSM
             had no edge out of `closed` at all. So the composer is not disabled — it is not
@@ -1006,6 +1007,7 @@ export function TaskThread({
         )}
         </>)}
       </div>
+      }
       {threadLightbox && <AttachLightbox att={threadLightbox} onClose={() => setThreadLightbox(null)} />}
         </div>
         {/* ONE rail (docs/25 round 2): the thread's own sections, and — when the room is a

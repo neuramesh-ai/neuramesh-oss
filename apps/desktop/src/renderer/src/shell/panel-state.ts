@@ -26,7 +26,7 @@ export interface PanelSession {
 
 /** what is in front of the sheet decides the session: a task outranks its thread, a thread its room */
 export function panelSessionOf(i: { taskId?: string | null; threadId?: string | null; coding?: boolean; roomId?: string | null; roomSections?: boolean; files?: boolean; drafts?: boolean }): PanelSession {
-  if (i.taskId) return { key: `task:${i.taskId}`, kind: 'task', files: !!i.files, drafts: !!i.drafts };
+  if (i.taskId) return { key: `task:${i.taskId}`, kind: i.coding ? 'coding' : 'task', files: !!i.files, drafts: !!i.drafts };
   if (i.threadId) return i.coding ? { key: `thread:${i.threadId}`, kind: 'coding' } : { key: `thread:${i.threadId}`, kind: 'thread', drafts: !!i.drafts };
   if (i.roomId) return { key: `room:${i.roomId}`, kind: 'room', roomSections: !!i.roomSections };
   return { key: null, kind: null };

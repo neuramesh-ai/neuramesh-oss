@@ -58,3 +58,15 @@ test('only the parent assistant public text becomes attributed conversation prog
   assert.deepEqual(events.filter(e=>e.type==='assistant.message').map(e=>e.payload),[{text:'I found the launch brief.',turnId:'parent'}]);
   assert.equal(events.filter(e=>e.type==='runtime.event').length,3);
 });
+
+test('a native coding task has one journal owner and generic task work cannot race it', async () => {
+  const root = mkdtempSync('/tmp/nm-coding-writer-');
+  const around = hostConversationRecorder({ root, workspace:'workspace-a', actorId:'actor-a', apiUrl:'https://api.test', headers:async()=>({}),
+    db:{getAll:async<T>()=>[{id:'native-thread',kind:'coding'}] as T[]},
+    fetchImpl:async()=>{throw new Error('Generic recorder must not open the native coding journal');} });
+  let ran=0;
+  try {
+    const result=await around({key:'execute',kind:'work',cause:'board',agentId:'patch',subject:{kind:'task',number:12}},async()=>{ran++;return 'native result';});
+    assert.equal(result,'native result');assert.equal(ran,1);
+  } finally {rmSync(root,{recursive:true,force:true});}
+});

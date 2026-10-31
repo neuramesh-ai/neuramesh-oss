@@ -6,7 +6,7 @@ import type { BrainCommitRequest, BrainCommitResult, BrainConversationEvent, Bra
 import { brainRoot } from './brain';
 import { durableAppend, durableWrite, packEvent, packRuntime, portableBrainValue, readJSON, unpackEvent, unpackRuntime } from './brain-sync-codec';
 export { portableBrainValue } from './brain-sync-codec';
-export { bindConversationCallback, captureConversationRecorder, conversationContext, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
+export { bindConversationCallback, captureConversationRecorder, conversationContext, conversationToolsThrough, setConversationHistoryBoundary, withoutConversationBrain, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
 
 export interface BrainSyncOptions {
   workspace: string;

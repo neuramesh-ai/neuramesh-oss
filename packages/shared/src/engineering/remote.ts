@@ -1,5 +1,5 @@
 import { DEFAULT_ENGINEERING_AGENT } from './selection';
-import { failRemoteEngineeringTransport, withEngineeringWarning } from './transport-state';
+import { applyTaskEngineeringState, failRemoteEngineeringTransport, withEngineeringWarning } from './transport-state';
 import { interruptToolReceipts, recordToolReceipt } from './tool-receipts';
 import { lastMessageIndex, updateMessage, collapseReasoning, finishStreamingMessages } from './transcript-state';
 import { createEngineeringPlanProgress, isEngineeringPlanProgress } from './plan-progress';
@@ -182,6 +182,7 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
 /** Project Cline Core's transport events into the stable Engineering UI model. */
 function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
   const type = wire['type'];
+  if (type === 'task_state') return applyTaskEngineeringState(session, wire['session']);
   // Keeping a completed thread open is not ongoing agent work. A socket restart must
   // not manufacture a reply, mark the task failed or bump it to the top of Recents.
   if (type === 'disconnected') return session.state === 'streaming' || session.state === 'awaiting_approval'

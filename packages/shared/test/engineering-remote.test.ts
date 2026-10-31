@@ -315,3 +315,17 @@ test('a refusal that repeats the last warning adds no second row', () => {
   const waits = applyRemoteEngineeringEvent(applyRemoteEngineeringEvent(createEngineeringSession(repo), github), github);
   assert.equal(waits.messages.filter(isEngineeringGitHubWait).length, 1);
 });
+
+
+test('task attachment restores a live approval only for the same conversation and repository', () => {
+  const client = {...createEngineeringSession(repo), id:'task-thread', machineId:'client-machine', project:{id:'project',name:'Project',slug:'project'}};
+  const host = applyRemoteEngineeringEvent({...client, machineId:undefined, project:undefined}, {
+    type:'approval', approvalId:'edit-1', category:'edit', toolName:'apply_patch', input:{},
+  });
+  const restored = applyRemoteEngineeringEvent(client, {type:'task_state',session:host});
+  assert.equal(restored.pendingApproval?.id,'edit-1');
+  assert.equal(restored.machineId,client.machineId);
+  assert.deepEqual(restored.project,client.project);
+  assert.equal(applyRemoteEngineeringEvent(client,{type:'task_state',session:{...host,id:'other-thread'}}),client);
+  assert.equal(applyRemoteEngineeringEvent(client,{type:'task_state',session:{...host,repo:{...repo,id:'other-repo'}}}),client);
+});

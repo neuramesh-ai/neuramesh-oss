@@ -1,3 +1,5 @@
+import { sharedLocalEngineeringHost } from '../relay/engineering-local-host';
+import { apiAuthHeaders } from '../apiauth';
 // THE ONBOARDING HANDLER — the wizard's Launch step creates (or adopts) the workspace, connects the providers,
 // hires the crew and starts the agent host, on the FOREGROUND connection.
 //
@@ -91,7 +93,7 @@ export function registerOnboardIpc(deps: { agentLog: AgentLog; killTaskPtys: (ta
       // defaults ON for PR-backed tasks, so the loop needs release hands from birth.
       const shipperModel = resolvePackRoles(input.activeModelPack ?? null, [])?.shipper;
       await api('/v1/commands', { type: 'agent.register', workspace: conn.ws, machineId, name: 'bosun', role: 'shipper', emoji: '🦭', brief: 'Production-readiness plans and release coordination: study the approved change, surface every manual prod step with its owner, and merge only when the checklist clears.', model: shipperModel, runtime: shipperModel ? runtimeForModel(shipperModel) : undefined, channels: [ONBOARD_SEAT_ROOM] }).catch(() => {});
-      startAgentHost({ db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
+      startAgentHost({ engineering: () => sharedLocalEngineeringHost({ db, machineId, workspaceId:conn.ws, apiUrl:conn.apiUrl, authHeaders:() => apiAuthHeaders(conn.apiUrl,{kind:'human',id:actorId()}) }), db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
       conn.agentHostStarted = true;
       if (orchestrator && orchestratorId) {
         // templated intro authored BY the orchestrator (no model spend) — the live reply comes

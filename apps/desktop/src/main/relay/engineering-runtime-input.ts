@@ -1,7 +1,7 @@
 import { ENGINEERING_DISPLAY_PROMPT, type EngineeringDisplayTool } from './engineering-display';
 import { engineeringTitleTool } from './engineering-title';
 import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan';
-import { ENGINEERING_PLAN_PROGRESS_PROMPT, WEB_PREVIEW_PROMPT, DEFAULT_ENGINEERING_AGENT, engineeringEffort, type EngineeringRuntimeEvent } from '@neuramesh/shared';
+import { CODING_IMPLEMENTATION_PLAN_SKILL, ENGINEERING_PLAN_PROGRESS_PROMPT, WEB_PREVIEW_PROMPT, DEFAULT_ENGINEERING_AGENT, engineeringEffort, type EngineeringRuntimeEvent } from '@neuramesh/shared';
 import type { ClineCore } from '@cline/sdk';
 import { ENGINEERING_CLINE_TOOL_POLICIES, type EngineeringControls, type EngineeringMachineOpenMeta } from '../../engineering-protocol';
 import type { EngineeringProviderResolution } from './engineering-provider';
@@ -12,7 +12,7 @@ Read repository files with read_files and search with search_codebase, not shell
 Preserve the user's command restrictions across turns and model changes. If commands are limited to a named test command, request only that command; do not add pipes, redirections, file inspection, or shell edits. If the available tools cannot perform an operation within those restrictions, explain the blocker instead of requesting a prohibited alternative.`;
 /** who the coding agent is and how it works in a thread: every coding lane sends these words */
 export const engineeringCorePrompt = (provider: Pick<EngineeringProviderResolution, 'agent' | 'instructions'>): string =>
-  `You are ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).name}, the ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).role} agent in NeuraMesh. ${provider.instructions ? `Your agent instructions: ${provider.instructions}\n` : ''}` + 'You are working in a coding conversation. When set_thread_title is available, call it once after you understand the first request, using a clean 2–6 word title describing the topic rather than echoing the prompt. Do not rename a conversation that already has a title-tool receipt.  Work only in the supplied workspace. Respect Plan mode as read-only. For function tools, generate complete JSON arguments matching the tool schema. Keep JSON formatting compact; do not emit padding or an unfinished argument object. Use normal prose for conversational replies. For a requested implementation plan, call propose_work_plan with a formal plan and a separate conversational report. In the report, explain in first person what you actually investigated or resolved, the finding that shaped your approach, two or three key choices with reasons and the verification approach, and the next step for the user. Do not simply repeat the plan summary or checklist. Do not claim you changed files or ran checks unless you actually did. The UI displays this report above the plan card, so after the tool succeeds finish with only one short readiness sentence. Ordinary answers and feature ideas do not need that tool. Explain decisions concisely, use tools for repository facts, and for implementation turns finish with what changed and what was verified. Save generated deliverables, images and portable files in .nm-artifacts/ so the thread can restore them on another device. Never place credentials or secrets in that folder. Never expose the implementation harness or its vendor name to the user.';
+  `You are ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).name}, the ${(provider.agent ?? DEFAULT_ENGINEERING_AGENT).role} agent in NeuraMesh. ${provider.instructions ? `Your agent instructions: ${provider.instructions}\n` : ''}` + 'You are working in a coding conversation. When set_thread_title is available, call it once after you understand the first request, using a clean 2–6 word title describing the topic rather than echoing the prompt. Do not rename a conversation that already has a title-tool receipt.  Work only in the supplied workspace. Respect Plan mode as read-only. For function tools, generate complete JSON arguments matching the tool schema. Keep JSON formatting compact; do not emit padding or an unfinished argument object. Use normal prose for conversational replies. For a requested implementation plan, call propose_work_plan with a formal plan and a separate conversational report. In the report, explain in first person what you actually investigated or resolved, the finding that shaped your approach, two or three key choices with reasons and the verification approach, and the next step for the user. Do not simply repeat the plan summary or checklist. Do not claim you changed files or ran checks unless you actually did. The UI displays this report above the plan card, so after the tool succeeds finish with only one short readiness sentence. Ordinary answers and feature ideas do not need that tool. Explain decisions concisely, use tools for repository facts, and for implementation turns finish with what changed and what was verified. Save generated deliverables, images and portable files in .nm-artifacts/ so the thread can restore them on another device. Never place credentials or secrets in that folder. Never expose the implementation harness or its vendor name to the user.' + '\n\n' + CODING_IMPLEMENTATION_PLAN_SKILL;
 
 export function readRuntimeMessages(core: ClineCore, sessionId: string): Promise<RuntimeMessages> {
   return typeof core.readLiveMessages === 'function' ? core.readLiveMessages(sessionId) : core.readMessages(sessionId);
@@ -83,6 +83,7 @@ export function engineeringRuntimeInput({
   controls,
   prompt,
   initialMessages,
+  initialCompactionState,
   userImages,
   userFiles,
   emit,
@@ -99,6 +100,7 @@ export function engineeringRuntimeInput({
   controls: EngineeringControls;
   prompt?: string;
   initialMessages?: RuntimeMessages;
+  initialCompactionState?: import('@cline/sdk').SessionCompactionState;
   userImages?: string[];
   userFiles?: string[];
   readPlanMessages?: () => Promise<unknown>;
@@ -112,6 +114,7 @@ export function engineeringRuntimeInput({
     interactive: true,
     ...(prompt ? { prompt } : {}),
     ...(initialMessages?.length ? { initialMessages: portableRuntimeMessages(initialMessages, provider.providerId, provider.modelId) } : {}),
+    ...(initialCompactionState ? { initialCompactionState } : {}),
     ...(userImages?.length ? { userImages } : {}),
     ...(userFiles?.length ? { userFiles } : {}),
     sessionMetadata: {
@@ -148,6 +151,7 @@ export function engineeringRuntimeInput({
       enableAgentTeams: false,
       disableMcpSettingsTools: true,
       checkpoint: { enabled: true },
+      compaction: { enabled: true, strategy: 'basic', preserveRecentTokens: 8000 },
     },
     toolPolicies: ENGINEERING_CLINE_TOOL_POLICIES,
   };

@@ -1,13 +1,13 @@
 import { teamChatTools } from './chattools-team';
+import { codingChatTools } from './chattools-coding';
 import { routineTools } from './tools-routine';
 import { redrawDraftImages } from './draft-redraw';
 import type { DrawOutcome } from './drawdraft';
 // THE TOOLS A CONVERSATION GETS (docs/34).
 //
-// Everything board-shaped is absent BY CONSTRUCTION: there is no create_task here to call, so
-// "never file work uninvited" is a fact about the inventory rather than an instruction in a
-// prompt. The orchestrator alone carries the backlog trio, for the human's explicit "create the
-// task" — park-then-promote, the same sanctioned path its triage turns already walk.
+// Generic board tools remain restricted. Agent Desk homes also get a scoped coding
+// handoff: every role can delegate requested implementation without converting its
+// home into a task. The API enforces the home, project, repository and plan gate.
 //
 // Turn-scoped like the orchestrator's registry, and for the same reason: a tool that closed over
 // a previous turn's seat or thread would answer in the wrong place. Split out of host/chatturn.ts.
@@ -75,6 +75,7 @@ export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai
 const wb = whiteboardClosures({ kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, ch, { threadId });
 return [
     ...teamChatTools(t),
+    ...codingChatTools(t),
     ...routineTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, here: () => ch.id, log }).map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))),
     tool(
       'recall',

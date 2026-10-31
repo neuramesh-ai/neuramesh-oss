@@ -32,11 +32,12 @@ afterAll(async () => {
 describe.skipIf(!DB)('message idempotency — a retried delivery is an ack, not an error', () => {
   it('same id retried by the same author: 200 both times, one row, one event', async () => {
     const id = crypto.randomUUID();
-    const first = await sendMsg(GEO, { id, body: 'hey rex, what should we work on next?' });
+    const body = `Idempotency ${id}: what should we work on next?`;
+    const first = await sendMsg(GEO, { id, body });
     expect(first.status).toBe(200);
 
     // the PowerSync retry: identical payload, identical id
-    const retry = await sendMsg(GEO, { id, body: 'hey rex, what should we work on next?' });
+    const retry = await sendMsg(GEO, { id, body });
     expect(retry.status).toBe(200);
     expect(((await retry.json()) as { message: { id: string } }).message.id).toBe(id);
 
@@ -45,7 +46,7 @@ describe.skipIf(!DB)('message idempotency — a retried delivery is an ack, not 
       const [msgs] = await sql`select count(*)::int as n from messages where id = ${id}`;
       expect(msgs!['n']).toBe(1);
       // the event log must not double either — the retry is an ack, not new activity
-      const [evs] = await sql`select count(*)::int as n from events where type = 'message.posted' and payload->>'preview' like 'hey rex, what should we work on next%'`;
+      const [evs] = await sql`select count(*)::int as n from events where type = 'message.posted' and workspace_id=${WS}::uuid and payload->>'preview'=${body}`;
       expect(evs!['n']).toBe(1);
     } finally {
       await sql.end();

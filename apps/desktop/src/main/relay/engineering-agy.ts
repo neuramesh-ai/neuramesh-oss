@@ -15,7 +15,7 @@ import { AgyEventMapper, type AgyInit } from './engineering-agy-events';
 import type { AgySpawn } from './engineering-agy-process';
 import { agyFirstTurn, agyNextTurn, agyToolRules } from './engineering-agy-prompt';
 import { agyBridgeTools, type AgyLaneTool } from './engineering-agy-tools';
-import { EngineeringAttachmentQueue } from './engineering-attachment-queue';
+import { EngineeringAttachmentQueue, queueEngineeringAttachment } from './engineering-attachment-queue';
 import { EngineeringAttachmentInbox } from './engineering-attachments';
 import { createEngineeringChangeRefresh } from './engineering-changes';
 import type { EngineeringConversation } from './engineering-conversation';
@@ -24,6 +24,7 @@ import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan
 import type { EngineeringProviderResolution } from './engineering-provider';
 import { engineeringTitleTool } from './engineering-title';
 import { EngineeringPromptQueue } from './engineering-turn';
+import { compactEngineeringMessages, projectedEngineeringMessages, COMPACT_RECEIPT } from './engineering-compaction';
 
 export interface AgyLaneDeps {
   /** the agy binary (runtime/cli.ts ensureCli), with any argv that goes first (a test's fake agy script) */
@@ -52,6 +53,7 @@ export class AgyChannelSession {
   private readonly bridgeTurn = randomUUID();
   private readonly bridgeSecret = randomUUID();
   private messages: unknown[] = [];
+  private compactionState: unknown;
   private conversationId: string | null = null;
   private sentRules: string | null = null;
   private running = false; private aborting = false; private closed = false; private warned = false; private nmCalled = false;
@@ -81,6 +83,7 @@ export class AgyChannelSession {
 
   async init(messages?: readonly unknown[]): Promise<void> {
     this.messages = [...(messages ?? [])];
+    this.compactionState = this.conversation?.brain.metadata()?.['compactionState'];
     const saved = this.conversation?.brain.metadata()?.['agyConversation'];
     this.conversationId = typeof saved === 'string' ? saved : null;
     this.emit({ type: 'plan_progress', progress: this.planProgress() });
@@ -145,6 +148,23 @@ export class AgyChannelSession {
     try {
       await this.attachmentQueue.wait();
       if (this.closed) return;
+      const manual = command.prompt.trim() === '/compact';
+      if (manual && command.attachments?.length) throw new Error('Send /compact on its own, without attachments.');
+      let history = await projectedEngineeringMessages(this.messages as never, this.compactionState);
+      if (manual || JSON.stringify(history).length > 128000) {
+        const state = await compactEngineeringMessages(this.messages as never, this.compactionState, this.provider.providerId, this.provider.modelId, this.meta.threadId);
+        if (state) {
+          await this.driver.close(); this.conversationId = null; this.sentRules = null;
+          this.compactionState = state; history = await projectedEngineeringMessages(this.messages as never, state);
+        }
+        if (manual) {
+          const receipt = state ? COMPACT_RECEIPT : 'This conversation is already compact. Its complete history is unchanged.';
+          this.conversation?.record('user.message', { ...this.metadata(), text: '/compact' });
+          this.messages.push({ role: 'user', content: [{ type: 'text', text: '/compact' }] }, { role: 'assistant', content: [{ type: 'text', text: receipt }] });
+          this.forward({ type: 'agent_event', event: { type: 'agent_event', payload: { sessionId: this.meta.threadId, event: { type: 'content_end', contentType: 'text', text: receipt } } } });
+          this.emit({ type: 'ended', reason: 'completed' }); return;
+        }
+      }
       const attached = await this.attachments.resolve(command.attachments);
       resolved = true;
       this.conversation?.record('user.message', { ...this.metadata(), text: command.prompt, attachments: command.attachments ?? [], model: this.provider.modelId, provider: this.provider.providerId });
@@ -153,7 +173,7 @@ export class AgyChannelSession {
       this.conversationId = init.conversationId;
       const files = [...attached.userImages, ...attached.userFiles];
       const text = fresh
-        ? agyFirstTurn({ provider: this.provider, rules, history: this.messages, prompt: command.prompt, attachments: files })
+        ? agyFirstTurn({ provider: this.provider, rules, history, prompt: command.prompt, attachments: files })
         : agyNextTurn({ rules: rules === this.sentRules ? null : rules, prompt: command.prompt, attachments: files });
       this.sentRules = rules;
       let result = await this.driver.run(text);
@@ -222,9 +242,7 @@ export class AgyChannelSession {
   }
 
   private queueAttachment(id: string, index: number, bytes: number, task: () => void | Promise<void>): void {
-    if (this.closed) return;
-    const queued = this.attachmentQueue.push(bytes, task, () => this.emit({ type: 'attachment_ack', id, index }), (error) => this.emit({ type: 'error', code: 'INVALID_ATTACHMENT', recoverable: true, message: error instanceof Error ? error.message : 'The attachment was invalid.' }));
-    if (!queued) { this.emit({ type: 'error', code: 'ENGINEERING_PROTOCOL_LIMIT', message: 'The Engineering attachment queue exceeded its safe limit.' }); void this.close(); }
+    if (!this.closed) queueEngineeringAttachment(this.attachmentQueue, { id, index, bytes, task, emit: this.emit, close: () => { void this.close(); } });
   }
 
   private async abort(): Promise<void> {
@@ -244,6 +262,7 @@ export class AgyChannelSession {
     selection: { agentId: this.provider.agent?.id ?? this.meta.agentId ?? null, modelId: this.modelId, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort) },
     agent: this.provider.agent, provider: this.provider.providerId, model: this.provider.modelId, repoId: this.meta.repoId, mode: this.controls.mode,
     agyConversation: this.conversationId, completeness: 'agy-turns',
+    compactionState: this.compactionState,
   });
 
   private fail(error: unknown): void {

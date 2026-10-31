@@ -1,0 +1,172 @@
+import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import postgres from 'postgres';
+import {beforeAll,afterAll,describe,it,expect} from 'vitest';
+import {PostgresStore} from '../src/pgstore';
+import {createApp} from '../src/app';
+const url=process.env['DATABASE_URL']; const sql=url?postgres(url):null; const store=url?new PostgresStore(url):null; const app=store?createApp(store):null;
+let user:string,workspace:string,project:string,channel:string,agent:string,other:string,home:string,repo:string;
+const request=(body:unknown,id=agent)=>app!.request('/v1/commands',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify({kind:'agent',id,role:'marketer'})},body:JSON.stringify(body)});
+const input=()=>({type:'task.create',workspace,channel,originThread:home,codingHandoff:{requestId:randomUUID()},title:`Fix formatter ${randomUUID()}`,description:'Implement the README and run npm test.',kind:'bug',repo:{id:repo,baseRef:'main'},checklist:['Boundary tests pass'],plan:{legs:['build','review'],subtasks:[],approach:'Read the formatter, implement boundary checks and run its tests.'}});
+beforeAll(async()=>{
+ if(!sql)return;
+ const [u]=await sql`insert into nm_users(clerk_user_id,email) values(${randomUUID()},${`${randomUUID()}@coding.test`}) returning id`; user=u!['id'];
+ const res=await app!.request('/v1/commands',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify({kind:'human',id:user})},body:JSON.stringify({type:'workspace.create',name:'Coding handoff tests',slug:`coding-${randomUUID().slice(0,8)}`})});
+ workspace=(await res.json() as {workspaceId:string}).workspaceId;
+ await sql`update workspaces set plan='cloud' where id=${workspace}::uuid`;
+ const [p]=await sql`select id,context_channel_id from projects where workspace_id=${workspace}::uuid and is_default`; project=p!['id'];channel=p!['context_channel_id'];
+ const agents=await sql`insert into agents(workspace_id,name,role,runtime,model) values(${workspace}::uuid,'parent','marketer','codex','gpt-5.6-sol'),(${workspace}::uuid,'other','marketer','codex','gpt-5.6-sol') returning id,name`;
+ await sql`insert into agents(workspace_id,name,role,runtime,model) values(${workspace}::uuid,'patch','developer','codex','gpt-5.6-sol')`;
+ agent=agents.find(a=>a['name']==='parent')!['id'];other=agents.find(a=>a['name']==='other')!['id'];
+ await sql`insert into project_agents(workspace_id,project_id,agent_id) values(${workspace}::uuid,${project}::uuid,${agent}::uuid),(${workspace}::uuid,${project}::uuid,${other}::uuid)`;
+ const [h]=await sql`insert into threads(workspace_id,channel_id,project_id,home_agent_id,created_by,title,kind,mode) values(${workspace}::uuid,${channel}::uuid,${project}::uuid,${agent}::uuid,${`human:${user}`},'Parent','chat','chat') returning id`;home=h!['id'];
+ const [r]=await sql`insert into repos(workspace_id,org_name,name,clone_url) values(${workspace}::uuid,'fixture','coding','https://example.test/fixture.git') returning id`;repo=r!['id'];
+ await sql`insert into project_repos(project_id,repo_id,is_primary) values(${project}::uuid,${repo}::uuid,true)`;
+});
+afterAll(async()=>{await sql?.end();await store?.close();});
+describe.skipIf(!url)('Agent Desk coding handoff',()=>{
+ it('lets a non-orchestrator create a separate coding task while preserving the home and approval gate',async()=>{
+   const body=input();const response=await request(body);expect(response.status,await response.clone().text()).toBe(200);
+   const [task]=await sql!`select state,origin_thread_id from tasks where id=${body.codingHandoff.requestId}::uuid`;
+   expect(task).toMatchObject({state:'plan_review',origin_thread_id:home});
+   const [thread]=await sql!`select id,kind,created_by from threads where task_id=${body.codingHandoff.requestId}::uuid`;
+   expect(thread).toMatchObject({kind:'coding',created_by:`human:${user}`});expect(thread!['id']).not.toBe(home);
+   expect((await sql!`select kind,task_id from threads where id=${home}::uuid`)[0]).toMatchObject({kind:'chat',task_id:null});
+   expect((await request(body)).status).toBe(200);
+   expect(await sql!`select id from tasks where id=${body.codingHandoff.requestId}::uuid`).toHaveLength(1);
+   expect((await request({...body,title:'Different request'})).status).toBe(422);
+ });
+ it('copies the selected developer home model and effort, never the parent model', async()=>{
+   const [dev]=await sql!`select id from agents where workspace_id=${workspace}::uuid and name='patch'`;
+   const [h]=await sql!`insert into threads(workspace_id,channel_id,project_id,home_agent_id,created_by,title,kind,mode,brain_override,home_thinking,origin)
+     values(${workspace}::uuid,${channel}::uuid,${project}::uuid,${dev!['id']}::uuid,${`human:${user}`},'Developer home','chat','chat','{"developer":"gpt-5.6-sol"}'::jsonb,'high','web') returning id`;
+   const body=input();expect((await request(body)).status).toBe(200);
+   const [thread]=await sql!`select brain_override,home_thinking,origin from threads where task_id=${body.codingHandoff.requestId}::uuid`;
+   expect(thread).toMatchObject({brain_override:{developer:'gpt-5.6-sol'},home_thinking:'high',origin:'web'});
+   await sql!`update threads set brain_override='{"developer":"gemini-4-argon"}'::jsonb where id=${h!['id']}::uuid`;
+   expect((await request(body)).status).toBe(200);
+   expect((await sql!`select brain_override from threads where task_id=${body.codingHandoff.requestId}::uuid`)[0]!['brain_override']).toEqual({developer:'gpt-5.6-sol'});
+ });
+ it('publishes actionable parent plan cards and acknowledges approval exactly once', async()=>{
+   const body=input();expect((await request(body)).status).toBe(200);
+   const id=body.codingHandoff.requestId;
+   const parent=()=>sql!`select body from messages where thread_id=${home}::uuid and body like ${`%${body.title}%`}`;
+   expect((await parent()).some(r=>r['body'].includes(`‹plan:${id}:v1›`))).toBe(true);
+   const human={kind:'human',id:user};
+   const approve=()=>app!.request('/v1/commands',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify(human)},body:JSON.stringify({type:'task.approve_plan',taskId:id})});
+   expect((await approve()).status).toBe(200);
+   expect((await parent()).filter(r=>r['body'].includes('approval is saved'))).toHaveLength(1);
+   await approve();
+   expect((await parent()).filter(r=>r['body'].includes('approval is saved'))).toHaveLength(1);
+   await sql!`select nm_coding_task_report(${id}::uuid,'runtime','awaiting_approval','npm test')`;
+   expect((await parent()).some(r=>r['body'].includes(`‹task:${id}›`))).toBe(true);
+   await sql!`insert into messages(workspace_id,channel_id,task_id,author_kind,author_id,body)
+     values(${workspace}::uuid,${channel}::uuid,${id}::uuid,'agent',${agent}::uuid,${'Reconnect the coding model.\n```nmauth\n{}\n```'})`;
+   expect((await parent()).some(r=>r['body'].includes('runtime reported an error') && r['body'].includes(`‹task:${id}›`))).toBe(true);
+ });
+ it('rejects another agent home and a repository outside the project',async()=>{
+   expect((await request(input(),other)).status).toBe(403);
+   const body=input();body.repo.id=randomUUID();expect((await request(body)).status).toBe(403);
+ });
+ it('adopts an unstarted existing task without replacing its messages or creating another task',async()=>{
+   const seed=input();
+   const [task]=await sql!`insert into tasks(workspace_id,channel_id,project_id,number,title,description,state,kind,creator_kind,creator_id)
+     values(${workspace}::uuid,${channel}::uuid,${project}::uuid,900001,'Existing bug','Fix the formatter','todo','bug','agent',${agent}::uuid) returning id`;
+   const id=String(task!['id']);
+   const [message]=await sql!`insert into messages(workspace_id,channel_id,task_id,author_kind,author_id,body) values(${workspace}::uuid,${channel}::uuid,${id}::uuid,'human',${user}::uuid,'Keep this requirement') returning id`;
+   const body={...seed,codingHandoff:{...seed.codingHandoff,taskId:id}};
+   const response=await request(body);expect(response.status,await response.clone().text()).toBe(200);
+   const [thread]=await sql!`select id,kind from threads where task_id=${id}::uuid`;expect(thread!['kind']).toBe('coding');
+   expect((await sql!`select thread_id from messages where id=${message!['id']}::uuid`)[0]!['thread_id']).toBe(thread!['id']);
+   expect(await sql!`select id from tasks where id=${seed.codingHandoff.requestId}::uuid`).toHaveLength(0);
+   expect((await request(body)).status).toBe(200);
+ });
+ it('keeps a developer through plan revision, rejects takeover, and requires fresh approval',async()=>{
+   const body=input();expect((await request(body)).status).toBe(200);
+   const id=body.codingHandoff.requestId;
+   const [created]=await sql!`select assignee_id,offered_agent_id from tasks where id=${id}::uuid`;
+   const developer=String(created!['assignee_id']);expect(developer).toBe(created!['offered_agent_id']);
+   const [architect]=await sql!`insert into agents(workspace_id,name,role,runtime,model) values(${workspace}::uuid,${`architect-${randomUUID()}`},'architect','claude','claude-haiku-4-5') returning id,name`;
+   await sql!`insert into agent_channels(agent_id,channel_id) values(${architect!['id']}::uuid,${channel}::uuid)`;
+   const command=(body:unknown,actor:{kind:string;id:string;role?:string})=>app!.request('/v1/commands',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify(actor)},body:JSON.stringify(body)});
+   const human={kind:'human',id:user}, coder={kind:'agent',id:developer,role:'developer'}, arch={kind:'agent',id:String(architect!['id']),role:'architect'};
+   expect((await command({type:'task.approve_plan',taskId:id},human)).status).toBe(200);
+   expect((await command({type:'task.revise_plan',taskId:id,feedback:'Include actual screenshot validation of the delivered UI.'},human)).status).toBe(200);
+   expect((await sql!`select state,assignee_id,plan_approved_at from tasks where id=${id}::uuid`)[0]).toMatchObject({state:'planning',assignee_id:developer,plan_approved_at:null});
+   expect((await command({type:'task.propose_plan',taskId:id,plan:'Architecture takeover'},arch)).status).toBe(403);
+   const response=await command({type:'task.propose_plan',taskId:id,plan:'Implement the formatter. Run npm test. For UI changes capture actual screenshots. Definition of done: tests pass and evidence is attached.'},coder);
+   expect(response.status,await response.clone().text()).toBe(200);
+   expect((await command({type:'task.offer',taskId:id,offerTo:architect!['name']},human)).status).toBe(403);
+   expect((await command({type:'task.claim',taskId:id},coder)).status).not.toBe(200);
+   expect((await command({type:'task.approve_plan',taskId:id},human)).status).toBe(200);
+   expect((await command({type:'task.claim',taskId:id},arch)).status).toBe(403);
+   expect((await command({type:'task.claim',taskId:id},coder)).status).toBe(200);
+   expect((await sql!`select state,assignee_id from tasks where id=${id}::uuid`)[0]).toMatchObject({state:'in_progress',assignee_id:developer});
+   expect(await sql!`select id from threads where task_id=${id}::uuid and kind='coding'`).toHaveLength(1);
+ });
+ it('persists state changes once in the parent thread, including the real PR',async()=>{
+   const body=input();expect((await request(body)).status).toBe(200);
+   await sql!`update tasks set state='in_progress' where id=${body.codingHandoff.requestId}::uuid`;
+   const before=await sql!`select id from messages where thread_id=${home}::uuid and body like '%picked up the approved%'`;
+   await sql!`update tasks set state='in_progress' where id=${body.codingHandoff.requestId}::uuid`;
+   expect(await sql!`select id from messages where thread_id=${home}::uuid and body like '%picked up the approved%'`).toHaveLength(before.length);
+   await sql!`update tasks set state='in_review',pr_url='https://github.com/fixture/code/pull/1' where id=${body.codingHandoff.requestId}::uuid`;
+   const rows=await sql!`select body,author_id from messages where thread_id=${home}::uuid and body like '%Open pull request%'`;
+   expect(rows[0]).toMatchObject({author_id:agent});expect(rows[0]!['body']).toContain('/pull/1');
+ });
+ it('keeps revised-plan cards in the task project when another project has the same channel slug',async()=>{
+   const [p]=await sql!`insert into projects(workspace_id,name,slug) values(${workspace}::uuid,'Same channel name','same-channel') returning id`;
+   const [c]=await sql!`insert into channels(workspace_id,project_id,slug) values(${workspace}::uuid,${p!['id']}::uuid,'general') returning id`;
+   await sql!`update projects set context_channel_id=${c!['id']}::uuid where id=${p!['id']}::uuid`;
+   await sql!`insert into project_repos(project_id,repo_id) values(${p!['id']}::uuid,${repo}::uuid)`;
+   await sql!`insert into project_agents(workspace_id,project_id,agent_id) values(${workspace}::uuid,${p!['id']}::uuid,${agent}::uuid)`;
+   const [h]=await sql!`insert into threads(workspace_id,channel_id,project_id,home_agent_id,created_by,title,kind,mode) values(${workspace}::uuid,${c!['id']}::uuid,${p!['id']}::uuid,${agent}::uuid,${`human:${user}`},'Other parent','chat','chat') returning id`;
+   const body={...input(),channel:String(c!['id']),originThread:String(h!['id'])};expect((await request(body)).status).toBe(200);
+   const id=body.codingHandoff.requestId;
+   await sql!`update tasks set state='planning' where id=${id}::uuid`;
+   const [t]=await sql!`select assignee_id from tasks where id=${id}::uuid`;
+   const response=await app!.request('/v1/commands',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify({kind:'agent',id:t!['assignee_id'],role:'developer'})},body:JSON.stringify({type:'task.propose_plan',taskId:id,plan:'Revised plan with tests and completion evidence.'})});
+   expect(response.status,await response.clone().text()).toBe(200);
+   const [thread]=await sql!`select id from threads where task_id=${id}::uuid`;
+   const [message]=await sql!`select channel_id,thread_id from messages where task_id=${id}::uuid and body like '%‹plan:v2›%'`;
+   expect(message).toMatchObject({channel_id:c!['id'],thread_id:thread!['id']});
+ });
+ it('throttles routine parent progress, retains urgent gates and includes the submitted summary',async()=>{
+   const body=input();expect((await request(body)).status).toBe(200);
+   const id=body.codingHandoff.requestId;
+   await sql!`update coding_task_progress set reported_at=now()-interval '2 minutes' where task_id=${id}::uuid`;
+   await sql!`select nm_coding_task_report(${id}::uuid,'runtime','working','Boundary cases implemented; running the formatter tests.')`;
+   await sql!`select nm_coding_task_report(${id}::uuid,'runtime','working','Checking another boundary.')`;
+   let rows=await sql!`select body from messages where thread_id=${home}::uuid and body like ${`%${body.title}%`}`;
+   expect(rows.some(r=>r['body'].includes('Boundary cases implemented'))).toBe(true);
+   expect(rows.some(r=>r['body'].includes('Checking another boundary'))).toBe(false);
+   await sql!`select nm_coding_task_report(${id}::uuid,'runtime','awaiting_approval','npm test')`;
+   rows=await sql!`select body from messages where thread_id=${home}::uuid and body like ${`%${body.title}%`}`;
+   expect(rows.some(r=>r['body'].includes('needs your approval'))).toBe(true);
+   await sql!`insert into messages(workspace_id,channel_id,task_id,author_kind,author_id,body) values(${workspace}::uuid,${channel}::uuid,${id}::uuid,'agent',${agent}::uuid,'Pushed abc123. Implemented validation; npm test passed, 4 tests.')`;
+   await sql!`update tasks set state='in_progress' where id=${id}::uuid`;
+   await sql!`update tasks set state='in_review',pr_url='https://github.com/fixture/code/pull/2' where id=${id}::uuid`;
+   rows=await sql!`select body from messages where thread_id=${home}::uuid and body like ${`%${body.title}%`}`;
+   expect(rows.some(r=>r['body'].includes('npm test passed, 4 tests.') && r['body'].includes('/pull/2'))).toBe(true);
+ });
+ it('repairs old architect handoffs and orphaned cards without moving active or other specialist work',async()=>{
+   const [architect]=await sql!`insert into agents(workspace_id,name,role,runtime,model) values(${workspace}::uuid,${`legacy-architect-${randomUUID()}`},'architect','codex','gpt-5.6-sol') returning id`;
+   const bodies=[input(),input(),input()] as const;
+   for(const body of bodies) expect((await request(body)).status).toBe(200);
+   const ids=[bodies[0].codingHandoff.requestId,bodies[1].codingHandoff.requestId,bodies[2].codingHandoff.requestId] as const;
+   await sql!`update tasks set assignee_id=${architect!['id']}::uuid where id in (${ids[0]}::uuid,${ids[1]}::uuid)`;
+   await sql!`update tasks set state='in_progress' where id=${ids[1]}::uuid`;
+   await sql!`update tasks set assignee_id=${other}::uuid where id=${ids[2]}::uuid`;
+   const [orphan]=await sql!`insert into messages(workspace_id,channel_id,task_id,author_kind,author_id,body) values(${workspace}::uuid,${channel}::uuid,${ids[0]}::uuid,'agent',${agent}::uuid,'Preserve the revised plan card') returning id`;
+   const migration=readFileSync(new URL('../../../supabase/migrations/0163_coding_task_ownership.sql',import.meta.url),'utf8');
+   await sql!.unsafe(migration);
+   const rows=await sql!`select id,assignee_id,offered_agent_id from tasks where id in (${ids[0]}::uuid,${ids[1]}::uuid,${ids[2]}::uuid)`;
+   const repaired=rows.find(r=>r['id']===ids[0])!;
+   expect(repaired['assignee_id']).toBe(repaired['offered_agent_id']);
+   expect(rows.find(r=>r['id']===ids[1])!['assignee_id']).toBe(architect!['id']);
+   expect(rows.find(r=>r['id']===ids[2])!['assignee_id']).toBe(other);
+   const [thread]=await sql!`select id from threads where task_id=${ids[0]}::uuid`;
+   expect((await sql!`select thread_id,body from messages where id=${orphan!['id']}::uuid`)[0]).toMatchObject({thread_id:thread!['id'],body:'Preserve the revised plan card'});
+ });
+
+});

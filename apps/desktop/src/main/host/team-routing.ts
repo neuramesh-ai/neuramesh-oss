@@ -16,7 +16,7 @@ export function routeTeamRequest(ctx: Routing & { db: ReplicaDatabase }, m: Mess
   if (!m.team_source_thread_id || !m.thread_id) return true;
   ctx.processed.add(m.id);
   void (async () => {
-    const request = await ctx.db.get<{ home_agent_id: string; source_owner: string }>(`select t.home_agent_id,s.home_agent_id as source_owner from messages m join threads t on t.id=m.thread_id join threads s on s.id=m.team_source_thread_id where m.id=? and t.project_id=s.project_id and m.team_depth between 1 and 3`, [m.id]);
+    const request = await ctx.db.get<{ home_agent_id: string; source_owner: string }>(`select t.home_agent_id,s.home_agent_id as source_owner from messages m join threads t on t.id=m.thread_id join threads s on s.id=m.team_source_thread_id where m.id=? and t.archived_at is null and t.project_id=s.project_id and m.team_depth between 1 and 3`, [m.id]);
     const recipient = request && request.source_owner === m.author_id ? ctx.agents.get(request.home_agent_id) : null;
     if (recipient?.channels.has(m.channel_id)) ctx.queueWake(recipient, m);
     else ctx.processed.delete(m.id); // Recovery retries while the replica seats the owner.
@@ -34,6 +34,6 @@ export function routeHomeOwner(ctx: Routing, ownerId: string | null | undefined,
 }
 
 export async function routeOwnedThread(ctx: Routing & { db: ReplicaDatabase }, m: Message): Promise<boolean> {
-  const thread = await ctx.db.get<{ kind: string | null; home_agent_id: string | null }>('select kind,home_agent_id from threads where id=?', [m.thread_id!]);
-  return isCodingThread(thread?.kind) || routeHomeOwner(ctx, thread?.home_agent_id, m);
+  const thread = await ctx.db.get<{ kind: string | null; home_agent_id: string | null; archived_at?: string | null }>('select kind,home_agent_id,archived_at from threads where id=?', [m.thread_id!]);
+  return !!(thread?.home_agent_id && thread.archived_at) || isCodingThread(thread?.kind) || routeHomeOwner(ctx, thread?.home_agent_id, m);
 }

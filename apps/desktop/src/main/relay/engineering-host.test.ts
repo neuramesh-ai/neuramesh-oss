@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { ClineCore, ToolApprovalRequest } from '@cline/sdk';
 import { createClineEngineeringHost, resolveEngineeringProvider } from './engineering-host';
 import { EngineeringModelRefused, createStarterEngineeringFetch } from './engineering-provider';
-import type { EngineeringRuntimeEvent } from '../../engineering-protocol';
+import type { EngineeringMachineOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 
 const keyFetch: typeof fetch = async () => new Response(JSON.stringify({ token: 'sk-test', authMode: 'apikey' }), { status: 200 });
@@ -515,4 +515,47 @@ test('the desktop host speaks as the signed-in member: its headers replace the m
   }, { modelId: 'claude-opus-4-8' }, {});
   assert.deepEqual(provider, { providerId: 'anthropic', modelId: 'claude-opus-4-8', apiKey: 'sk-test' });
   assert.deepEqual(seen, ['{"kind":"human","id":"u1"}']);
+});
+
+test('an inactive task pane cannot start untracked implementation outside the task lifecycle', async () => {
+  let started = 0;
+  const fake = {
+    subscribe: () => () => {}, listHistory: async () => [], readMessages: async () => [],
+    start: async () => { started++; return {sessionId:'untracked'}; },
+    abort: async () => {}, stop: async () => {}, dispose: async () => {},
+  } as unknown as ClineCore;
+  const events: EngineeringRuntimeEvent[] = [];
+  const host=createClineEngineeringHost({
+    apiUrl:'https://api.test',machineToken:'test',workspaceId:'workspace',fetchImpl:keyFetch,
+    resolveCwd:async()=>'/work/app',resolveBrain:async()=>({modelId:'claude-sonnet-4-6'}),
+    isTaskThread:async()=>true,createCore:(async()=>fake) as typeof import('@cline/sdk').ClineCore.create,log:()=>{},
+  });
+  const session=await host.open({threadId:'task',actorId:'owner',repoId:'repo',repoName:'fixture',branch:'main',mode:'act',
+    permissions:{read:true,edit:false,command:false,web:false,mcp:false},policy:{read:true,edit:true,command:true,web:true,mcp:true}},event=>events.push(event));
+  session.command({type:'prompt',prompt:'Bypass task review and change more files'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(started,0);
+  assert.ok(events.some(event=>event.type==='error' && event.message.includes('managed by the task')));
+  await session.close();
+});
+
+test('a pane arriving before dispatch attaches to the task runtime without opening a competing worktree', async () => {
+  let forward = (_event: unknown) => {}; let opens = 0;
+  const fake = {subscribe:(listener: typeof forward)=>{forward=listener;return ()=>{};},listHistory:async()=>[],readMessages:async()=>[],
+    start:async()=>({sessionId:'task-run'}),abort:async()=>{},stop:async()=>{},dispose:async()=>{}} as unknown as ClineCore;
+  const host=createClineEngineeringHost({apiUrl:'https://api.test',machineToken:'test',workspaceId:'workspace',fetchImpl:keyFetch,
+    resolveCwd:async()=>{opens++;return '/wrong-worktree';},resolveBrain:async()=>({modelId:'claude-sonnet-4-6'}),isTaskThread:async()=>'planning',
+    createCore:(async()=>fake) as typeof import('@cline/sdk').ClineCore.create,log:()=>{}});
+  const meta: EngineeringMachineOpenMeta={threadId:'task',actorId:'owner',repoId:'repo',repoName:'fixture',branch:'main',mode:'act',
+    permissions:{read:true,edit:false,command:false,web:false,mcp:false},policy:{read:true,edit:true,command:true,web:true,mcp:true}};
+  const events:EngineeringRuntimeEvent[]=[];
+  const opening=host.open(meta,event=>events.push(event));
+  await new Promise(resolve=>setTimeout(resolve,20));
+  const run=host.runTask!(meta,{cwd:'/task-worktree',repoRoot:null},'Implement',()=>false);
+  const pane=await opening;
+  assert.equal(opens,0); assert.ok(events.some(event=>event.type==='task_state'));
+  await pane.close();
+  forward({type:'agent_event',payload:{sessionId:'task-run',event:{type:'done',reason:'completed',text:'Implemented and tested',iterations:1}}});
+  forward({type:'ended',payload:{reason:'completed',sessionId:'task-run'}});
+  assert.equal(await run,'Implemented and tested');
 });

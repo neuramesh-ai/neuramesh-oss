@@ -25,6 +25,7 @@ function send(actor: Actor, body: unknown) {
 // a task driven to in_progress with patch (developer) as the working agent
 async function inProgressTask() {
   await send(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'patch', role: 'developer', channels: ['dev'] });
+  patch.id = await store.resolveOffer('ws_acme', 'dev', 'patch');
   const t = (await j(await send(george, { type: 'task.create', workspace: 'ws_acme', channel: 'dev', title: 'fix the crash', kind: 'bug', offerTo: 'patch', checklist: ['repro'] }))).task;
   expect((await send(patch, { type: 'task.claim', taskId: t.id })).status).toBe(200); // → in_progress, patch assignee
   return t;

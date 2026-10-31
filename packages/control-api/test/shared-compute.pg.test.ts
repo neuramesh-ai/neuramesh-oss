@@ -147,13 +147,13 @@ describe.skipIf(!DB)('free is one machine PER MEMBER, not per workspace', () => 
   });
 
   it('publishes what each machine can serve, so failover can tell busy from incapable', async () => {
-    const r = await j(await send(george, { type: 'machine.register', workspace: WS, name: 'cap-probe', platform: 'darwin', daemonVersion: '1', runtimes: ['claude-code', 'codex'] }));
+    const r = await j(await send(george, { type: 'machine.register', workspace: WS, name: 'compute-test-host', platform: 'darwin', daemonVersion: '1', runtimes: ['claude-code', 'codex'] }));
     const [row] = await sql!`select runtimes from machines where id = ${r.machineId}::uuid`;
     expect(row!['runtimes']).toEqual(['claude-code', 'codex']);
 
     // a register that omits runtimes (an older desktop mid-rollout) must not BLANK them — a
     // machine that looked incapable would be skipped by every peer
-    await send(george, { type: 'machine.register', workspace: WS, name: 'cap-probe', platform: 'darwin', daemonVersion: '2' });
+    await send(george, { type: 'machine.register', workspace: WS, name: 'compute-test-host', platform: 'darwin', daemonVersion: '2' });
     const [after] = await sql!`select runtimes from machines where id = ${r.machineId}::uuid`;
     expect(after!['runtimes']).toEqual(['claude-code', 'codex']);
   });

@@ -1,3 +1,6 @@
+import { messageThreadScope } from './store/message-thread-scope';
+import { bindCodingTaskMessage, createCodingTaskThread, taskMessageAddress } from './store/coding-task-thread';
+import { requireTaskOwner } from './store/task-owner';
 import { startProjectMarketing } from './store/project-marketing';
 import { seedStartupTeamSql } from './store/startup-team';
 import { memoryViewSql } from './store/project-memory';
@@ -23,7 +26,7 @@ import { seedBundledPacksSql } from './store/skillpack-seed';   import { addMark
 import { PgAnnounceStore } from './store/announce';
 import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';   import { PgGitHubProofStore } from './store/github-proofs';
 import { computeRetro } from './retro';
-import { SKILL_SEED } from './seed/skill-seed';
+import { SKILL_SEED } from './seed/skill-seed'; import { TASK_SKILL_SEED } from './seed/task-skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
 import { MARKETING_OS_SKILL_SEED } from './seed/marketing-os-skill-seed';
 import type { LifecycleRow } from './lifecycle';
@@ -199,11 +202,12 @@ export class PostgresStore implements Store {
       // whole object while this column list silently dropped the stamp, so on postgres every
       // "born approved" unit was actually born GATED and parked at plan_review forever.
       await sql`insert into tasks (id, workspace_id, channel_id, project_id, number, title, description, state, kind,
-          creator_kind, creator_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
+          creator_kind, creator_id, assignee_kind, assignee_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
         values (${task.id}, ${task.workspace}::uuid, ${chId}, ${projectId}, ${task.number}, ${task.title},
-          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid,
+          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid, ${task.assignee?.kind ?? null}::actor_kind, ${task.assignee?.id ?? null}::uuid,
           ${task.repo?.id ?? null}, ${task.repo?.baseRef ?? null}, ${task.repo?.branch ?? null},
           ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements as never) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan as never) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt})`;
+      if (typeof event.payload['codingOwner'] === 'string') await createCodingTaskThread(sql,task.id,event.payload['codingOwner']);
       await this.insertEvent(sql, event, task.id);
     });
     return task;
@@ -355,7 +359,7 @@ export class PostgresStore implements Store {
       }
       await sql`update projects set context_channel_id = ${generalId}::uuid where id = ${defaultProjectId}::uuid`;
       // #build (né #dev) ships with the bundled default skill packs (gstack + addyosmani)
-      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, SKILL_SEED);
+      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, [...TASK_SKILL_SEED, ...SKILL_SEED]);
       await this.insertEvent(sql, { ...event, workspace: workspaceId }, null);
       return { workspaceId, channelId: generalId };
     }) as Promise<{ workspaceId: string; channelId: string }>;
@@ -424,7 +428,7 @@ export class PostgresStore implements Store {
   ): Promise<{ offeredAgentId: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
-      const [t] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, c.slug as channel_slug
+      const [t] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, t.assignee_id, t.offered_agent_id, c.slug as channel_slug
         from tasks t join channels c on c.id = t.channel_id where t.id = ${taskId} for update of t`;
       if (!t) throw new DomainError('NOT_FOUND', `task ${taskId} not found`);
       // todo (trivial path) or plan_review (the approved, planned task) may be
@@ -437,19 +441,13 @@ export class PostgresStore implements Store {
       if (!agent) throw new DomainError('NOT_FOUND', `agent ${agentName} is not registered to #${t['channel_slug']}`);
       // a retired agent keeps its channel rows (rehire restores remit) but can't take work
       if (agent['retired_at']) throw new DomainError('NOT_PERMITTED', `agent ${agentName} is retired — rehire it or offer to someone else`);
-      // Hand the task off: a planned task is still assigned to the ARCHITECT (request_plan set the
-      // assignee so the board shows who's planning it). Offering it to a developer must release that
-      // assignment — otherwise the claim is denied (claiming requires the task be unassigned or the
-      // claimer's own), so the offered dev can never pick up a planned task. Clear it on every offer
-      // (a no-op for the trivial todo path, where it's already null).
+      requireTaskOwner(t['assignee_id'] ?? t['offered_agent_id'], agent['id']);
       if (repo) {
         // intake resolved to repo-backed work — bind it now, branch derived
         // the same way task.create does
         const branch = taskBranch(Number(t['number']), t['title'] as string);
-        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = null, assignee_kind = null, repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId}`;
-      } else {
-        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = null, assignee_kind = null where id = ${taskId}`;
-      }
+        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = ${agent['id']}, assignee_kind = 'agent', repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId}`;
+      } else await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = ${agent['id']}, assignee_kind = 'agent' where id = ${taskId}`;
       if (checklist?.length) {
         // the orchestrator resolved requirements in the thread — recorded
         // here so the offered worker executes them instead of inventing its own
@@ -1643,7 +1641,7 @@ export class PostgresStore implements Store {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const chId = await resolveChannelId(sql, workspace, channel);
-      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
+      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, [...TASK_SKILL_SEED, ...(kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED)]);
       if (added > 0 || refreshed > 0) await this.insertEvent(sql, { ...event, workspace }, null);
       return { added, refreshed };
     }) as Promise<{ added: number; refreshed: number }>;
@@ -2954,11 +2952,8 @@ export class PostgresStore implements Store {
         // must agree with the existing thread. Resolve inside this transaction before writing.
         // Serialize births too, where no row exists for SELECT FOR UPDATE to lock yet.
         if (msg.threadId) await sql`select pg_advisory_xact_lock(hashtextextended(${msg.threadId}, 0))`;
-        const [existingThread] = msg.threadId ? await sql`select t.workspace_id, t.channel_id, coalesce(t.project_id, c.project_id) as project_id
-          from threads t join channels c on c.id = t.channel_id
-          where t.id = ${msg.threadId}::uuid for update of t` : [];
-        if (existingThread && existingThread['workspace_id'] !== msg.workspace) throw new DomainError('NOT_FOUND', 'Thread not found in this workspace.');
-        let address = msg.channel;
+        const existingThread = await messageThreadScope(sql, msg);
+        let address = await taskMessageAddress(sql, msg);
         if (msg.projectId) {
           const [project] = await sql`select id, context_channel_id from projects where id = ${msg.projectId}::uuid and workspace_id = ${msg.workspace}::uuid for share`;
           if (!project) throw new DomainError('NOT_FOUND', 'Project not found in this workspace.');
@@ -2980,7 +2975,7 @@ export class PostgresStore implements Store {
           if (task['project_id'] !== msg.projectId || task['channel_id'] !== chId) throw new DomainError('CONFLICT', 'The task belongs to another conversation context.');
         }
         if (!msg.channel && !msg.taskId) event = { ...event, target: `channel/${chId}` };
-        msg = { ...msg, channel: chId, projectId: scope!['project_id'] as string };
+        msg = await bindCodingTaskMessage(sql, { ...msg, channel: chId, projectId: scope!['project_id'] as string });
         // conversation threads: the first message carrying an unknown thread id births
         // the thread (title = heuristic over the body) in this same transaction; every
         // later message just touches updated_at so history sorts by freshness.

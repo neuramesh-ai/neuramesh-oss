@@ -126,3 +126,18 @@ test('no pick, no override, no pack: the very same seat comes back', async () =>
   const s = await seat(world({ trigger: { kind: 'human', id: 'ana' } }));
   assert.equal(s, rex);
 });
+
+
+test('a task-scoped coding run uses its inherited developer model and effort', async () => {
+  const { seatAgent } = await import('./seatpick');
+  const agent = { ...rex, id: 'patch', name: 'patch', role: 'developer' };
+  const db = { get: async <T>(sql: string): Promise<T> => {
+    if (sql.includes('where task_id')) return { id: 'coding', schedule_id: null, brain_override: JSON.stringify({ developer: 'gpt-5.6-sol' }) } as T;
+    if (sql.includes('home_thinking')) return { task_id: 'task', home_agent_id: null, home_thinking: 'high' } as T;
+    if (sql.includes('from channels c')) return { workspace_id: 'ws', model_pack: 'claude-core' } as T;
+    throw new Error('empty result');
+  }};
+  const picked = await seatAgent(agent, 'ch', { taskId: 'task' }, { db, customPacksFor: async () => [], houseBrain: async () => false });
+  assert.equal(picked.model, 'gpt-5.6-sol');
+  assert.equal(picked.thinking, 'high');
+});

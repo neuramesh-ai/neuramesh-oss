@@ -221,8 +221,11 @@ export async function conversationOrigin(where: { threadId?: string | null; task
   if (!ctx) return null;
   const thread = await owningThread(ctx.db, where).catch(() => null);
   if (!thread) return null;
-  const root = await ctx.db.get<{ author_kind: string; author_id: string | null }>(
-    'select m.author_kind, m.author_id from threads th join messages m on m.id = th.root_message_id where th.id = ?', [thread.id],
+  const root = await ctx.db.get<{ created_by?: string; author_kind: string; author_id: string | null }>(
+    'select th.created_by, m.author_kind, m.author_id from threads th left join messages m on m.id = th.root_message_id where th.id = ?', [thread.id],
   ).catch(() => null);
+  // A coding handoff starts with an agent-authored brief. Its authenticated human owner
+  // remains on the thread; the brief's author must not erase placement/fallback ownership.
+  if (root?.created_by?.startsWith('human:')) return root.created_by.slice(6) || null;
   return root?.author_kind === 'human' && root.author_id ? root.author_id : null;
 }

@@ -322,7 +322,7 @@ export function makeWake(ctx: {
         clog({ kind: 'turn', phase: 'inject', summary: assemblyLine(ctx) }); // context spend is measured, not asserted
         const transcript = ctx.text;
         reply = await withTimeout(
-          chatTurn({ agent, ch, threadId: m.thread_id!, transcript, token, log: clog, onDelta: (t2, th) => emitChat(t2, false, th), attachments: att.list, run: wakeRun }),
+          chatTurn({ agent, ch, threadId: m.thread_id!, transcript, request: { body: m.body, author_kind: (await db.get<{ author_kind: string }>('select author_kind from messages where id=?', [m.id]))?.author_kind ?? '' }, token, log: clog, onDelta: (t2, th) => emitChat(t2, false, th), attachments: att.list, run: wakeRun }),
           TURN_BUDGETS.chat.wallMs, // docs/harness/05 §3.6 — a chat may research + write + run code
           'the chat turn timed out after 12m',
         );

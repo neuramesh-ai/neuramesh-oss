@@ -12,15 +12,17 @@ with the next desktop tag, because the desktop's renderer copy already carries t
   version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** [v0.156.2](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.156.2)
-(published 2026-10-25 at 00:08 UTC, built from `a7eb17bb`, merged in PR #767 as `a592cd33`).
-It adds project library and repository access across thread types and streams Gemini activity.
-Both signed, notarized architectures passed CLI and SQLite write/reopen checks. Native Intel
-validation passed with a 1,521 ms cold start; dark and cream-oak screenshots were inspected.
-See the [release validation](design/powersync-retirement-2026-10/desktop-0.156.2-validation.md).
+**Newest published desktop:** [v0.157.0](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.157.0)
+(published 2026-10-30 at 05:39 UTC, built from `32d2158e`, merged in PR #778).
+It adds optional cloud activation, the free-local startup action, and an editable introduction
+on New session. Both signed, notarized architectures passed CLI and SQLite write/reopen checks.
+Native Intel started in 1,516 ms. Apple Silicon passed on retry at 875 ms after a 4,172 ms
+budget failure on the loaded host; the signed activation profile started in 964 ms.
+Both first-run themes and the signed free-local path were inspected. See the
+[client release validation](design/trial-activation-2026-10/client-release.md).
 
-The previous supported published desktop is v0.156.1. Both supported releases use the API
-replica. v0.155.1 is outside the supported pair. v0.156.0 was withdrawn after its native SQLite
+The previous supported published desktop is v0.156.2. Both supported releases use the API
+replica. v0.156.1 is outside the supported pair. v0.156.0 was withdrawn after its native SQLite
 constructor failure and remains a draft; v0.154.1 is also an unpublished, superseded draft.
 Hosted PowerSync remains available for legacy installed clients until the public iOS upgrade
 and final consumer checks pass.
@@ -29,18 +31,18 @@ The raw list since the newest published desktop, from git (the ledger names feat
 commits, and the two must agree):
 
 ```bash
-git log a592cd33..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log 32d2158e..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
 
-v0.156.2 is the second published desktop with the API replica. The supported pair is now
-v0.156.2/v0.156.1; earlier desktops receive the existing update notice. The hosted PowerSync
+v0.157.0 is the third published desktop with the API replica. The supported pair is now
+v0.157.0/v0.156.2; earlier desktops receive the existing update notice. The hosted PowerSync
 shutdown remains separate from this support-version change.
 
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
-| 2026-10-30 | Optional cloud trial activation, the free-local desktop action, and an editable first message on New session after onboarding. Existing free workspaces retain their data and credits. | #777 | [Activation validation](design/trial-activation-2026-10/validation.md) | HQ, API; desktop candidate | Includes the native activation screen, existing Local startup IPC, activation resume, and New session draft. Enforcement stays off until compatible clients and cancellation validation are ready. | v0.157.0 |
+| 2026-10-30 | Optional cloud trial activation, the free-local desktop action, and an editable first message on New session after onboarding. Existing free workspaces retain their data and credits. | #777 | [Activation validation](design/trial-activation-2026-10/validation.md) | HQ, API, desktop | Includes the native activation screen, existing Local startup IPC, activation resume, and New session draft. Enforcement stays off until compatible clients and cancellation validation are ready. | v0.157.0 |
 | 2026-10-28 | **Agent Desk.** Durable project/agent homes, parallel compact conversations, inline automations/connectors, draggable/resizable cards and custom-agent creation. | this PR | [Implementation and validation](design/project-team-2026-10/validation.md) | HQ web + API + cloud after deployment | HQ has a separate renderer. A future desktop UI port needs the Agent Desk view and bridge; shared routing, compaction and collaboration tools reach the desktop runtime with its next tag. No native UI certification is claimed here. | |
 | 2026-10-24 | Shared project library and all attached repositories in normal, marketing and coding threads; live Gemini reasoning summaries and tool steps. | #767 | Project context parity | web, phone update, cloud, desktop | Shared context resolution, bounded repository reads, Gemini conversation streaming. | v0.156.2 |
 | 2026-10-23 | Shared SQLite replica replaces PowerSync; preserves queued edits and cached reads across upgrades. File previews, expandable coding activity, and connection/history recovery. | #762 | [Retirement](design/powersync-retirement-2026-10/plan.md) | web, phone, cloud, desktop after rollout | Shared replica, normal API credentials, legacy cache import, native SQLite packaging. | v0.156.1 |

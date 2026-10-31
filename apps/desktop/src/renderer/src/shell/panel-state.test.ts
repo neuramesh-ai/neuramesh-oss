@@ -147,3 +147,11 @@ test('a move into another session never opens the panel, whatever kind it is (Ge
   // a coding thread's own tabs in front: Changes is a session tab, so it opens nothing either
   assert.equal(panelFoldAfter(at(null, null, 0), at('thread:C', 's:changes', 0, 5)), null);
 });
+
+
+test('a coding task keeps task ownership and exposes the native workspace', () => {
+  const session = panelSessionOf({ taskId: 'T', threadId: 'H', coding: true });
+  assert.equal(session.key, 'task:T');
+  assert.deepEqual(sessionTabsOf(session), ['changes', 'files', 'artifacts', 'plan', 'checkpoints', 'terminal']);
+  assert.equal(panelFront('s:overview', sessionTabsOf(session), []), 's:changes');
+});

@@ -19,3 +19,10 @@ export function failRemoteEngineeringTransport(session: EngineeringSession, erro
   };
   return { ...session, state: 'resumable', activeActivity: null, pendingApproval: null, messages: [...interruptReviews(messages), warning], updatedAt: new Date().toISOString() };
 }
+
+/** A live task attachment restores public UI state without changing this client's identity. */
+export function applyTaskEngineeringState(session: EngineeringSession, value: unknown): EngineeringSession {
+  const live = value as EngineeringSession | null;
+  return live?.id === session.id && live.repo?.id === session.repo.id && Array.isArray(live.messages)
+    ? { ...live, project: session.project, machineId: session.machineId } : session;
+}

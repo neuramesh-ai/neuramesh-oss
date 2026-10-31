@@ -111,4 +111,22 @@ describe.skipIf(!url)('Agent Desk persistent homes', () => {
     expect(after.messages).toHaveLength(20); expect(after.revision).toBe(1);
     expect(await sql!`select id from messages where thread_id=${home.id}::uuid`).toHaveLength(68);
   });
+  it('manually compacts a short ordinary chat without deleting history or crossing workspace access', async () => {
+    const [channel] = await sql!`select context_channel_id from projects where id=${projectId}::uuid`;
+    const [thread] = await sql!`insert into threads(workspace_id,project_id,channel_id,created_by,title,kind,mode)
+      values(${workspace}::uuid,${projectId}::uuid,${channel!['context_channel_id']}::uuid,${`human:${user}`},'Short chat','chat','chat') returning id`;
+    const id = String(thread!['id']);
+    for (const body of ['Keep budget below $500.', 'Understood. Deliverable: brief.md.', '/compact']) await sql!`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body)
+      values(${workspace}::uuid,${channel!['context_channel_id']}::uuid,${id}::uuid,'human',${user}::uuid,${body})`;
+    const auto = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}`)).json() as TeamContext;
+    expect(auto.compactThrough).toBeNull();
+    const manual = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}&mode=manual`)).json() as TeamContext;
+    expect(manual.home).toBeNull(); expect(manual.threadId).toBe(id); expect(manual.compactThrough).toBe(manual.messages[1]!.id);
+    const body = { workspace, threadId: id, mode: 'manual', revision: manual.revision, through: manual.compactThrough, summary: 'Budget $500; deliver brief.md.' };
+    expect((await request('/v1/team/compact', body, { kind: 'agent', id: randomUUID() })).status).toBe(404);
+    expect((await request('/v1/team/compact', body, { kind: 'agent', id: agentA })).status).toBe(200);
+    const next = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}&mode=manual`)).json() as TeamContext;
+    expect(next.messages.map(m => m.body)).toEqual(['/compact']); expect(next.compactThrough).toBeNull(); expect(next.compactedThroughAt).toBeTruthy();
+    expect(await sql!`select id from messages where thread_id=${id}::uuid`).toHaveLength(3);
+  });
 });

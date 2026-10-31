@@ -13,6 +13,8 @@ import { cleanupTempProfile, sandboxExecArgv, sandboxExecAvailable, strictCodeSe
 import { vetEgressDestination } from '../sandbox/egress';
 import { protectedPathsFromRules } from '../policygate';
 import { brainRoot } from '../harness/brain';
+import { engineeringNetworkSeccompFilter } from './engineering-network-policy';
+export { engineeringNetworkSeccompFilter } from './engineering-network-policy';
 
 const MAX_COMMAND_OUTPUT = 48_000;
 const MAX_WEB_BYTES = 2_000_000;
@@ -85,39 +87,6 @@ export function engineeringBubblewrapArgv(root: string, command: string, managed
   return args;
 }
 
-/** Native-architecture seccomp BPF: reject socket creation (including io_uring's alternate path)
- * while allowing the ordinary compiler/test syscalls needed inside the Code worktree. */
-export function engineeringNetworkSeccompFilter(): Buffer {
-  const platform = process.arch === 'x64'
-    ? { auditArch: 0xc000003e, socket: 41, socketpair: 53, ioUringSetup: 425 }
-    : process.arch === 'arm64'
-      ? { auditArch: 0xc00000b7, socket: 198, socketpair: 199, ioUringSetup: 425 }
-      : null;
-  if (!platform) throw new Error(`Code command execution does not support Linux architecture ${process.arch}.`);
-  const instructions: Array<[number, number, number, number]> = [
-    [0x20, 0, 0, 4], // load seccomp_data.arch
-    [0x15, 1, 0, platform.auditArch],
-    [0x06, 0, 0, 0x80000000], // kill a process that changes syscall ABI
-    [0x20, 0, 0, 0], // load seccomp_data.nr
-  ];
-  // x32 shares AUDIT_ARCH_X86_64 but ORs this bit into its syscall numbers. Refuse that ABI
-  // outright rather than letting its alternate socket numbers fall through to the allow rule.
-  if (process.arch === 'x64') instructions.push(
-    [0x45, 0, 1, 0x40000000], // BPF_JSET __X32_SYSCALL_BIT
-    [0x06, 0, 0, 0x00050001], // EPERM
-  );
-  for (const syscall of [platform.socket, platform.socketpair, platform.ioUringSetup]) {
-    instructions.push([0x15, 0, 1, syscall], [0x06, 0, 0, 0x00050001]); // EPERM
-  }
-  instructions.push([0x06, 0, 0, 0x7fff0000]); // allow
-  const filter = Buffer.alloc(instructions.length * 8);
-  instructions.forEach(([code, jt, jf, value], index) => {
-    const offset = index * 8;
-    filter.writeUInt16LE(code, offset); filter.writeUInt8(jt, offset + 2);
-    filter.writeUInt8(jf, offset + 3); filter.writeUInt32LE(value, offset + 4);
-  });
-  return filter;
-}
 
 function execBubblewrap(args: readonly string[], root: string, env: NodeJS.ProcessEnv): Promise<string> {
   const filter = engineeringNetworkSeccompFilter();
