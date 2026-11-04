@@ -28,13 +28,17 @@ function send(actor: Actor, body: unknown) {
   });
 }
 
+let originalPlan: string | undefined;
 afterAll(async () => {
+  if (store && originalPlan) await store.setWorkspacePlan(WS, { plan: originalPlan });
   await store?.close();
 });
 
 describe.skipIf(!DB)('runs on postgres (real schema, migration 0096)', () => {
   beforeAll(async () => {
     if (!DB) return;
+    originalPlan = await store!.workspacePlan(WS);
+    await store!.setWorkspacePlan(WS, { plan: 'cloud' }); // routing, not the free machine cap
     const mach = await j(await send(george, { type: 'machine.register', workspace: WS, name: 'runs-rig', platform: 'darwin', daemonVersion: '0.1.0' }));
     const r = await j(await send(george, { type: 'agent.register', workspace: WS, machineId: mach.machineId, name: 'runs-rex', role: 'orchestrator', channels: ['dev'] }));
     const p = await j(await send(george, { type: 'agent.register', workspace: WS, machineId: mach.machineId, name: 'runs-patch', role: 'worker', channels: ['dev'] }));

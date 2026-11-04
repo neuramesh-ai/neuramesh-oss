@@ -21,6 +21,7 @@
 import { Dispatcher, defaultCaps, priorityOf, SqliteSeenStore, type Caps, type SeenStore, type TriggerCause } from './dispatch';
 import { MemorySeenStore } from './dispatch';
 import { join } from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdirSync } from 'node:fs';
 import type { TurnKind } from '@neuramesh/shared';
 import type { LogFn } from '../agentlog';
@@ -50,6 +51,9 @@ export interface TurnRecorder {
   open(work: QueuedWork): void;
   settle(work: QueuedWork, state: 'done' | 'failed', err?: unknown): void;
 }
+
+/** Captured by the managed coding task before UI commands arrive on a different async chain. */
+export const hostApprovalSlot = new AsyncLocalStorage<{ pause(): void; resume(): Promise<void> }>();
 
 export interface QueuedWork {
   /** the dedupe/accounting key — a triggerKey.* value */
@@ -83,6 +87,26 @@ export class HostQueue {
   private turns?: TurnRecorder;
   private around?: HostQueueOpts['around'];
   private meta = new Map<string, QueuedWork>();
+  private resuming = new Map<string, () => void>();
+
+  private approvalSlot(key: string) {
+    let resume: Promise<void> | undefined;
+    return {
+      pause: () => {
+        this.d.waitForApproval(key);
+        void this.drain();
+      },
+      resume: () => {
+        if (!resume) {
+          resume = new Promise<void>(resolve => {
+            this.resuming.set(key, resolve);
+            void this.drain();
+          }).finally(() => { resume = undefined; });
+        }
+        return resume;
+      },
+    };
+  }
 
   constructor(opts: HostQueueOpts = {}) {
     const caps = opts.caps ?? defaultCaps(cpuCount(), opts.headless);
@@ -121,12 +145,20 @@ export class HostQueue {
     this.draining = true;
     try {
       for (;;) {
+        // A human has already answered these approvals. Give those tasks their
+        // slots back before admitting more work, subject to the same ceilings.
+        for (const [key, resolve] of this.resuming) {
+          if (this.d.resumeAfterApproval(key)) {
+            this.resuming.delete(key);
+            resolve();
+          }
+        }
         const t = this.d.admit();
         if (!t) return;
         const fn = this.pending.get(t.id);
         const work = this.meta.get(t.id);
-        this.pending.delete(t.id);
-        if (!fn || !work) { this.d.settle(t.id, 'stopped'); this.meta.delete(t.id); continue; }
+        this.pending.delete(t.id); this.meta.delete(t.id);
+        if (!fn || !work) { this.d.settle(t.id, 'stopped'); continue; }
         this.log?.(`admit ${t.kind} ${t.id} (p${priorityOf(t)}) · ${this.d.stats().running}/${this.d.stats().slots} slots`);
         // fire and forget: the flow owns its own errors, and the queue only owns accounting. Settling
         // in `finally` mirrors the turn lifecycle's rule — an unsettled key would leak a slot forever.
@@ -137,7 +169,7 @@ export class HostQueue {
           let outcome: 'done' | 'failed' = 'done';
           let thrown: unknown;
           try {
-            await (this.around ? this.around(work, fn) : fn());
+            await hostApprovalSlot.run(this.approvalSlot(t.id), () => this.around ? this.around(work, fn) : fn());
           } catch (err) {
             outcome = 'failed';
             thrown = err;
@@ -147,7 +179,6 @@ export class HostQueue {
             // unsettled key leaks a slot forever, which is a wedged host rather than a lost turn.
             this.d.settle(t.id, outcome);
             try { this.turns?.settle(work, outcome, thrown); } catch { /* see above */ }
-            this.meta.delete(t.id);
             void this.drain();
           }
         })();

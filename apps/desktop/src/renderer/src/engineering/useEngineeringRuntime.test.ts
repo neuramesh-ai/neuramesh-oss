@@ -38,6 +38,6 @@ test('send() takes the composer step', () => {
 // restore first, so the host's ready can make it read again (shared engineering/restore-connection.ts)
 test('each host event reaches the restore before the client applies it', () => {
   const src = readFileSync(join(import.meta.dirname, 'useEngineeringRuntime.ts'), 'utf8');
-  assert.match(src, /const open = \(session: EngineeringSession, observe\?: \(event: \{ type\?: unknown; recordedRevision\?: unknown \}\) => void\): Handle =>/);
-  assert.match(src, /\(event\) => \{ observe\?\.\(event\); setSessions\(/);
+  assert.match(src, /const open = \(session: EngineeringSession, observe\?: \(event: \{ type\?: unknown; recordedRevision\?: unknown \}\) => void, callbacks\?:/);
+  assert.match(src, /\(event\) => \{ if \(callbacks\) callbacks\.event\(event\); else \{ observe\?\.\(event\); receive\(event\); \}/);
 });

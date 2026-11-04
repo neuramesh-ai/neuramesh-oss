@@ -1,3 +1,6 @@
+import type { WaitForPermission } from './permission-deadline';
+import type { RunHandle } from './runs';
+import { skillBody } from './workspace-skills';
 // What a chat turn needs around it — who answers by default, what mode a thread is in, the
 // recall and skill lookups, the permission gate, and how produced files reach the thread.
 //
@@ -6,9 +9,12 @@
 // Split out of host/chatturn.ts.
 
 
-import { buildPermissionCardBody, permissionQuestion, policyGateOutcome, toolCallToAction, protectedPathsFromRules, rowsToRules, CHAT_WHERE, cleanIntent, intentPrompt, type PolicyRowLite } from '../policygate';
-import { defaultBaselineRules, isChatThread, mergePolicies } from '@neuramesh/shared';
-import { awaitDecision, imageDataUri, runtimeFor } from '../agents';
+import { buildPermissionCardBody, permissionQuestion, policyGateOutcome, protectedPathsFromRules, rowsToRules, CHAT_WHERE, type PolicyRowLite } from '../policygate';
+import { isChatThread, defaultBaselineRules, mergePolicies } from '@neuramesh/shared';
+import { chatPermissionAction } from '../chat-permission-action';
+import { loadEngineeringPolicyRules } from '../relay/engineering-policy';
+import type { ThreadPermissionGate } from '../thread-permission-gate';
+import { awaitDecision, imageDataUri } from '../agents';
 import { fileDropBody, isImageFile, pickDeliverables, pickResponder, type ChatFile } from '../chatmode';
 import type { HostedAgent, SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -66,9 +72,8 @@ async function recallFor(workspaceId: string, _channelId: string, query: string)
 }
 
 // …and the skill bodies, resolved through the same discovery the board turn uses.
-async function loadSkillBody(channelId: string, workspaceId: string, name: string): Promise<string> {
-  const sk = (await discoverSkills(channelId, workspaceId)).find((x) => x.name === name);
-  return sk ? `# Skill: ${sk.name}\n${sk.description}\n\n${sk.body}` : `no active skill named "${name}" in this room`;
+async function loadSkillBody(channelId: string, workspaceId: string, name: string, pack?: string): Promise<string> {
+  return skillBody(await discoverSkills(channelId, workspaceId), name, pack);
 }
 
 // A produced file's human-readable label for its card header: "competitor-teardown.md" reads
@@ -93,29 +98,23 @@ async function chatPermissionGate(
   agent: HostedAgent,
   ch: { id: string; slug: string; workspace_id: string },
   threadId: string,
-  token: string,
+  permissionGate: ThreadPermissionGate,
   toolName: string,
   toolInput: Record<string, unknown>,
+  run: RunHandle,
+  wait?: WaitForPermission,
 ): Promise<{ decision: 'allow' | 'deny'; reason?: string }> {
-  const action = toolCallToAction(toolName, toolInput);
-  if (!action) return { decision: 'allow' };
-  const rows = await db
-    .getAll<PolicyRowLite>('select id, scope, capability, selector, verdict, rationale, locked from policies where workspace_id = ?', [ch.workspace_id])
-    .catch(() => [] as PolicyRowLite[]);
-  const outcome = policyGateOutcome(action, mergePolicies(defaultBaselineRules(), rowsToRules(rows)));
-  if (outcome.decision === 'allow') return { decision: 'allow' };
-  if (outcome.decision === 'deny') return { decision: 'deny', reason: outcome.reason };
-  // ask → the agent's own words on the card, elicited when the call carries no description
-  let summary = typeof toolInput['description'] === 'string' ? (toolInput['description'] as string).trim().slice(0, 200) : '';
-  if (!summary) {
-    const p = intentPrompt(action, agent.name, CHAT_WHERE, '');
-    summary = cleanIntent(
-      await Promise.race([
-        runtimeFor(agent.runtime).complete(p.system, p.user, token, agent.model, 120),
-        new Promise<string>((r) => setTimeout(() => r(''), 8000)),
-      ]).catch(() => ''),
-    );
-  }
+  const mapped = chatPermissionAction(toolName, toolInput);
+  if (!mapped) return { decision: 'allow' };
+  const action = mapped.actions[0];
+  if (!action) return { decision: 'deny', reason: 'This tool has no permission mapping.' };
+  const project = await db.get<{project_id:string}>('select project_id from threads where id=? and workspace_id=?', [threadId,ch.workspace_id]);
+  const rules = await loadEngineeringPolicyRules(db, ch.workspace_id, project?.project_id);
+  const mode = await permissionGate.decide(mapped.kind, mapped.actions, rules);
+  if (mode?.verdict === 'allow') return { decision: 'allow' };
+  if (!mode || mode.verdict === 'deny') return { decision: 'deny', reason: mode?.reason ?? 'Could not confirm chat permissions.' };
+  const outcome = { ...policyGateOutcome(action, rules), decision: 'ask' as const, reason: mode.reason };
+  const summary = typeof toolInput.description === 'string' ? toolInput.description.slice(0,200) : undefined;
   const res = await post('/v1/messages', { kind: 'agent', id: agent.id }, {
     workspace: ch.workspace_id, channel: ch.id, threadId,
     body: buildPermissionCardBody(action, outcome, agent.name, CHAT_WHERE, summary || undefined),
@@ -123,7 +122,10 @@ async function chatPermissionGate(
   if (!res || !res.ok) return { decision: 'deny', reason: 'could not raise the approval request' };
   const messageId = ((await res.json().catch(() => ({}))) as { message?: { id?: string } }).message?.id;
   if (!messageId) return { decision: 'deny', reason: 'approval request had no id' };
-  const answer = await awaitDecision(db, messageId, { threadId }, permissionQuestion(action, agent.name, CHAT_WHERE));
+  const decide = () => awaitDecision(db, messageId, { threadId }, permissionQuestion(action, agent.name, CHAT_WHERE), undefined, true);
+  await run.step('Waiting for your permission');
+  const answer = wait ? await wait(decide) : await decide();
+  await run.step(answer === 'Approve' ? 'Approval received · continuing work' : 'Permission declined · returning to the conversation');
   return answer === 'Approve' ? { decision: 'allow' } : { decision: 'deny', reason: answer == null ? 'approval timed out — denied' : 'a human denied this action' };
 }
 

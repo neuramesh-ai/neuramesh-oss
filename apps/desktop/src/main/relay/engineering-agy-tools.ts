@@ -39,6 +39,7 @@ export function agyBridgeTools(o: {
   threadId: string;
   controls: () => EngineeringControls;
   policyRules: readonly PolicyRule[];
+  permissionGate?: import('../thread-permission-gate').ThreadPermissionGate;
   pending: Map<string, (approved: boolean) => void>;
   emit: (event: EngineeringRuntimeEvent) => void;
   record: (type: string, payload: unknown) => void;
@@ -61,7 +62,7 @@ export function agyBridgeTools(o: {
           toolCallId, toolName: tool.name, input,
           policy: { enabled: true, autoApprove: false },
         };
-        const verdict = await requestEngineeringApproval(request, o.controls(), [...o.policyRules], o.pending, o.emit, o.record, o.cwd, o.isActive);
+        const verdict = await requestEngineeringApproval(request, o.controls(), [...o.policyRules], o.pending, o.emit, o.record, o.cwd, o.isActive, o.permissionGate);
         if (!verdict.approved) return JSON.stringify({ error: verdict.reason ?? 'Declined in Neuramesh' });
       }
       try {

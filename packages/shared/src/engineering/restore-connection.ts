@@ -59,6 +59,8 @@ export function restoreEngineeringConnection(input: {
     shown = snapshot.revision;
     input.restored(session);
     handle = input.open(session, observe);
+    // A transport can synchronously report a failed attach during open.
+    if (closed) handle.close();
     return handle;
   })();
   void ready.catch(error => { if (!closed) input.failed(error); });

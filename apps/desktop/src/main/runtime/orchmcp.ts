@@ -7,7 +7,7 @@
 // down to the shim. Nothing leaves the machine (loopback only); the secret stops other local procs
 // from invoking orchestrator tools.
 import { createServer, type Server } from 'node:http';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -35,13 +35,20 @@ export async function ensureBridge(): Promise<number> {
         let body = '';
         req.on('data', (d) => { body += String(d); if (body.length > 2_000_000) req.destroy(); });
         req.on('end', () => { void (async () => {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.flushHeaders();
+          // A human may take minutes to decide. JSON whitespace keeps the loopback
+          // transport alive while the handler waits for that exact decision.
+          const heartbeat = setInterval(() => res.write(' '), 15000);
+          res.once('close', () => clearInterval(heartbeat));
           let result: string;
           try {
             const { name, args } = JSON.parse(body || '{}') as { name?: string; args?: unknown };
             const t = name ? reg.tools.get(name) : undefined;
             result = t ? await t.run(objectArgs(args)) : `error: unknown tool ${name}`;
           } catch (e) { result = `error: ${e instanceof Error ? e.message : 'tool failed'}`; }
-          res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ result }));
+          clearInterval(heartbeat);
+          if (!res.destroyed) res.end(JSON.stringify({ result }));
         })(); });
         return;
       }
@@ -93,7 +100,7 @@ export function bridgePort(): number { return port; }
  * per-turn secret is the boundary); codex's own sandbox stays on.
  */
 export function codexNmServer(command: string, shimPath: string, env: { NM_ORCH_URL: string; NM_ORCH_TURN: string; NM_ORCH_SECRET: string }): Record<string, unknown> {
-  return { command, args: [shimPath], default_tools_approval_mode: 'approve', env };
+  return { command, args: [shimPath], default_tools_approval_mode: 'approve', tool_timeout_sec: 660, env };
 }
 
 // The stdio MCP shim agy spawns. Written to userData for a stable path. Uses string concatenation
@@ -170,4 +177,18 @@ export function ensureAgyMcpAllow(home = homedir()): boolean {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600 });
   return true;
+}
+
+/** A managed turn can reach only the host's registered tools. In particular
+ * a saved CLI Turbo preference must never grant a second path to shell or files. */
+export function managedAgySettings(home = homedir()): string {
+  const path = join(home, '.gemini', 'config', 'mcp_config.json');
+  let servers: Record<string, unknown> = {};
+  if (existsSync(path)) servers = JSON.parse(readFileSync(path, 'utf8')).mcpServers ?? {};
+  const external = Object.keys(servers).filter(name => name !== 'nm');
+  if (external.some(name => !/^[\w.-]+$/.test(name))) throw new Error('Cannot isolate an unrecognized MCP server name.');
+  return JSON.stringify({ allowNonWorkspaceAccess: false, permissions: {
+    allow: [NM_MCP_ALLOW], deny: ['read_file(*)', 'write_file(*)', 'command(*)', 'unsandboxed(*)',
+      'read_url(*)', 'execute_url(*)', ...external.map(name => `mcp(${name}/*)`)],
+  } });
 }

@@ -25,6 +25,22 @@ function strings(value: unknown): string[] {
 
 export function engineeringPolicyActions(toolName: string, input: unknown): PolicyAction[] {
   const value = recordOf(input);
+  // Skill bodies are workspace-scoped reads, with no model-selected file path or URL.
+  // The loader enforces workspace membership and enabled status; read policy still applies.
+  if (toolName === 'load_skill') return [{ capability: 'fs.read' }];
+  if (['list_library','read_library_doc','list_repos','list_repo_files','read_repo_file','list_repo_changes'].includes(toolName)) {
+    const path = typeof value.path === 'string' ? value.path : undefined;
+    return [{ capability: 'fs.read', path }, { capability: 'tool.mcp', tool: toolName }];
+  }
+  if (toolName === 'capture_task_view') {
+    if (!['before','after'].includes(String(value.phase)) || !/^[a-z0-9][a-z0-9-]{0,59}$/.test(String(value.view))) return [];
+    const actions: PolicyAction[] = [{ capability: 'fs.write', path: `.nm-artifacts/validation/${value.phase}/${value.view}.png` }];
+    if (value.previewOrigin) {
+      try { const url = new URL(String(value.previewOrigin)); if (url.protocol !== 'https:') return []; actions.push({capability:'net.egress',host:url.hostname}); }
+      catch { return []; }
+    }
+    return actions;
+  }
   if (toolName === 'show_artifact') {
     const path = typeof value['path'] === 'string' ? value['path'].replace(/^\.\//, '').replace(/^\.nm-artifacts\//, '') : '';
     if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').some(part => !part || part === '..' || part === '.')) return [];

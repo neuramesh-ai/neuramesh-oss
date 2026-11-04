@@ -10,10 +10,9 @@
 // design rests on. It also means the relay restarting is normal (single replica, rolls on
 // deploy), so redialling is a first-class path rather than error handling.
 import WebSocket from 'ws';
-import { existsSync, mkdirSync } from 'node:fs';
 import { isChannelFrame, keepAlive, parseMessage, toB64, fromB64, type ChannelFrame } from '@neuramesh/relay';
+import { terminalDirectory, type TerminalLocation } from './terminal-workspace';
 import { makeJail } from './jail';
-import { brainRoot, cachePath, deliverablePath } from '../harness/brain';
 import { isEngineeringOpenMeta, type EngineeringRuntimeEvent } from '../../engineering-protocol';
 import type { EngineeringMachineHost } from './engineering-host';
 import { createEngineeringCommandBuffer, MAX_ENGINEERING_COMMAND_BYTES } from './engineering-channel-buffer';
@@ -30,6 +29,8 @@ export interface MachineEdgeOptions {
   /** a shell ended — a vendor login may just have happened in it (member-machines plan §4) */
   onSessionEnd?(): void;
   engineering?: EngineeringMachineHost;
+  taskTerminalDirectory?: (number:number) => Promise<TerminalLocation>;
+  threadTerminalDirectory?: (threadId: string, actorId: string) => Promise<TerminalLocation>;
   /** the keepalive period (tests shorten it) */
   keepaliveMs?: number;
   /** the live-reply registry emitStream feeds (livestreams.ts). Absent = no `stream` lane here. */
@@ -52,25 +53,6 @@ interface Session {
 const ENGINEERING_CHUNK_BYTES = 128 * 1024;
 export const MAX_MACHINE_CHANNELS = 32;
 export const MAX_TERMINAL_SESSIONS_PER_ACTOR = 8;
-
-/** where an `open` frame points. The browser has no filesystem, so it names the SESSION and
- *  the machine resolves the path — the same resolution the desktop does locally. */
-function resolveCwd(f: ChannelFrame): { cwd: string; note: string | null } {
-  const home = brainRoot();
-  if (!existsSync(home)) { try { mkdirSync(home, { recursive: true }); } catch { /* spawn will fail loudly */ } }
-  if (typeof f.taskNumber === 'number') {
-    const dir = f.hasRepo ? cachePath('worktrees', `nm-${f.taskNumber}`) : deliverablePath(f.taskNumber);
-    if (existsSync(dir)) return { cwd: dir, note: null };
-    // the desktop says this too, and for the same reason: an explained terminal you can work
-    // in beats a dead one, and silence would read as a broken shell
-    return {
-      cwd: home,
-      note: `\r\n\x1b[33mnm:\x1b[0m \x1b[2m#${f.taskNumber}'s ${f.hasRepo ? 'worktree' : 'deliverables folder'} is not on this machine — opened the NeuraMesh home instead.\x1b[0m\r\n`,
-    };
-  }
-  if (f.cwd && existsSync(f.cwd)) return { cwd: f.cwd, note: null };
-  return { cwd: home, note: null };
-}
 
 export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; killTask(taskNumber: number): void; sessionCount(): number } {
   const log = opts.log ?? ((l: string) => console.log(`[relay-edge] ${l}`));
@@ -111,33 +93,31 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
     try {
       const pty = await import('node-pty');
       if (reservation.cancelled) return;
-      const { cwd, note } = resolveCwd(frame);
+      const { cwd, taskNumber } = await terminalDirectory(frame, opts.threadTerminalDirectory, opts.taskTerminalDirectory);
+      if (reservation.cancelled) return;
       const jail = makeJail(cwd);
       cleanup = jail.cleanup;
       const term = pty.spawn(jail.shell, jail.args, {
         name: 'xterm-color', cwd, cols: frame.cols || 80, rows: frame.rows || 24,
         env: { ...process.env, ...jail.env } as Record<string, string>,
       });
-    // the note rides the shell's FIRST output so it lands under the prompt instead of being
-    // overwritten by bash's startup redraw
-      let pending = note;
-      term.onData((d: string) => {
-        send({ ch: frame.ch, t: 'data', d: toB64(d) });
-        if (pending) { const n = pending; pending = null; queueMicrotask(() => send({ ch: frame.ch, t: 'data', d: toB64(n) })); }
-      });
+      term.onData(d => send({ ch: frame.ch, t: 'data', d: toB64(d) }));
       term.onExit(() => {
         sessions.delete(frame.ch); jail.cleanup(); send({ ch: frame.ch, t: 'close' }); opts.onSessionEnd?.();
       });
       sessions.set(frame.ch, {
         write: (d) => term.write(d), resize: (c, r) => { try { term.resize(c, r); } catch { /* race on close */ } },
         kill: () => { try { term.kill(); } catch { /* gone */ } jail.cleanup(); },
-        taskNumber: typeof frame.taskNumber === 'number' ? frame.taskNumber : null, lane: 'terminal', actorId,
+        taskNumber: taskNumber ?? null, lane: 'terminal', actorId,
       });
       cleanup = null;
       log(`pty_open ch=${frame.ch} cwd=${cwd}`);
     } catch (error) {
       cleanup?.();
-      if (!reservation.cancelled) send({ ch: frame.ch, t: 'close' });
+      if (!reservation.cancelled) {
+        send({ ch: frame.ch, t: 'data', d: toB64(`\r\nTerminal could not start: ${error instanceof Error ? error.message : 'directory unavailable'}.\r\n`) });
+        send({ ch: frame.ch, t: 'close' });
+      }
       throw error;
     } finally {
       if (pendingTerminals.get(frame.ch) === reservation) pendingTerminals.delete(frame.ch);

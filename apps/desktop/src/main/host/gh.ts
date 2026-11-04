@@ -88,8 +88,25 @@ export async function repoSlugFor(row: { clone_url?: string | null; local_path?:
 export async function ghPrCreate(cwd: string, slug: string, base: string, head: string, title: string, body: string, env?: GhEnv): Promise<{ url: string; number: number } | null> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr create ${slug} ${head}`); return { url: `https://github.com/${slug}/pull/7`, number: 7 }; }
   // reuse an existing PR for the branch (re-submits land on the same PR)
-  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number'], cwd, env);
-  if (view.ok) { try { const j = JSON.parse(view.stdout) as { url?: string; number?: number }; if (j.url && j.number) return { url: j.url, number: j.number }; } catch { /* create below */ } }
+  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number,body'], cwd, env);
+  if (view.ok) {
+    const current = JSON.parse(view.stdout) as { url: string; number: number; body: string };
+    if (current.url && current.number) {
+      const marker = '<!-- nm-validation:start -->';
+      const start = body.indexOf(marker);
+      if (start >= 0) {
+        const section = body.slice(start);
+        const original = current.body ?? '';
+        const previous = /<!-- nm-validation:start -->[\s\S]*?<!-- nm-validation:end -->/;
+        const updated = previous.test(original) ? original.replace(previous, () => section) : original.trimEnd() + '\n\n' + section;
+        if (updated !== original) {
+          const edit = await ghRaw(['api', `repos/${slug}/pulls/${current.number}`, '-X', 'PATCH', '-f', `body=${updated}`],cwd,env);
+          if (!edit.ok) throw new Error('The PR exists but its implementation evidence could not be updated.');
+        }
+      }
+      return { url: current.url, number: current.number };
+    }
+  }
   const create = await ghRaw(['pr', 'create', '-R', slug, '--base', base, '--head', head, '--title', title, '--body', body], cwd, env);
   if (!create.ok) return null;
   const url = create.stdout.split('\n').map((l) => l.trim()).find((l) => /\/pull\/\d+/.test(l)) ?? create.stdout.trim();
@@ -103,19 +120,27 @@ export async function ghPrCreate(cwd: string, slug: string, base: string, head: 
 // which is NOT "no CI": a gate that read it as none passed unverified work
 // (docs/design/repo-writes-2026-09). Live-verified (a file:// fixture can't run
 // GitHub Actions); the gate exercises the watch via NM_GH_FAKE.
-export type CiVerdict = 'pass' | 'fail' | 'pending' | 'none' | 'unknown';
+export type CiVerdict = 'pass' | 'fail' | 'pending' | 'none' | 'unknown' | 'author_unverified';
 export async function ghPrChecks(cwd: string | undefined, slug: string, number: number, env?: GhEnv): Promise<{ verdict: CiVerdict; detail: string }> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr checks ${slug} ${number}`); return { verdict: 'none', detail: '' }; }
-  return ciVerdictOf(await ghRaw(['pr', 'checks', String(number), '-R', slug, '--json', 'name,state,bucket'], cwd, env));
+  return ciVerdictOf(await ghRaw(['pr', 'checks', String(number), '-R', slug, '--json', 'name,state,bucket,description'], cwd, env));
 }
 
 /** the verdict from one `gh pr checks --json` run, pure so the unknown/none line is testable */
 export function ciVerdictOf(r: { ok: boolean; stdout: string; stderr: string }): { verdict: CiVerdict; detail: string } {
   if (/no checks reported/i.test(r.stderr)) return { verdict: 'none', detail: '' };
-  let checks: Array<{ name?: string; bucket?: string }> = [];
+  let checks: Array<{ name?: string; bucket?: string; description?: string }> = [];
   try { checks = JSON.parse(r.stdout) as typeof checks; } catch { return r.ok ? { verdict: 'pass', detail: '' } : { verdict: 'unknown', detail: (r.stderr || r.stdout).slice(0, 160) }; }
   if (!checks.length) return { verdict: 'none', detail: '' };
-  const fail = checks.find((c) => c.bucket === 'fail' || c.bucket === 'cancel');
+  const failed = checks.filter(c => c.bucket === 'fail' || c.bucket === 'cancel');
+  const vercel = (c: (typeof failed)[number]) => /^Vercel\b/i.test(c.name ?? '');
+  const authorGate = (c: (typeof failed)[number]) => vercel(c) && /(?:couldn[’']t|could not|cannot) verify an account for the commit/i.test(c.description ?? '');
+  const authorCheck = failed.find(authorGate);
+  // A companion Vercel project can report only "Deployment was blocked".
+  // A distinct build or test failure still needs implementation work.
+  const actionable = failed.find(c => !authorGate(c) && !(vercel(c) && /^Deployment was blocked[.!]?$/i.test(c.description?.trim() ?? '')));
+  if (authorCheck && !actionable) return { verdict: 'author_unverified', detail: authorCheck.name! };
+  const fail = actionable ?? failed[0];
   if (fail) return { verdict: 'fail', detail: fail.name ?? 'a required check' };
   const pending = checks.find((c) => c.bucket === 'pending');
   if (pending) return { verdict: 'pending', detail: pending.name ?? 'a check' };

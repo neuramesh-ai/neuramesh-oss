@@ -1,3 +1,5 @@
+import { EngineeringTaskSession } from './engineering-task-session';
+import { remoteThreadPermissionGate } from '../thread-permission-gate';
 import { engineeringDisplayTools, type EngineeringDisplayContext } from './engineering-display';
 import { engineeringThreadNamer } from './engineering-title';
 import { EngineeringSessionRegistry } from './engineering-session-registry';
@@ -25,6 +27,8 @@ export interface EngineeringMachineSession {
 }
 
 export interface EngineeringMachineHost {
+  /** Trusted task dispatcher only; never accepted from a browser open frame. */
+  runTask?(meta: EngineeringMachineOpenMeta, workspace: EngineeringWorkspace, prompt: string, stopped: () => boolean, progress?: (state: import('@neuramesh/shared').EngineeringSession) => void, approvedPlan?: import('@neuramesh/shared').EngineeringPlanProgress): Promise<string>;
   open(meta: EngineeringMachineOpenMeta, emit: (event: EngineeringRuntimeEvent) => void): Promise<EngineeringMachineSession>;
 }
 
@@ -38,9 +42,12 @@ export interface ClineEngineeringHostOptions {
    *  worktree of the session repository's own cache clone. */
   resolveCwd(meta: EngineeringMachineOpenMeta): Promise<string | EngineeringWorkspace>;
   resolveDisplayContext?(meta: EngineeringMachineOpenMeta): Promise<EngineeringDisplayContext | null>;
+  /** Task execution belongs to the dispatcher; inactive task panes only inspect history/files. */
+  isTaskThread?(meta: EngineeringMachineOpenMeta): Promise<boolean | 'planning' | 'in_progress'>;
   resolveBrain(meta: EngineeringMachineOpenMeta): Promise<EngineeringBrainResolution>;
   /** Machine-owned policy rules. Browser controls can only narrow session behavior. */
   resolvePolicyRules?(meta: EngineeringMachineOpenMeta): Promise<PolicyRule[]>;
+  threadPermissions?: boolean;
   fetchImpl?: typeof fetch;
   /** An explicit local profile for pristine-device restore tests and headless hosts. */
   brainRoot?: string;
@@ -59,14 +66,18 @@ export interface ClineEngineeringHostOptions {
 export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): EngineeringMachineHost {
   const log = opts.log ?? ((line) => console.log(`[engineering] ${line}`));
   const registry = new EngineeringSessionRegistry<EngineeringMachineSession>();
-  return {
-    async open(meta, emit) {
-      return registry.open(JSON.stringify([opts.workspaceId, meta.actorId, meta.threadId]), async () => {
+  const tasks = new Map<string, { task: EngineeringTaskSession; opened: Promise<void> }>();
+  const keyOf = (meta: EngineeringMachineOpenMeta) => JSON.stringify([opts.workspaceId, meta.actorId, meta.threadId]);
+  const create = (meta: EngineeringMachineOpenMeta, emit: (event: EngineeringRuntimeEvent) => void, whereOverride?: EngineeringWorkspace, task?: EngineeringTaskSession, approvedPlan?: import('@neuramesh/shared').EngineeringPlanProgress, allowFollowups = true) =>
+      registry.open(keyOf(meta), async () => {
       const record = opts.recorder ? new CodeSessionRecord(opts.recorder, meta) : null;
+      const permissionGate = opts.threadPermissions ? remoteThreadPermissionGate({
+        apiUrl: opts.apiUrl, workspace: opts.workspaceId, actorId: meta.actorId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl,
+      }) : undefined;
       const recordedEmit = record ? record.emit(emit) : emit;
       const emitTo = (event: EngineeringRuntimeEvent) => recordedEmit(event.type === 'ready' ? { ...event, filePreview: true } : event);
       const [where, policyRules] = await Promise.all([
-        opts.resolveCwd(meta), opts.resolvePolicyRules?.(meta) ?? defaultBaselineRules(),
+        whereOverride ?? opts.resolveCwd(meta), opts.resolvePolicyRules?.(meta) ?? defaultBaselineRules(),
       ]);
       // the shell checks the worktree's git pointer against the clone it came from, a twin's included
       const { cwd, repoRoot, privateRepoRoot } = typeof where === 'string' ? { cwd: where, repoRoot: engineeringRepoRoot(meta.repoId), privateRepoRoot: undefined } : where;
@@ -76,8 +87,17 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
         : undefined;
       try {
       const messages = await conversation?.hydrate();
+      if (conversation && task) {
+        if (approvedPlan && !conversation.brain.events().some(event => event.type === 'plan.restored' && (event.payload as { progress?: { id?: string } })?.progress?.id === approvedPlan.id)) {
+          conversation.record('plan.restored', { progress: approvedPlan });
+          await conversation.brain.flush();
+        }
+        const permissions = task.restore({ workspace: opts.workspaceId, threadId: meta.threadId, revision: conversation.brain.revision(),
+          events: [...conversation.brain.events()], runtimeMessages: conversation.brain.messages(), metadata: conversation.brain.metadata() });
+        meta = { ...meta, permissions };
+      }
       const saved = conversation?.brain.metadata()?.['selection'];
-      if (isEngineeringSelection(saved)) meta = { ...meta, ...saved };
+      if (!task && isEngineeringSelection(saved)) meta = { ...meta, ...saved };
       const brain = await opts.resolveBrain(meta);
       const displayContext = await opts.resolveDisplayContext?.(meta);
       // a model this machine refuses still opens the thread: it reads, says why once, and a new pick replaces the model.
@@ -102,18 +122,18 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
         const selected = await opts.resolveBrain({ ...meta, modelId, brainPack, ...(agentId !== undefined ? { agentId } : {}) });
         return { ...await resolveEngineeringProvider(opts, selected, undefined, opts.authProbe), agent: selected.agent, instructions: selected.instructions };
       };
-      const namer = engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl });
-      const display = (agent?: EngineeringAgent) => engineeringDisplayTools({ apiUrl: opts.apiUrl, threadId: meta.threadId, cwd, context: displayContext, conversation, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }, agent);
+      const namer = task ? async () => ({unchanged:true,message:'This task already has its approved title.'}) : engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl });
+      const display = (agent?: EngineeringAgent) => engineeringDisplayTools({ apiUrl: opts.apiUrl, threadId: meta.threadId, cwd, context: displayContext, conversation, ...(task ? { capturePolicy: policyRules, taskBaseRef: typeof where === 'string' ? undefined : where.taskBaseRef } : {}), headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }, agent);
       const agyDeps = opts.agyDeps?.(cwd) ?? agyLaneDeps({ cwd, ...(managedTools ? { executors: managedTools.executors } : {}), ...(runtimeModule ? { createDefaultTools: runtimeModule.createDefaultTools } : {}) });
       // a Google sign-in runs on agy, every other brain on the Cline SDK; a model change can cross lanes (engineering-lanes.ts)
       const open = async (next: EngineeringProviderResolution, modelId: string | null, brainPack: string | null, history: unknown, refusal: string | null = null): Promise<EngineeringLane> => {
         if (laneOf(next) === 'agy') {
-          const agy = new AgyChannelSession(meta, cwd, next, modelId, brainPack, policyRules, emitTo, agyDeps, log, conversation, namer, display);
-          await agy.init(Array.isArray(history) ? history : []);
+          const agy = new AgyChannelSession(meta, cwd, next, modelId, brainPack, policyRules, emitTo, agyDeps, log, conversation, namer, display, permissionGate);
+          await agy.init(Array.isArray(history) ? history : [], allowFollowups);
           return agy;
         }
-        const cline = new ClineChannelSession(meta, cwd, next, modelId, brainPack, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, namer, refusal, display);
-        await cline.init(history as Parameters<ClineChannelSession['init']>[0]);
+        const cline = new ClineChannelSession(meta, cwd, next, modelId, brainPack, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, namer, refusal, display, permissionGate);
+        await cline.init(history as Parameters<ClineChannelSession['init']>[0], allowFollowups);
         return cline;
       };
       let first: EngineeringLane;
@@ -123,6 +143,34 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
       return record ? record.wrap(session) : session;
       } catch (error) { await conversation?.close().catch(() => {}); throw error; }
       });
+  return {
+    async open(meta, emit) {
+      let taskThread = await opts.isTaskThread?.(meta);
+      // The board can sync a phase change before its dispatcher opens the runtime.
+      // Attach to that run instead of opening a competing history session.
+      const until = Date.now() + 30_000;
+      while ((taskThread === 'planning' || taskThread === 'in_progress') && !tasks.has(keyOf(meta)) && Date.now() < until) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        taskThread = await opts.isTaskThread?.(meta);
+      }
+      const active = tasks.get(keyOf(meta));
+      if (active) { await active.opened; log(`coding_task_attach thread=${meta.threadId}`); return active.task.attach(emit); }
+      const session = await create(meta, emit, undefined, undefined, undefined, !taskThread);
+      if (!taskThread) return session;
+      return { ...session, command(value: unknown) {
+        const type = (value as {type?:string})?.type;
+        if (type === 'preview_file') session.command(value);
+        else emit({type:'error',recoverable:true,message:'This implementation is managed by the task. Approve its plan or request changes on the task to start the next pass.'});
+      }};
+    },
+    async runTask(meta, workspace, prompt, stopped, progress, approvedPlan) {
+      const key = keyOf(meta);
+      if (tasks.has(key)) throw new Error('This coding task is already executing.');
+      const task = new EngineeringTaskSession(meta, progress);
+      const opened = create(meta, task.emit, workspace, task, approvedPlan).then(session => task.bind(session));
+      tasks.set(key, {task,opened});
+      try { await opened; return await task.run(prompt, stopped); }
+      finally { try { await task.close(); } finally { tasks.delete(key); } }
     },
   };
 }

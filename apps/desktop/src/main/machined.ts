@@ -1,3 +1,5 @@
+import { startThreadFollowups } from './host/thread-followups';
+import { numberedTaskTerminalDirectory, threadTerminalDirectory } from './relay/terminal-workspace';
 import { resolveEngineeringDisplayContext } from './relay/engineering-display-context';
 // nm-machined — the headless daemon boot (docs/design/cloud-first-2026-08, W1).
 //
@@ -162,12 +164,15 @@ export async function main(): Promise<void> {
   // BEFORE the agent host so the reclaim hook below has something to call.
   const relayUrl = process.env['NM_RELAY_URL'];
   const engineeringCred = makeRepoCred({ apiUrl: cfg.apiUrl, cloud: true, runner: cfg.kind === 'runner', ownLogin: ghLoggedIn, bearer: async () => ({ authorization: `Bearer ${cfg.machineToken}` }) });
+  const workspaceFor = (meta: Parameters<typeof ensureEngineeringWorkspace>[2]) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta, { credFor: (slug, channel) => engineeringCred.forRepo(slug, channel) });
   const engineering = createClineEngineeringHost({
+    threadPermissions: true,
     apiUrl: cfg.apiUrl,
     machineToken: cfg.machineToken,
     workspaceId: cfg.workspaceId,
     // a login-less machine clones a private repository through the App (host/repocred.ts, docs/design/repo-connect-2026-10)
-    resolveCwd: (meta) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta, { credFor: (slug, channel) => engineeringCred.forRepo(slug, channel) }),
+    resolveCwd: workspaceFor,
+    isTaskThread: async meta => { const [task] = await db.getAll<{state:string}>("select k.state from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.kind='coding'", [meta.threadId, cfg.workspaceId]); return task?.state === 'planning' || task?.state === 'in_progress' ? task.state : !!task; },
     resolveDisplayContext: meta => resolveEngineeringDisplayContext(db, cfg.apiUrl, cfg.workspaceId, meta),
     resolveBrain: (meta) => resolveEngineeringBrain(db, {
       apiUrl: cfg.apiUrl,
@@ -178,8 +183,11 @@ export async function main(): Promise<void> {
     // the session's synced row (0135), written with the machine's own bearer — it speaks as its owner
     recorder: createCodeSessionRecorder({ apiUrl: cfg.apiUrl, headers: async () => ({ authorization: `Bearer ${cfg.machineToken}` }), workspaceId: cfg.workspaceId, machineId: cfg.machineId, log: (line) => console.log(`[engineering] ${line}`) }),
   });
+  startThreadFollowups({ db, apiUrl: cfg.apiUrl, workspace: cfg.workspaceId, machineToken: cfg.machineToken, log: message => console.warn('[follow-ups]',message) });
   const relay = relayUrl ? connectMachineEdge({
     relayUrl, token: cfg.machineToken, machineId: cfg.machineId, engineering,
+    taskTerminalDirectory: number => numberedTaskTerminalDirectory(db,cfg.workspaceId,number,{repoCred:engineeringCred}),
+    threadTerminalDirectory: (threadId, actorId) => threadTerminalDirectory(db, cfg.workspaceId, threadId, actorId, {repoCred:engineeringCred,workspace:workspaceFor}),
     // the `stream` lane: a browser's live bubble for the replies this machine writes (livestreams.ts)
     streams: liveStreams,
     ...(browser ? { browser } : {}),
@@ -190,6 +198,7 @@ export async function main(): Promise<void> {
   if (agentLog) {
     startAgentHost({
       headless: true,
+      engineering: () => engineering,
       db,
       machineId: cfg.machineId,
       workspace: cfg.workspaceId,

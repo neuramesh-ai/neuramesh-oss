@@ -11,6 +11,7 @@
 // repository is the one the room's project connected, so the machine's workspace must be the
 // connector's. The App itself must carry those permissions (a GitHub App setting, re-approved by
 // every installation); until it does GitHub answers 422 and the route names what is missing.
+import { NEURAMESH_BOT } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
 import { hashMachineToken } from './machine-auth';
 import { GitHubApiError, appSlug, githubAppConfigured, installationToken } from './github-app';
@@ -30,15 +31,16 @@ export const RUN_WRITE_PERMISSIONS: Record<string, 'read' | 'write'> = { content
 let botIdentity: { name: string; email: string } | null = null;
 async function commitIdentity(fetchFn: Fetch, token: string): Promise<{ name: string; email: string }> {
   const login = `${appSlug()}[bot]`;
+  if (login === NEURAMESH_BOT.name) return NEURAMESH_BOT;
   if (botIdentity?.name === login) return botIdentity;
-  const fallback = { name: login, email: `${login}@users.noreply.github.com` };
+
   try {
     const r = await fetchFn(`https://api.github.com/users/${encodeURIComponent(login)}`, { headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'user-agent': 'neuramesh-announce' } });
-    const id = r.ok ? ((await r.json()) as { id?: number }).id : undefined;
-    if (!id) return fallback;
-    botIdentity = { name: login, email: `${id}+${login}@users.noreply.github.com` };
+    const account = r.ok ? await r.json() as { id?: number; login?: string; type?: string } : null;
+    if (!account?.id || account.login !== login || account.type !== 'Bot') throw new Error('Unverified GitHub App author.');
+    botIdentity = { name: login, email: `${account.id}+${login}@users.noreply.github.com` };
     return botIdentity;
-  } catch { return fallback; }
+  } catch { throw new Error(`Could not verify the GitHub bot account ${login}. Check the configured App slug and retry.`); }
 }
 
 export function githubWriteRoutes<E extends Env>(app: Hono<E>, store: Store, fetchFn: Fetch): void {

@@ -64,16 +64,21 @@ export function runtimeProbe(o: { cloud: boolean; hasKey: KeyProbe; local?: () =
   const gap = o.minGapMs ?? 30_000;
   let value: string[] = [];
   let at = Number.NEGATIVE_INFINITY;
-  const refresh = async (): Promise<string[]> => {
+  let pending: Promise<string[]> | undefined;
+  const refresh = (): Promise<string[]> => {
+    if (pending) return pending;
     at = now();
-    value = await machineRuntimes(o);
-    return value;
+    pending = machineRuntimes(o).then(runtimes => {
+      value = runtimes;
+      return runtimes;
+    }).finally(() => { pending = undefined; });
+    return pending;
   };
   return {
     refresh,
     current: (): string[] => value,
     /** the runtimes, re-probed first on a cloud machine when this one is missing and the last
      *  probe is stale. A laptop keeps its old rhythm: its logins refresh on the register beat. */
-    ensure: async (runtime: string): Promise<string[]> => (!o.cloud || value.includes(runtime) || now() - at < gap ? value : refresh()),
+    ensure: async (runtime: string): Promise<string[]> => pending ?? (!o.cloud || value.includes(runtime) || now() - at < gap ? value : refresh()),
   };
 }

@@ -37,7 +37,7 @@ const SENTINEL_FORMING = /^[\s*_`>]*N(?:O(?:_(?:R(?:E(?:P(?:L)?)?)?)?)?)?$/;
 
 export function isStandDown(reply: string): boolean {
   const lines = reply.split('\n').map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return true;
+  if (!lines.length || (lines.length === 1 && /^\(no reply\)$/i.test(lines[0]!))) return true;
   return SENTINEL.test(lines[0]!) || SENTINEL.test(lines[lines.length - 1]!);
 }
 

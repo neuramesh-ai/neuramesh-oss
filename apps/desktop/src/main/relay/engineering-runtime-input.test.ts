@@ -21,6 +21,7 @@ test('Code sessions disable every repository-owned runtime extension', () => {
     controls,
   });
 
+  assert.equal(input.config?.compaction?.enabled, false);
   assert.deepEqual(input.localRuntime?.configExtensions, []);
   assert.match(input.config?.systemPrompt ?? '', /selected repository root is "\/workspace\/repo"/);
   assert.match(input.config?.systemPrompt ?? '', /current editing tool is editor/);

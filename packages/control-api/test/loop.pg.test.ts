@@ -3,7 +3,7 @@ import { TABLE_COLUMNS } from '@neuramesh/client-core/schema';
 // Run via scripts/test-pg.sh — skipped without DATABASE_URL.
 import type { Actor } from '@neuramesh/shared';
 import postgres from 'postgres';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { PostgresStore } from '../src/pgstore';
 
@@ -28,7 +28,16 @@ function send(actor: Actor, body: unknown) {
   });
 }
 
+let originalPlan: string | undefined;
+beforeAll(async () => {
+  if (!store) return;
+  originalPlan = await store.workspacePlan(WS);
+  // This suite exercises registration and routing with several machines. Do not
+  // depend on a sibling suite having upgraded the shared fixture first.
+  await store.setWorkspacePlan(WS, { plan: 'cloud' });
+});
 afterAll(async () => {
+  if (store && originalPlan) await store.setWorkspacePlan(WS, { plan: originalPlan });
   await store?.close();
 });
 
@@ -178,11 +187,14 @@ describe.skipIf(!DB)('the loop on postgres (real schema + triggers)', () => {
     expect(detail.task.requirementsConfirmed).toBe(true);
     expect(detail.task.requirements).toContain('both themes verified');
 
-    // once claimed, re-offering is illegal — and submit needs NO separate
-    // confirm step (the offer already resolved requirements)
-    expect((await send(patch, { type: 'task.claim', taskId: task.id })).status).toBe(200);
+    // Only the offered specialist can claim; another worker cannot take over.
+    const echo: Actor = { kind: 'agent', id: offered.offeredAgentId, role: 'worker' };
+    expect(detail.task.assignee).toEqual({ kind: 'agent', id: echo.id });
+    expect((await send(patch, { type: 'task.claim', taskId: task.id })).status).toBe(403);
+    expect((await send(echo, { type: 'task.claim', taskId: task.id })).status).toBe(200);
+    // Once claimed, re-offering is illegal. The offer already resolved requirements.
     expect((await send(rex, { type: 'task.offer', taskId: task.id, offerTo: 'echo' })).status).toBe(409);
-    const directSubmit = await send(patch, {
+    const directSubmit = await send(echo, {
       type: 'task.submit',
       taskId: task.id,
       artifacts: [{ kind: 'diff', name: 'toggle.diff', content: 'diff --git a/t b/t\n+x' }],

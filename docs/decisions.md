@@ -2,6 +2,12 @@
 
 Per [05-engineering-philosophy.md](05-engineering-philosophy.md) §2/§7: two-way doors get a line here; one-way doors get a doc. Newest first.
 
+## 2026-11-03 — Six failed executions before auto-blocking; preserve human recovery guidance
+
+Tasks previously auto-blocked after two failed execution attempts. The live retry and restart recovery paths now share a six-failure budget. Individual tool errors, a waiting approval, and losing the browser viewer are not failed executions. Explicit stops, missing access, provider caps and validation blockers retain their existing handling; a larger retry budget does not grant permissions or release approval.
+
+A person can still reply while a task is blocked, suggest an alternative, and use **Unblock** to restart execution. Every execution receives recent human guidance, review feedback and the last execution failure, so it can adapt instead of repeating the same action. Previously, human guidance was discarded unless a reviewer had also posted “changes requested.” Unblock receipts reset the failure budget but are excluded from the guidance window. Already-blocked tasks are not restarted by deploying this change.
+
 ## 2026-10-16: A Google sign-in runs code through agy, and a coding agent may use any available tool (doc: docs/design/gemini-code-lane-2026-10/plan.md)
 
 George, on the report that a coding thread refused Gemini while agy was signed in on the same machine:

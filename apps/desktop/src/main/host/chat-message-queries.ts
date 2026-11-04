@@ -2,7 +2,7 @@
 // routing waits for that thread, then wakes only the runtime that owns its kind.
 // The same boundary applies to the boot/recovery sweep, including explicit mentions.
 const conversationalThread = `left join threads t on t.id = m.thread_id and t.workspace_id = m.workspace_id
-  where (m.thread_id is null or t.id is not null) and coalesce(t.kind, 'chat') <> 'coding'`;
+  where coalesce(m.applied_followup,0)=0 and (m.thread_id is null or t.id is not null) and coalesce(t.kind, 'chat') <> 'coding'`;
 
 export const feedMessagesQuery = `select m.id, m.channel_id, m.thread_id, m.author_kind, m.author_id, m.team_source_thread_id, m.body
   from messages m ${conversationalThread}

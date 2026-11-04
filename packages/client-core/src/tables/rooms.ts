@@ -20,6 +20,7 @@ export const channels = new Table({ workspace_id: column.text, slug: column.text
 });
 
 export const messages = new Table({
+  applied_followup: column.integer,
   workspace_id: column.text,
   channel_id: column.text,
   task_id: column.text,
@@ -34,6 +35,7 @@ export const messages = new Table({
   // Named `birth_mode`, NOT thread_mode: `channels.thread_mode` is the unrelated docs/20 view
   // lens (threads on/off in a room), and one grep returning both would be a trap.
   birth_mode: column.text,
+  birth_permission_mode: column.text,
   // docs/10 §15: the composer's brain draft, carried on the send that BIRTHS the thread. Local
   // only, like birth_mode — the server keeps it on `threads`, so sync never writes it back.
   birth_brain: column.text,
@@ -67,6 +69,7 @@ export const messages = new Table({
 // conversation threads: every send starts one; threads.task_id links the task a
 // conversation upgraded into (the thread IS that task's thread from then on)
 export const threads = new Table({
+  followup_count: column.integer,
   workspace_id: column.text,
   channel_id: column.text,
   // Additive ownership projection. Channel contracts remain during desktop compatibility.

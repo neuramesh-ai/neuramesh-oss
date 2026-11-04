@@ -130,6 +130,28 @@ describe('seeded documents', () => {
 });
 
 describe('Md end to end', () => {
+  test('Git references stay readable alongside external links, task links and actual palette colors', () => {
+    const url = 'https://github.com/alonge-dev/flowe-ai/pull/235';
+    const text = [
+      `- Neither PR #235 nor PR #234 has merged. Open [PR #235](${url}).`,
+      '- **PR** #235, pull request `#234`, issue #123456 and owner/repo#235.',
+      '- PRs #235, #234 and #233. PR #1118 and Task #1118.',
+      '',
+      '| Reference | Palette |', '| --- | --- |',
+      '| PR #235 | #235 and #123456 |',
+      '',
+      `Use #abc and \`#333\`. Open [\`#235\`](${url}).`,
+    ].join('\n');
+    const html = renderToStaticMarkup(h(Md, {
+      text, taskRef: n => n === 1118 ? { id: 'task', number: n, title: 'Local task', state: 'in_progress', assignee: null, branch: null, pr: null } : null,
+      onOpenTask: () => {},
+    }));
+    assert.deepEqual([...html.matchAll(/class="swatch" style="background:(#[0-9a-f]+)"/g)].map(m => m[1]), ['#235','#123456','#abc','#333']);
+    assert.ok(html.includes(`href="${url}">PR #235</a>`) && html.includes(`href="${url}"><code>#235</code></a>`));
+    assert.equal((html.match(/class="taskref"/g) ?? []).length, 1);
+    assert.ok(html.includes('PR #1118 and Task '));
+  });
+
   test('Md renders the body through blocks and still lifts the cards out', () => {
     const text = `${CORPUS.mixed}\n\n\`\`\`nmq\n{"question":"Ship it?","options":[{"label":"Yes"},{"label":"No"}]}\n\`\`\``;
     const out = renderToStaticMarkup(h(Md, { text }));

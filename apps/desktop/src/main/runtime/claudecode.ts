@@ -44,6 +44,10 @@ export async function claudeCode(
   protectedPaths?: string[],
   opts?: TurnOpts,
 ): Promise<string> {
+  if (permissionGate && opts?.permissionRules && !promptOverride?.claudeDesign) {
+    const {starterRunQuery}=await import('./starter');
+    return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,permissionGate,opts,{provider:'anthropic',token});
+  }
   const { query } = await import('@anthropic-ai/claude-agent-sdk');
   // The worker's plan → beats (docs/17), coordinated by createBeatRun with two write
   // paths and first-declare-wins: the explicit nm declare_beats/advance_beat tools

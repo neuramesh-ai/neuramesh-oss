@@ -40,12 +40,12 @@ test('imageShaOf: the image names its commit, and only a full commit sha counts'
   assert.equal(imageShaOf({ NM_IMAGE_SHA: 'latest' }), null);
 });
 
-test('heartbeatBody: the beat carries the image sha as daemonVersion, and a beat with none keeps its old shape', () => {
+test('heartbeatBody: the beat carries the image sha as daemonVersion, and always declares its permission support', () => {
   assert.deepEqual(heartbeatBody('m1', { activeSeconds: 5, busy: true, runtimes: ['claude-code'], imageSha: SHA }), {
-    type: 'machine.heartbeat', machineId: 'm1', activeSeconds: 5, busy: true, runtimes: ['claude-code'], daemonVersion: SHA,
+    type: 'machine.heartbeat', permissionVersion: 1, machineId: 'm1', activeSeconds: 5, busy: true, runtimes: ['claude-code'], daemonVersion: SHA,
   });
-  // an unnamed build sends exactly what every machine sent before, so the API sees no new field
+  // An unnamed build can still enforce permissions.
   assert.deepEqual(heartbeatBody('m1', { activeSeconds: 0, busy: false, imageSha: null }), {
-    type: 'machine.heartbeat', machineId: 'm1', activeSeconds: 0, busy: false,
+    type: 'machine.heartbeat', permissionVersion: 1, machineId: 'm1', activeSeconds: 0, busy: false,
   });
 });

@@ -1,3 +1,4 @@
+import { skillBody } from './workspace-skills';
 import { projectRepos } from './project-context';
 // The READ tools — what the orchestrator can look up before it decides (docs/harness/04).
 //
@@ -165,11 +166,9 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       // ONE implementation (host/searchx.ts) — the chat registry and worker legs read the same
       return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input);
     } },
-    { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a skill listed for this channel looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list') }, run: async (input) => {
-      const sk = skills.find((x) => x.name === input.name);
-      if (!sk) return `no active skill named "${input.name}" — check the available-skills list`;
+    { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a workspace skill looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list'), pack: z.string().optional() }, run: async (input) => {
       log?.({ kind: 'tool', phase: 'call', summary: `load_skill ${input.name}` });
-      return `# Skill: ${sk.name}\n${sk.description}\n\n${sk.body}`;
+      return skillBody(skills, input.name, input.pack);
     } },
     { name: 'start_deep_work', description: 'Start research that OUTLIVES this reply — the only way to keep working after your turn ends. Use it when the human asks for something that genuinely needs searching and reading around (market/competitor research, "what does the evidence say", a landscape scan), and NOT for anything you can answer now or that belongs to a teammate (if a worker in this room fits the ask, create_task with offerTo instead — that gets a board card, a plan gate, beats and review). Fans out 2–6 named angles in parallel, shows every angle live in the thread while it works, and POSTS THE REPORT HERE ITSELF when done — you do not have to be alive for that. Never claim background work without calling this.', schema: {
       title: z.string().min(1).describe('what this work IS, in the human\'s words — it becomes the card they watch, e.g. "Research: how to improve Flowe"'),

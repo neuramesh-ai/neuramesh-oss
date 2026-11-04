@@ -6,51 +6,44 @@
 // is the seam for every IPC group — deps for what startSync OWNS, live imports for module
 // state (procEvents is a module-level bus, so it is imported, not passed).
 import { ipcMain, type WebContents } from 'electron';
-import { existsSync as existsSyncTop, mkdirSync as mkdirSyncTop } from 'node:fs';
+import { numberedTaskTerminalDirectory } from '../../relay/terminal-workspace';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { emitProcChange, procEvents } from '../../procbus';
 import { executing, stopExecuting } from '../../agents';
-import { brainRoot, cachePath, deliverablePath } from '../../harness/brain';
+import { brainRoot } from '../../harness/brain';
 
 export type PtyTerm = { write: (d: string) => void; resize: (c: number, r: number) => void; kill: () => void; taskNumber: number };
 
 export interface TerminalDeps {
   db: () => ReplicaDatabase;
+  workspace: () => string;
   /** created by startSync so the host's reclaim path can kill a task's shells */
   ptys: Map<string, PtyTerm>;
   procWatchers: Map<string, () => void>;
 }
 
-export function registerTerminals({ db, ptys, procWatchers }: TerminalDeps): void {
+export function registerTerminals({ db, workspace, ptys, procWatchers }: TerminalDeps): void {
 // integrated terminal (review cockpit run tier) — a pty scoped to the task's
 // RETAINED local deliverable workspace. Local-only: only the machine that
 // ran the task has the workspace; read + RUN (it's the user's own shell on
 // their own machine). Never synced.
-const workspaceDir = async (taskNumber: number, hasRepo: boolean): Promise<string | null> => {
-  const { existsSync } = await import('node:fs');
-  // the terminal opens the SAME directory the flow built (docs/harness/01 §3.2): worktrees live
-  // under cache/, deliverables under the root. Reading a different path than the writer is what
-  // made this say "not on this machine" while the work sat happily one directory over.
-  const dir = hasRepo ? cachePath('worktrees', `nm-${taskNumber}`) : deliverablePath(taskNumber);
-  return existsSync(dir) ? dir : null;
-};
+const workspaceDir = async (number:number) => (await numberedTaskTerminalDirectory(db(),workspace(),number,{preferLocal:true})).cwd;
 
-ipcMain.handle('nm:terminal-info', async (_e, { taskNumber, hasRepo }: { taskNumber: number; hasRepo: boolean }) => {
-  const cwd = await workspaceDir(taskNumber, hasRepo);
-  return { available: !!cwd, cwd };
+ipcMain.handle('nm:terminal-info', async (_e, { taskNumber }: { taskNumber: number }) => {
+  try { return {available:true,cwd:await workspaceDir(taskNumber)}; }
+  catch (e) { return {available:false,cwd:null,reason:e instanceof Error ? e.message : 'Task checkout unavailable.'}; }
 });
-ipcMain.handle('nm:terminal-open', async (event, { subId, taskNumber, hasRepo, cols, rows }: { subId: string; taskNumber: number; hasRepo: boolean; cols: number; rows: number }) => {
-  // A task whose workspace is not on THIS machine used to return a bare {ok:false} that nothing
-  // surfaced: the tab rendered an empty pane. Say which folder is missing, then fall back to the
-  // NeuraMesh home so you still get a usable shell — an explained terminal you can work in beats
-  // a dead one. The jail below re-roots to whatever we actually opened, so it stays coherent.
-  const workspace = await workspaceDir(taskNumber, hasRepo);
-  const nmHome = brainRoot();
-  if (!workspace && !existsSyncTop(nmHome)) { try { mkdirSyncTop(nmHome, { recursive: true }); } catch { /* fall back to spawn failure */ } }
-  const cwd = workspace ?? nmHome;
-  const missingNote = workspace
-    ? null
-    : `\r\n\x1b[33mnm:\x1b[0m \x1b[2m#${taskNumber}'s ${hasRepo ? 'worktree' : 'deliverables folder'} is not on this machine — opened ~/.neuramesh instead.\x1b[0m\r\n`;
+ipcMain.handle('nm:terminal-open', async (event, { subId, taskNumber, cols, rows }: { subId: string; taskNumber: number; cols: number; rows: number }) => {
+  let cwd: string;
+  try { cwd = await workspaceDir(taskNumber); }
+  catch (e) {
+    const reason=e instanceof Error ? e.message : 'Task checkout unavailable.';
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('nm:terminal-data',{subId,data:reason+'\r\n'});
+      event.sender.send('nm:terminal-exit',{subId});
+    }
+    return {ok:false,reason};
+  }
   const pty = await import('node-pty');
   const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
   const { join: pjoin } = await import('node:path');
@@ -86,11 +79,9 @@ ipcMain.handle('nm:terminal-open', async (event, { subId, taskNumber, hasRepo, c
   const cleanup = () => { try { rmSync(zdot, { recursive: true, force: true }); } catch { /* gone */ } };
   // the note rides the shell's FIRST output so it lands under the prompt rather than being
   // overwritten by the zsh startup redraw
-  let note = missingNote;
   term.onData((d) => {
     if (sender.isDestroyed()) return;
     sender.send('nm:terminal-data', { subId, data: d });
-    if (note) { const n = note; note = null; queueMicrotask(() => { if (!sender.isDestroyed()) sender.send('nm:terminal-data', { subId, data: n }); }); }
   });
   term.onExit(() => { if (!sender.isDestroyed()) sender.send('nm:terminal-exit', { subId }); ptys.delete(subId); emitProcChange(); cleanup(); });
   ptys.set(subId, {

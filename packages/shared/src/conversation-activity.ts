@@ -36,9 +36,11 @@ export function conversationActivity(events: readonly BrainConversationEvent[], 
       const turn = current.get(turnId ?? (open.size === 1 ? [...open][0]! : ''));
       const body = p.text.trim();
       if (turn && body && !/^(?:NO_REPLY|HEARTBEAT_OK)$/.test(body)) {
-        const pending = prose.get(turn) ?? [];
+        // A host-generated compaction stage is public progress in its own right.
+        // It can last minutes without any subsequent model tool call to flush it.
+        const pending = p.source === 'compaction' ? turn.messages : (prose.get(turn) ?? []);
         if (pending.at(-1)?.body !== body) pending.push({ id: `progress-${event.id}`, role: 'assistant', body, createdAt: event.timestamp });
-        prose.set(turn, pending);
+        if (p.source !== 'compaction') prose.set(turn, pending);
       }
     } else if (event.type === 'tool.call' && typeof p.id === 'string' && typeof p.name === 'string' && !p.name.startsWith('mcp__')) {
       if(calls.has(p.id)) continue;

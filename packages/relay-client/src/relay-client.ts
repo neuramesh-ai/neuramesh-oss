@@ -270,7 +270,7 @@ export function openRelayPty(
   cfg: RelayConfig,
   opts: {
     cols: number; rows: number;
-    cwd?: string; taskNumber?: number; hasRepo?: boolean;
+    cwd?: string; taskNumber?: number; hasRepo?: boolean; threadId?: string;
     onData(d: string): void; onExit(): void;
   },
 ): PtyHandle {
@@ -305,6 +305,7 @@ export function openRelayPty(
     opened = true;
     raw(c.sock, {
       ch, t: 'open', cols: opts.cols, rows: opts.rows,
+      ...(opts.threadId ? { meta: { threadId: opts.threadId } } : {}),
       ...(opts.cwd ? { cwd: opts.cwd } : {}),
       ...(opts.taskNumber !== undefined ? { taskNumber: opts.taskNumber, hasRepo: !!opts.hasRepo } : {}),
     });

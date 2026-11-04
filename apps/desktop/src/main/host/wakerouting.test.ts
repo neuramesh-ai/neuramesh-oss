@@ -103,6 +103,18 @@ test('the GitHub divider in a setup task continues the ask, and does not start t
   assert.deepEqual(await post('where are the brand docs?'), ['bootstrap:plume']);
 });
 
+test('an unblock receipt starts no chat wake; a real follow-up still reaches the assignee', async () => {
+  const send = thread('in_progress', '');
+  assert.deepEqual(await send('↻ Unblocked #12 — the retry budget starts over.'), []);
+  assert.deepEqual(await send('Did the unblock work?'), ['patch']);
+});
+
+test('a blocked task still routes questions and an alternative approach to its owning agent', async () => {
+  const send = thread('blocked', '');
+  assert.deepEqual(await send('Why did the test fail?'), ['patch']);
+  assert.deepEqual(await send('Use the existing dependency cache and rerun the route tests.'), ['patch']);
+});
+
 test('a message that is not the divider keeps the state policy', async () => {
   const asked = card('scout', 'answered', '2026-10-04T10:00:00Z');
   assert.deepEqual(await (thread('in_review', asked))('looks good to me'), []);

@@ -39,29 +39,34 @@ export async function selectModel(p,scope,name,level='Medium') {
   await p.waitForFunction(()=>!document.querySelector('.cmodpop'),undefined,{timeout:15000});
 }
 
-/** Exercise approvals even when a new cloud session allows edits and commands by default. */
+/** Exercise both real approval gates regardless of the workspace default. */
 export async function requireApprovals(p) {
-  await p.click('.codingthread .engpermtrigger');
-  await p.waitForSelector('[aria-label="Permissions for this session"]');
-  for(const label of ['Edit files','Execute commands']) {
-    const selector=`.cpermrow:has-text("${label}")`;
-    const checked=await p.evaluate(name=>[...document.querySelectorAll('.cpermrow')]
-      .find(row=>row.querySelector('b')?.textContent===name)?.getAttribute('aria-checked'),label);
-    assert.ok(checked==='true'||checked==='false',`${label} permission must be available`);
-    if(checked==='true') await p.click(selector);
-    await p.waitForSelector(`.cpermrow[aria-checked="false"]:has-text("${label}")`);
-  }
-  await p.keyboard.press('Escape');
-  await p.waitForSelector('.cpermpop',{state:'hidden'});
+  await p.click('.codingthread .perm-trigger');
+  const option = '[role="menuitemradio"]:has-text("Request Review")';
+  await p.waitForSelector(option);
+  await p.click(option);
+  await p.waitForSelector('.codingthread button[aria-label="Permissions: Request Review"]');
+  await p.waitForSelector('[role="menu"][aria-label="Thread permissions"]', {state:'hidden'});
 }
 
 export async function start(p,run,spec) {
   await p.goto(run.url);
-  await p.waitForSelector('[aria-label="Agent: rex"]',{timeout:30000});
+  await p.waitForSelector('[aria-label="New session"]',{timeout:30000});
   await p.click('[aria-label="New session"]');
   await p.click('.stagebox .crepo');
-  await p.waitForSelector(`loc=role:menuitemradio[name*="${spec.repoLabel}"]`,{timeout:30000});
-  await p.click(`loc=role:menuitemradio[name*="${spec.repoLabel}"]`);
+  const repoOption = `loc=role:menuitemradio[name*="${spec.repoLabel}"]`;
+  await p.waitForSelector(repoOption,{timeout:30000});
+  // Keyboard activation also reaches an option below the fold in a large fixture catalog.
+  await p.press(repoOption,'Enter');
+  await p.waitForFunction(label => document.querySelector('.stagebox .crepo')?.textContent?.includes(label.split('/').at(-1)), spec.repoLabel);
+  // Selecting a repository switches the launcher from its chat agent to its coding agent.
+  const agent = '.stagebox [aria-label^="Agent: "]';
+  await p.waitForSelector(agent);
+  if (!await p.evaluate(selector => document.querySelector(selector)?.getAttribute('aria-label') === 'Agent: rex', agent)) {
+    await p.click(agent);
+    await p.click('[role="dialog"][aria-label="Agents"] [role="menuitemradio"]:has-text("rex")');
+  }
+  await p.waitForSelector('.stagebox [aria-label="Agent: rex"]');
   await selectModel(p,'.stagebox',run.model);
   await p.fill('.stagebox textarea',spec.prompt);
   await p.click('.stagebox button[aria-label="Send"]');

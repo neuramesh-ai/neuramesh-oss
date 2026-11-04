@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, hostSpeaksForOrigin, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, hostSpeaksForOrigin, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unblockNote, unaddressedWake } from '@neuramesh/shared';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { afterMessageSync } from './message-commit-gate';
 import { sweepMessagesQuery } from './chat-message-queries';
@@ -283,6 +283,9 @@ export function makeWakeRouting(ctx: {
     }
     const [t] = await db.getAll<ThreadTask>(`select id, number, title, description, state, channel_id, assignee_kind, assignee_id, kind from tasks where id = ?`, [m.task_id]);
     if (!t) { processed.delete(m.id); return; } // task row not synced yet — the watch refires
+    // The persisted unblock receipt resets the retry budget. The state transition
+    // already dispatches the work; answering the receipt launches a second, chat-only turn.
+    if (m.body === unblockNote(t.number)) return;
     // the grant's divider is not a reply: it continues the ask its card waited for, in any state
     let target: HostedAgent | undefined = parseGitHubConnected(m.body) ? await githubAsker(db, agents, t) : undefined;
     const liveThread = process.env['NM_AGENT_MODE'] !== 'echo';
@@ -314,8 +317,7 @@ export function makeWakeRouting(ctx: {
       } catch { /* fall through to the ordinary wake */ }
     }
     for (const a of agents.values()) {
-      if (!a.channels.has(t.channel_id)) continue;
-      if (!addressedIn(m.body, a.name)) continue;
+      if (!a.channels.has(t.channel_id) || !addressedIn(m.body, a.name)) continue;
       // An @mention — or the bare name opening the reply ("rex can we make a pdf…") — summons
       // that teammate to answer in the thread within its remit (it stands down with NO_REPLY
       // otherwise). Without this, a bare-name reply in a review-stage thread woke nobody: a

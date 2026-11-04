@@ -19,7 +19,7 @@ test('the block itself: defaults ON, opt-out empties it', () => {
   assert.match(b, /STE-100/);
   __setHouseStyleForTest({ ste100: false, noEmdash: false });
   assert.equal(houseStyle(), null);
-  assert.equal(styled('sys'), 'sys'); // all-off appends nothing
+  assert.match(styled('sys'), /^sys\n\nNever manufacture evidence/); // integrity is independent of writing style
 });
 
 test('EVERY composer carries the sentinel — the list is the contract', () => {

@@ -110,6 +110,17 @@ test('Engineering rejects a repository outside the machine workspace', async () 
   }
 });
 
+test('a planning task opens its own branch from the registered base before its first edit', () => inBrain(async root => {
+  const clone = remote(root, 'qa/plan-history');
+  const db = {get: async (sql: string) => sql.includes('join tasks')
+    ? {number:42,repo_id:'repo-plan',branch:'nm/42-plan',base_ref:'main',state:'planning'}
+    : {clone_url:clone,default_branch:'main'}} as Db;
+  const where = await ensureEngineeringWorkspace(db, 'workspace', session({repoId:'repo-plan',threadId:'task-plan',branch:'main'}));
+  assert.equal(where.cwd,join(root,'brain/cache/worktrees/nm-42'));
+  assert.equal(git(['branch','--show-current'],where.cwd),'nm/42-plan');
+  assert.equal(git(['status','--porcelain'],where.cwd),'');
+}));
+
 test('Engineering preserves slash-delimited default branch names', () => inBrain(async (root) => {
   const source = join(root, 'source'); const remote = join(root, 'remote.git');
   mkdirSync(source); git(['init', '-b', 'release/2026'], source);

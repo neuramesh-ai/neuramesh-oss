@@ -43,6 +43,7 @@ import type { RepoReader } from './reporead';
  *  over a previous turn's seat or thread would spend the wrong credential or answer in the wrong
  *  place, which is why every group takes this rather than reaching for a module-level value. */
 export interface ToolCtx {
+  permissionRunId?: string;
   /** what this turn has read from the shelf (host/grounding.ts): draft_posts asks it before it writes */
   grounding: Grounding;
   z: typeof import('zod')['z'];
@@ -156,6 +157,7 @@ const { post, db, agents, apiGet, brain, buildScheduleCard, draftsForAnchor, ens
         generateDraftImage, generateShareImage, libraryDocs, startDeepWork, subjectFor, whiteboardClosures, workspaceListing, workspaceRead } = ctx;
 
 async function buildOrchestratorTools(ctx: {
+  permissionRunId?: string;
   ch: { id: string; slug: string; workspace_id: string };
   agent: HostedAgent;
   actor: { kind: string; id: string; role?: string };
@@ -343,7 +345,7 @@ async function buildOrchestratorTools(ctx: {
 
   // The registry, by domain (tools-*.ts). It is ONE list to both transports; the split is for
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
-  const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
+  const tc: ToolCtx = { permissionRunId:ctx.permissionRunId, grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
     draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, namedBySchedule, wbReads, wbWrites,
     agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs: (id, limit, scope, _at, name, offset) => libraryDocs(id, limit, scope, { threadId: convoThreadId, taskId: thread?.id }, name, offset),
     startDeepWork, subjectFor, workspaceListing, workspaceRead };

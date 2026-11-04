@@ -22,8 +22,9 @@ export function makeBerthSweep(ctx: {
   withRepoLock: <T>(key: string, fn: () => Promise<T>) => Promise<T>;
   /** startAgentHost's own option — a dead berth's terminals die with it */
   killTaskPtys?: (taskNumber: number) => void;
+  keepPrCheckout: (number:number) => Promise<boolean>;
 }) {
-  const { db, brain, withRepoLock, killTaskPtys } = ctx;
+  const { db, brain, withRepoLock, killTaskPtys, keepPrCheckout } = ctx;
 
   // ── the berth sweep: ONE owner for cache/ (worktree-berths round) ──────────────────────────
   // Policy is pure (harness/berths.ts); this executor gathers what exists + what the board says,
@@ -42,12 +43,14 @@ export function makeBerthSweep(ctx: {
       if (!m) continue;
       const num = Number(m[1]);
       const dir = join(wtRoot, name);
-      const row = await db.get<{ state: string; repo_id: string | null; branch: string | null }>(
-        'select state, repo_id, branch from tasks where number = ?', [num],
-      ).catch(() => null);
+      const [row] = await db.getAll<{ state: string; repo_id: string | null; branch: string | null; pr_number:number|null; coding:number }>(
+        `select k.state,k.repo_id,k.branch,k.pr_number, exists(select 1 from threads th where th.task_id=k.id and th.kind='coding' and th.archived_at is null) as coding from tasks k where k.number=?`, [num],
+      );
+      const settled = row?.state === 'accepted' || row?.state === 'closed';
+      const keep = settled ? row?.pr_number && await keepPrCheckout(num) : row?.repo_id || row?.coding || row?.pr_number;
       berthEntries.push({
         taskNumber: num,
-        boardState: row?.state ?? null,
+        boardState: keep ? 'protected' : row?.state ?? null,
         mtimeMs: (() => { try { return statSync(dir).mtimeMs; } catch { return 0; } })(),
         bytes: treeBytes(dir),
         repoId: row?.repo_id ?? null,
@@ -65,9 +68,13 @@ export function makeBerthSweep(ctx: {
     }
 
     const open = await db.getAll<{ repo_id: string; n: number }>(
-      `select repo_id, count(*) as n from tasks where repo_id is not null and state not in ('accepted','closed') group by repo_id`,
-    ).catch(() => [] as Array<{ repo_id: string; n: number }>);
+      `select repo_id, count(*) as n from (
+        select repo_id from tasks where repo_id is not null and state not in ('accepted','closed')
+        union all select s.repo_id from code_sessions s left join threads t on t.id=coalesce(s.thread_id,s.id) where s.repo_id is not null and t.archived_at is null and t.settled_at is null and (t.id is not null or s.ended_at is null)
+      ) group by repo_id`,
+    );
     const openByRepo = new Map(open.map((r) => [r.repo_id, r.n]));
+    for (const berth of berthEntries) if (berth.boardState === 'protected' && berth.repoId) openByRepo.set(berth.repoId,1);
     const cloneEntries: import('../harness/berths').CloneEntry[] = [];
     const repoRoot = cachePath('repos');
     for (const repoId of existsSync(repoRoot) ? readdirSync(repoRoot) : []) {

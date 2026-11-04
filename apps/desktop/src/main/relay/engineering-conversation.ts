@@ -1,7 +1,7 @@
-import { artifactMime, brainApiBaseUrl } from '@neuramesh/shared';
+import { isValidationImageName, artifactMime, brainApiBaseUrl } from '@neuramesh/shared';
 import { readRuntimeMessages } from './engineering-runtime-input';
-import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { lstat, mkdir, readFile, readdir, realpath, utimes, writeFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ClineCore, CoreSessionEvent } from '@cline/sdk';
 import { ConversationBrain, type BrainSyncOptions } from '../harness/brain-sync';
@@ -47,7 +47,11 @@ export class EngineeringConversation {
   excludeSecret(secret?: string): void { this.brain.excludeSecret(secret); }
 
   checkpoint(core: ClineCore, sessionId: string, metadata: Record<string, unknown>): Promise<void> {
-    return this.seal(() => readRuntimeMessages(core, sessionId), metadata);
+    return this.seal(async () => {
+      const messages = await readRuntimeMessages(core, sessionId);
+      metadata['compactionState'] = typeof core.readSessionCompactionState === 'function' ? await core.readSessionCompactionState(sessionId) : undefined;
+      return messages;
+    }, metadata);
   }
 
   /** a lane with no Cline core (the agy lane) seals the messages it keeps itself */
@@ -60,7 +64,7 @@ export class EngineeringConversation {
       const messages = await read();
       let artifactError: unknown;
       try { await this.uploadArtifacts(); } catch (error) { artifactError = error; }
-      this.brain.setRuntime(messages, { ...metadata, recordedEventCount: this.brain.events().length });
+      this.brain.setRuntime(messages, { ...this.brain.metadata(), ...metadata, recordedEventCount: this.brain.events().length });
       await this.brain.flush();
       if (artifactError) throw artifactError;
     });
@@ -92,14 +96,16 @@ export class EngineeringConversation {
     const actualParent = await realpath(join(target, '..'));
     if (!actualParent.startsWith(await realpath(this.cwd) + sep)) throw new Error('The artifact folder leaves this workspace.');
     await writeFile(target, bytes, { flag: 'wx', mode: 0o600 });
+    // Hydration restores history. A prior screenshot cannot count as verification of a new edit.
+    if (artifact.name.startsWith('validation/after/')) await utimes(target, 0, 0);
   }
 
   /** A display tool publishes confirmed bytes before returning a clickable reference. */
-  publishArtifact(path: string): Promise<ArtifactReference> {
+  publishArtifact(path: string, capture?: {sha256:string;target:string}): Promise<ArtifactReference> {
     const name = path.replace(/^\.\//, '').replace(/^\.nm-artifacts\//, '');
     if (!name || name.startsWith('/') || name.includes('\\') || name.split('/').some(part => !part || part === '..' || part === '.')) return Promise.reject(new Error('Use a file path inside .nm-artifacts/.'));
     const result = this.boundary.catch(() => {}).then(async () => {
-      const artifact = await this.uploadArtifact(name);
+      const artifact = await this.uploadArtifact(name, capture);
       await this.brain.flush();
       return artifact;
     });
@@ -107,7 +113,7 @@ export class EngineeringConversation {
     return result;
   }
 
-  private async uploadArtifact(name: string): Promise<ArtifactReference> {
+  private async uploadArtifact(name: string, capture?: {sha256:string;target:string}): Promise<ArtifactReference> {
     const target = this.artifactPath(name);
     // Check every ancestor: a symlink inside the output folder must not publish other files.
     let cursor = join(this.cwd, '.nm-artifacts');
@@ -121,11 +127,15 @@ export class EngineeringConversation {
     const bytes = await readFile(target);
     const sha256 = hash(bytes);
     const previous = this.artifacts.get(name);
-    if (previous?.sha256 === sha256) return previous;
+    if (capture && capture.sha256 !== sha256) throw new Error('The captured image changed before it could be published. Capture it again.');
+    if (!capture && previous?.sha256 === sha256) return previous;
+    if (!capture && isValidationImageName(name)) {
+      throw new Error('Validation evidence requires a real capture. Use capture_task_view on the running page or report the visual check as blocked.');
+    }
     const identity = createHash('sha256').update(`${this.options.workspace}/${this.options.threadId}/${name}/${sha256}`).digest('hex');
-    const id = `${identity.slice(0, 8)}-${identity.slice(8, 12)}-5${identity.slice(13, 16)}-8${identity.slice(17, 20)}-${identity.slice(20, 32)}`;
+    const id = capture ? randomUUID() : `${identity.slice(0, 8)}-${identity.slice(8, 12)}-5${identity.slice(13, 16)}-8${identity.slice(17, 20)}-${identity.slice(20, 32)}`;
     const artifact = { id, name, sha256, mime: artifactMime(name) };
-    await this.brain.artifact({ ...artifact, kind: 'file', inlineContent: `data:${artifact.mime};base64,${bytes.toString('base64')}` }, { kind: 'human', id: this.options.actorId });
+    await this.brain.artifact({ ...artifact, kind: 'file', ...(capture ? {capture:{source:'managed-browser',target:capture.target}} : {}), inlineContent: `data:${artifact.mime};base64,${bytes.toString('base64')}` }, { kind: 'human', id: this.options.actorId });
     this.artifacts.set(name, artifact);
     return artifact;
   }
@@ -144,7 +154,7 @@ export class EngineeringConversation {
           const info = await lstat(file);
           if (info.isSymbolicLink()) throw new Error('Portable artifacts cannot contain symbolic links.');
           if (info.isDirectory()) await walk(file);
-          else if (info.isFile()) await this.uploadArtifact(relativeName);
+          else if (info.isFile() && !isValidationImageName(relativeName)) await this.uploadArtifact(relativeName);
         } catch (error) { failures.push(`${relativeName}: ${error instanceof Error ? error.message : 'upload failed'}`); }
       }
     };

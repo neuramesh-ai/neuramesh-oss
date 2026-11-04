@@ -1,3 +1,4 @@
+import { PermissionPicker } from '../composer/PermissionPicker';
 // The new-chat stage (docs/35) — where ⌘N lands. Extracted from App.tsx (track A4).
 import { ProjLogo } from '../components/AgentAvatar';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
@@ -63,7 +64,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
    * PRE-DRAFTED MESSAGE, never a command — the human still sends). null leaves the draft alone */
   initialDraft?: string | null;
   firstSendHint?: boolean;
-  onSend: (channelId: string, text: string, opts: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: SessionOrigin | null; threadKind?: ThreadKind }) => Promise<unknown>;
+  onSend: (channelId: string, text: string, opts: { permissionMode?:import('@neuramesh/shared').PermissionMode; id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: SessionOrigin | null; threadKind?: ThreadKind }) => Promise<unknown>;
   /** WHERE this session runs (rule D9): the shell draws the chip (it owns the fleet) and says what the birth message writes — `threads.machine_id` + `threads.origin` (0134) */
   machineChip?: (value: string | null, onPick: (machineId: string | null) => void) => ReactNode;
   sessionBirth?: (chosen: string | null) => { threadMachineId: string | null; threadOrigin: SessionOrigin };
@@ -84,6 +85,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   // no machine can run, so the stage shows WHY instead of a composer that cannot deliver
   const capped = useCompute(true)?.status === 'capped';
   // what the person typed into the browser's static composer before the app loaded (lib/staticshell.ts)
+  const [permissionMode,setPermissionMode]=useState<import('@neuramesh/shared').PermissionMode|null>(null);
   const [draft, setDraft] = useState(staticDraft);
   const boxRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { handOffStaticShell(boxRef.current?.querySelector('textarea') ?? null); }, []);
@@ -126,7 +128,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
       // this message IS the thread's root (docs/31): the server births + names the thread on it,
       // and the docs/34 mode + the pill's brain draft ride the birth message — this send BIRTHS
       // the conversation, so what the pill was showing is what the conversation starts on
-      await onSend(targetChan.id, marker + consumeWbAttach(text), { id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine), ...(repo ? { threadKind: 'coding' as const } : {}) });
+      await onSend(targetChan.id, marker + consumeWbAttach(text), { ...(permissionMode ? {permissionMode} : {}), id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine), ...(repo ? { threadKind: 'coding' as const } : {}) });
       if (repo) onCodingBirth?.(threadId, repo, codeSelection);
       setDraft(''); setMachine(null); setRepo(null); setCodeSelection({ agentId: null, modelId: null, reasoningEffort: null }); setAttachedSkill(null); atts.reset();
       // the send animates into its thread — the TARGET room rides along (docs/32)
@@ -252,14 +254,15 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             </span>
             {machineChip?.(machine, setMachine)}
             <RepoChip repos={repos} projectId={targetChan?.project_id ?? null} value={repo} onPick={setRepo} onConnect={onConnectRepo} /> {/* the fourth knob (0144): a repository makes the send a coding conversation */}
+            <MentionButton onMention={() => setCmention((n) => n + 1)} />
+            <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
+            <span style={{ flex: 1 }} />
+            <PermissionPicker draftMode={permissionMode} onDraft={setPermissionMode} disabled={sending} />
             {repo ? <CodingBrains selection={codeSelection} onChange={setCodeSelection} machineId={sessionBirth?.(machine).threadMachineId ?? machine} roomId={targetChan?.id ?? null} roomSlug={targetChan?.slug ?? ''} disabled={sending} /> /* a repository's session runs the coding runtime: the Code chip picks its model */
               // else the SAME pill as the thread composer (docs/10 §15): one switcher, every surface
               : <BrainChip onConnect={onBrainConnect} onSetProjectPack={onSetProjectPack}
                 project={ap ? { id: ap.id, name: ap.name, pack: ap.model_pack ?? null } : null}
                 castAgents={targetChan ? agents.filter((a) => agentInChannel(a.channel_ids, targetChan.id)) : []} />}
-            <MentionButton onMention={() => setCmention((n) => n + 1)} />
-            <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
-            <span style={{ flex: 1 }} />
             <button className="hsend" disabled={sending || atts.busy || (!draft.trim() && !atts.count) || !targetChan} onClick={() => void sendDraft()} data-tip="Send · ↵" aria-label={atts.busy ? 'Uploading attachments' : 'Send'}>
               {sending || atts.busy ? '…' : <IconSend s={20} />}
             </button>

@@ -7,6 +7,10 @@ export type WallOutcome =
   | { action: 'retry'; attempt: number; wallNote: string }
   | { action: 'block'; blockReason: string; wallNote: string; blockNote: string };
 
+// Failed executions, not tool errors or approval waits. Shared by the live retry
+// path and restart recovery so a runner restart cannot shorten the budget.
+export const EXEC_FAIL_BLOCK_AFTER = 6;
+
 // ── Capacity failover (docs/22): classify WHY a turn walled ──────────────────────────────
 // The runtimes surface refusals, rate limits, spend caps, and quota errors only as message TEXT (no
 // typed status reaches this seam), so we match on the durable phrases each provider uses. Phrase sets
@@ -68,14 +72,17 @@ export function isTurnExhaustion(reason: string): boolean {
 }
 
 /** what the human should actually do about this wall — the honest hint, per cause */
-function wallHint(reason: string, agentName: string): string {
+export function wallHint(reason: string, agentName: string): string {
+  if (/no work product|nothing changed in the worktree/i.test(reason)) {
+    return 'Inspect the task branch and any submitted pull request. Reply with the missing change or an alternative approach, then **Unblock** to retry with your guidance.';
+  }
   if (isTurnExhaustion(reason)) {
-    return `It ran out of turns before producing anything — the scope is too big for one pass, not a credentials problem. Narrow the task (or split it with a subtask), then **Unblock** to retry, or **Close** it.`;
+    return 'It ran out of turns before finishing. Reply with a smaller step or an alternative approach, then **Unblock** to retry with your guidance.';
   }
   if (classifyExecError(reason) === 'exhausted') {
     return `@${agentName} is at a provider cap — re-seat it or wait for the window to reset, then **Unblock** to retry.`;
   }
-  return `Fix the cause (check @${agentName}'s provider key/quota if it's auth), then **Unblock** to retry, or **Close** the task.`;
+  return 'Address the reported failure, or reply with an alternative approach or missing information. Then **Unblock** to retry with your guidance.';
 }
 
 export function planWallOutcome(p: {

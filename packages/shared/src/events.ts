@@ -32,6 +32,7 @@ export const EVENT_TYPES = [
   'task.design_proposed',
   'task.design_revising',
   'task.design_approved',
+  'task.release_checklist_requested',
   'task.ship_claimed',
   'task.ship_plan_proposed',
   'task.ship_plan_revising',

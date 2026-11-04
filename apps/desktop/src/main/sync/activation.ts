@@ -1,3 +1,5 @@
+import { sharedLocalEngineeringHost } from '../relay/engineering-local-host';
+import { apiAuthHeaders } from '../apiauth';
 // Resume the desktop host after payment is verified in HQ; keep the existing replica intact.
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { app } from 'electron';
@@ -13,7 +15,7 @@ export const listWorkspaces = async (conn: Connection): Promise<WsRow[]> =>
   ((await apiOn(conn, '/v1/workspaces')) as { workspaces: WsRow[] }).workspaces;
 
 export function startHost(conn: Connection, db: ReplicaDatabase, machineId: string, deps: BootDeps): void {
-  startAgentHost({ db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(conn), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
+  startAgentHost({ engineering: () => sharedLocalEngineeringHost({ db, machineId, workspaceId:conn.ws, apiUrl:conn.apiUrl, authHeaders:() => apiAuthHeaders(conn.apiUrl,{kind:'human',id:actorId(conn)}) }), db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(conn), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
   conn.agentHostStarted = true;
 }
 

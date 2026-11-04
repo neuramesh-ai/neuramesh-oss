@@ -1,5 +1,5 @@
 import { DEFAULT_ENGINEERING_AGENT } from './selection';
-import { failRemoteEngineeringTransport, withEngineeringWarning } from './transport-state';
+import { applyTaskEngineeringState, failRemoteEngineeringTransport, withEngineeringWarning } from './transport-state';
 import { interruptToolReceipts, recordToolReceipt } from './tool-receipts';
 import { lastMessageIndex, updateMessage, collapseReasoning, finishStreamingMessages } from './transcript-state';
 import { createEngineeringPlanProgress, isEngineeringPlanProgress } from './plan-progress';
@@ -182,37 +182,26 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
 /** Project Cline Core's transport events into the stable Engineering UI model. */
 function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
   const type = wire['type'];
+  if (type === 'task_state') return applyTaskEngineeringState(session, wire['session']);
   // Keeping a completed thread open is not ongoing agent work. A socket restart must
   // not manufacture a reply, mark the task failed or bump it to the top of Recents.
   if (type === 'disconnected') return session.state === 'streaming' || session.state === 'awaiting_approval'
     ? failRemoteEngineeringTransport(session, wire['message']) : session;
   session = applyEngineeringSelection(session, wire);
-  if (type === 'ready') {
-    const provider = engineeringSystemText(String(wire['provider']));
-    const model = engineeringSystemText(String(wire['model']));
+  if (type === 'ready' || type === 'model_changed' || type === 'brain_changed') {
+    const provider = engineeringSystemText(String(wire['provider'])), model = engineeringSystemText(String(wire['model']));
     const brainPack = typeof wire['brainPack'] === 'string' ? wire['brainPack'] : null;
-    const modelOverride = typeof wire['modelId'] === 'string' ? wire['modelId'] : null;
-    // Runtime readiness is already expressed by the enabled composer and model selector. A
-    // transcript receipt made connection setup look like user work and created a noisy one-item
-    // task list before the first repository action.
-    return { ...session, provider, model, modelOverride, brainPack, updatedAt: stamp() };
-  }
-  if (type === 'model_changed') {
-    const provider = engineeringSystemText(String(wire['provider']));
-    const model = engineeringSystemText(String(wire['model']));
-    const brainPack = typeof wire['brainPack'] === 'string' ? wire['brainPack'] : null;
-    const modelOverride = typeof wire['modelId'] === 'string' ? wire['modelId'] : null;
-    return { ...session, provider, model, modelOverride, brainPack, messages: [...session.messages, message('tool', `Model switched · ${provider} · ${modelLabel(model)}`)], updatedAt: stamp() };
-  }
-  if (type === 'brain_changed') {
-    const provider = engineeringSystemText(String(wire['provider']));
-    const model = engineeringSystemText(String(wire['model']));
-    const brainPack = typeof wire['brainPack'] === 'string' ? wire['brainPack'] : null;
-    return { ...session, provider, model, modelOverride: null, brainPack, messages: [...session.messages, message('tool', `Model switched · ${provider} · ${modelLabel(model)}`)], updatedAt: stamp() };
+    const modelOverride = type !== 'brain_changed' && typeof wire['modelId'] === 'string' ? wire['modelId'] : null;
+    const messages = type === 'ready' ? session.messages : [...session.messages, message('tool', `Model switched · ${provider} · ${modelLabel(model)}`)];
+    return { ...session, provider, model, brainPack, modelOverride, messages, updatedAt:stamp() };
   }
   if (type === 'status') return wire['status'] === 'running'
     ? { ...session, state: 'streaming', activeActivity: session.activeActivity ?? { phase: 'thinking', startedAt: stamp() }, updatedAt: stamp() }
     : session.state === 'streaming' ? { ...session, state: 'idle', activeActivity: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp() } : session;
+  if (type === 'followup_received' && typeof wire['id'] === 'string' && typeof wire['text'] === 'string') {
+    if (session.messages.some(row => row.id === wire['id'])) return session;
+    return { ...session, messages: [...session.messages, { ...message('user',wire['text']), id:wire['id'] }], updatedAt: stamp() };
+  }
   if (type === 'plan_progress') return wire['progress'] === null || isEngineeringPlanProgress(wire['progress'])
     ? { ...session, planProgress: wire['progress'], ...(wire['progress'] ? { workPlan: engineeringWorkPlanText(wire['progress'].plan) } : {}), updatedAt: stamp() } : session;
   if (type === 'work_plan' && session.mode === 'plan' && isEngineeringWorkPlan(wire['plan'])) {

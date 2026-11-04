@@ -357,7 +357,7 @@ async function registerIpc({ agentLog, ptys, killTaskPtys }: { agentLog: AgentLo
   const watchers = new Map<string, AbortController>();
   const procWatchers = new Map<string, () => void>(); // background-processes 'change' subscribers, by subId
 
-  registerTerminals({ db, ptys, procWatchers }); registerLocalEngineering({ db }); // + Code on this Mac (the desktop Code bridge, slice B1)
+  registerTerminals({ db, workspace:()=>cur().ws, ptys, procWatchers }); registerLocalEngineering({ db }); // + Code on this Mac (the desktop Code bridge, slice B1)
   registerWorktrees({ db, ptys, killTaskPtys }); // the Worktrees destination: the table + the one act (docs/design/worktrees-2026-09)
   registerWorkspaceFiles();
   registerAgents({ db, ws });

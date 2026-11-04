@@ -1,5 +1,16 @@
+import { withChatSteering } from './thread-followups';
+import { nativePermissionHooks } from '../chat-permission-action';
+import { runManualCompaction } from './compact-command';
+import { withPermissionDeadline, type WaitForPermission } from './permission-deadline';
+import { remoteThreadPermissionGate } from '../thread-permission-gate';
+import { apiAuthHeaders } from '../apiauth';
+import { createEngineeringShellExecutor } from '../relay/engineering-safe-executors';
+import { loadEngineeringPolicyRules } from '../relay/engineering-policy';
+import { postWithRetry } from '../presence';
+import { isNoCreditsError } from '../computenotice';
+import { conversationToolsThrough, recordConversationEvent, setConversationHistoryBoundary, withoutConversationBrain } from '../harness/brain-sync';
 import { agentHomeTranscript } from './team-context';
-import { STARTER_MODEL } from '@neuramesh/shared';
+import { isCompactCommand, STARTER_MODEL, TURN_BUDGETS } from '@neuramesh/shared';
 import { bindConversationCallback } from '../harness/brain-sync';
 // CHAT MODE (docs/34) — the turn an agent runs when the composer's Tasks toggle is OFF.
 //
@@ -57,6 +68,12 @@ export function makeChatTurn(ctx: HostCtx & {
 const { post, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace, generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures } = ctx;
 const { defaultResponder, threadModeFor, recallFor, loadSkillBody, chatProtectedPaths, chatPermissionGate, deliverChatFiles } = makeChatSupport({ post, machineId: ctx.machineId, guards: ctx.guards, db, agents, apiGet, discoverSkills });
 
+function permissionsFor(agent: HostedAgent, ch: {id:string;slug:string;workspace_id:string}, threadId:string, run: RunHandle, wait?: WaitForPermission) {
+  const gate = remoteThreadPermissionGate({apiUrl:ctx.apiUrl,workspace:ch.workspace_id,threadId,runId:run.id || undefined,actorId:ctx.ownerActorId,
+    headers:()=>apiAuthHeaders(ctx.apiUrl,{kind:'agent',id:agent.id})});
+  return (name:string,input:Record<string,unknown>) => chatPermissionGate(agent,ch,threadId,gate,name,input,run,wait);
+}
+
 // ── Chat mode (docs/34): the turn a thread with Tasks OFF runs ────────────────────────────
 //
 // This is not a smaller orchestrator turn — it is a different job. The board turn's registry
@@ -75,25 +92,52 @@ async function chatTurn(args: {
   ch: { id: string; slug: string; workspace_id: string };
   threadId: string;
   transcript: string;
+  request?: { body: string; author_kind: string };
+  replyTo: string;
   token: string;
   log: LogFn;
   onDelta: (text: string, thinking?: string) => void;
   attachments: AgentAttachment[];
   run: RunHandle;
+  compactSignal?: AbortSignal;
+  steering?: { suffix: string; controller: AbortController };
+  onCompactProgress?: () => void;
+  waitForPermission?: WaitForPermission;
 }): Promise<string> {
   const { agent, ch, threadId, token, log, onDelta, attachments, run } = args;
   let transcript = args.transcript;
   const home = await db.get<{ home_agent_id: string | null }>('select home_agent_id from threads where id = ?', [threadId]);
-  if (home?.home_agent_id) {
+  const manualCompact = !!args.request && isCompactCommand(args.request.body, args.request.author_kind, agent.name);
+  if (manualCompact && attachments.length) return 'Send /compact on its own, without attachments. Your conversation has not been changed.';
+  const compactQuery = manualCompact ? `&mode=manual&commandId=${args.replyTo}` : '';
+  let compacted = false;
+  let progressWrite = Promise.resolve();
+  const compactProgress = (text: string) => {
+    args.compactSignal?.throwIfAborted();
+    args.onCompactProgress?.();
+    log({ kind: 'tool', phase: 'inject', summary: text });
+    recordConversationEvent('assistant.message', { text, source: 'compaction' });
+    onDelta(text);
+    progressWrite = progressWrite.then(() => run.step(text)).catch(() => {});
+  };
+  if (manualCompact) compactProgress('Checking the conversation history for messages to compact.');
+  {
     const actor = { kind: 'agent', id: agent.id, role: agent.role };
     const continued = await agentHomeTranscript({
-      read: async () => { const res: Response = await apiGet(`/v1/team/context?workspace=${ch.workspace_id}&threadId=${threadId}`, actor); if (!res.ok) throw new Error(`Could not restore the agent thread (${res.status}).`); return res.json(); },
-      compact: async (revision, through, summary) => { const res = await post('/v1/team/compact', actor, { workspace: ch.workspace_id, threadId, revision, through, summary }); if (!res.ok) throw new Error('Could not save the context summary. Retry to continue safely.'); },
-      summarize: (system, input) => runtimeFor(agent.runtime).complete(system, input, token, agent.model, 3500),
-      status: summary => log({ kind: 'tool', phase: 'inject', summary }),
-    });
+      read: async () => {
+        const res: Response = await apiGet(`/v1/team/context?workspace=${ch.workspace_id}&threadId=${threadId}${compactQuery}`, actor);
+        if (!res.ok) throw new Error(`Could not restore the agent thread (${res.status}).`);
+        return res.json() as Promise<import('@neuramesh/shared').TeamContext>;
+      },
+      compact: async (revision, through, summary) => { const res = await post('/v1/team/compact', actor, { workspace: ch.workspace_id, threadId, revision, through, summary, mode: 'manual', commandId: args.replyTo }); if (!res.ok) throw new Error('Could not save the context summary. Retry to continue safely.'); compacted = true; },
+      summarize: (system, input) => withoutConversationBrain(() => runtimeFor(agent.runtime).complete(system, input, token, agent.model, 3500)),
+      toolsThrough: conversationToolsThrough, boundary: setConversationHistoryBoundary,
+      status: compactProgress, signal: args.compactSignal,
+    }, manualCompact);
     if (continued) transcript = continued;
   }
+  if (args.steering) { args.steering.controller.signal.throwIfAborted(); transcript += args.steering.suffix; }
+  if (manualCompact) return compacted ? 'Compacted the earlier conversation. Decisions, constraints and unfinished work are retained in a working summary; the complete history stays available.' : 'This conversation is already compact. Its complete history is unchanged.';
   const { mkdirSync } = await import('node:fs');
   // the thread's brain workspace, with any pre-merge `chats/` directory adopted on first use
   const dir = ensureChatWorkspace(threadId);
@@ -140,7 +184,20 @@ async function chatTurn(args: {
   const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 
   // The conversation registry (host/chattools.ts) — turn-scoped, so it takes the turn.
-  const toolContext = { z, tool: ((name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(handler), extras)) as typeof tool, createSdkMcpServer, text, agent, ch, threadId, log,
+  const checkPermission = permissionsFor(agent,ch,threadId,run,args.waitForPermission);
+  const runCommand = async (command:string) => {
+    const project = await db.get<{project_id:string}>('select project_id from threads where id=? and workspace_id=?',[threadId,ch.workspace_id]);
+    const rules = await loadEngineeringPolicyRules(db,ch.workspace_id,project?.project_id);
+    args.steering?.controller.signal.throwIfAborted();
+    return String(await createEngineeringShellExecutor(dir,rules)(command));
+  };
+  const toolContext = { permissionRunId:run.id || undefined, runCommand, z, tool: ((name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(async (input, extra) => {
+    args.steering?.controller.signal.throwIfAborted();
+    const result = await checkPermission('mcp__nm__' + name, input);
+    args.steering?.controller.signal.throwIfAborted();
+    if (result.decision === 'deny') return { ...text(result.reason ?? 'Permission declined.'), isError:true };
+    return handler(input, extra);
+  }), extras)) as typeof tool, createSdkMcpServer, text, agent, ch, threadId, log,
     db, post, apiGet, recallFor: home?.home_agent_id ? async (_ws: string, _ch: string, query: string) => {
       const response: Response = await apiGet(`/v1/team/recall?workspace=${ch.workspace_id}&threadId=${threadId}&query=${encodeURIComponent(query)}`, { kind: 'agent', id: agent.id, role: agent.role });
       if (!response.ok) throw new Error('Project recall is unavailable.');
@@ -148,12 +205,12 @@ async function chatTurn(args: {
     } : recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs: (id: string, limit?: number, scope?: 'room' | 'project' | 'workspace', _at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => libraryDocs(id, limit, scope, { threadId }, name, offset) };
   if (provider === 'gemini') {
     return geminiDispatch({ model: agent.model, thinking: agent.thinking, token, systemPrompt: system + skillsNote, transcript,
-      tools: chatTransportTools(toolContext), attachments, cwd: dir, log: narrate(run, log), onDelta },
+      tools: chatTransportTools(toolContext), attachments, abort: args.steering?.controller.signal, cwd: dir, log: narrate(run, log), onDelta },
       { houseModel: agent.model === STARTER_MODEL, apiUrl: ctx.apiUrl, workspace: ch.workspace_id, actorId: ctx.ownerActorId });
   }
   if (provider === 'openai') {
     return codexSdkOrchestratorTurn({ model: agent.model, thinking: agent.thinking, token, systemPrompt: system + skillsNote, transcript,
-      tools: chatTransportTools(toolContext), attachments, cwd: dir, log: narrate(run, log), onDelta });
+      tools: chatTransportTools(toolContext), attachments, abort: args.steering?.controller.signal, cwd: dir, log: narrate(run, log), onDelta });
   }
   const nm = makeChatTools(toolContext);
 
@@ -169,6 +226,7 @@ async function chatTurn(args: {
     query({
       prompt: claudeAgentPrompt(conversationInput('claude', agent.model, system + skillsNote, transcript, token), attachments),
       options: {
+        abortController: args.steering?.controller,
         ...claudePathOption(),
         ...jail,
         env: providerEnv('anthropic', token),
@@ -178,21 +236,12 @@ async function chatTurn(args: {
         mcpServers: { nm },
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits). The
         // preset pins the standard toolset; the allowlist is what runs without a prompt.
-        tools: { type: 'preset' as const, preset: 'claude_code' as const },
-        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__propose_routine', 'mcp__nm__offer_routine_session', 'mcp__nm__list_team', 'mcp__nm__read_agent_thread', 'mcp__nm__message_agent', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
+        tools: ['ToolSearch','Read','Write','Edit','Glob','Grep','TodoWrite','WebSearch','WebFetch'],
+        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'mcp__nm__run_command', 'TodoWrite', 'mcp__nm__propose_routine', 'mcp__nm__offer_routine_session', 'mcp__nm__create_coding_task', 'mcp__nm__read_coding_tasks', 'mcp__nm__list_team', 'mcp__nm__read_agent_thread', 'mcp__nm__message_agent', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
         permissionMode: 'bypassPermissions',
         // the same policy engine a worker runs under — PreToolUse fires even under
         // bypassPermissions, so a shell call in a chat is gated exactly as one in a task
-        hooks: {
-          PreToolUse: [{
-            hooks: [async (input: { hook_event_name?: string; tool_name?: string; tool_input?: unknown }) => {
-              if (input.hook_event_name !== 'PreToolUse') return {};
-              const g = await chatPermissionGate(agent, ch, threadId, token, String(input.tool_name ?? ''), (input.tool_input ?? {}) as Record<string, unknown>);
-              return { hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: g.decision, permissionDecisionReason: g.reason } };
-            }],
-            timeout: 900,
-          }],
-        },
+        hooks: nativePermissionHooks(checkPermission),
         cwd: dir,
         systemPrompt: system + skillsNote,
         ...partialMessages(onDelta, agent.model), // the chat types as it is written, its thoughts beside it (turnkit.ts)
@@ -221,5 +270,29 @@ async function chatTurn(args: {
  */
 
 
-  return { chatTurn, defaultResponder, threadModeFor };
+  async function runChat(args: Omit<Parameters<typeof chatTurn>[0], 'compactSignal' | 'onCompactProgress'>) {
+    const {request, agent, ch, threadId, replyTo} = args;
+    if (!request || !isCompactCommand(request.body, request.author_kind, agent.name)) {
+      return withPermissionDeadline(waitForPermission => withChatSteering(threadId,'',(suffix,controller,progress)=>
+        chatTurn({...args,waitForPermission,steering:{suffix,controller},onDelta:(text,thinking)=>{progress(text);args.onDelta(text,thinking);}})),
+        TURN_BUDGETS.chat.wallMs, 'the chat turn timed out after 12m');
+    }
+    try {
+      return await runManualCompaction((compactSignal, onCompactProgress) =>
+        chatTurn({...args, compactSignal, onCompactProgress}), TURN_BUDGETS.chat.wallMs);
+    } catch (error) {
+      if (!isNoCreditsError(error)) {
+        const reason = error instanceof Error && error.message.startsWith('Context summary could not be validated')
+          ? 'The generated summary did not meet the storage requirements.' : 'The compaction step did not finish.';
+        const channel = (await db.get<{channel_id: string}>('select channel_id from threads where id=?', [threadId]).catch(() => null))?.channel_id ?? ch.id;
+        await postWithRetry(() => post('/v1/messages', {kind:'agent', id:agent.id}, {
+          workspace: ch.workspace_id, channel, threadId, replyTo,
+          body: `${reason} Your history is saved. Run /compact again to continue from the last saved checkpoint.`,
+        }).then(response => response.status));
+      }
+      throw error;
+    }
+  }
+
+  return { chatTurn: runChat, defaultResponder, threadModeFor, permissionsFor };
 }

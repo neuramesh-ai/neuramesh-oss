@@ -164,6 +164,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
    *  meter that cannot read must not paint a full one. */
   usage(): Promise<WorkspaceUsage | null>;
   policies(): Promise<PolicyRowUI[]>;
+  getPermissions(threadId?: string, taskId?:string): Promise<import('@neuramesh/shared').PermissionSelection>;
+  setPermissions(mode: import('@neuramesh/shared').PermissionMode | null, threadId?: string, taskId?:string): Promise<import('@neuramesh/shared').PermissionSelection>;
   policySet(input: { id?: string; scope: string; projectId?: string | null; capability: string; selector: unknown; verdict: string; rationale?: string; locked?: boolean }): Promise<unknown>;
   policyDelete(id: string): Promise<unknown>;
   sandboxGet(): Promise<{ enabled: boolean; envForced: boolean }>;

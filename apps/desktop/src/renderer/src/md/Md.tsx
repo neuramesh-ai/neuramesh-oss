@@ -4,6 +4,7 @@
 // markdown, the shared renderer splits out below this rather than the arrow reversing.
 import { Children, createContext, useContext, useMemo } from 'react';
 import { type Components } from 'react-markdown';
+import { followsGitReference } from '@neuramesh/client-core/markdown-references';
 import { parseWebPreview } from '@neuramesh/shared';
 import { WebPreviewCard } from '../cards/WebPreviewCard';
 import { MdBody } from './MdBody';
@@ -84,7 +85,7 @@ function MdCode({ className, children }: { className?: string; children?: React.
   if (!protectedCode && !className && fileRef?.(t) && onOpenFile) {
     return <button type="button" className="fileref" title={`Open ${t}`} onClick={() => onOpenFile(t)}><code>{t}</code><span className="fx" aria-hidden>↗</span></button>;
   }
-  if (!className && isHexColor(t)) return <code className="hexcode"><i className="swatch" style={{ background: t.trim() }} aria-hidden />{t}</code>;
+  if (!protectedCode && !className && isHexColor(t)) return <code className="hexcode"><i className="swatch" style={{ background: t.trim() }} aria-hidden />{t}</code>;
   return <code className={className}>{children}</code>;
 }
 
@@ -220,7 +221,7 @@ export function mdPrepare(text: string, o: Pick<MdLinks, 'taskRef' | 'onOpenTask
   // #1004 → an inline task link (and only when the number resolves to a real
   // task — unknown numbers stay plain text)
   if (taskRef && onOpenTask && /#\d{4}\b/.test(stripped)) {
-    stripped = outsideProtected(stripped, (seg) => seg.replace(/#(\d{4})\b/g, (m, d: string) => (taskRef(Number(d)) ? `[#${d}](nm:task/${d})` : m)));
+    stripped = outsideProtected(stripped, (seg) => seg.replace(/#(\d{4})\b/g, (m, d: string, offset: number) => (!followsGitReference(seg.slice(0, offset)) && taskRef(Number(d)) ? `[#${d}](nm:task/${d})` : m)));
   }
   // FLOWE_RESEARCH_REPORT.md → the attached file, same shape as the task ref above: rewritten
   // ONLY when the name resolves to an artifact on this task, so prose about package.json in a

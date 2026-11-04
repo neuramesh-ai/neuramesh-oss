@@ -1,3 +1,4 @@
+import { validationImages } from '@neuramesh/shared';
 // THE FSM BOUNDARY — extracted from handler.ts (track C1).
 //
 // This is the one file that decides whether a transition is legal. It owns the
@@ -60,7 +61,8 @@ export function setDefinitionOfDone(task: Task, actor: Actor, dod: string): Muta
   // humans + the orchestrator own the acceptance contract; the architect may set
   // the DoD it derived from its own implementation plan (which the human reviews
   // as part of plan approval before any work starts). Workers/reviewers never do.
-  const mayEdit = actor.kind === 'human' || actor.role === 'orchestrator' || actor.role === 'architect';
+  const ownsPlan = (task.state === 'planning' || task.state === 'plan_review') && !task.planApprovedAt && (sameActor(task.assignee, actor) || (!task.assignee && actor.kind === 'agent' && task.offeredAgentId === actor.id));
+  const mayEdit = actor.kind === 'human' || actor.role === 'orchestrator' || actor.role === 'architect' || ownsPlan;
   if (!mayEdit) throw new DomainError('NOT_PERMITTED', 'the Definition of Done is set by humans, the orchestrator, or the architect');
   if (!DOD_EDITABLE_STATES.has(task.state)) {
     throw new DomainError('ILLEGAL_TRANSITION', `the Definition of Done is frozen once a task is ${task.state}`);
@@ -99,7 +101,11 @@ export function checkShipItem(task: Task, actor: Actor, cmd: { itemId: string; s
   if (!plan) throw new DomainError('NOT_FOUND', `task ${task.number} has no release plan`);
   const item = plan.items.find((i) => i.id === cmd.itemId);
   if (!item) throw new DomainError('NOT_FOUND', `release checklist item ${cmd.itemId} not found`);
-  if (!mayCheckShipItem(actor, item)) {
+  const ownerShips = task.workPlan?.codingDelivery && actor.kind === 'agent' && actor.id === task.assignee?.id && actor.id === plan.shipperId;
+  const canCheck = task.workPlan?.codingDelivery && actor.kind === 'agent'
+    ? (ownerShips && item.owner !== 'human') || (item.owner === 'agent' && item.agentId === actor.id)
+    : mayCheckShipItem(actor, item);
+  if (!canCheck) {
     throw new DomainError('NOT_PERMITTED', `"${item.title}" is ${item.owner === 'human' ? 'a human step — only a person may check it' : `owned by ${item.owner === 'agent' ? 'its delegated agent or the shipper' : 'the shipper'}`}`);
   }
   const now = new Date().toISOString();
@@ -129,7 +135,7 @@ export function checkShipItem(task: Task, actor: Actor, cmd: { itemId: string; s
 // approved list while releasing — an added item re-arms the execute_ship guard,
 // which is exactly the point). Humans, the orchestrator, or the shipper.
 export function addShipItem(task: Task, actor: Actor, cmd: { title: string; detail?: string; owner: ShipItem['owner']; agentId?: string }): MutationResult {
-  const mayAdd = actor.kind === 'human' || actor.role === 'orchestrator' || actor.role === 'shipper';
+  const mayAdd = actor.kind === 'human' || (task.workPlan?.codingDelivery ? task.assignee?.id === actor.id : actor.role === 'orchestrator' || actor.role === 'shipper');
   if (!mayAdd) throw new DomainError('NOT_PERMITTED', 'release checklist items are added by humans, the orchestrator, or the shipper');
   if (task.state !== 'ship_review' && task.state !== 'releasing') {
     throw new DomainError('ILLEGAL_TRANSITION', `items can be added while the plan is under review or releasing — #${task.number} is ${task.state}`);
@@ -296,6 +302,12 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
     throw new DomainError('REQUIREMENTS_NOT_CONFIRMED', 'confirm requirements before submitting');
   }
 
+  if (cmd.type === 'task.submit' && task.workPlan?.codingDelivery?.visualEvidence) {
+    try {
+      if (!validationImages(cmd.artifacts).length) throw new Error('Capture and attach before and after screenshots of the implementation.');
+    } catch (error) { throw new DomainError('EVIDENCE_REQUIRED', error instanceof Error ? error.message : 'Visual evidence is missing.'); }
+  }
+
   // unblock returns to the stage the task was blocked FROM (stamped below) —
   // legacy blocked rows with no stamp keep the historical in_progress return
   // approve_design forks by plan shape (2026-08-17): a plan-first unit already HAS its
@@ -308,13 +320,18 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
       ? 'todo'
       : target.to;
 
+  const owner = task.assignee ?? (task.offeredAgentId ? { kind: 'agent' as const, id: task.offeredAgentId } : null);
+  if (cmd.type === 'task.propose_plan' && owner && actor.kind !== 'human' && !sameActor(owner, actor)) {
+    throw new DomainError('NOT_PERMITTED', 'The assigned agent revises this plan. Request specialist input separately; do not take over the task.');
+  }
   const claiming = cmd.type === 'task.claim';
   const ctx: TransitionContext = {
     actor,
     isAssignee: claiming
-      ? task.assignee === null || sameActor(task.assignee, actor)
-      : sameActor(task.assignee, actor),
+      ? owner === null || sameActor(owner, actor)
+      : sameActor(owner, actor),
     isCreator: sameActor(task.creator, actor),
+    ownerManagedCoding: !!task.workPlan?.codingDelivery,
     // Reviewer-pool membership comes from the channel registry once the DB
     // layer lands (week 2); until then the agent's role is the pool.
     isReviewerPoolMember: actor.kind === 'agent' && actor.role === 'reviewer',
@@ -349,17 +366,11 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
   if (verdict.spec.name === 'block') next.blockedFrom = task.state;
   if (verdict.spec.name === 'unblock') next.blockedFrom = null;
 
+  if (verdict.spec.name === 'claim_ship' && next.workPlan?.codingDelivery) next.workPlan = { ...next.workPlan, codingDelivery: { ...next.workPlan.codingDelivery, prepareRelease: true } };
   if (verdict.spec.name === 'claim') next.assignee = { kind: actor.kind, id: actor.id };
-  // request_plan assigns the task to the named architect, so the board/thread show who's planning
-  // it (not "unassigned") from the moment it enters planning. `architect` is the resolved architect
-  // agent id (the orchestrator's request_plan tool looks it up for the channel).
-  if (verdict.spec.name === 'request_plan' && cmd.type === 'task.request_plan' && cmd.architect) next.assignee = { kind: 'agent', id: cmd.architect };
-  // request_design mirrors request_plan: the resolved channel designer becomes the assignee
-  // while the mockups are drafted. approve_design hands off to planning with the assignee
-  // CLEARED — the human's button can't know the architect; the architect watch self-selects
-  // by role and announces itself in the thread.
-  if (verdict.spec.name === 'request_design' && cmd.type === 'task.request_design' && cmd.designer) next.assignee = { kind: 'agent', id: cmd.designer };
-  if (verdict.spec.name === 'approve_design') next.assignee = null;
+  // Planning and design are phases, never implicit reassignment. The selected
+  // owner stays accountable; specialist input is a separate consultation.
+  if (verdict.spec.name === 'revise_plan' || verdict.spec.name === 'request_plan') next.planApprovedAt = null;
   // routing must categorize the task (docs/16): use the command's kind, else one already
   // set; refuse if still null. NEVER a route gate — any kind may take either route; we
   // only require that the label exists so no task is routed uncategorized.
@@ -416,6 +427,7 @@ export function transition(task: Task, actor: Actor, cmd: Exclude<Command, { typ
       const bad = validateWorkPlanLegs(legs, task.repo !== null);
       if (bad) throw new DomainError('INVALID_INPUT', bad);
       next.workPlan = {
+        ...(task.workPlan?.codingDelivery ? { codingDelivery: task.workPlan.codingDelivery } : {}),
         legs: [...legs],
         subtasks: cmd.subtasks ?? task.workPlan?.subtasks ?? [],
         approach: cmd.plan,
@@ -566,7 +578,7 @@ export function payloadFor(cmd: Command): Record<string, unknown> {
       // the host's one-line verdict summary (checks green, workflows settled) — audit trail
       return cmd.note ? { note: cmd.note } : {};
     case 'task.block':
-      return { reason: cmd.reason };
+      return { reason: cmd.reason, ...(cmd.resolution ? { resolution: cmd.resolution } : {}) };
     case 'task.request_plan':
       return { ...(cmd.architect ? { architect: cmd.architect } : {}), ...(cmd.kind ? { kind: cmd.kind } : {}) };
     case 'task.request_design':

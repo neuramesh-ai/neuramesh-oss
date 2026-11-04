@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('nm', {
   electron: process.versions.electron,
   channels: (): Promise<ChannelRow[]> => ipcRenderer.invoke('nm:channels'),
   policies: () => ipcRenderer.invoke('nm:policies'),
+  getPermissions: (threadId?: string,taskId?:string) => ipcRenderer.invoke('nm:permission-selection', {threadId,taskId}),
+  setPermissions: (mode: string | null, threadId?: string,taskId?:string) => ipcRenderer.invoke('nm:permission-save', { mode, threadId,taskId }),
   policySet: (input: unknown) => ipcRenderer.invoke('nm:policy-set', input),
   policyDelete: (id: string) => ipcRenderer.invoke('nm:policy-delete', { id }),
   sandboxGet: () => ipcRenderer.invoke('nm:sandbox-get'),

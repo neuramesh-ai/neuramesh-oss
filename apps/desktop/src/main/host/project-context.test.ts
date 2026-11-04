@@ -34,7 +34,7 @@ test('chat, marketing and coding read the same project shelf and repositories, i
     }
     const context = await resolveEngineeringDisplayContext(db, 'http://127.0.0.1', 'ws', { threadId: 'code', actorId: 'user' } as never);
     const tools = context?.projectTools?.() ?? [];
-    assert.deepEqual(tools.map(tool => tool.name), ['list_library', 'read_library_doc', 'list_repos', 'read_repo_file', 'list_repo_files', 'list_repo_changes']);
+    assert.deepEqual(tools.map(tool => tool.name), ['load_skill', 'list_library', 'read_library_doc', 'list_repos', 'read_repo_file', 'list_repo_files', 'list_repo_changes']);
     assert.equal(await tools.find(tool => tool.name === 'read_library_doc')!.execute({ name: 'business-profile.md' }), 'Product B facts');
     const newer = sql.prepare("insert into artifacts values (?, 'ws', 'b', null, ?, 'doc', 'Recent note', null, '2026-10-24')");
     for (let i = 0; i < 310; i++) newer.run(`note-${i}`, `note-${i}.md`);

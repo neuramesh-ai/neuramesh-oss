@@ -1,3 +1,4 @@
+import { PermissionPicker } from '../composer/PermissionPicker';
 // The policy gate — what a machine will run without asking, and what it must ask about.
 // Split out of settings/panels-compute.tsx.
 import { DEFAULT_PROTECTED, POLICY_GROUPS, V_COLOR, isProtectedPathRule, pathOfGlob, sameSelector, selectorLabel } from './policy';
@@ -75,6 +76,8 @@ export function PolicyPanel() {
 
   return (
     <div>
+      <div className="permission-settings"><div><b>Default thread permissions</b><small>New conversations inherit this choice.</small></div><PermissionPicker workspace /></div>
+      <details className="permission-restrictions"><summary>Workspace restrictions and protected paths</summary>
       <p className="modalhint" style={{ marginBottom: 13 }}>What agents may do here — <b>ask</b> pauses for your approval, <b>deny</b> blocks it. The sandbox makes a deny binding at the OS kernel.</p>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 12px', borderRadius: 10, background: 'var(--panel2)', border: '1px solid var(--border)', marginBottom: 16 }}>
@@ -144,6 +147,7 @@ export function PolicyPanel() {
         );
       })}
       <p className="fldhint" style={{ marginTop: 2 }}>Egress is allowed by default; the sandbox proxy enforces the host allowlist. Set <b>Network → ask</b> to review each host, or <b>deny</b> to cut the network.</p>
+      </details>
     </div>
   );
 }

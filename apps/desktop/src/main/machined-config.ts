@@ -101,7 +101,7 @@ export function imageShaOf(env: Record<string, string | undefined>): string | nu
  *  names its commit; an older image sends none, and the API keeps whatever the row holds. */
 export function heartbeatBody(machineId: string, beat: { activeSeconds: number; busy: boolean; runtimes?: string[]; imageSha: string | null }) {
   return {
-    type: 'machine.heartbeat' as const,
+    type: 'machine.heartbeat' as const, permissionVersion: 1,
     machineId,
     activeSeconds: beat.activeSeconds,
     busy: beat.busy,

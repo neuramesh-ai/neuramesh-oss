@@ -1,3 +1,4 @@
+import { agentGitIdentity } from '@neuramesh/shared';
 // The runtime seam (A2A multi-runtime). Every model call in the AgentHost funnels
 // through one RuntimeAdapter so an agent can run on Claude, Codex, or Gemini chosen
 // by its `runtime`. The methods carry the EXACT positional signatures of the
@@ -88,6 +89,8 @@ export type SpawnFn = (i: { role: string; prompt: string; label?: string }) => P
 export type ParkFn = (i: { until: string; prNumber?: number; afterMinutes?: number; note: string }) => Promise<{ ok: boolean; error?: string }>;
 
 export interface TurnOpts {
+  /** Only the host supplies these. A permissioned worker routes side effects through the managed tool registry. */
+  permissionRules?: import('@neuramesh/shared').PolicyRule[];
   spawn?: SpawnFn;
   park?: ParkFn;
   /** whiteboards (docs/38): the four tool closures — built once per turn by the daemon */
@@ -234,7 +237,7 @@ export function agentBaseEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.Pr
   // "--dangerously-skip-permissions cannot be used with root/sudo privileges" (k3d, 2026-09-26).
   // A laptop is the user's own computer and keeps the check.
   if (onCloudMachine(source)) out.IS_SANDBOX = '1';
-  return out;
+  return { ...out, ...agentGitIdentity() };
 }
 
 // Build the child env for a provider invocation. apikey mode injects the key into the var the tool

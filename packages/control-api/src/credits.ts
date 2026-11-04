@@ -103,6 +103,7 @@ const GenerateSchema = z.object({
   /** the machine shows the turn's thought summaries. only on request: an older machine joins every
    *  part's text, so a thought part would print in its reply */
   thoughts: z.boolean().optional(),
+  purpose: z.literal('action-review').optional(),
 });
 type StarterBody = z.infer<typeof GenerateSchema>;
 
@@ -146,7 +147,7 @@ export function starterRequest(b: StarterBody): Record<string, unknown> {
     contents: b.contents,
     ...(b.system ? { systemInstruction: { parts: [{ text: b.system }] } } : {}),
     ...(b.tools ? { tools: b.tools } : {}),
-    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...(b.thoughts ? { includeThoughts: true } : {}) } },
+    generationConfig: { ...(b.purpose === 'action-review' ? { maxOutputTokens: 160, responseMimeType: 'application/json' } : {}), thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...(b.thoughts ? { includeThoughts: true } : {}) } },
   };
 }
 
@@ -177,6 +178,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
     const res = await fetchFn(`${STARTER_MODEL_URL}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': pre.key },
+      ...(pre.body.purpose === 'action-review' ? { signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(2500)]) } : {}),
       body: JSON.stringify(starterRequest(pre.body)),
     });
     const payload = (await res.json().catch(() => ({}))) as { usageMetadata?: GeminiUsage };

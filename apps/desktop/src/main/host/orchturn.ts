@@ -1,7 +1,9 @@
+import { zodShapeToGemini } from './gemini-tool-schema';
+export { zodShapeToGemini };
 import { orchToolsToBridge } from './orchtools-bridge';
 export { orchToolsToBridge } from './orchtools-bridge';
-import { agyConversationStream } from './agy-stream';
-import { agyModelFor } from '../relay/engineering-agy-args';
+import { agyConversationStream, agyFailureMessage } from './agy-stream';
+import { agyArgs, agyModelFor, agyUserLine } from '../relay/engineering-agy-args';
 // THE ORCHESTRATOR'S FOUR TRANSPORTS — extracted from agents.ts (track B2).
 //
 // One registry (host/orchtools.ts), four ways to hand it to a model: the Agent SDK wraps each
@@ -11,7 +13,7 @@ import { agyModelFor } from '../relay/engineering-agy-args';
 import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { starterGenerate, starterStream } from './starterproxy';
 import { replyText, starterThoughts } from './starterthoughts';
-import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
+import { claudePathOption, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
 import { claudeEffort, codexEffort, geminiThinking } from '../runtime/thinking';
 import type { ThinkingLevel } from '@neuramesh/shared';
@@ -19,12 +21,13 @@ import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
 import type { OrchTool } from './orchtools';
 import type { CodexCtor } from '../runtime/codexsdk';
+import { nativePermissionHooks } from '../chat-permission-action';
 import { conversationInput, recordRuntimeEvent, recordedTools } from '../runtime/brain-recording';
 import { recordConversationEvent } from '../harness/brain-sync';
 
 // The three orchestrator transports share ONE signature so `orchestratorTurn` dispatches by
 // provider with no coupling — each runs the SAME buildOrchestratorTools registry its own way.
-export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string, thinking?: string) => void; thinking?: ThinkingLevel | null };
+export type OrchTransportArgs = { nativeGate?: import('../runtime/adapter').PermissionGate; managedTools?:boolean; abort?:AbortSignal; abortController?: AbortController; model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string, thinking?: string) => void; thinking?: ThinkingLevel | null };
 
 
 
@@ -47,44 +50,6 @@ export async function geminiDispatch(
 // The orchestrator's tool-loop on GEMINI (the free default brain). Mirrors the Anthropic query()
 // loop — same tools, same system prompt — but via @google/genai function-calling, in-process.
 // The reply (which may embed a ```nmq card — plain text) is returned exactly like the Claude path.
-/** the enum of Gemini schema types, as `@google/genai` exports it (passed in, so this stays a pure function) */
-type GeminiTypes = { STRING: unknown; NUMBER: unknown; BOOLEAN: unknown; ARRAY: unknown; OBJECT: unknown };
-
-/**
- * zod shape → a Gemini parameter Schema. describe() text rides through as the field description.
- * OBJECTS NEST (2026-09-19, the local fleet harness): `draft_posts` takes `posts: array(object)`, and
- * the old table mapped every unknown zod type to STRING, so the house model saw `items: STRING`,
- * answered `["{body:", "imageBrief:", "script:", "}"]` ten times over and hit the turn cap. A
- * schema the model cannot satisfy is a tool the model cannot call.
- */
-export function zodShapeToGemini(shape: Record<string, any>, Type: GeminiTypes): any | undefined {
-  const unwrap = (t: any): { inner: any; optional: boolean } => {
-    let inner = t; let optional = false;
-    while (['ZodOptional', 'ZodNullable', 'ZodDefault'].includes(inner?._def?.typeName)) { optional = true; inner = inner._def.innerType; }
-    return { inner, optional };
-  };
-  const geminiType = (t: any): any => {
-    const tn = t?._def?.typeName;
-    if (tn === 'ZodNumber') return { type: Type.NUMBER };
-    if (tn === 'ZodBoolean') return { type: Type.BOOLEAN };
-    if (tn === 'ZodArray') return { type: Type.ARRAY, items: geminiType(unwrap(t._def.type).inner) };
-    if (tn === 'ZodEnum') return { type: Type.STRING, enum: t._def.values };
-    if (tn === 'ZodObject') return zodShapeToGemini(typeof t._def.shape === 'function' ? t._def.shape() : t.shape, Type) ?? { type: Type.OBJECT };
-    return { type: Type.STRING };
-  };
-  const keys = Object.keys(shape);
-  if (!keys.length) return undefined; // no-arg tool → omit parameters
-  const properties: Record<string, any> = {};
-  const required: string[] = [];
-  for (const [key, zt] of Object.entries(shape)) {
-    const { inner, optional } = unwrap(zt);
-    const description = (zt as any).description as string | undefined;
-    properties[key] = { ...geminiType(inner), ...(description ? { description } : {}) };
-    if (!optional) required.push(key);
-  }
-  return { type: Type.OBJECT, properties, ...(required.length ? { required } : {}) };
-}
-
 export async function geminiOrchestratorTurn(args: {
   model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; thinking?: ThinkingLevel | null;
   /** the platform pays: route through control-api's metered proxy, never a local key */
@@ -114,7 +79,7 @@ export async function geminiOrchestratorTurn(args: {
   const byName = new Map(args.tools.map((t) => [t.name, t]));
   const contents: any[] = [{ role: 'user', parts: [{ text: args.transcript }] }];
   // the person's level rides an API key only: the metered lane's level is fixed, and part of its price
-  const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
+  const config = { abortSignal:args.abort, systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
   // Both the metered lane and a personal key stream provider reasoning and tool activity.
   const th = args.onDelta ? starterThoughts() : null;
   // the bubble's words outlive their round: a thought or a tool step keeps them, and only the next round's
@@ -125,7 +90,7 @@ export async function geminiOrchestratorTurn(args: {
   let lastText = '';
   for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
     if (args.abort?.aborted) throw new Error('stopped by a human');
-    const call = { apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config, ...(th ? { thoughts: true } : {}) };
+    const call = { signal:args.abort, apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config, ...(th ? { thoughts: true } : {}) };
     // a watched round streams: the bubble types this round's words, filtered as the posted reply is
     // below (a narrated call never types itself out); the next round's words replace them, as on Claude.
     // every update carries the thoughts so far: the desktop's stream store drops them from an update that lacks them
@@ -195,6 +160,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
     query({
       prompt: claudeAgentPrompt(args.transcript, args.attachments),
       options: {
+        abortController: args.abortController,
         ...claudePathOption(),
         env: providerEnv('anthropic', args.token),
         model: args.model,
@@ -216,9 +182,10 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         // write anything at all, which is what made it answer "I don't have a write tool" and go
         // looking for a teammate. Five tools back, scoped to `cwd` above; Bash stays out, because
         // running commands on the user's machine is a worker's job behind the policy gate.
-        tools: ['ToolSearch', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+        tools: args.managedTools ? ['ToolSearch'] : ['ToolSearch', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
         allowedTools: args.tools.map((t) => `mcp__nm__${t.name}`),
         permissionMode: 'bypassPermissions',
+        ...(args.nativeGate ? { hooks: nativePermissionHooks(args.nativeGate) } : {}),
         cwd: args.cwd ?? os.tmpdir(),
         systemPrompt: args.systemPrompt,
         ...partialMessages(args.onDelta, args.model), // token deltas for the live bubble (turnkit.ts)
@@ -241,7 +208,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
 // plan with NO API key. agy can't see our in-process tool closures (it spawns its MCP server as a
 // separate process), so the bridge exposes them on 127.0.0.1 behind a per-turn secret and a tiny
 // shim agy spawns proxies to it; per-turn context rides in the env we pass agy (it forwards env to
-// the shim, verified). stdin is closed — `agy --print` hangs on an open stdin pipe (see gemini.ts).
+// the shim, verified). Send one stream-json turn on stdin so long threads fit without compaction.
 // zod shape → MCP JSON-Schema BridgeTool[] (string/number/boolean/array/enum/optional subset) —
 // shared by the agy + codex orchestrators, which both drive the same nm tools over the orchmcp bridge.
 
@@ -256,8 +223,7 @@ export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<stri
   const { ensureCli } = await import('../runtime/cli');
 
   const port = await orchmcp.ensureBridge();
-  const shim = orchmcp.ensureShim(userDataDir());
-  orchmcp.ensureAgyMcpConfig(shim);
+  orchmcp.ensureAgyMcpConfig(orchmcp.ensureShim(userDataDir()));
   const bin = await ensureCli('gemini', args.log); // resolves the `agy` binary (or throws install steps)
 
   const turnId = randomUUID();
@@ -268,15 +234,19 @@ export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<stri
   const env = { ...process.env, NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret };
   const runAgy = (promptText: string) => new Promise<string>((resolve, reject) => {
     const model = agyModelFor(args.model, args.thinking);
-    const child = spawn(bin, ['--output-format', 'stream-json', ...(model ? ['--model', model] : []), '--print', promptText], { stdio: ['ignore', 'pipe', 'pipe'], env, cwd: args.cwd });
+    const child = spawn(bin, ['--settings', orchmcp.managedAgySettings(), ...agyArgs({model,mode:null})], { stdio: ['pipe', 'pipe', 'pipe'], env, cwd: args.cwd, signal:args.abort });
     const stream = agyConversationStream(args.tools.map(t => t.name), args.onDelta, event => recordRuntimeEvent('agy', event), text => recordConversationEvent('assistant.message', { text, provider: 'agy', model: args.model }));
-    let errTail = '';
+    let errorStart = '';
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (data: string) => { try { stream.push(data); } catch (error) { child.kill(); reject(error); } });
-    child.stderr.on('data', (d) => { errTail = (errTail + String(d)).slice(-400); });
+    // A CLI which rejects its flags may close stdin before reading; close reports its actual error.
+    child.stdin.on('error', (error: NodeJS.ErrnoException) => { if (error.code !== 'EPIPE') { child.kill(); reject(error); } });
+    child.stdin.end(agyUserLine(promptText));
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (d: string) => { if (errorStart.length < 4096) errorStart += d.slice(0, 4096 - errorStart.length); });
     child.on('error', (e) => reject(new Error(`agy failed to start: ${e.message}`)));
     child.on('close', (code) => {
-      if (code !== 0) { reject(new Error(`agy orchestrator exited ${code}: ${errTail.replace(/\s+/g, ' ').slice(-200) || 'is agy signed in? run `agy` to sign in'}`)); return; }
+      if (code !== 0) { reject(new Error(agyFailureMessage(code, errorStart))); return; }
       try { resolve(stream.finish()); } catch (error) { reject(error); }
     });
   });
@@ -307,7 +277,7 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   args = { ...args, transcript: conversationInput('codex', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
   const { randomUUID } = await import('node:crypto');
   const os = await import('node:os');
-  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { userDataDir } = await import('../harness/turntools'); // not electron: see agyOrchestratorTurn
   const orchmcp = await import('../runtime/orchmcp');
@@ -332,14 +302,21 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
     features: { image_generation: false },
     developer_instructions: 'This turn runs inside NeuraMesh. Generate and deliver images with the nm share_images tool. It saves the image as an attachment in the current conversation. Host image-generation skills and files rendered in another client do not deliver images here. Only report an image as delivered after share_images confirms attachment success.',
   } : {};
-  const config = { model_reasoning_summary: 'detailed', ...imageDelivery, mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
-  const codex = new Codex({ codexPathOverride: bin, apiKey: args.token || undefined, env, config });
-  const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' as const };
+  const config = { model_reasoning_summary: 'detailed', ...imageDelivery,
+    features: { ...imageDelivery.features, shell_tool:false, unified_exec:false }, web_search:'disabled',
+    mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
+  // The SDK exposes structured config overrides but the CLI flag that isolates
+  // user-installed MCP servers is separate. Keep the subscription credential
+  // store while loading only the tools configured for this turn.
+  const launcher = join(dir, 'nm-codex-exec');
+  writeFileSync(launcher, '#!/bin/sh\nshift\nexec "$NM_CODEX_EXECUTABLE" exec --ignore-user-config "$@"\n', { mode: 0o700 });
+  const codex = new Codex({ codexPathOverride: launcher, apiKey: args.token || undefined, env: { ...env, NM_CODEX_EXECUTABLE: bin }, config });
+  const opts = { sandboxMode: 'read-only' as const, workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' as const };
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
     // STREAMED, like every other codex turn: `.run()` gave the bubble nothing until the whole reply
     // landed. runResilient falls back to the account default when the plan lacks the model.
-    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, codexInput(prompt, args.attachments), {}, args.log, args.onDelta);
+    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, codexInput(prompt, args.attachments), {signal:args.abort}, args.log, args.onDelta);
     if (!turn.text && turn.failure) throw new Error(`codex: ${turn.failure.slice(0, 200)}`);
     args.log?.({ kind: 'result', phase: 'success', summary: 'replied · codex (ChatGPT login)' });
     return turn.text.trim() || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder

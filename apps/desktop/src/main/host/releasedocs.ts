@@ -120,7 +120,7 @@ async function releaseDocsNote(cloneUrl: string | null): Promise<string> {
 // the list clears — the server refuses an early execute (SHIP_ITEMS_PENDING), so
 // this can be eager. The watch selects ship_plan, so every tick re-fires it.
 db.watch(
-  `select id, number, title, channel_id, pr_number, ship_plan from tasks where state = 'releasing'`,
+  `select id, number, title, channel_id, pr_number, ship_plan, case when json_type(work_plan,'$.codingDelivery') is not null then assignee_id end as coding_owner from tasks where state = 'releasing'`,
   [],
   {
     onResult: async (r) => {
@@ -131,9 +131,9 @@ db.watch(
         if (!plan) continue;
         shipPrepped.delete(row.id); // the round landed — a later revise re-enters the draft flow cleanly
         // prefer the shipper that authored the plan when it lives here; else any local channel shipper
-        const shipper = agents.get(plan.shipperId) ?? [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(row.channel_id));
-        if (!shipper || shipper.role !== 'shipper') continue;
-        const actor = { kind: 'agent', id: shipper.id, role: 'shipper' };
+        const shipper = row.coding_owner ? agents.get(row.coding_owner) : agents.get(plan.shipperId) ?? [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(row.channel_id));
+        if (!shipper || (!row.coding_owner && shipper.role !== 'shipper')) continue;
+        const actor = { kind: 'agent', id: shipper.id, role: shipper.role };
         // host-verified CI items: settle once, tick on green
         for (const item of plan.items) {
           if (item.auto !== 'ci' || item.state !== 'pending') continue;
@@ -178,23 +178,23 @@ db.watch(
 );
 
 db.watch(
-  `select t.id, t.number, t.title, t.channel_id, t.pr_number, t.pr_url, t.ship_plan, r.org_name, r.name as repo_name, r.clone_url, r.local_path
+  `select t.id, t.number, t.title, t.channel_id, t.pr_number, t.pr_url, t.ship_plan, case when json_type(t.work_plan,'$.codingDelivery') is not null then t.assignee_id end as coding_owner, r.org_name, r.name as repo_name, r.clone_url, r.local_path
    from tasks t join repos r on r.id = t.repo_id
    where t.state = 'verifying' and t.pr_number is not null`,
   [],
   {
     onResult: async (r) => {
       if (!(await repoCred.watches())) return; // no own gh login and not the runner's App lane: a capable daemon merges + verifies
-      for (const row of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; channel_id: string; pr_number: number; pr_url: string | null; ship_plan: string | null; org_name: string; repo_name: string; clone_url: string | null; local_path: string | null }>) {
+      for (const row of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; channel_id: string; pr_number: number; pr_url: string | null; ship_plan: string | null; coding_owner: string | null; org_name: string; repo_name: string; clone_url: string | null; local_path: string | null }>) {
         if (verifyInFlight.has(row.id)) continue;
         let plan: ShipPlan | null = null;
         try { plan = row.ship_plan ? (JSON.parse(row.ship_plan) as ShipPlan) : null; } catch { /* tolerated — fall through to any local shipper */ }
-        const shipper = (plan ? agents.get(plan.shipperId) : undefined) ?? [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(row.channel_id));
-        if (!shipper || shipper.role !== 'shipper') continue;
+        const shipper = row.coding_owner ? agents.get(row.coding_owner) : (plan ? agents.get(plan.shipperId) : undefined) ?? [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(row.channel_id));
+        if (!shipper || (!row.coding_owner && shipper.role !== 'shipper')) continue;
         verifyInFlight.add(row.id);
         void (async () => {
           try {
-            const actor = { kind: 'agent', id: shipper.id, role: 'shipper' };
+            const actor = { kind: 'agent', id: shipper.id, role: shipper.role };
             const chan = await db.get<{ id: string; workspace_id: string }>('select id, workspace_id from channels where id = ?', [row.channel_id]).catch(() => null);
             const say = async (body: string) => { if (chan) await post('/v1/messages', actor, { workspace: chan.workspace_id, channel: chan.id, taskId: row.id, body }).catch(() => {}); };
             // the thread IS the dedupe store — a daemon restart re-runs the

@@ -32,6 +32,7 @@ export interface JourneyTask {
   /** ship leg present when the project gate is on AND the task is repo-backed */
   repoBacked: boolean;
   shipGate: boolean;
+  codingDelivery?: { prepareRelease: boolean } | null;
   assigneeName?: string | null;
   /**
    * Plan-first units (2026-08-17): the DECLARED legs from the unit's work plan. When present
@@ -127,7 +128,7 @@ export function journeyFor(task: JourneyTask, roster: JourneyRoster, beats?: { d
     if (task.hasPlanDoc || state === 'planning' || state === 'plan_review') keys.push('plan');
     keys.push('build', 'review');
   }
-  if (task.shipGate && (task.repoBacked || state === 'shipping' || state === 'ship_review' || state === 'releasing' || state === 'verifying')) keys.push('ship');
+  if ((task.shipGate || task.codingDelivery) && ((task.repoBacked && (!task.codingDelivery || task.codingDelivery.prepareRelease)) || state === 'shipping' || state === 'ship_review' || state === 'releasing' || state === 'verifying')) keys.push('ship');
   keys.push('accept');
 
   const cur = legOfState(state);
@@ -139,10 +140,10 @@ export function journeyFor(task: JourneyTask, roster: JourneyRoster, beats?: { d
   const ownerOf = (k: JourneyKey): string | null => {
     switch (k) {
       case 'design': return roster.designer ?? null;
-      case 'plan': return roster.architect ?? null;
+      case 'plan': return task.assigneeName ?? roster.architect ?? null;
       case 'build': return task.assigneeName ?? roster.developer ?? null;
-      case 'review': return roster.reviewer ?? null;
-      case 'ship': return roster.shipper ?? null;
+      case 'review': return task.codingDelivery ? task.assigneeName ?? null : roster.reviewer ?? null;
+      case 'ship': return task.codingDelivery ? task.assigneeName ?? null : roster.shipper ?? null;
       case 'accept': return 'you';
     }
   };

@@ -1,11 +1,11 @@
-import { awaitingEngineeringHistory, restoreEngineeringConnection } from '@neuramesh/shared';
+import { awaitingEngineeringHistory, restoreEngineeringConnection, connectEngineeringTask, type EngineeringTaskConnectionState, type EngineeringRuntimeEvent } from '@neuramesh/shared';
 import { engineeringEffort, type EngineeringSelection } from '@neuramesh/shared';
 import { canContinueEngineering } from '@neuramesh/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bridgeReady, nm, type NMBridge } from '../bridge/nm';
 import { codeBridge } from '../bridge/desktop-relay';
 import {
-  createEngineeringSession,
+  createEngineeringSession, REVIEW_ENGINEERING_PERMISSIONS,
   dismissEngineeringModeHandoff,
   setEngineeringModel,
   setEngineeringMode,
@@ -38,12 +38,13 @@ const sendCommand = (handle: Handle | null, command: Parameters<Handle['send']>[
 export const beginComposerPrompt = (session: EngineeringSession, prompt: string, attachments: EngineeringAttachment[] = []): EngineeringSession =>
   ({ ...beginRemoteEngineeringPrompt(session, prompt, attachments), blockedOn: null });
 
-export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[], workspaceId: string, initialActiveId: string | null = null, defaultMachineId: string | null = null) {
+export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[], workspaceId: string, initialActiveId: string | null = null, defaultMachineId: string | null = null, taskOwned = false) {
   const [sessions, setSessions] = useState<EngineeringSession[]>(() => loadEngineeringSessions(workspaceId, repos));
   const [activeId, setActiveId] = useState<string | null>(() => initialActiveId && sessions.some((session) => session.id === initialActiveId) ? initialActiveId : null);
   const [runtime, setRuntime] = useState<RuntimeState>(harness ? 'ready' : 'checking');
   const [reason, setReason] = useState<string | undefined>(harness ? 'Deterministic local harness: permission gates, diffs, and checkpoints are simulated without model billing.' : undefined);
   const handles = useRef(new Map<string, Handle>());
+  const [taskConnection, setTaskConnection] = useState<EngineeringTaskConnectionState | null>(null);
   const [historyReady, setHistoryReady] = useState<Set<string>>(() => new Set());
   const markHistoryReady = useCallback((id: string, ready: boolean) => setHistoryReady(previous => {
     const next = new Set(previous); if (ready) next.add(id); else next.delete(id); return next;
@@ -111,7 +112,9 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     const existing = handles.current.get(session.id);
     const code = codeBridge();
     if (existing || harness || !code?.openEngineering) return existing ?? null;
-    const open = (session: EngineeringSession, observe?: (event: { type?: unknown; recordedRevision?: unknown }) => void): Handle => code!.openEngineering!({
+    const receive = (event: EngineeringRuntimeEvent) =>
+      setSessions(all => all.map(item => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item));
+    const open = (session: EngineeringSession, observe?: (event: { type?: unknown; recordedRevision?: unknown }) => void, callbacks?: { event: typeof receive; exit: () => void }): Handle => code!.openEngineering!({
       threadId: session.id, repoId: session.repo.id, repoName: session.repo.name, branch: session.repo.branch,
       ...(session.project?.id ? { projectId: session.project.id } : {}),
       ...(session.repo.root ? { cwd: session.repo.root } : {}),
@@ -120,23 +123,30 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
       agentId: session.agentId ?? null, reasoningEffort: session.reasoningEffort ?? null, modelId: codeModelOf(session.modelOverride), brainPack: session.brainPack,
       // rule D9: which machine hosts this session — the desktop routes its own id in process
       ...(session.machineId ? { machineId: session.machineId } : {}),
-    }, (event) => { observe?.(event); setSessions((all) => all.map((item) => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item)); }, () => {
+    }, (event) => { if (callbacks) callbacks.event(event); else { observe?.(event); receive(event); } }, () => {
+      if (callbacks) { callbacks.exit(); return; }
       handles.current.delete(session.id);
       setSessions((all) => all.map((item) => item.id === session.id && (item.state === 'streaming' || item.state === 'awaiting_approval')
         ? failRemoteEngineeringTransport(item, new Error('The Code workspace connection closed.'))
         : item));
     });
     markHistoryReady(session.id, !restore);
-    const handle = restore ? restoreEngineeringConnection({
-      workspace: workspaceId, session,
+    const history = {
+      workspace: workspaceId,
       read: () => nm?.engineeringHistory?.(session.id, workspaceId) ?? Promise.reject(new Error('Update the app to restore this recorded conversation.')),
-      restored: next => { setSessions(all => all.map(item => item.id === next.id ? next : item)); markHistoryReady(next.id, true); },
-      open,
+      restored: (next: EngineeringSession) => { setSessions(all => all.map(item => item.id === next.id ? next : item)); markHistoryReady(next.id, true); },
+    };
+    const handle = taskOwned ? connectEngineeringTask({
+      ...history, session: () => sessionsRef.current.find(item => item.id === session.id) ?? session,
+      open: (next, event, exit) => open(next, undefined, { event, exit }),
+      event: receive, changed: setTaskConnection,
+    }) : restore ? restoreEngineeringConnection({
+      ...history, session, open,
       failed: error => { fail(session.id, error); markHistoryReady(session.id, true); },
     }) : open(session);
     handles.current.set(session.id, handle);
     return handle;
-  }, [harness, workspaceId, fail, markHistoryReady]);
+  }, [harness, workspaceId, fail, markHistoryReady, taskOwned]);
   // A click in the workspace-wide All threads rail arrives as a requested Engineering session.
   // Resolve it inside the already-mounted destination so global navigation and the in-pane
   // history button share the same runtime connection rather than remounting an active runner.
@@ -183,7 +193,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
   const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null; modelOverride?: string | null; agentId?: string | null; reasoningEffort?: EngineeringSelection['reasoningEffort'] }) => {
     const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing, true); return; }
     const text = spec.firstPrompt?.trim() ?? '';
-    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, agentId: spec.agentId ?? null, reasoningEffort: spec.reasoningEffort ?? null, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
+    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId, text ? undefined : REVIEW_ENGINEERING_PERMISSIONS), id: spec.id, agentId: spec.agentId ?? null, reasoningEffort: spec.reasoningEffort ?? null, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
     if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created, true); return; }
     setSessions((all) => [...all, harness ? submitEngineeringPrompt(created, text) : beginRemoteEngineeringPrompt(created, text, [])]); setActiveId(spec.id);
     if (harness) return;
@@ -246,8 +256,9 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (Number.isInteger(checkpointRunCount) && checkpointRunCount > 0) sendCommand(connect(session), { type: 'restore', checkpointRunCount }, (error) => fail(session.id, error));
   };
   const home = () => { closeInactiveEngineeringHandles(handles.current, sessions, null); setActiveId(null); };
+  const reconnect = (session: EngineeringSession) => { handles.current.get(session.id)?.close(); handles.current.delete(session.id); connect(session, true); };
   const active = sessions.find(session => session.id === activeId) ?? null;
   // Cached text can paint immediately; actions wait for the recording, even before adoption runs.
-  const visible = active && !harness && !historyReady.has(active.id) ? awaitingEngineeringHistory(active) : active;
-  return { sessions, active: visible, runtime, reason, update, create, start, open, adopt, reopen, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, configure, approve, restore };
+  const visible = active && !harness && (!historyReady.has(active.id) || (taskOwned && taskConnection && taskConnection.phase !== 'connected')) ? awaitingEngineeringHistory(active) : active;
+  return { sessions, active: visible, runtime, reason, taskConnection, reconnect, update, create, start, open, adopt, reopen, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, configure, approve, restore };
 }
