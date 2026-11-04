@@ -300,7 +300,7 @@ export interface Store extends MarketingStore {
    *  resolves to the owner), and a local one from any human member of its workspace. false: no
    *  machine this actor may beat has that id, and nothing moved or was charged. `daemonVersion`:
    *  the build a cloud machine reports (its image's commit); absent keeps the row's */
-  heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<boolean>;
+  heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string; permissionVersion?: number }): Promise<boolean>;
   // Upsert by (workspace, name); registers channel scope. Event on first insert.
   registerAgent(input: {
     workspace: string;
@@ -394,7 +394,7 @@ export interface Store extends MarketingStore {
   setScheduleStatus(scheduleId: string, status: 'active' | 'paused', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string; replyGap?: number | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteSchedule(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
-  claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ claimed: boolean }>;
+  claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent, authority?: { actor: import('@neuramesh/shared').Actor; machineWorkspace?: string }): Promise<{ claimed: boolean; schedulePermission?: string }>;
   /** Run now (routine sessions, 2026-09-28): the schedule is due at once, so the next tick fires it into its
    * session. INVALID_INPUT on a paused or finished row, NOT_FOUND on none (store/schedule-now.ts). */
   runScheduleNow(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;

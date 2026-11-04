@@ -1,17 +1,6 @@
 -- Smoke: seed one workspace end-to-end, prove counter, claim CAS, and the
 -- transition guard. Runs as superuser (RLS bypassed by design here).
 --
--- ⚠ STALE — this fixture stopped matching the schema a long time ago and is only PARTLY
--- repaired (2026-08-08). Fixed here: the missing `nm_users` row (0032 repointed the user FKs
--- off auth.users, and its backfill can't cover rows inserted later). Still broken below:
--- `channels.project_id` went NOT NULL at 0035, so the channel/project inserts need reordering
--- — and there may be more after it; each layer only surfaces once the one above it passes.
---
--- The MIGRATIONS themselves are verified: scripts/validate-db.sh applies all of them cleanly
--- (its own two bugs — the alpine image with no pgvector, and a pg_isready race against the
--- entrypoint's temporary server — are fixed), and `pnpm test:pg` runs 112 tests against the
--- real schema. This file is the assertion layer on top, and it is the piece still owed.
-
 \set ON_ERROR_STOP on
 
 begin;
@@ -30,11 +19,17 @@ values ('10000000-0000-0000-0000-000000000001', 'Acme Robotics', 'acme', '000000
 insert into workspace_members (workspace_id, user_id, role)
 values ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'owner');
 
-insert into channels (id, workspace_id, slug, topic)
-values ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'dev', 'Engineering');
+insert into projects (id, workspace_id, name, slug, is_default)
+values ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'marketing-site', 'marketing-site', true);
 
-insert into projects (id, workspace_id, channel_id, name, slug, is_default)
-values ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'marketing-site', 'marketing-site', true);
+insert into channels (id, workspace_id, project_id, slug, topic)
+values ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'dev', 'Engineering');
+
+do $$
+begin
+  if (select permission_mode from workspaces where id='10000000-0000-0000-0000-000000000001') is distinct from 'auto-review'
+    then raise exception 'new workspaces must start in Auto Review permission mode'; end if;
+end $$;
 
 insert into repos (id, workspace_id, org_name, name, clone_url)
 values ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'acme', 'marketing-site', 'git@github.com:acme/marketing-site.git');
@@ -122,12 +117,12 @@ values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-0000000
 insert into artifacts (workspace_id, channel_id, project_id, task_id, kind, name, storage_path, created_by_kind, created_by)
 values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'screenshot', 'after.png', 'ws/acme/artifacts/after.png', 'agent', '60000000-0000-0000-0000-000000000001');
 
--- second default project in the same channel must be rejected
+-- second default project in the same workspace must be rejected
 do $$
 begin
-  insert into projects (workspace_id, channel_id, name, slug, is_default)
-  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'docs', 'docs-platform', true);
-  raise exception 'one-default-project-per-channel index missing';
+  insert into projects (workspace_id, name, slug, is_default)
+  values ('10000000-0000-0000-0000-000000000001', 'docs', 'docs-platform', true);
+  raise exception 'one-default-project-per-workspace index missing';
 exception when unique_violation then
   null;
 end $$;

@@ -85,6 +85,10 @@ ipcMain.handle('nm:workspace-update', async (_e, { autoFailover, activeModelPack
 });
 // Agent permission policies (Phase 1): read persisted overrides from the replica (the
 // renderer merges them with the shared baseline); writes go through the command handler.
+ipcMain.handle('nm:permission-selection', (_e, {threadId,taskId}: {threadId?:string;taskId?:string}) =>
+  api('/v1/permissions?' + new URLSearchParams({ workspace: ws(), ...(threadId ? {threadId} : {}), ...(taskId ? {taskId} : {}) })));
+ipcMain.handle('nm:permission-save', (_e, { mode, threadId,taskId }: { mode: string | null; threadId?: string;taskId?:string }) =>
+  api('/v1/permissions', { workspace: ws(), mode, threadId,taskId }));
 ipcMain.handle('nm:policies', async () =>
   db().getAll('select id, scope, capability, selector, verdict, rationale, locked, project_id from policies where workspace_id = ?', [ws()]));
 ipcMain.handle('nm:policy-set', async (_e, input: Record<string, unknown>) =>

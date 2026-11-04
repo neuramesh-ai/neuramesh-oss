@@ -95,7 +95,7 @@ export function makeReleaseWatch(ctx: {
   }
 
   /** after the claim: read, scan, dedupe, open the session or leave a quiet line, move the cursor */
-  async function fire(s: SlotRow, payload: ReleasePayload, pre: Extract<Preflight, { ok: true }>): Promise<{ outcome: 'fired' | 'quiet'; error: null } | { outcome: 'failed'; error: string }> {
+  async function fire(s: SlotRow, payload: ReleasePayload, pre: Extract<Preflight, { ok: true }>, schedulePermission?:string): Promise<{ outcome: 'fired' | 'quiet'; error: null } | { outcome: 'failed'; error: string }> {
     const at = now();
     const cursorAt = payload.latest ? '1970-01-01T00:00:00.000Z' : (payload.cursor?.at ?? at.toISOString());
     const sinceTag = payload.cursor?.tag ?? null;
@@ -141,7 +141,7 @@ export function makeReleaseWatch(ctx: {
     try {
       // one session per routine: each window with news is a run in the routine's one session
       const at = ctx.session ? await ctx.session(s) : { threadId: mintThread(), channelId: s.channel_id };
-      const r = await ctx.post('/v1/messages', owner, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, body });
+      const r = await ctx.post('/v1/messages', owner, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, ...(schedulePermission ? { schedulePermission } : {}), body });
       if (!r.ok) throw new Error(`the server refused the release session (${r.status})`);
       await setCursor();
     } catch (e) {

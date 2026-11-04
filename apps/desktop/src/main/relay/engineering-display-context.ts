@@ -1,3 +1,4 @@
+import { skillBody, workspaceSkills } from '../host/workspace-skills';
 import { z } from 'zod';
 import { jsonSchemaFor } from '../harness/toolschema';
 import { projectLibrary, projectRepos } from '../host/project-context';
@@ -22,6 +23,7 @@ export async function resolveEngineeringDisplayContext(db: AttDbLike, apiUrl: st
   const scope = z.enum(['project', 'room', 'workspace']).optional();
   const tool = <T extends z.ZodRawShape>(name: string, description: string, shape: T, run: (i: z.infer<z.ZodObject<T>>) => Promise<unknown>) => ({ name, description, inputSchema: jsonSchemaFor(shape), execute: async (i: unknown) => run(z.object(shape).strict().parse(i)) });
   return { ...room, projectTools: () => [
+    tool('load_skill', 'Load an enabled workspace skill by name. Use it when the user attaches a skill to their message. The optional pack identifies the requested copy.', { name: z.string().min(1), pack: z.string().optional() }, async i => skillBody(await workspaceSkills(db, workspaceId), i.name, i.pack)),
     tool('list_library', 'List the active project files, including brand documents and historical project contexts. Available in every thread. Returns up to 60 documents; use offset 60, 120, etc. for subsequent pages.', { scope, offset: z.number().int().min(0).optional() }, i => listLibrary(library, room.id, i.scope ?? 'project', i.offset)),
     tool('read_library_doc', 'Read a project document by name from list_library before making claims about the product.', { name: z.string().min(1), scope }, i => readLibraryDoc(library, room.id, i.name, i.scope ?? 'project', grounding)),
     tool('list_repos', 'List all repositories attached to the active project. Pass an id to the repository read tools.', {}, () => projectRepos(db, room.id, at)),

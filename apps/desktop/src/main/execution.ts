@@ -11,6 +11,10 @@
 // submit so review/acceptance never depends on this machine (docs/03 §9).
 // A machine uses its own git credentials (BYO git). A login-less cloud machine
 // uses the GitHub App's token for the one repository instead (host/repocred.ts).
+import { join } from 'node:path';
+import { openTaskCheckout } from './host/task-checkout';
+import { agentGitIdentity } from '@neuramesh/shared';
+import { CodingEvidenceBlocked, prValidationSection } from './host/coding-validation-files';
 import type { LogFn } from './agentlog';
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, planEvidenceBudget, sweepEvidenceImages } from './evidence';
 import { cachePath } from './harness/brain';
@@ -27,11 +31,11 @@ import type { ExecTask, HostedAgent, SkillRef } from './agents';
 export async function worktreeRun(
   t: ExecTask & { repo_id: string },
   repo: { clone_url: string; default_branch: string },
-  work: (dir: string) => Promise<void>,
+  work: (dir: string) => Promise<string[] | void>,
   autoOpenPr = true,
   repoCred?: RepoCred,
 ): Promise<{ sha: string; branch: string; diff: string; prUrl?: string; prNumber?: number; prNote?: string }> {
-  const { existsSync, mkdirSync, rmSync } = await import('node:fs');
+  const { existsSync, rmSync, readFileSync, realpathSync, writeFileSync } = await import('node:fs');
   const slug = repoSlug(repo.clone_url);
   // the clone, the push and the PR run on the machine's own login, or on a login-less cloud
   // machine on the App's token for this one repository. No credential fails before any work.
@@ -44,23 +48,20 @@ export async function worktreeRun(
   const cloneDir = cachePath('repos', t.repo_id);
   const wtDir = cachePath('worktrees', `nm-${t.number}`);
 
+  const pending = cachePath('worktrees', `.pending-validation-${t.id}`);
   const baseSha = await withRepoLock(t.repo_id, async () => {
-    if (!existsSync(cloneDir)) {
-      mkdirSync(cachePath('repos'), { recursive: true });
-      await git(['clone', repo.clone_url, cloneDir], undefined, cred.env);
-    } else {
-      // --prune: stale remote-tracking refs poison --force-with-lease pushes
-      // (lease checks against a branch the remote no longer has)
-      await git(['fetch', 'origin', '--prune'], cloneDir, cred.env);
+    const { remote } = await openTaskCheckout({ number:t.number,repoId:t.repo_id,branch,base,url:repo.clone_url },cred.env,true);
+    if (existsSync(pending) && existsSync(wtDir)) {
+      const [base, savedHead = base] = readFileSync(pending, 'utf8').trim().split('\n');
+      if (!base || !/^[0-9a-f]{40}$/.test(base)) throw new CodingEvidenceBlocked('The retained checkout has an invalid baseline. Inspect the task worktree before retrying.');
+      const common = await git(['rev-parse','--path-format=absolute','--git-common-dir'],wtDir);
+      if (realpathSync(common) !== realpathSync(join(cloneDir,'.git')) || await git(['branch','--show-current'],wtDir) !== branch ||
+          await git(['rev-parse','HEAD'],wtDir) !== savedHead) throw new CodingEvidenceBlocked('The saved validation checkout changed. Inspect the task terminal and restore the expected checkout before retrying.');
+      await git(['merge-base', '--is-ancestor', base, savedHead!], wtDir).catch(() => {
+        throw new CodingEvidenceBlocked('The retained checkout no longer contains its original baseline. Inspect the task terminal before retrying.');
+      });
+      return base;
     }
-    rmSync(wtDir, { recursive: true, force: true }); // crashed-run leftovers
-    await git(['worktree', 'prune'], cloneDir);
-    // A REWORK continues from the prior attempt's pushed branch — the submitted work IS the
-    // starting point and review feedback edits it forward (rework.ts's stated contract, which
-    // this line silently broke by always resetting to base: prior commits survived only on the
-    // remote until the next force-push erased them). Only a first attempt starts from base.
-    const priorWork = await git(['rev-parse', '--verify', '--quiet', `origin/${branch}`], cloneDir).catch(() => '');
-    await git(['worktree', 'add', '--force', wtDir, '-B', branch, priorWork ? `origin/${branch}` : `origin/${base}`], cloneDir);
     // structural: staging dirs (.nm-evidence/, .nm-attachments/) can never reach the
     // commit below — excluded before any agent writes a file (the #1004 class)
     await excludeFromGit(wtDir, STAGING_EXCLUDES);
@@ -69,13 +70,19 @@ export async function worktreeRun(
     const hyd = await hydrateFromDonor(wtDir, cachePath('donors', t.repo_id)).catch(() => null);
     if (hyd?.action === 'hydrated') console.log(`donor_hydrate nm-${t.number}: ${hyd.relPaths.length} tree(s) in ${hyd.ms}ms`);
     else if (hyd?.action === 'skipped' && hyd.reason === 'not-ignored') console.log(`donor_hydrate nm-${t.number}: undone — repo does not gitignore node_modules`);
-    return git(['rev-parse', 'HEAD'], wtDir);
+    return remote || git(['merge-base','HEAD',`origin/${base}`],wtDir);
   });
   try {
-    await work(wtDir);
-    if (await git(['status', '--porcelain'], wtDir)) {
+    const captures = await work(wtDir) ?? [];
+    if (captures.length || await git(['status', '--porcelain'], wtDir)) {
       await git(['add', '-A'], wtDir);
-      await git(['commit', '-m', `nm #${t.number}: ${t.title}`], wtDir, cred.env); // the App lane carries the committer identity
+      if (captures.length) await git(['add','-f','--',...captures.map(name => `.nm-artifacts/${name}`)],wtDir);
+      const author = { ...agentGitIdentity(), ...cred.env };
+      await git(['commit', '-m', `nm #${t.number}: ${t.title}`], wtDir, author);
+      const identity = await git(['show','-s','--format=%an%x00%ae%x00%cn%x00%ce','HEAD'],wtDir);
+      if (identity !== [author.GIT_AUTHOR_NAME,author.GIT_AUTHOR_EMAIL,author.GIT_COMMITTER_NAME,author.GIT_COMMITTER_EMAIL].join('\0')) {
+        throw new Error('The commit identity differs from the configured agent identity. Inspect the author and committer before publishing the task branch.');
+      }
     }
     const sha = await git(['rev-parse', 'HEAD'], wtDir);
     if (sha === baseSha) throw new Error('no work product — nothing changed in the worktree');
@@ -97,19 +104,22 @@ export async function worktreeRun(
     // human's accept, never committed straight to main. Uses the credential above;
     // if gh is absent/unauthed we fall back to push-only (clear thread note).
     const pr = slug && autoOpenPr
-      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}; merged on acceptance.`, cred.env)
+      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}.` + prValidationSection(slug, sha, captures), cred.env)
       : null;
     const prNote = !autoOpenPr
       ? `Pushed \`${branch}\` — auto-open-PR is off for this project. Review proceeds on the diff; open a PR manually to enable the CI gate + merge-on-accept.`
       : slug
-      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\` — merges on acceptance.`
+      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\`.`
         : cred.lane === 'app' ? `Pushed \`${branch}\`, but the neuramesh GitHub App could not open a pull request. Review proceeds on the diff. Open a pull request to turn on the CI gate and the merge on accept.`
         : `Pushed \`${branch}\` but could not open a PR (is \`gh\` installed and authed? \`gh auth login\`). Review proceeds on the diff; open a PR to enable the CI gate + merge-on-accept.`)
       : '';
+    rmSync(pending,{force:true});
     return { sha, branch, diff, ...(pr ? { prUrl: pr.url, prNumber: pr.number } : {}), prNote };
   } catch (err) {
-    // a failed run leaves nothing useful to review — reclaim it
-    await withRepoLock(t.repo_id, () => git(['worktree', 'remove', '--force', wtDir], cloneDir)).catch(() => {});
+    // A blocked or failed task still owns its worktree. Terminal and a later retry
+    // must see the same files. Only accepted/closed tasks are reclaimed by the host.
+    const head = await git(['rev-parse', 'HEAD'], wtDir);
+    writeFileSync(pending, `${baseSha}\n${head}`, { mode: 0o600 });
     throw err;
   }
   // success path keeps the worktree for the reviewer's terminal (retention

@@ -68,6 +68,9 @@ describe('the stand-down sentinel never renders', () => {
   it('stands down when the sentinel is its own first or last line, however dressed', () => {
     expect(isStandDown('NO_REPLY')).toBe(true);
     expect(isStandDown(' NO_REPLY ')).toBe(true);
+    expect(isStandDown(' (no reply) ')).toBe(true);
+    expect(isStandDown('The previous attempt had (no reply).')).toBe(false);
+    expect(visibleStream('(no reply)').text).toBe('');
     expect(isStandDown('**NO_REPLY**')).toBe(true);
     expect(isStandDown('Board is empty, nothing needs me.\n\nNO_REPLY')).toBe(true);
     expect(isStandDown('')).toBe(true); // an empty turn IS a stand-down (ORCH_EMPTY_TURN)

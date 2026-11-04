@@ -140,6 +140,7 @@ export const geminiAdapter: RuntimeAdapter = {
   async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: PermissionGate, protectedPaths?: string[], opts?: TurnOpts) {
     // the Starter lane: the same bus, direct, on the proxy — no agy, no login (runtime/starter.ts)
     if (isStarterSeat(agent.model, token)) return starterRunQuery(agent, t, dir, channelBlock, repoBacked, ac, log, skills, proposeSkill, reworkNotes, attachmentsNote, recordLesson, lessonsNote, promptOverride, addBacklogItem, beats, _permissionGate, opts);
+    if (_permissionGate && opts?.permissionRules) return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,_permissionGate,opts,{provider:'gemini',token});
     void token; // workers authenticate through agy's own Google login, not a GEMINI_API_KEY
     // ── The tool bus (docs/harness/03) ─────────────────────────────────────────────────────────
     // agy used to receive these six tool closures and discard every one of them. Now they arrive as

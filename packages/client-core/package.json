@@ -10,6 +10,7 @@
     "./api": "./src/api.ts",
     "./crud-upload": "./src/crud-upload.ts",
     "./projmeta": "./src/projmeta.ts",
+    "./markdown-references": "./src/markdown-references.ts",
     "./library": "./src/library.ts",
     "./replica": "./src/replica.ts",
     "./sqlite-replica": "./src/sqlite-replica.ts",

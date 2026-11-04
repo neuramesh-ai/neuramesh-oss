@@ -72,3 +72,14 @@ export function agyConversationStream(tools: readonly string[], onDelta?: (text:
     },
   };
 }
+
+export function agyFailureMessage(code: number | null, stderr: string): string {
+  if (/flags? provided but not defined.{0,20}-settings|unknown (?:flag|option).{0,20}-settings/i.test(stderr)) {
+    return 'This machine needs a newer Gemini runtime to use thread permissions. Choose another model in the composer, or retry after the machine updates.';
+  }
+  if (/authentication required|authentication failed|not signed in/i.test(stderr)) {
+    return 'Gemini needs you to sign in again. Reconnect your Google account on this machine, then retry.';
+  }
+  return code === 2 ? 'Gemini could not start this reply. Retry, or choose another model in the composer and retry.'
+    : 'Gemini stopped before it finished replying. Retry, or choose another model in the composer.';
+}

@@ -6,8 +6,6 @@ import { ENGINEERING_DISPLAY_PROMPT } from './engineering-display';
 import type { EngineeringProviderResolution } from './engineering-provider';
 import { engineeringCorePrompt } from './engineering-runtime-input';
 
-const HISTORY_CHARS = 40_000;
-
 /** the tool rules for this turn's mode, and for whether the nm server reached agy */
 export function agyToolRules(o: { mode: EngineeringMode; nativeEdits: boolean; nmTools: boolean }): string {
   const rules = ['Read and search files in this workspace with your own tools. Link a file with its path relative to the workspace root, never with a file:// link.'];
@@ -29,7 +27,8 @@ const blockText = (block: unknown): string => {
   return '';
 };
 
-/** an earlier conversation as plain text, newest kept when it is long */
+/** Earlier conversation as text. The lane supplies its validated compacted projection;
+ * slicing this again would discard the retained user constraints and summary. */
 export function agyHistoryText(messages: readonly unknown[]): string {
   const lines = messages.flatMap((message) => {
     if (!message || typeof message !== 'object') return [];
@@ -38,8 +37,7 @@ export function agyHistoryText(messages: readonly unknown[]): string {
     const text = typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(blockText).filter(Boolean).join('\n') : '';
     return text.trim() ? [`${m.role === 'user' ? 'User' : 'Assistant'}: ${text.trim()}`] : [];
   });
-  const joined = lines.join('\n\n');
-  return joined.length <= HISTORY_CHARS ? joined : `[earlier messages omitted]\n${joined.slice(joined.length - HISTORY_CHARS)}`;
+  return lines.join('\n\n');
 }
 
 const attachmentText = (paths: readonly string[]): string => paths.length ? `\n\nAttached files (read them with your own tools):\n${paths.map((p) => `- ${p}`).join('\n')}` : '';

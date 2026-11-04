@@ -1,6 +1,14 @@
 const MAX_QUEUED_ATTACHMENT_COMMANDS = 64;
 const MAX_QUEUED_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 
+export function queueEngineeringAttachment(queue: EngineeringAttachmentQueue, o: {
+  id: string; index: number; bytes: number; task: () => void | Promise<void>;
+  emit: (event: import('../../engineering-protocol').EngineeringRuntimeEvent) => void; close: () => void;
+}): void {
+  const queued = queue.push(o.bytes, o.task, () => o.emit({ type: 'attachment_ack', id: o.id, index: o.index }), error => o.emit({ type: 'error', code: 'INVALID_ATTACHMENT', recoverable: true, message: error instanceof Error ? error.message : 'The attachment could not be received.' }));
+  if (!queued) { o.emit({ type: 'error', code: 'ENGINEERING_PROTOCOL_LIMIT', message: 'The Engineering attachment queue exceeded its safe limit.' }); o.close(); }
+}
+
 /** Serializes stream writes while bounding closures and base64 bodies retained by pending work. */
 export class EngineeringAttachmentQueue {
   private chain = Promise.resolve();

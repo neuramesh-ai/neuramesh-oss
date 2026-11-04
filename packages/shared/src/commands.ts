@@ -65,6 +65,9 @@ export const taskCreateCommand = z.object({
   // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
   // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
   originThread: z.string().uuid().optional(),
+  permissionRunId: z.string().uuid().optional(),
+  /** Agent Desk's explicit implementation handoff; home ownership is checked by the server. */
+  codingHandoff: z.object({ requestId: z.string().uuid(), taskId: z.string().uuid().optional(), visualEvidence: z.boolean().optional(), prepareRelease: z.boolean().optional() }).optional(),
 });
 
 // The human gates + edits (the whole point of the mobile companion).
@@ -72,7 +75,7 @@ export const taskAcceptCommand = z.object({ type: z.literal('task.accept'), task
 export const taskApproveCommand = z.object({ type: z.literal('task.approve'), taskId });
 export const taskRequestChangesCommand = z.object({ type: z.literal('task.request_changes'), taskId, feedback: z.string().min(1) });
 export const taskCancelCommand = z.object({ type: z.literal('task.cancel'), taskId });
-export const taskBlockCommand = z.object({ type: z.literal('task.block'), taskId, reason: z.string().min(1) });
+export const taskBlockCommand = z.object({ type: z.literal('task.block'), taskId, reason: z.string().min(1), resolution: z.string().trim().min(1).max(2000).optional() });
 export const taskUnblockCommand = z.object({ type: z.literal('task.unblock'), taskId });
 export const taskArchiveCommand = z.object({ type: z.literal('task.archive'), taskId });
 // Backlog: promote releases a parked idea into todo (human/orchestrator only, enforced by the FSM).

@@ -1,13 +1,13 @@
+import type { ChatToolCtx } from './chat-tool-context';
 import { teamChatTools } from './chattools-team';
+import { codingChatTools } from './chattools-coding';
 import { routineTools } from './tools-routine';
 import { redrawDraftImages } from './draft-redraw';
-import type { DrawOutcome } from './drawdraft';
 // THE TOOLS A CONVERSATION GETS (docs/34).
 //
-// Everything board-shaped is absent BY CONSTRUCTION: there is no create_task here to call, so
-// "never file work uninvited" is a fact about the inventory rather than an instruction in a
-// prompt. The orchestrator alone carries the backlog trio, for the human's explicit "create the
-// task" — park-then-promote, the same sanctioned path its triage turns already walk.
+// Generic board tools remain restricted. Agent Desk homes also get a scoped coding
+// handoff: every role can delegate requested implementation without converting its
+// home into a task. The API enforces the home, project, repository and plan gate.
 //
 // Turn-scoped like the orchestrator's registry, and for the same reason: a tool that closed over
 // a previous turn's seat or thread would answer in the wrong place. Split out of host/chatturn.ts.
@@ -15,51 +15,23 @@ import type { DrawOutcome } from './drawdraft';
 
 
 
-import { type WhiteboardToolClosures } from '../harness/toolbus';
 import { SEARCH_X_DESC, WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC, searchXParams } from '../harness/tooldesc';
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import { shareChatTools } from './chattools-share';
 import { playbookCatalogText } from './tools-playbooks';
 import { searchXText, type SearchXQuery } from './searchx';
-import { newGrounding, ungrounded, type LibraryReader } from './grounding';
+import { newGrounding, ungrounded } from './grounding';
 import { draftSeconds, unpicked } from './ugcflow';
 import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
 import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; import { webChatTools } from './chattools-web'; // four leaves, one line: this file sits at its cap
 
-import type { HostedAgent } from '../agents';
-import type { LogFn } from '../agentlog';
-
-import type { HostCtx } from './ctx';
-import type { DraftRow } from './orchtools';
 
 
-type ReplicaDatabase = import('@neuramesh/client-core/replica').ReplicaDatabase;
 
-export interface ChatToolCtx {
-  z: typeof import('zod')['z'];
-  tool: typeof import('@anthropic-ai/claude-agent-sdk')['tool'];
-  createSdkMcpServer: typeof import('@anthropic-ai/claude-agent-sdk')['createSdkMcpServer'];
-  text: (t: string) => { content: Array<{ type: 'text'; text: string }> };
-  agent: HostedAgent;
-  ch: { id: string; slug: string; workspace_id: string };
-  threadId: string;
-  log: LogFn;
-  // the host services the registry calls — passed, never closed over, so the module is a
-  // function of its turn and its dependencies and nothing else
-  db: ReplicaDatabase;
-  post: HostCtx['post'];
-  apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
-  recallFor: (workspaceId: string, channelId: string, query: string) => Promise<string>;
-  loadSkillBody: (channelId: string, workspaceId: string, name: string) => Promise<string>;
-  whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
-  draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
-  /** the room's shelf (host/workspace.ts): the conversation had no way to read it before 2026-09-19 */
-  libraryDocs: LibraryReader;
-}
 
+
+export type { ChatToolCtx } from './chat-tool-context';
 export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai/claude-agent-sdk').SdkMcpToolDefinition<any>> {
   const { z, tool, text, agent, ch, threadId, log,
           db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, libraryDocs } = t;
@@ -74,7 +46,10 @@ export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai
 // pipeline" is exactly a conversation's ask — so the four board tools ride along.
 const wb = whiteboardClosures({ kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, ch, { threadId });
 return [
+    ...(t.runCommand ? [tool('run_command','Run one local command in this thread’s isolated workspace. Network and credentials are unavailable.',
+      { command:z.string().min(1).max(8000) },async i => text(await t.runCommand!(i.command)))] : []),
     ...teamChatTools(t),
+    ...codingChatTools(t),
     ...routineTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, here: () => ch.id, log }).map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))),
     tool(
       'recall',
@@ -85,8 +60,8 @@ return [
     tool(
       'load_skill',
       'Load a team skill\'s full procedure by name — how this team likes a particular kind of work done.',
-      { name: z.string().min(1) },
-      async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name))),
+      { name: z.string().min(1), pack: z.string().optional() },
+      async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name), i.pack)),
     ),
     ...libraryChatTools(t, grounding),
     ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t), ...webChatTools(t),

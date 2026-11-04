@@ -1,3 +1,5 @@
+import { registerIdleAgy, runSteerableAgy } from './engineering-agy-followups';
+import { managedAgySettings } from '../runtime/orchmcp';
 // the Gemini sign-in lane for a coding thread (docs/design/gemini-code-lane-2026-10/plan.md). agy runs
 // each turn with its own read and edit tools, and reaches NeuraMesh's managed shell, gated edits and
 // its plan, title and display tools over the loopback MCP bridge. it takes the same commands and emits
@@ -8,14 +10,14 @@ import { mkdirSync } from 'node:fs';
 import { engineeringEffort, recoverEngineeringPlanProgress, recoverRecordedEngineeringPlan, type EngineeringAgent, type EngineeringPlanProgress, type PolicyRule } from '@neuramesh/shared';
 import { isEngineeringCommand, type EngineeringCommand, type EngineeringControls, type EngineeringMachineOpenMeta, type EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { agentBaseEnv } from '../runtime/adapter';
-import type { BridgeTool } from '../runtime/orchmcp';
+import type { AgyLaneDeps } from './engineering-agy-lane';
+export type { AgyLaneDeps } from './engineering-agy-lane';
 import { agyArgs, agyModeFor, agyModelFor, nmToolsMissed } from './engineering-agy-args';
 import { AgyDriver } from './engineering-agy-driver';
 import { AgyEventMapper, type AgyInit } from './engineering-agy-events';
-import type { AgySpawn } from './engineering-agy-process';
 import { agyFirstTurn, agyNextTurn, agyToolRules } from './engineering-agy-prompt';
 import { agyBridgeTools, type AgyLaneTool } from './engineering-agy-tools';
-import { EngineeringAttachmentQueue } from './engineering-attachment-queue';
+import { EngineeringAttachmentQueue, queueEngineeringAttachment } from './engineering-attachment-queue';
 import { EngineeringAttachmentInbox } from './engineering-attachments';
 import { createEngineeringChangeRefresh } from './engineering-changes';
 import type { EngineeringConversation } from './engineering-conversation';
@@ -24,18 +26,7 @@ import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan
 import type { EngineeringProviderResolution } from './engineering-provider';
 import { engineeringTitleTool } from './engineering-title';
 import { EngineeringPromptQueue } from './engineering-turn';
-
-export interface AgyLaneDeps {
-  /** the agy binary (runtime/cli.ts ensureCli), with any argv that goes first (a test's fake agy script) */
-  bin(): Promise<{ path: string; lead?: string[] }>;
-  /** the loopback bridge's URL, with the nm shim present in agy's MCP config */
-  bridge(): Promise<string>;
-  register(turn: string, secret: string, tools: BridgeTool[]): void;
-  unregister(turn: string): void;
-  /** Cline's managed shell, web, editor and patch tools over this thread's executors */
-  managedTools(nativeEdits: boolean): AgyLaneTool[];
-  spawn?: AgySpawn;
-}
+import { compactActivity, compactEngineeringMessages, projectedEngineeringMessages, COMPACT_RECEIPT } from './engineering-compaction';
 
 const TOOLS_BLOCKED = 'Gemini could not reach the NeuraMesh tools on this machine, so it cannot run commands here. On a business Google account, the admin must allow the nm MCP server.';
 const PLAN_TOOLS = new Set(['propose_work_plan', 'update_plan_progress']);
@@ -52,12 +43,14 @@ export class AgyChannelSession {
   private readonly bridgeTurn = randomUUID();
   private readonly bridgeSecret = randomUUID();
   private messages: unknown[] = [];
+  private compactionState: unknown;
   private conversationId: string | null = null;
   private sentRules: string | null = null;
   private running = false; private aborting = false; private closed = false; private warned = false; private nmCalled = false;
   private closing: Promise<unknown[]> | null = null;
   private totals = { inputTokens: 0, outputTokens: 0 };
 
+  private releaseFollowups?: () => void;
   constructor(
     private readonly meta: EngineeringMachineOpenMeta,
     private readonly cwd: string,
@@ -71,6 +64,7 @@ export class AgyChannelSession {
     private readonly conversation?: EngineeringConversation,
     private readonly setThreadTitle?: (title: string) => Promise<unknown>,
     private readonly displayTools?: (agent?: EngineeringAgent) => EngineeringDisplayTool[],
+    private readonly permissionGate?: import('../thread-permission-gate').ThreadPermissionGate,
   ) {
     this.controls = { mode: meta.mode, permissions: { ...meta.permissions }, policy: { read: true, edit: true, command: true, web: true, mcp: true } };
     this.attachments = new EngineeringAttachmentInbox(meta.actorId, meta.threadId);
@@ -79,8 +73,14 @@ export class AgyChannelSession {
     this.driver = new AgyDriver({ cwd, mapper: new AgyEventMapper(this.ours), emit: (event) => this.forward(event), onEdited: () => this.refreshChanges(), log, ...(deps.spawn ? { spawn: deps.spawn } : {}) });
   }
 
-  async init(messages?: readonly unknown[]): Promise<void> {
+  async init(messages?: readonly unknown[], allowFollowups = true): Promise<void> {
+    if (allowFollowups) this.releaseFollowups = registerIdleAgy(this.meta.threadId, () => this.closed || this.busy, async (prompt,id,attachments) => {
+      await this.attachmentQueue.wait(); await this.attachments.resolve(attachments);
+      this.emit({type:'followup_received',id,text:prompt,attachments});
+      await this.promptQueue.run(() => this.runPrompt({type:'prompt',prompt,attachments}));
+    });
     this.messages = [...(messages ?? [])];
+    this.compactionState = this.conversation?.brain.metadata()?.['compactionState'];
     const saved = this.conversation?.brain.metadata()?.['agyConversation'];
     this.conversationId = typeof saved === 'string' ? saved : null;
     this.emit({ type: 'plan_progress', progress: this.planProgress() });
@@ -118,7 +118,7 @@ export class AgyChannelSession {
   /** end the lane: agy exits, the journal seals. `keepJournal` hands the thread to another lane */
   close(keepJournal = false): Promise<unknown[]> {
     if (this.closing) return this.closing;
-    this.closed = true;
+    this.closed = true; this.releaseFollowups?.();
     for (const resolve of this.pending.values()) resolve(false);
     this.pending.clear();
     void this.attachmentQueue.close().finally(() => this.attachments.close());
@@ -145,18 +145,43 @@ export class AgyChannelSession {
     try {
       await this.attachmentQueue.wait();
       if (this.closed) return;
+      if (command.prompt.trim() === '/compact') {
+        if (command.attachments?.length) throw new Error('Send /compact on its own, without attachments.');
+        this.emit(compactActivity(this.meta.threadId, 'Reading the conversation history.'));
+        this.emit(compactActivity(this.meta.threadId, 'Compacting earlier context and preserving recent work.'));
+        const state = await compactEngineeringMessages(this.messages as never, this.compactionState, this.provider.providerId, this.provider.modelId, this.meta.threadId);
+        if (state) {
+          await this.driver.close(); this.conversationId = null; this.sentRules = null;
+          this.compactionState = state;
+        }
+        this.emit(compactActivity(this.meta.threadId, 'Saving the working context.'));
+        const receipt = state ? COMPACT_RECEIPT : 'This conversation is already compact. Its complete history is unchanged.';
+        this.conversation?.record('user.message', { permissions: { ...this.controls.permissions }, ...this.metadata(), text: '/compact' });
+        this.messages.push({ role: 'user', content: [{ type: 'text', text: '/compact' }] }, { role: 'assistant', content: [{ type: 'text', text: receipt }] });
+        this.forward({ type: 'agent_event', event: { type: 'agent_event', payload: { sessionId: this.meta.threadId, event: { type: 'content_end', contentType: 'text', text: receipt } } } });
+        this.emit({ type: 'ended', reason: 'completed' }); return;
+      }
       const attached = await this.attachments.resolve(command.attachments);
       resolved = true;
-      this.conversation?.record('user.message', { ...this.metadata(), text: command.prompt, attachments: command.attachments ?? [], model: this.provider.modelId, provider: this.provider.providerId });
+      this.conversation?.record('user.message', { permissions: { ...this.controls.permissions }, ...this.metadata(), text: command.prompt, attachments: command.attachments ?? [], model: this.provider.modelId, provider: this.provider.providerId });
       const { init, rules } = await this.start();
       const fresh = init.conversationId !== this.conversationId;
       this.conversationId = init.conversationId;
       const files = [...attached.userImages, ...attached.userFiles];
       const text = fresh
-        ? agyFirstTurn({ provider: this.provider, rules, history: this.messages, prompt: command.prompt, attachments: files })
+        ? agyFirstTurn({ provider: this.provider, rules, history: await projectedEngineeringMessages(this.messages as never, this.compactionState), prompt: command.prompt, attachments: files })
         : agyNextTurn({ rules: rules === this.sentRules ? null : rules, prompt: command.prompt, attachments: files });
       this.sentRules = rules;
-      let result = await this.driver.run(text);
+      const {result: initial, updates} = await runSteerableAgy({
+        threadId:this.meta.threadId, text, driver:this.driver, restart:()=>this.start(),
+        attachments:this.attachments, queue:this.attachmentQueue,
+        interruptApprovals:()=>{ for (const approvalId of this.pending.keys()) this.command({type:'approval',approvalId,approved:false}); },
+        received:(id,body,refs)=>{
+          this.conversation?.record('user.message',{text:body, followupId:id, delivery:'steer', permissions:this.controls.permissions, ...this.metadata(), attachments:refs});
+          this.emit({type:'followup_received',id,text:body,attachments:refs});
+        },
+      });
+      let result = initial;
       // headless agy ends a turn with no reply when a refused step was its last move: ask once more without it
       if (!result.response.trim() && result.denied.length) result = await this.driver.run(`This machine refused your last ${result.denied.join(', ')} call. Do not repeat that call. Finish my last request with the tools that work here, or answer in text.`);
       if (!this.warned && !this.nmCalled && nmToolsMissed(result.denied)) {
@@ -168,7 +193,7 @@ export class AgyChannelSession {
       this.totals = { inputTokens: this.totals.inputTokens + result.inputTokens, outputTokens: this.totals.outputTokens + result.outputTokens };
       this.emit({ type: 'usage', ...this.totals });
       this.conversation?.record('assistant.message', { text: result.response, provider: this.provider.providerId, model: this.provider.modelId });
-      this.messages.push({ role: 'user', content: [{ type: 'text', text: command.prompt }] }, { role: 'assistant', content: [{ type: 'text', text: result.response.trim() || '[no text reply]' }] });
+      this.messages.push({ role: 'user', content: [{ type: 'text', text: command.prompt }] }, ...updates, { role: 'assistant', content: [{ type: 'text', text: result.response.trim() || '[no text reply]' }] });
       this.emit({ type: 'ended', reason: result.ok ? 'completed' : 'error' });
     } catch (error) {
       if (this.aborting) this.emit({ type: 'ended', reason: 'aborted' }); else this.fail(error);
@@ -183,13 +208,13 @@ export class AgyChannelSession {
 
   /** the agy process for this turn's mode, with this turn's tools on the bridge */
   private async start(): Promise<{ init: AgyInit; rules: string }> {
-    const mode = agyModeFor(this.controls);
+    const mode = this.permissionGate ? null : agyModeFor(this.controls);
     const tools = this.laneTools(mode === 'accept-edits');
     this.ours.clear();
     for (const tool of tools) this.ours.add(tool.name);
     const url = await this.deps.bridge();
     this.deps.register(this.bridgeTurn, this.bridgeSecret, agyBridgeTools({
-      tools, threadId: this.meta.threadId, controls: () => this.controls, policyRules: this.policyRules, pending: this.pending, emit: this.emit,
+      tools, threadId: this.meta.threadId, controls: () => this.controls, policyRules: this.policyRules, permissionGate: this.permissionGate, pending: this.pending, emit: this.emit,
       record: (type, payload) => this.conversation?.record(type, payload), cwd: this.cwd, isActive: () => !this.closed, onCall: () => { this.nmCalled = true; },
       onResult: (name, toolCallId, output) => { if (PLAN_TOOLS.has(name)) this.conversation?.event({ type: 'agent_event', payload: { sessionId: this.meta.threadId, event: { type: 'content_end', contentType: 'tool', toolName: name, toolCallId, output } } } as never); },
     }));
@@ -197,7 +222,7 @@ export class AgyChannelSession {
     // agy refuses an --add-dir it cannot find, and a lane swap can race the old inbox's cleanup of this folder
     mkdirSync(this.attachments.folder, { recursive: true });
     const model = agyModelFor(this.modelId ?? this.provider.modelId, this.meta.reasoningEffort);
-    const args = [...(bin.lead ?? []), ...agyArgs({ model, mode, conversationId: this.conversationId, addDirs: [this.attachments.folder] })];
+    const args = [...(bin.lead ?? []), ...(this.permissionGate ? ['--settings', managedAgySettings()] : []), ...agyArgs({ model, mode, conversationId: this.conversationId, addDirs: [this.attachments.folder] })];
     const key = JSON.stringify({ model, mode, tools: [...this.ours].sort() });
     const init = await this.driver.ensure(key, bin.path, args, { ...agentBaseEnv(), NM_ORCH_URL: url, NM_ORCH_TURN: this.bridgeTurn, NM_ORCH_SECRET: this.bridgeSecret });
     return { init, rules: agyToolRules({ mode: this.controls.mode, nativeEdits: mode === 'accept-edits', nmTools: true }) };
@@ -222,9 +247,7 @@ export class AgyChannelSession {
   }
 
   private queueAttachment(id: string, index: number, bytes: number, task: () => void | Promise<void>): void {
-    if (this.closed) return;
-    const queued = this.attachmentQueue.push(bytes, task, () => this.emit({ type: 'attachment_ack', id, index }), (error) => this.emit({ type: 'error', code: 'INVALID_ATTACHMENT', recoverable: true, message: error instanceof Error ? error.message : 'The attachment was invalid.' }));
-    if (!queued) { this.emit({ type: 'error', code: 'ENGINEERING_PROTOCOL_LIMIT', message: 'The Engineering attachment queue exceeded its safe limit.' }); void this.close(); }
+    if (!this.closed) queueEngineeringAttachment(this.attachmentQueue, { id, index, bytes, task, emit: this.emit, close: () => { void this.close(); } });
   }
 
   private async abort(): Promise<void> {
@@ -244,6 +267,7 @@ export class AgyChannelSession {
     selection: { agentId: this.provider.agent?.id ?? this.meta.agentId ?? null, modelId: this.modelId, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort) },
     agent: this.provider.agent, provider: this.provider.providerId, model: this.provider.modelId, repoId: this.meta.repoId, mode: this.controls.mode,
     agyConversation: this.conversationId, completeness: 'agy-turns',
+    compactionState: this.compactionState,
   });
 
   private fail(error: unknown): void {

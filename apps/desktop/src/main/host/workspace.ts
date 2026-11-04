@@ -10,10 +10,11 @@ import type { HostedAgent } from '../agents';
 
 import { adoptLegacyDir, planChatAdoption } from '../harness/migrate';
 
-import { chatWorkspaceDir, legacyChatWorkspaceDir } from '../chatmode';
+import { ensureChatWorkspace } from '../harness/chat-workspace';
+import { chatWorkspaceDir } from '../chatmode';
 
 
-import { existsSync as existsSync_, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync as existsSync_, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as os_ from 'node:os';
 import { resolveInWorkspace, type SubjectRef } from '../harness/brain';
@@ -76,21 +77,6 @@ function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'project' | 
 function subjectFor(t: { thread?: { number: number } | null; convoThreadId?: string | null }): SubjectRef | null {
   if (t.thread) return { kind: 'task', number: t.thread.number };
   return t.convoThreadId ? { kind: 'thread', id: t.convoThreadId } : null;
-}
-
-/**
- * A conversation's workspace, with its pre-merge directory adopted on first use.
- *
- * The adoption is here rather than in `chatWorkspaceDir` because that function is the pure half
- * of chat mode (testable with no disk, no database, no Electron) and a one-time move is neither.
- */
-function ensureChatWorkspace(threadId: string): string {
-  const dir = chatWorkspaceDir(os_.homedir(), threadId);
-  try {
-    adoptLegacyDir(legacyChatWorkspaceDir(os_.homedir(), threadId), dir, (line) => console.log(`agent_host ${line}`));
-  } catch { /* a failed adoption costs the old files' presence, never the turn */ }
-  mkdirSync(dir, { recursive: true });
-  return dir;
 }
 
 /**

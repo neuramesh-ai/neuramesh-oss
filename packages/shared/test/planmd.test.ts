@@ -94,3 +94,9 @@ describe('the published clients still read the new plan messages', () => {
     expect(prose.split(PHONE_SPLIT_F5C6C2AC)).toContain('implementation-plan-v4.md');
   });
 });
+
+
+it('resolves cross-thread approval references without a local task context', () => {
+  const id = 'f8e4d123-7a6b-4c5d-9e8f-111200002026';
+  expect(parsePlanRef(`Ready to review.\n‹plan:${id}:v2›`)).toEqual({ taskId: id, version: 2, prose: 'Ready to review.' });
+});

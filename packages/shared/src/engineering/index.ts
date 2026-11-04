@@ -7,6 +7,7 @@
 export * from './protocol';
 export * from './selection';
 export * from './restore-connection';
+export * from './task-connection';
 export * from './patch';
 export * from './changes';
 export * from './domain';

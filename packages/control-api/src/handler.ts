@@ -28,7 +28,9 @@ import { requireCommandActivation } from './activation';
 
 import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
-import { actorAddress, verifiedEmailFor, taskTarget } from './handler/guards';
+import { requireHumanAuthority, actorAddress, verifiedEmailFor, taskTarget, sameActor } from './handler/guards';
+import { requireReleasePreparation, requestCodingChecklist, wantsCodingRelease } from './handler/coding-handoff';
+import { prepareReviewTransition } from './handler/unblock-review';
 import { SUBTASK_GATED, setDefinitionOfDone, checkShipItem, addShipItem, updateDetails, selectDesignProvider, confirmRequirements, approvePlan, transition, nextPlanVersion } from './handler/fsm';
 import { planRevisionFollowup, routineAcceptFollowup, routineDesignFollowup, routinePlanFollowup } from './handler/planfollowup';
 import { channelCommands } from './handler/channel';
@@ -86,7 +88,9 @@ export async function executeCommand(
   store: Store,
   actor: Actor,
   cmd: Command,
+  machine?: { id:string; workspaceId:string }, memberId?:string,
 ): Promise<CommandOutcome | { machineId: string }> {
+  if (machine) requireHumanAuthority(actor, cmd);
   await requireCommandActivation(store, cmd);
   // Domain branches (handler/<domain>.ts). Delegated in one place, before the FSM tail:
   // command types are unique, so matching here is identical to matching where they were.
@@ -104,7 +108,7 @@ export async function executeCommand(
   { const r = await repoCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await projectCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await threadCommands(store, actor, cmd); if (r !== undefined) return r; }
-  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
+  { const r = await scheduleCommands(store, actor, cmd, machine?.workspaceId); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await contentCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await connectorCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await marketingCommands(store, actor, cmd); if (r !== undefined) return r; }
@@ -114,7 +118,7 @@ export async function executeCommand(
   { const r = await messageCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await workspaceCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await channelCommands(store, actor, cmd); if (r !== undefined) return r; }
-  if (cmd.type === 'task.create') return createTask(store, actor, cmd);
+  if (cmd.type === 'task.create') return createTask(store, actor, cmd, machine?.id,memberId);
 
   if (cmd.type === 'task.offer') {
     const mayOffer = actor.kind === 'human' || actor.role === 'orchestrator';
@@ -154,7 +158,8 @@ export async function executeCommand(
     const task = await store.getTask(cmd.taskId);
     if (!task) throw new DomainError('NOT_FOUND', `task ${cmd.taskId} not found`);
     const owners = BEAT_PHASE_ROLES[task.state] ?? [];
-    if (!actor.role || !owners.includes(actor.role)) {
+    const ownsPhase = sameActor(task.assignee, actor) || (!task.assignee && task.offeredAgentId === actor.id);
+    if (!actor.role || (!owners.includes(actor.role) && !ownsPhase)) {
       throw new DomainError('NOT_PERMITTED', `only the ${owners.join('/') || 'assigned agent'} may set beats while a task is ${task.state}`);
     }
     if (cmd.type === 'beats.declare') {
@@ -348,16 +353,8 @@ export async function executeCommand(
   // Ship gate arming check (docs/23): claiming ship prep is legal only for a
   // repo-backed task with an open PR, in a project whose release gate is on.
   // Both are enforced here — the daemon's own filter is convenience, not law.
-  if (cmd.type === 'task.claim_ship') {
-    const t = await store.getTask(cmd.taskId);
-    if (!t) throw new DomainError('NOT_FOUND', `task ${cmd.taskId} not found`);
-    if (!t.prNumber) {
-      throw new DomainError('INVALID_INPUT', 'the ship gate covers repo-backed tasks with an open pull request — a human accept ships this one directly');
-    }
-    if (!(await store.shipGate(cmd.taskId))) {
-      throw new DomainError('NOT_PERMITTED', 'the release gate is off for this project — a human accept merges it directly');
-    }
-  }
+  const recheckVersion = await prepareReviewTransition(store,cmd);
+  if (cmd.type === 'task.claim_ship') await requireReleasePreparation(store, actor, cmd.taskId);
 
   // Subtask gate (docs/24): a parent may not pass submit/accept/ship with open
   // companion work — the count is fetched here, verified structurally inside
@@ -383,7 +380,10 @@ export async function executeCommand(
     throw new DomainError('HUMAN_ONLY', 'accept needs the human\'s word: nobody typed in this thread since the review verdict, and a card click is no word');
   }
 
+  const releaseWord = word && await wantsCodingRelease(store,cmd.taskId,word.id);
   let outcome = await store.mutate(cmd.taskId, async (task) => {
+    if (releaseWord && task.state === 'done' && task.workPlan?.codingDelivery) return transition(task,actor,{type:'task.claim_ship',taskId:task.id},0,0,true);
+    if (cmd.type === 'task.request_release_checklist') return requestCodingChecklist(task, actor);
     if (cmd.type === 'task.confirm_requirements') return confirmRequirements(task, actor, cmd.checklist);
     if (cmd.type === 'task.approve_plan') return approvePlan(task, actor);
     if (cmd.type === 'task.set_definition_of_done') return setDefinitionOfDone(task, actor, cmd.dod);
@@ -391,7 +391,8 @@ export async function executeCommand(
     if (cmd.type === 'task.select_design_provider') return selectDesignProvider(task, actor, cmd.provider);
     if (cmd.type === 'task.check_ship_item') return checkShipItem(task, actor, cmd);
     if (cmd.type === 'task.add_ship_item') return addShipItem(task, actor, cmd);
-    return transition(task, actor, cmd, subtasksPending, planVersion, !!word);
+    const from = task.version === recheckVersion ? { ...task, blockedFrom: 'in_review' as const } : task;
+    return transition(from, actor, cmd, subtasksPending, planVersion, !!word);
   });
   // the record names the message the accept acted on, so the thread can say "on your word at 11:01"
   if (word) Object.assign(outcome, { onWord: word });

@@ -53,3 +53,12 @@ test('ciVerdictOf: the buckets decide fail, pending and pass', () => {
   // gh exits non-zero with valid JSON when a check fails: the JSON still decides
   assert.equal(ciVerdictOf({ ok: false, stdout: JSON.stringify([{ name: 'e2e', bucket: 'cancel' }]), stderr: '' }).verdict, 'fail');
 });
+
+test('a verified Vercel identity gate holds review, while independent implementation failures still go back to the developer', () => {
+  const author = {name:'Vercel – web',bucket:'fail',description:'GitHub couldn’t verify an account for the commit.'};
+  const companion = {name:'Vercel – docs',bucket:'fail',description:'Deployment was blocked'};
+  const run = (...checks: unknown[]) => ciVerdictOf({ok:false,stdout:JSON.stringify(checks),stderr:''});
+  assert.deepEqual(run(companion,author),{verdict:'author_unverified',detail:author.name});
+  assert.deepEqual(run(author,companion,{name:'unit tests',bucket:'fail'}),{verdict:'fail',detail:'unit tests'});
+  assert.equal(run(companion).verdict,'fail');
+});

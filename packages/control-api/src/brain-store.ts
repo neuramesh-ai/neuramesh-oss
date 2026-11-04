@@ -1,3 +1,4 @@
+import type { CaptureOrigin } from '@neuramesh/shared';
 import { brainArtifactInline } from './brain-compatibility';
 import { brainArtifactBytes } from './brain-artifact-bytes';
 import { artifactPreview } from './artifact-preview';
@@ -21,6 +22,7 @@ export interface BrainCommit {
   artifactIds?: string[];
 }
 export interface BrainArtifact {
+  capture?: CaptureOrigin;
   workspace: string;
   threadId: string;
   id: string;
@@ -146,19 +148,31 @@ export class BrainStore {
 
   async artifacts(actor: Actor, workspace: string, threadId: string) {
     await brainThreadAccess(this.sql, actor, workspace, threadId);
-    const rows = await this.sql`select a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.thread_id = ${threadId}::uuid and b.workspace_id = ${workspace}::uuid order by b.created_at`;
-    return rows.map((r) => ({ id: r['id'] as string, name: r['name'] as string, kind: r['kind'] as string, tags: r['tags'] as string[], mime: r['mime'] as string, sizeBytes: Number(r['size_bytes']), sha256: r['content_hash'] as string, createdAt: new Date(r['created_at']).toISOString(), storagePath: `brain:${r['id']}`, url: `/v1/brain/artifacts/${r['id']}?workspace=${workspace}` }));
+    const rows = await this.sql`select a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at,b.capture,b.created_at as captured_at,b.object_ref from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.thread_id = ${threadId}::uuid and b.workspace_id = ${workspace}::uuid order by b.created_at`;
+    return rows.map((r) => ({ id: r['id'] as string, name: r['name'] as string, ...(r['capture'] ? {capture:{...r['capture'],sha256:r['object_ref'].sha256,capturedAt:new Date(r['captured_at']).toISOString()}} : {}), kind: r['kind'] as string, tags: r['tags'] as string[], mime: r['mime'] as string, sizeBytes: Number(r['size_bytes']), sha256: r['content_hash'] as string, createdAt: new Date(r['created_at']).toISOString(), storagePath: `brain:${r['id']}`, url: `/v1/brain/artifacts/${r['id']}?workspace=${workspace}` }));
   }
 
   async artifact(actor: Actor, input: BrainArtifact) {
+    if (input.capture && (actor.kind !== 'human' || !/^validation\/(before|after)\/[a-z0-9][a-z0-9-]{0,59}\.(?:png|jpg)$/.test(input.name) || !['image/png','image/jpeg'].includes(input.mime))) {
+      throw new BrainError('NOT_PERMITTED', 'A capture receipt requires an authenticated capture publisher and a validation image.', 403);
+    }
     const scope = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
+    if (input.capture?.source === 'independent-observer' && input.capture.reviewedRevision) {
+      const [reviewed] = await this.sql`select id from tasks where id=${scope.task_id}::uuid and workspace_id=${input.workspace}::uuid and submitted_sha=${input.capture.reviewedRevision}`;
+      if (!reviewed) throw new BrainError('INVALID_INPUT','The independent capture must match the submitted revision of this task.',400);
+    }
     if (input.channel && input.channel !== scope.channel_id) throw new BrainError('NOT_FOUND', 'The artifact channel does not belong to this thread.', 404);
     const bytes = brainArtifactBytes(input.contentBase64);
+    if (input.capture && (bytes.length < 24 || (input.mime === 'image/png'
+      ? !bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')) || bytes.toString('ascii',12,16) !== 'IHDR' || !bytes.subarray(-8).equals(Buffer.from('49454e44ae426082','hex'))
+      : !bytes.subarray(0,3).equals(Buffer.from('ffd8ff','hex')) || !bytes.subarray(-2).equals(Buffer.from('ffd9','hex'))))) {
+      throw new BrainError('INVALID_INPUT','The capture bytes must match their image format.',400);
+    }
     const sha256 = brainHash(bytes);
     if (input.sha256 && input.sha256 !== sha256) throw new BrainError('BRAIN_CHECKSUM_MISMATCH', 'The artifact checksum does not match its bytes.', 400);
     // Fail before uploading if this workspace has not completed the private-reader rollout.
     brainArtifactInline(bytes, input.mime, input.workspace, scope.kind === 'coding');
-    const digest = brainHash(canonicalJson({ workspace: input.workspace, threadId: input.threadId, id: input.id, name: input.name, mime: input.mime, sha256, messageId: input.messageId, kind: input.kind, tags: input.tags, channel: input.channel }));
+    const digest = brainHash(canonicalJson({ workspace: input.workspace, threadId: input.threadId, id: input.id, name: input.name, mime: input.mime, sha256, messageId: input.messageId, kind: input.kind, tags: input.tags, channel: input.channel, ...(input.capture ? {capture:input.capture} : {}) }));
     const ref = await this.objects.put(`v1/workspaces/${input.workspace}/threads/${input.threadId}/artifacts/${input.id}/${sha256}`, bytes, input.mime);
     await this.sql.begin(async (transaction) => {
       const tx = transaction as unknown as postgres.Sql;
@@ -179,7 +193,7 @@ export class BrainStore {
       if (collision.length) throw new BrainError('BRAIN_ARTIFACT_REUSED', 'This artifact ID already exists. Use a new artifact ID.');
       await tx`insert into artifacts (id, workspace_id, channel_id, project_id, task_id, message_id, kind, name, mime, tags, content_hash, storage_path, size_bytes, inline_content, created_by_kind, created_by)
         values (${input.id}::uuid, ${input.workspace}::uuid, ${thread.channel_id}::uuid, ${thread.project_id}::uuid, ${thread.task_id}::uuid, ${messageId ?? null}::uuid, ${input.kind ?? (input.mime.startsWith('image/') ? 'screenshot' : 'file')}::artifact_kind, ${input.name}, ${input.mime}, ${input.tags ?? []}, ${sha256}, ${`brain:${input.id}`}, ${bytes.length}, ${inline}, ${actor.kind}::actor_kind, ${actor.id}::uuid)`;
-      await tx`insert into brain_artifacts (artifact_id, thread_id, workspace_id, object_ref, request_sha256) values (${input.id}::uuid, ${input.threadId}::uuid, ${input.workspace}::uuid, ${tx.json(ref as never)}, ${digest})`;
+      await tx`insert into brain_artifacts (artifact_id, thread_id, workspace_id, object_ref, request_sha256, capture) values (${input.id}::uuid, ${input.threadId}::uuid, ${input.workspace}::uuid, ${tx.json(ref as never)}, ${digest}, ${input.capture ? tx.json({...input.capture,name:input.name}) : null})`;
       const event = createEvent({ type: 'brain.artifact_created', workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/artifact/${input.id}`, payload: { artifactId: input.id, threadId: input.threadId, sha256, sizeBytes: bytes.length } });
       await tx`insert into events (id, workspace_id, type, source, target, payload)
         values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload as never)})`;

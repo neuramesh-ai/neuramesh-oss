@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { STARTER_MODEL } from '@neuramesh/shared';
 import type { HostedAgent } from '../agents';
-import { configureStarterFallback, fallbackText, offerCard, owningThread, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { configureStarterFallback, conversationOrigin, fallbackText, offerCard, owningThread, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 
 const rex: HostedAgent = { id: 'a-rex', name: 'rex', role: 'orchestrator', model: 'gpt-5.6-sol', runtime: 'codex', modelSource: 'manual', channels: new Set() };
 const expired = { kind: 'login', provider: 'openai', reason: 'expired' } as const;
@@ -218,4 +218,15 @@ test('unconfigured (a test host, a build that never booted the lane): the door i
   configureStarterFallback(null);
   assert.equal(await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't' }), null);
   assert.equal(calls.length, 0);
+});
+
+
+test('agent-authored coding handoffs retain their authenticated human owner', async () => {
+  rows['own:task'] = { id: 'coding', schedule_id: null, brain_override: null };
+  rows['root:coding'] = { created_by: 'human:george', author_kind: 'agent', author_id: 'patch' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), 'george');
+  rows['root:coding'] = { author_kind: 'human', author_id: 'legacy-human' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), 'legacy-human');
+  rows['root:coding'] = { created_by: 'agent:patch', author_kind: 'agent', author_id: 'patch' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), null);
 });

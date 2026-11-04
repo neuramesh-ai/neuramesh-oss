@@ -104,6 +104,19 @@ test('rearm makes a bounced task runnable again — the request_changes path, ma
   assert.equal(runs, 2);
 });
 
+test('Unblock requeues once even when the previous failed attempt has not settled', async () => {
+  const q = new HostQueue({ caps: { slots: 2, perAgent: 2 } });
+  const ending = gate(), restarted = gate();
+  const order: string[] = [];
+  q.run(work('task'), async () => { order.push('old'); await ending.done; order.push('settled'); });
+  q.rearm('task');
+  assert.equal(q.run(work('task'), async () => { order.push('retry'); restarted.release(); }), true);
+  assert.equal(q.run(work('task'), async () => { order.push('duplicate'); }), false);
+  assert.deepEqual(order, ['old']);
+  ending.release();
+  await restarted.done;
+  assert.deepEqual(order, ['old', 'settled', 'retry']);
+});
 test('no over-admission under a re-entrant drain', async () => {
   // Every settle re-enters drain(); without the latch two drains each see the same free slot.
   const q = new HostQueue({ caps: { slots: 2, perAgent: 5 } });

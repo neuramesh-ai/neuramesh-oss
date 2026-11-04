@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { OPEN_ENGINEERING_POLICY, RECOMMENDED_ENGINEERING_PERMISSIONS } from '@neuramesh/shared';
+import { OPEN_ENGINEERING_POLICY, RECOMMENDED_ENGINEERING_PERMISSIONS, REVIEW_ENGINEERING_PERMISSIONS } from '@neuramesh/shared';
 import type { ToolApprovalRequest } from '@cline/sdk';
 import { requestEngineeringApproval } from './engineering-approvals';
 
@@ -15,7 +15,7 @@ test('records exact review bytes before asking and never treats the receipt as p
     await writeFile(join(root, 'file.txt'), 'old\n');
     const request = { toolCallId: 'edit-1', toolName: 'apply_patch', input: { input: '*** Begin Patch\n*** Update File: file.txt\n@@\n-old\n+new\n*** End Patch' } } as ToolApprovalRequest;
     const result = await requestEngineeringApproval(request,
-      { mode: 'act', permissions: RECOMMENDED_ENGINEERING_PERMISSIONS, policy: OPEN_ENGINEERING_POLICY }, [], pending,
+      { mode: 'act', permissions: REVIEW_ENGINEERING_PERMISSIONS, policy: OPEN_ENGINEERING_POLICY }, [], pending,
       event => {
         assert.equal(event.type, 'approval');
         const review = records.find(r => r.type === 'review.proposed')?.payload as { changes: Array<{ before: string; after: string }> };

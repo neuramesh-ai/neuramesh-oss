@@ -15,9 +15,10 @@
 import { memo, useMemo, type ReactNode } from 'react';
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { remarkGitReferences } from '@neuramesh/client-core/markdown-references';
 import { splitBlocks } from './blocks';
 
-export const REMARK_PLUGINS = [remarkGfm];
+export const REMARK_PLUGINS = [remarkGfm, remarkGitReferences];
 /** react-markdown sanitizes unknown URL protocols to '' — keep our internal nm: deep-links alive */
 export const mdUrlTransform = (url: string): string => (url.startsWith('nm:') ? url : defaultUrlTransform(url));
 

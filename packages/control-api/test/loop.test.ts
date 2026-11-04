@@ -387,6 +387,22 @@ describe('enforcement (the server, not prompts)', () => {
     expect((await j(denied)).code).toBe('NOT_PERMITTED');
   });
 
+  it('unblock rechecks the existing unchanged CI submission and preserves human change requests', async () => {
+    for (const reviewer of [gem,george]) {
+      const t = await createTask({title:'Preview review'});
+      await send(patch,{type:'task.claim',taskId:t.id});
+      await send(patch,{type:'task.confirm_requirements',taskId:t.id,checklist:['review preview']});
+      await send(patch,{type:'task.submit',taskId:t.id,sha:'abc',prNumber:236,prUrl:'https://github.com/example/repo/pull/236',artifacts:[{kind:'diff',name:'changes.patch'}]});
+      await send(reviewer,{type:'task.request_changes',taskId:t.id,feedback:'CI is red on the pull request — `Vercel – web` failed. Fix it so the checks pass, then re-submit.'});
+      await send(patch,{type:'task.block',taskId:t.id,reason:'execution failed 2× — no work product — nothing changed in the worktree',resolution:'Open the PR and check its preview.'});
+      const events=await store.listEvents(`task:${t.number}`);
+      expect(events.findLast(e=>e.type==='task.blocked')?.payload.resolution).toBe('Open the PR and check its preview.');
+      const reopened=await j(await send(george,{type:'task.unblock',taskId:t.id}));
+      expect(reopened.task.state).toBe(reviewer===gem?'in_review':'in_progress');
+      expect(reopened.task.submittedSha).toBe('abc');
+    }
+  });
+
   it('block from any working stage — unblock returns to the stage it left, never blindly to in_progress', async () => {
     const atlas: Actor = { kind: 'agent', id: 'atlas', role: 'architect' };
     const iris: Actor = { kind: 'agent', id: 'iris', role: 'designer' };
@@ -414,7 +430,7 @@ describe('enforcement (the server, not prompts)', () => {
     await send(patch, { type: 'task.claim', taskId: t3.id });
     await send(patch, { type: 'task.confirm_requirements', taskId: t3.id, checklist: ['ok'] });
     await send(patch, { type: 'task.submit', taskId: t3.id, artifacts: [{ kind: 'diff', name: 'd.patch' }], sha: 'abc' });
-    const b3 = await send(gem, { type: 'task.block', taskId: t3.id, reason: 'DoD requires screenshots; none attached after a bounce' });
+    const b3 = await send(gem, { type: 'task.block', taskId: t3.id, reason: 'DoD requires screenshots; none attached after a bounce', resolution: 'Attach the original screenshots, then unblock to retry review.' });
     expect(b3.status).toBe(200);
     expect((await j(b3)).task.blockedFrom).toBe('in_review');
     expect((await j(await send(george, { type: 'task.unblock', taskId: t3.id }))).task.state).toBe('in_review');
@@ -436,13 +452,13 @@ describe('enforcement (the server, not prompts)', () => {
     const atlas: Actor = { kind: 'agent', id: 'atlas', role: 'architect' };
     const task = await createTask({ title: 'landing page hero refresh' });
 
-    // a worker can't route work into design; the orchestrator can, assigning the channel designer
+    // A worker cannot route work into design. A design phase does not assign the designer as owner.
     expect((await send(patch, { type: 'task.request_design', taskId: task.id, designer: 'iris' })).status).toBe(403);
     const routed = await send(rex, { type: 'task.request_design', taskId: task.id, designer: 'iris', provider: 'claude-design' });
     expect(routed.status).toBe(200);
     expect((await j(routed)).task.state).toBe('designing');
     const routedDetail = await j(await app.request(`/v1/tasks/${task.id}`, { headers: { 'x-nm-actor': JSON.stringify(george) } }));
-    expect(routedDetail.task.assignee).toMatchObject({ id: 'iris' });
+    expect(routedDetail.task.assignee).toBeNull();
     expect(routedDetail.events.find((e: { type: string }) => e.type === 'task.design_requested')?.payload).toMatchObject({ provider: 'claude-design' });
 
     // only the designer proposes; a proposal without mockups doesn't parse
@@ -465,7 +481,7 @@ describe('enforcement (the server, not prompts)', () => {
     expect((await j(await send(george, { type: 'task.revise_design', taskId: task.id, feedback: 'warmer palette, sticky header' }))).task.state).toBe('designing');
     expect((await send(iris, { type: 'task.propose_design', taskId: task.id, round: 2, mockups: [{ name: 'Hero warm', html: '<html>w</html>' }] })).status).toBe(200);
 
-    // human approval releases it to planning, clears the assignee for the architect watch,
+    // Human approval releases it to planning without changing ownership,
     // and promotes ONLY the approved (latest) round into the channel library
     const approved = await send(george, { type: 'task.approve_design', taskId: task.id });
     expect(approved.status).toBe(200);

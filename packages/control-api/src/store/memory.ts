@@ -15,6 +15,7 @@ import { anchorContentItemMem } from './content-anchor';
 import { threadRoutineIdMem } from './routine-rule';   import { sessionTitle } from './session-title';
 import type { LifecycleRow } from '../lifecycle';
 import { normalizeTaskTitle } from './types';
+import { requireTaskOwner } from './task-owner';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
 import type { Store } from './contract';   import type { VideoMeta } from './films';
 
@@ -487,10 +488,11 @@ export class MemoryStore implements Store {
     if (!task) throw new DomainError('NOT_FOUND', `task ${taskId} not found`);
     if (task.state !== 'todo' && task.state !== 'plan_review') throw new DomainError('ILLEGAL_TRANSITION', 'only todo or plan_review tasks can be offered');
     const agentId = await this.resolveOffer(task.workspace, task.channel, agentName);
+    requireTaskOwner(task.assignee?.id ?? task.offeredAgentId, agentId);
     const boundRepo = repo ? { id: repo.id, baseRef: repo.baseRef, branch: taskBranch(task.number, task.title) } : task.repo;
     this.tasks.set(taskId, {
       ...task,
-      offeredAgentId: agentId,
+      offeredAgentId: agentId, assignee: { kind: 'agent', id: agentId },
       repo: boundRepo,
       ...(checklist?.length ? { requirements: checklist, requirementsConfirmed: true } : {}),
       ...(dod ? { definitionOfDone: dod } : {}),
@@ -811,7 +813,7 @@ export class MemoryStore implements Store {
       // a re-asked question supersedes its older open card in the same channel/thread. A GitHub
       // card's question names only its ask, so it supersedes only in its own conversation too.
       for (const prior of this.decisionRows) {
-        if (prior.status === 'open' && prior.workspace === msg.workspace && prior.channel === msg.channel && prior.taskId === (msg.taskId ?? null) && prior.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior.messageId)?.threadId ?? null) === (msg.threadId ?? null))) {
+        if (!d.requiresExactAnswer && !prior.requiresExactAnswer && prior.status === 'open' && prior.workspace === msg.workspace && prior.channel === msg.channel && prior.taskId === (msg.taskId ?? null) && prior.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior.messageId)?.threadId ?? null) === (msg.threadId ?? null))) {
           prior.status = 'dismissed';
           prior.answeredAt = new Date().toISOString();
         }
@@ -825,7 +827,7 @@ export class MemoryStore implements Store {
         asker: { kind: msg.author.kind, id: msg.author.id },
         question: d.question,
         options: d.options,
-        allowOther: d.allowOther,
+        allowOther: d.allowOther, requiresExactAnswer: d.requiresExactAnswer,
         status: 'open',
         answer: null,
         answeredBy: null,
@@ -840,7 +842,7 @@ export class MemoryStore implements Store {
     if (msg.author.kind === 'human') {
       for (const [question, answer] of readAnswers([msg.body])) {
         for (const row of this.decisionRows) {
-          if (row.status === 'open' && row.workspace === msg.workspace && row.channel === msg.channel && row.taskId === (msg.taskId ?? null) && row.question === question) {
+          if (!row.requiresExactAnswer && row.status === 'open' && row.workspace === msg.workspace && row.channel === msg.channel && row.taskId === (msg.taskId ?? null) && row.question === question) {
             row.status = 'answered';
             row.answer = answer;
             row.answeredBy = { kind: msg.author.kind, id: msg.author.id };

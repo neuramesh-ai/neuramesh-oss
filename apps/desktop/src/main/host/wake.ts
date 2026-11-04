@@ -22,6 +22,7 @@ import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harne
 import { type RunHandle } from './runs';
 import type { AgentAttachment, DeltaFn } from '../runtime/adapter';
 import { foLabel } from './staffing';
+import { withPermissionDeadline } from './permission-deadline';
 import { withTimeout } from './turnkit';
 import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
@@ -46,7 +47,7 @@ import type { makeContent } from './content';
 export const openStream = (emit: (text: string, done: boolean, thinking?: string) => void): typeof emit => { let ended = false; emit('', false); return (text, done, thinking) => { if (done || !ended) emit(text, done, thinking); ended ||= done; }; };
 
 /** the orchestrator's turn — a host closure, so its shape is named here once */
-type OrchestratorTurn = (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: DeltaFn) => Promise<string>;
+type OrchestratorTurn = (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: DeltaFn, waitForPermission?: import('./permission-deadline').WaitForPermission) => Promise<string>;
 
 // FORTY-THREE dependencies. That number is the finding, not an accident of the split: the wake
 // path touches nearly everything the host does, and until now that was true but invisible.
@@ -182,6 +183,7 @@ export function makeWake(ctx: {
         reply = `[echo · ${agent.name}] noted in #${t.number}: “${m.body.slice(0, 80)}”`;
       }
 
+      if (isStandDown(reply)) return; // finally closes the task wake and its typing indicator
       // a cap that arrives as REPLY TEXT (subscription runtimes end the turn cleanly)
       // must raise the failover card, not be posted as if the agent said it
       if (isLimitNotice(reply)) {
@@ -321,11 +323,9 @@ export function makeWake(ctx: {
         ], contextBudget('chat'));
         clog({ kind: 'turn', phase: 'inject', summary: assemblyLine(ctx) }); // context spend is measured, not asserted
         const transcript = ctx.text;
-        reply = await withTimeout(
-          chatTurn({ agent, ch, threadId: m.thread_id!, transcript, token, log: clog, onDelta: (t2, th) => emitChat(t2, false, th), attachments: att.list, run: wakeRun }),
-          TURN_BUDGETS.chat.wallMs, // docs/harness/05 §3.6 — a chat may research + write + run code
-          'the chat turn timed out after 12m',
-        );
+        const request = { body: m.body, author_kind: (await db.get<{ author_kind: string }>('select author_kind from messages where id=?', [m.id]))?.author_kind ?? '' };
+        reply = await chatTurn({ agent, ch, threadId: m.thread_id!, transcript, request, replyTo: m.id,
+          token, log: clog, attachments: att.list, run: wakeRun, onDelta: (text, thinking) => emitChat(text, false, thinking) });
       } else if (agent.role === 'orchestrator') {
         // the orchestrator considers team skills too (to scope/route work). Logged
         // for both echo + claude so "skills considered" is visible in the activity
@@ -371,7 +371,7 @@ export function makeWake(ctx: {
           ], contextBudget('triage'));
           olog({ kind: 'turn', phase: 'inject', summary: assemblyLine(octx) });
           const transcript = octx.text;
-          reply = await withTimeout(orchestratorTurn(agent, ch, transcript, token, undefined, olog, skills, att.list, m.thread_id ?? null, wakeRun, (t, th) => emitChat(t, false, th)), TURN_BUDGETS.triage.wallMs, 'orchestration timed out');
+          reply = await withPermissionDeadline(wait => orchestratorTurn(agent, ch, transcript, token, undefined, olog, skills, att.list, m.thread_id ?? null, wakeRun, (t, th) => emitChat(t, false, th), wait), TURN_BUDGETS.triage.wallMs, 'orchestration timed out');
         } else {
           reply = await echoOrchestrate(agent, m.body, ch);
         }
@@ -406,7 +406,7 @@ export function makeWake(ctx: {
       emitChat('', true); // clear the live bubble; the synced message lands next
       if (isStandDown(reply)) {
         console.log(`agent_wake agent=${agent.name} mode=${mode} stood_down=ok`);
-        log({ kind: 'wake', phase: 'stood_down', summary: 'stood down (NO_REPLY)' });
+        log({ kind: 'wake', phase: 'stood_down', summary: 'No reply needed.' });
         return;
       }
       // a cap that arrives as REPLY TEXT (subscription runtimes end the turn cleanly)

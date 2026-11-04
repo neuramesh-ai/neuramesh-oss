@@ -1,3 +1,5 @@
+import { withChatSteering } from './thread-followups';
+import type { WaitForPermission } from './permission-deadline';
 import { projectContext } from './project-context';
 // THE ORCHESTRATOR'S TURN — picking a transport and running one.
 //
@@ -40,6 +42,7 @@ export async function routineNoteFor(db: { getAll: <T>(sql: string, params?: unk
 }
 
 export function makeOrchTurn(ctx: {
+  permissionsFor?: ReturnType<typeof import('./chatturn').makeChatTurn>['permissionsFor'];
   db: ReplicaDatabase;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   buildOrchestratorTools: ReturnType<typeof makeOrchTools>['buildOrchestratorTools'];
@@ -70,11 +73,12 @@ export function makeOrchTurn(ctx: {
     // live tokens to the renderer's bubble — the orchestrator NEVER streamed before this (the
     // transport had no onDelta), which is why rex's replies always appeared all at once
     onDelta?: (t: string, thinking?: string) => void,
+    waitForPermission?: WaitForPermission,
   ): Promise<string> {
     const actor = { kind: 'agent', id: agent.id, role: 'orchestrator' };
 
     const otools = await buildOrchestratorTools({
-      ch, agent, actor, skills, log, thread, convoThreadId, token,
+      ch, agent, actor, skills, log, thread, convoThreadId, token, permissionRunId:run.id || undefined,
       // a turn holding a task OWNS it (docs/harness §OWNING_KINDS); a room message is triage
       kind: thread ? 'own' : 'triage',
       // THE fix: the orchestrator can finally fan out. TOOL_KINDS.spawn has always listed 'triage',
@@ -250,15 +254,26 @@ export function makeOrchTurn(ctx: {
     // Decoupled by provider: dispatch the SAME tool registry to the matching in-process transport.
     // The token is whatever resolveToken returned for the agent's provider (our free GEMINI_API_KEY
     // by default for a Gemini orchestrator; the user's subscription/key once they change the model).
+    const check = convoThreadId && ctx.permissionsFor?.(agent,ch,convoThreadId,run,waitForPermission);
+    const toolsFor = (signal?: AbortSignal) => check ? otools.map(tool => ({...tool, run: async (input:Record<string,unknown>) => {
+      signal?.throwIfAborted();
+      const decision = await check('mcp__nm__' + tool.name,input);
+      if (decision.decision !== 'allow') throw new Error(decision.reason ?? 'Permission declined.');
+      signal?.throwIfAborted();
+      return tool.run(input);
+    }})) : otools;
     const args: OrchTransportArgs = {
-      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools: otools, log, attachments, onDelta,
+      nativeGate: check || undefined,
+      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools:toolsFor(), log, attachments, onDelta,
       // The turn used to run in os.tmpdir() with no file tools at all, which is why an
       // orchestrator asked to write a document truthfully said it could not. This is the SAME
       // directory its subagents work in (ensureChatWorkspace), so a file a leg produces is one
       // the orchestrator can read back and save with write_library_doc.
       cwd: ensureChatWorkspace(convoThreadId ?? thread?.id ?? ch.id),
     };
-    return dispatchOrchestrator(agent, args);
+    return convoThreadId ? withChatSteering(convoThreadId, transcript, (context, controller, progress) =>
+      dispatchOrchestrator(agent, { ...args, tools:toolsFor(controller.signal), transcript:context, abort:controller.signal, abortController:controller,
+        onDelta:(text,thinking)=>{ progress(text); onDelta?.(text,thinking); } })) : dispatchOrchestrator(agent, args);
   }
 
   return { orchestratorTurn };

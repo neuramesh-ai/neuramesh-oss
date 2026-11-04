@@ -1,3 +1,5 @@
+import { existingWorkspacePath, writableWorkspacePath } from '../relay/engineering-tools';
+import {createEngineeringShellExecutor} from '../relay/engineering-safe-executors';
 // THE STARTER LANE FOR WORKER TURNS (2026-09-16, George: "build the starter worker lane too; we
 // should be able to switch the active brain to starter at any point, and every agent in that thread
 // re-seats onto it — that's the whole point").
@@ -23,7 +25,7 @@
 // R1: an adapter takes what the seam gives it). Unset (a plain-node test, a daemon that never
 // booted a host) it fails loudly rather than reaching for a vendor login it was told not to use.
 import { resolve, sep } from 'node:path';
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, lstat, realpath, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { STARTER_MODEL, type TurnKind } from '@neuramesh/shared';
 import { invokeTool, outputToText, toolsForTurn, type ToolHost } from '../harness/toolbus';
@@ -78,10 +80,11 @@ export function fileTools(dir: string, gate: PermissionGate | undefined, log?: L
     }, run: async (i: { path: string; content: string }) => {
       const full = insideDir(dir, i.path);
       if (!full) return `refused: "${i.path}" is outside the workspace`;
-      const no = await allowed('Write', full);
+      const safe = await writableWorkspacePath(await realpath(dir),full);
+      const no = await allowed('Write', safe);
       if (no) return `refused: ${no}`;
-      await mkdir(resolve(full, '..'), { recursive: true });
-      await writeFile(full, i.content);
+      await mkdir(resolve(safe, '..'), { recursive: true });
+      await writeFile(safe, i.content);
       log?.({ kind: 'tool', phase: 'call', summary: `write_file ${i.path} (${i.content.length}b)` });
       return `wrote ${i.path}`;
     } },
@@ -90,19 +93,22 @@ export function fileTools(dir: string, gate: PermissionGate | undefined, log?: L
     }, run: async (i: { path: string }) => {
       const full = insideDir(dir, i.path);
       if (!full) return `refused: "${i.path}" is outside the workspace`;
-      const no = await allowed('Read', full);
+      const safe = await existingWorkspacePath(await realpath(dir),full);
+      const no = await allowed('Read', safe);
       if (no) return `refused: ${no}`;
-      try { return (await readFile(full, 'utf8')).slice(0, 120_000); }
+      try { return (await readFile(safe, 'utf8')).slice(0, 120_000); }
       catch (e) { return `read failed: ${e instanceof Error ? e.message : 'error'}`; }
     } },
     { name: 'list_files', description: 'List the files in your workspace (recursive, names relative to the root).', schema: {}, run: async () => {
+      const no = await allowed('Read',dir);
+      if (no) return 'refused: '+no;
       const out: string[] = [];
       const walk = async (d: string, rel: string): Promise<void> => {
         for (const e of await readdir(d).catch(() => [] as string[])) {
           if (e === 'node_modules' || (e.startsWith('.') && e !== '.nm-evidence')) continue;
           const p = resolve(d, e); const r = rel ? `${rel}/${e}` : e;
-          const s = await stat(p).catch(() => null);
-          if (!s) continue;
+          const s = await lstat(p).catch(() => null);
+          if (!s || s.isSymbolicLink()) continue;
           if (s.isDirectory()) await walk(p, r); else if (out.length < 200) out.push(`${r} (${s.size}b)`);
         }
       };
@@ -146,8 +152,8 @@ export async function starterRunQuery(
   recordLesson?: ToolHost['recordLesson'], lessonsNote?: string, promptOverride?: PromptOverride,
   addBacklogItem?: ToolHost['addBacklogItem'], beats?: { declare: (items: string[]) => Promise<void>; advance: (seq: number, status: string) => Promise<void> },
   permissionGate?: PermissionGate, opts?: TurnOpts,
+  transport?: { provider:'openai'|'gemini'|'anthropic'; token:string },
 ): Promise<string> {
-  const l = laneOrThrow();
   const kind: TurnKind = opts?.turnKind ?? (promptOverride ? 'design' : 'work');
   // the SAME host the CLI adapters build for the bus — a design round carries no beats (mirrors
   // claudeCode: the round is not a phase the worker owns), a leg carries no subtasks by kind
@@ -155,13 +161,34 @@ export async function starterRunQuery(
     ...(beats && !promptOverride ? { beats: beatsAdapter(beats) } : {}),
     ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}),
     ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) };
-  const tools = [...busToolsForStarter(kind, host), ...fileTools(dir, permissionGate, log)];
-  log?.({ kind: 'tool', phase: 'inject', summary: `${tools.length} tools on the Starter lane (${kind} turn) — bus + files, no shell` });
-  const prompt = (promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, true)) + STARTER_NOTE;
+  const bus = busToolsForStarter(kind,host).map(tool => ({...tool, run:async (input:Record<string,unknown>) => {
+    const grant = await permissionGate?.('mcp__nm__'+tool.name,input);
+    if (grant?.decision==='deny') throw new Error(grant.reason || 'Permission declined.');
+    return tool.run(input);
+  }}));
+  const tools: OrchTool[] = [...bus,...fileTools(dir,permissionGate,log)];
+  if (transport && permissionGate && opts?.permissionRules) {
+    const exec = createEngineeringShellExecutor(dir,opts.permissionRules);
+    tools.push({name:'run_command',description:'Run a local shell command in the isolated working directory.',schema:{command:z.string().min(1).max(8000)},run:async i=>{
+      const grant=await permissionGate('Bash',{command:i.command});
+      if (grant.decision!=='allow') throw new Error(grant.reason || 'Permission declined.');
+      return exec(i.command);
+    }});
+  }
+  const prompt = (promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, true))
+    + (transport ? '\nUse the provided workspace file and command tools to perform the task.' : STARTER_NOTE);
   const systemPrompt = promptOverride?.system ?? codingSystemPrompt(agent.name, repoBacked, instructionsFor(agent));
-  const started = Date.now();
-  const out = await geminiOrchestratorTurn({ model: STARTER_MODEL, token: '', systemPrompt, transcript: prompt, tools, log, starter: true, apiUrl: l.apiUrl, workspace: l.workspace, actorId: l.actorId, maxTurns: STARTER_WORKER_MAX_TURNS, abort: ac?.signal });
-  log?.({ kind: 'result', phase: 'success', summary: `completed ${Math.round((Date.now() - started) / 1000)}s · starter` });
+  const args={model:agent.model,token:transport?.token ?? '',systemPrompt,transcript:prompt,tools,log,thinking:agent.thinking,cwd:dir,abort:ac?.signal,managedTools:true,nativeGate:permissionGate};
+  log?.({kind:'tool',phase:'inject',summary:tools.length+' managed tools in this '+kind+' turn'});
+  const {codexSdkOrchestratorTurn,agyOrchestratorTurn,anthropicOrchestratorTurn}=await import('../host/orchturn');
+  let out:string;
+  if (transport?.provider==='openai') out=await codexSdkOrchestratorTurn(args);
+  else if (transport?.provider==='anthropic') out=await anthropicOrchestratorTurn(args);
+  else if (transport?.provider==='gemini') out=transport.token ? await geminiOrchestratorTurn(args) : await agyOrchestratorTurn(args);
+  else {
+    const l=laneOrThrow();
+    out=await geminiOrchestratorTurn({...args,model:STARTER_MODEL,starter:true,apiUrl:l.apiUrl,workspace:l.workspace,actorId:l.actorId,maxTurns:STARTER_WORKER_MAX_TURNS});
+  }
   return out.trim() || '(no summary)';
 }
 

@@ -40,2157 +40,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js
-var require_encoder = __commonJS({
-  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js"(exports, module) {
-    var btoa = btoa || function(buf) {
-      return Buffer.from(buf).toString("base64");
-    };
-    function JPEGEncoder(quality) {
-      var self2 = this;
-      var fround = Math.round;
-      var ffloor = Math.floor;
-      var YTable = new Array(64);
-      var UVTable = new Array(64);
-      var fdtbl_Y = new Array(64);
-      var fdtbl_UV = new Array(64);
-      var YDC_HT;
-      var UVDC_HT;
-      var YAC_HT;
-      var UVAC_HT;
-      var bitcode = new Array(65535);
-      var category = new Array(65535);
-      var outputfDCTQuant = new Array(64);
-      var DU = new Array(64);
-      var byteout = [];
-      var bytenew = 0;
-      var bytepos = 7;
-      var YDU = new Array(64);
-      var UDU = new Array(64);
-      var VDU = new Array(64);
-      var clt = new Array(256);
-      var RGB_YUV_TABLE = new Array(2048);
-      var currentQuality;
-      var ZigZag = [
-        0,
-        1,
-        5,
-        6,
-        14,
-        15,
-        27,
-        28,
-        2,
-        4,
-        7,
-        13,
-        16,
-        26,
-        29,
-        42,
-        3,
-        8,
-        12,
-        17,
-        25,
-        30,
-        41,
-        43,
-        9,
-        11,
-        18,
-        24,
-        31,
-        40,
-        44,
-        53,
-        10,
-        19,
-        23,
-        32,
-        39,
-        45,
-        52,
-        54,
-        20,
-        22,
-        33,
-        38,
-        46,
-        51,
-        55,
-        60,
-        21,
-        34,
-        37,
-        47,
-        50,
-        56,
-        59,
-        61,
-        35,
-        36,
-        48,
-        49,
-        57,
-        58,
-        62,
-        63
-      ];
-      var std_dc_luminance_nrcodes = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
-      var std_dc_luminance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-      var std_ac_luminance_nrcodes = [0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 125];
-      var std_ac_luminance_values = [
-        1,
-        2,
-        3,
-        0,
-        4,
-        17,
-        5,
-        18,
-        33,
-        49,
-        65,
-        6,
-        19,
-        81,
-        97,
-        7,
-        34,
-        113,
-        20,
-        50,
-        129,
-        145,
-        161,
-        8,
-        35,
-        66,
-        177,
-        193,
-        21,
-        82,
-        209,
-        240,
-        36,
-        51,
-        98,
-        114,
-        130,
-        9,
-        10,
-        22,
-        23,
-        24,
-        25,
-        26,
-        37,
-        38,
-        39,
-        40,
-        41,
-        42,
-        52,
-        53,
-        54,
-        55,
-        56,
-        57,
-        58,
-        67,
-        68,
-        69,
-        70,
-        71,
-        72,
-        73,
-        74,
-        83,
-        84,
-        85,
-        86,
-        87,
-        88,
-        89,
-        90,
-        99,
-        100,
-        101,
-        102,
-        103,
-        104,
-        105,
-        106,
-        115,
-        116,
-        117,
-        118,
-        119,
-        120,
-        121,
-        122,
-        131,
-        132,
-        133,
-        134,
-        135,
-        136,
-        137,
-        138,
-        146,
-        147,
-        148,
-        149,
-        150,
-        151,
-        152,
-        153,
-        154,
-        162,
-        163,
-        164,
-        165,
-        166,
-        167,
-        168,
-        169,
-        170,
-        178,
-        179,
-        180,
-        181,
-        182,
-        183,
-        184,
-        185,
-        186,
-        194,
-        195,
-        196,
-        197,
-        198,
-        199,
-        200,
-        201,
-        202,
-        210,
-        211,
-        212,
-        213,
-        214,
-        215,
-        216,
-        217,
-        218,
-        225,
-        226,
-        227,
-        228,
-        229,
-        230,
-        231,
-        232,
-        233,
-        234,
-        241,
-        242,
-        243,
-        244,
-        245,
-        246,
-        247,
-        248,
-        249,
-        250
-      ];
-      var std_dc_chrominance_nrcodes = [0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0];
-      var std_dc_chrominance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-      var std_ac_chrominance_nrcodes = [0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 119];
-      var std_ac_chrominance_values = [
-        0,
-        1,
-        2,
-        3,
-        17,
-        4,
-        5,
-        33,
-        49,
-        6,
-        18,
-        65,
-        81,
-        7,
-        97,
-        113,
-        19,
-        34,
-        50,
-        129,
-        8,
-        20,
-        66,
-        145,
-        161,
-        177,
-        193,
-        9,
-        35,
-        51,
-        82,
-        240,
-        21,
-        98,
-        114,
-        209,
-        10,
-        22,
-        36,
-        52,
-        225,
-        37,
-        241,
-        23,
-        24,
-        25,
-        26,
-        38,
-        39,
-        40,
-        41,
-        42,
-        53,
-        54,
-        55,
-        56,
-        57,
-        58,
-        67,
-        68,
-        69,
-        70,
-        71,
-        72,
-        73,
-        74,
-        83,
-        84,
-        85,
-        86,
-        87,
-        88,
-        89,
-        90,
-        99,
-        100,
-        101,
-        102,
-        103,
-        104,
-        105,
-        106,
-        115,
-        116,
-        117,
-        118,
-        119,
-        120,
-        121,
-        122,
-        130,
-        131,
-        132,
-        133,
-        134,
-        135,
-        136,
-        137,
-        138,
-        146,
-        147,
-        148,
-        149,
-        150,
-        151,
-        152,
-        153,
-        154,
-        162,
-        163,
-        164,
-        165,
-        166,
-        167,
-        168,
-        169,
-        170,
-        178,
-        179,
-        180,
-        181,
-        182,
-        183,
-        184,
-        185,
-        186,
-        194,
-        195,
-        196,
-        197,
-        198,
-        199,
-        200,
-        201,
-        202,
-        210,
-        211,
-        212,
-        213,
-        214,
-        215,
-        216,
-        217,
-        218,
-        226,
-        227,
-        228,
-        229,
-        230,
-        231,
-        232,
-        233,
-        234,
-        242,
-        243,
-        244,
-        245,
-        246,
-        247,
-        248,
-        249,
-        250
-      ];
-      function initQuantTables(sf) {
-        var YQT = [
-          16,
-          11,
-          10,
-          16,
-          24,
-          40,
-          51,
-          61,
-          12,
-          12,
-          14,
-          19,
-          26,
-          58,
-          60,
-          55,
-          14,
-          13,
-          16,
-          24,
-          40,
-          57,
-          69,
-          56,
-          14,
-          17,
-          22,
-          29,
-          51,
-          87,
-          80,
-          62,
-          18,
-          22,
-          37,
-          56,
-          68,
-          109,
-          103,
-          77,
-          24,
-          35,
-          55,
-          64,
-          81,
-          104,
-          113,
-          92,
-          49,
-          64,
-          78,
-          87,
-          103,
-          121,
-          120,
-          101,
-          72,
-          92,
-          95,
-          98,
-          112,
-          100,
-          103,
-          99
-        ];
-        for (var i = 0; i < 64; i++) {
-          var t2 = ffloor((YQT[i] * sf + 50) / 100);
-          if (t2 < 1) {
-            t2 = 1;
-          } else if (t2 > 255) {
-            t2 = 255;
-          }
-          YTable[ZigZag[i]] = t2;
-        }
-        var UVQT = [
-          17,
-          18,
-          24,
-          47,
-          99,
-          99,
-          99,
-          99,
-          18,
-          21,
-          26,
-          66,
-          99,
-          99,
-          99,
-          99,
-          24,
-          26,
-          56,
-          99,
-          99,
-          99,
-          99,
-          99,
-          47,
-          66,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99,
-          99
-        ];
-        for (var j = 0; j < 64; j++) {
-          var u = ffloor((UVQT[j] * sf + 50) / 100);
-          if (u < 1) {
-            u = 1;
-          } else if (u > 255) {
-            u = 255;
-          }
-          UVTable[ZigZag[j]] = u;
-        }
-        var aasf = [
-          1,
-          1.387039845,
-          1.306562965,
-          1.175875602,
-          1,
-          0.785694958,
-          0.5411961,
-          0.275899379
-        ];
-        var k = 0;
-        for (var row = 0; row < 8; row++) {
-          for (var col = 0; col < 8; col++) {
-            fdtbl_Y[k] = 1 / (YTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
-            fdtbl_UV[k] = 1 / (UVTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
-            k++;
-          }
-        }
-      }
-      function computeHuffmanTbl(nrcodes, std_table) {
-        var codevalue = 0;
-        var pos_in_table = 0;
-        var HT = new Array();
-        for (var k = 1; k <= 16; k++) {
-          for (var j = 1; j <= nrcodes[k]; j++) {
-            HT[std_table[pos_in_table]] = [];
-            HT[std_table[pos_in_table]][0] = codevalue;
-            HT[std_table[pos_in_table]][1] = k;
-            pos_in_table++;
-            codevalue++;
-          }
-          codevalue *= 2;
-        }
-        return HT;
-      }
-      function initHuffmanTbl() {
-        YDC_HT = computeHuffmanTbl(std_dc_luminance_nrcodes, std_dc_luminance_values);
-        UVDC_HT = computeHuffmanTbl(std_dc_chrominance_nrcodes, std_dc_chrominance_values);
-        YAC_HT = computeHuffmanTbl(std_ac_luminance_nrcodes, std_ac_luminance_values);
-        UVAC_HT = computeHuffmanTbl(std_ac_chrominance_nrcodes, std_ac_chrominance_values);
-      }
-      function initCategoryNumber() {
-        var nrlower = 1;
-        var nrupper = 2;
-        for (var cat = 1; cat <= 15; cat++) {
-          for (var nr = nrlower; nr < nrupper; nr++) {
-            category[32767 + nr] = cat;
-            bitcode[32767 + nr] = [];
-            bitcode[32767 + nr][1] = cat;
-            bitcode[32767 + nr][0] = nr;
-          }
-          for (var nrneg = -(nrupper - 1); nrneg <= -nrlower; nrneg++) {
-            category[32767 + nrneg] = cat;
-            bitcode[32767 + nrneg] = [];
-            bitcode[32767 + nrneg][1] = cat;
-            bitcode[32767 + nrneg][0] = nrupper - 1 + nrneg;
-          }
-          nrlower <<= 1;
-          nrupper <<= 1;
-        }
-      }
-      function initRGBYUVTable() {
-        for (var i = 0; i < 256; i++) {
-          RGB_YUV_TABLE[i] = 19595 * i;
-          RGB_YUV_TABLE[i + 256 >> 0] = 38470 * i;
-          RGB_YUV_TABLE[i + 512 >> 0] = 7471 * i + 32768;
-          RGB_YUV_TABLE[i + 768 >> 0] = -11059 * i;
-          RGB_YUV_TABLE[i + 1024 >> 0] = -21709 * i;
-          RGB_YUV_TABLE[i + 1280 >> 0] = 32768 * i + 8421375;
-          RGB_YUV_TABLE[i + 1536 >> 0] = -27439 * i;
-          RGB_YUV_TABLE[i + 1792 >> 0] = -5329 * i;
-        }
-      }
-      function writeBits(bs) {
-        var value = bs[0];
-        var posval = bs[1] - 1;
-        while (posval >= 0) {
-          if (value & 1 << posval) {
-            bytenew |= 1 << bytepos;
-          }
-          posval--;
-          bytepos--;
-          if (bytepos < 0) {
-            if (bytenew == 255) {
-              writeByte(255);
-              writeByte(0);
-            } else {
-              writeByte(bytenew);
-            }
-            bytepos = 7;
-            bytenew = 0;
-          }
-        }
-      }
-      function writeByte(value) {
-        byteout.push(value);
-      }
-      function writeWord(value) {
-        writeByte(value >> 8 & 255);
-        writeByte(value & 255);
-      }
-      function fDCTQuant(data, fdtbl) {
-        var d0, d1, d2, d3, d4, d5, d6, d7;
-        var dataOff = 0;
-        var i;
-        var I8 = 8;
-        var I64 = 64;
-        for (i = 0; i < I8; ++i) {
-          d0 = data[dataOff];
-          d1 = data[dataOff + 1];
-          d2 = data[dataOff + 2];
-          d3 = data[dataOff + 3];
-          d4 = data[dataOff + 4];
-          d5 = data[dataOff + 5];
-          d6 = data[dataOff + 6];
-          d7 = data[dataOff + 7];
-          var tmp0 = d0 + d7;
-          var tmp7 = d0 - d7;
-          var tmp1 = d1 + d6;
-          var tmp6 = d1 - d6;
-          var tmp2 = d2 + d5;
-          var tmp5 = d2 - d5;
-          var tmp3 = d3 + d4;
-          var tmp4 = d3 - d4;
-          var tmp10 = tmp0 + tmp3;
-          var tmp13 = tmp0 - tmp3;
-          var tmp11 = tmp1 + tmp2;
-          var tmp12 = tmp1 - tmp2;
-          data[dataOff] = tmp10 + tmp11;
-          data[dataOff + 4] = tmp10 - tmp11;
-          var z1 = (tmp12 + tmp13) * 0.707106781;
-          data[dataOff + 2] = tmp13 + z1;
-          data[dataOff + 6] = tmp13 - z1;
-          tmp10 = tmp4 + tmp5;
-          tmp11 = tmp5 + tmp6;
-          tmp12 = tmp6 + tmp7;
-          var z52 = (tmp10 - tmp12) * 0.382683433;
-          var z27 = 0.5411961 * tmp10 + z52;
-          var z42 = 1.306562965 * tmp12 + z52;
-          var z32 = tmp11 * 0.707106781;
-          var z112 = tmp7 + z32;
-          var z132 = tmp7 - z32;
-          data[dataOff + 5] = z132 + z27;
-          data[dataOff + 3] = z132 - z27;
-          data[dataOff + 1] = z112 + z42;
-          data[dataOff + 7] = z112 - z42;
-          dataOff += 8;
-        }
-        dataOff = 0;
-        for (i = 0; i < I8; ++i) {
-          d0 = data[dataOff];
-          d1 = data[dataOff + 8];
-          d2 = data[dataOff + 16];
-          d3 = data[dataOff + 24];
-          d4 = data[dataOff + 32];
-          d5 = data[dataOff + 40];
-          d6 = data[dataOff + 48];
-          d7 = data[dataOff + 56];
-          var tmp0p2 = d0 + d7;
-          var tmp7p2 = d0 - d7;
-          var tmp1p2 = d1 + d6;
-          var tmp6p2 = d1 - d6;
-          var tmp2p2 = d2 + d5;
-          var tmp5p2 = d2 - d5;
-          var tmp3p2 = d3 + d4;
-          var tmp4p2 = d3 - d4;
-          var tmp10p2 = tmp0p2 + tmp3p2;
-          var tmp13p2 = tmp0p2 - tmp3p2;
-          var tmp11p2 = tmp1p2 + tmp2p2;
-          var tmp12p2 = tmp1p2 - tmp2p2;
-          data[dataOff] = tmp10p2 + tmp11p2;
-          data[dataOff + 32] = tmp10p2 - tmp11p2;
-          var z1p2 = (tmp12p2 + tmp13p2) * 0.707106781;
-          data[dataOff + 16] = tmp13p2 + z1p2;
-          data[dataOff + 48] = tmp13p2 - z1p2;
-          tmp10p2 = tmp4p2 + tmp5p2;
-          tmp11p2 = tmp5p2 + tmp6p2;
-          tmp12p2 = tmp6p2 + tmp7p2;
-          var z5p2 = (tmp10p2 - tmp12p2) * 0.382683433;
-          var z2p2 = 0.5411961 * tmp10p2 + z5p2;
-          var z4p2 = 1.306562965 * tmp12p2 + z5p2;
-          var z3p2 = tmp11p2 * 0.707106781;
-          var z11p2 = tmp7p2 + z3p2;
-          var z13p2 = tmp7p2 - z3p2;
-          data[dataOff + 40] = z13p2 + z2p2;
-          data[dataOff + 24] = z13p2 - z2p2;
-          data[dataOff + 8] = z11p2 + z4p2;
-          data[dataOff + 56] = z11p2 - z4p2;
-          dataOff++;
-        }
-        var fDCTQuant2;
-        for (i = 0; i < I64; ++i) {
-          fDCTQuant2 = data[i] * fdtbl[i];
-          outputfDCTQuant[i] = fDCTQuant2 > 0 ? fDCTQuant2 + 0.5 | 0 : fDCTQuant2 - 0.5 | 0;
-        }
-        return outputfDCTQuant;
-      }
-      function writeAPP0() {
-        writeWord(65504);
-        writeWord(16);
-        writeByte(74);
-        writeByte(70);
-        writeByte(73);
-        writeByte(70);
-        writeByte(0);
-        writeByte(1);
-        writeByte(1);
-        writeByte(0);
-        writeWord(1);
-        writeWord(1);
-        writeByte(0);
-        writeByte(0);
-      }
-      function writeAPP1(exifBuffer) {
-        if (!exifBuffer) return;
-        writeWord(65505);
-        if (exifBuffer[0] === 69 && exifBuffer[1] === 120 && exifBuffer[2] === 105 && exifBuffer[3] === 102) {
-          writeWord(exifBuffer.length + 2);
-        } else {
-          writeWord(exifBuffer.length + 5 + 2);
-          writeByte(69);
-          writeByte(120);
-          writeByte(105);
-          writeByte(102);
-          writeByte(0);
-        }
-        for (var i = 0; i < exifBuffer.length; i++) {
-          writeByte(exifBuffer[i]);
-        }
-      }
-      function writeSOF0(width, height) {
-        writeWord(65472);
-        writeWord(17);
-        writeByte(8);
-        writeWord(height);
-        writeWord(width);
-        writeByte(3);
-        writeByte(1);
-        writeByte(17);
-        writeByte(0);
-        writeByte(2);
-        writeByte(17);
-        writeByte(1);
-        writeByte(3);
-        writeByte(17);
-        writeByte(1);
-      }
-      function writeDQT() {
-        writeWord(65499);
-        writeWord(132);
-        writeByte(0);
-        for (var i = 0; i < 64; i++) {
-          writeByte(YTable[i]);
-        }
-        writeByte(1);
-        for (var j = 0; j < 64; j++) {
-          writeByte(UVTable[j]);
-        }
-      }
-      function writeDHT() {
-        writeWord(65476);
-        writeWord(418);
-        writeByte(0);
-        for (var i = 0; i < 16; i++) {
-          writeByte(std_dc_luminance_nrcodes[i + 1]);
-        }
-        for (var j = 0; j <= 11; j++) {
-          writeByte(std_dc_luminance_values[j]);
-        }
-        writeByte(16);
-        for (var k = 0; k < 16; k++) {
-          writeByte(std_ac_luminance_nrcodes[k + 1]);
-        }
-        for (var l = 0; l <= 161; l++) {
-          writeByte(std_ac_luminance_values[l]);
-        }
-        writeByte(1);
-        for (var m = 0; m < 16; m++) {
-          writeByte(std_dc_chrominance_nrcodes[m + 1]);
-        }
-        for (var n = 0; n <= 11; n++) {
-          writeByte(std_dc_chrominance_values[n]);
-        }
-        writeByte(17);
-        for (var o = 0; o < 16; o++) {
-          writeByte(std_ac_chrominance_nrcodes[o + 1]);
-        }
-        for (var p2 = 0; p2 <= 161; p2++) {
-          writeByte(std_ac_chrominance_values[p2]);
-        }
-      }
-      function writeCOM(comments) {
-        if (typeof comments === "undefined" || comments.constructor !== Array) return;
-        comments.forEach((e) => {
-          if (typeof e !== "string") return;
-          writeWord(65534);
-          var l = e.length;
-          writeWord(l + 2);
-          var i;
-          for (i = 0; i < l; i++)
-            writeByte(e.charCodeAt(i));
-        });
-      }
-      function writeSOS() {
-        writeWord(65498);
-        writeWord(12);
-        writeByte(3);
-        writeByte(1);
-        writeByte(0);
-        writeByte(2);
-        writeByte(17);
-        writeByte(3);
-        writeByte(17);
-        writeByte(0);
-        writeByte(63);
-        writeByte(0);
-      }
-      function processDU(CDU, fdtbl, DC, HTDC, HTAC) {
-        var EOB = HTAC[0];
-        var M16zeroes = HTAC[240];
-        var pos;
-        var I16 = 16;
-        var I63 = 63;
-        var I64 = 64;
-        var DU_DCT = fDCTQuant(CDU, fdtbl);
-        for (var j = 0; j < I64; ++j) {
-          DU[ZigZag[j]] = DU_DCT[j];
-        }
-        var Diff2 = DU[0] - DC;
-        DC = DU[0];
-        if (Diff2 == 0) {
-          writeBits(HTDC[0]);
-        } else {
-          pos = 32767 + Diff2;
-          writeBits(HTDC[category[pos]]);
-          writeBits(bitcode[pos]);
-        }
-        var end0pos = 63;
-        for (; end0pos > 0 && DU[end0pos] == 0; end0pos--) {
-        }
-        ;
-        if (end0pos == 0) {
-          writeBits(EOB);
-          return DC;
-        }
-        var i = 1;
-        var lng;
-        while (i <= end0pos) {
-          var startpos = i;
-          for (; DU[i] == 0 && i <= end0pos; ++i) {
-          }
-          var nrzeroes = i - startpos;
-          if (nrzeroes >= I16) {
-            lng = nrzeroes >> 4;
-            for (var nrmarker = 1; nrmarker <= lng; ++nrmarker)
-              writeBits(M16zeroes);
-            nrzeroes = nrzeroes & 15;
-          }
-          pos = 32767 + DU[i];
-          writeBits(HTAC[(nrzeroes << 4) + category[pos]]);
-          writeBits(bitcode[pos]);
-          i++;
-        }
-        if (end0pos != I63) {
-          writeBits(EOB);
-        }
-        return DC;
-      }
-      function initCharLookupTable() {
-        var sfcc = String.fromCharCode;
-        for (var i = 0; i < 256; i++) {
-          clt[i] = sfcc(i);
-        }
-      }
-      this.encode = function(image, quality2) {
-        var time_start = (/* @__PURE__ */ new Date()).getTime();
-        if (quality2) setQuality(quality2);
-        byteout = new Array();
-        bytenew = 0;
-        bytepos = 7;
-        writeWord(65496);
-        writeAPP0();
-        writeCOM(image.comments);
-        writeAPP1(image.exifBuffer);
-        writeDQT();
-        writeSOF0(image.width, image.height);
-        writeDHT();
-        writeSOS();
-        var DCY = 0;
-        var DCU = 0;
-        var DCV = 0;
-        bytenew = 0;
-        bytepos = 7;
-        this.encode.displayName = "_encode_";
-        var imageData = image.data;
-        var width = image.width;
-        var height = image.height;
-        var quadWidth = width * 4;
-        var tripleWidth = width * 3;
-        var x, y = 0;
-        var r, g, b2;
-        var start, p2, col, row, pos;
-        while (y < height) {
-          x = 0;
-          while (x < quadWidth) {
-            start = quadWidth * y + x;
-            p2 = start;
-            col = -1;
-            row = 0;
-            for (pos = 0; pos < 64; pos++) {
-              row = pos >> 3;
-              col = (pos & 7) * 4;
-              p2 = start + row * quadWidth + col;
-              if (y + row >= height) {
-                p2 -= quadWidth * (y + 1 + row - height);
-              }
-              if (x + col >= quadWidth) {
-                p2 -= x + col - quadWidth + 4;
-              }
-              r = imageData[p2++];
-              g = imageData[p2++];
-              b2 = imageData[p2++];
-              YDU[pos] = (RGB_YUV_TABLE[r] + RGB_YUV_TABLE[g + 256 >> 0] + RGB_YUV_TABLE[b2 + 512 >> 0] >> 16) - 128;
-              UDU[pos] = (RGB_YUV_TABLE[r + 768 >> 0] + RGB_YUV_TABLE[g + 1024 >> 0] + RGB_YUV_TABLE[b2 + 1280 >> 0] >> 16) - 128;
-              VDU[pos] = (RGB_YUV_TABLE[r + 1280 >> 0] + RGB_YUV_TABLE[g + 1536 >> 0] + RGB_YUV_TABLE[b2 + 1792 >> 0] >> 16) - 128;
-            }
-            DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
-            DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
-            DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
-            x += 32;
-          }
-          y += 8;
-        }
-        if (bytepos >= 0) {
-          var fillbits = [];
-          fillbits[1] = bytepos + 1;
-          fillbits[0] = (1 << bytepos + 1) - 1;
-          writeBits(fillbits);
-        }
-        writeWord(65497);
-        if (typeof module === "undefined") return new Uint8Array(byteout);
-        return Buffer.from(byteout);
-        var jpegDataUri = "data:image/jpeg;base64," + btoa(byteout.join(""));
-        byteout = [];
-        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
-        return jpegDataUri;
-      };
-      function setQuality(quality2) {
-        if (quality2 <= 0) {
-          quality2 = 1;
-        }
-        if (quality2 > 100) {
-          quality2 = 100;
-        }
-        if (currentQuality == quality2) return;
-        var sf = 0;
-        if (quality2 < 50) {
-          sf = Math.floor(5e3 / quality2);
-        } else {
-          sf = Math.floor(200 - quality2 * 2);
-        }
-        initQuantTables(sf);
-        currentQuality = quality2;
-      }
-      function init() {
-        var time_start = (/* @__PURE__ */ new Date()).getTime();
-        if (!quality) quality = 50;
-        initCharLookupTable();
-        initHuffmanTbl();
-        initCategoryNumber();
-        initRGBYUVTable();
-        setQuality(quality);
-        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
-      }
-      init();
-    }
-    if (typeof module !== "undefined") {
-      module.exports = encode5;
-    } else if (typeof window !== "undefined") {
-      window["jpeg-js"] = window["jpeg-js"] || {};
-      window["jpeg-js"].encode = encode5;
-    }
-    function encode5(imgData, qu) {
-      if (typeof qu === "undefined") qu = 50;
-      var encoder = new JPEGEncoder(qu);
-      var data = encoder.encode(imgData, qu);
-      return {
-        data,
-        width: imgData.width,
-        height: imgData.height
-      };
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js
-var require_decoder = __commonJS({
-  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js"(exports, module) {
-    var JpegImage = (function jpegImage() {
-      "use strict";
-      var dctZigZag = new Int32Array([
-        0,
-        1,
-        8,
-        16,
-        9,
-        2,
-        3,
-        10,
-        17,
-        24,
-        32,
-        25,
-        18,
-        11,
-        4,
-        5,
-        12,
-        19,
-        26,
-        33,
-        40,
-        48,
-        41,
-        34,
-        27,
-        20,
-        13,
-        6,
-        7,
-        14,
-        21,
-        28,
-        35,
-        42,
-        49,
-        56,
-        57,
-        50,
-        43,
-        36,
-        29,
-        22,
-        15,
-        23,
-        30,
-        37,
-        44,
-        51,
-        58,
-        59,
-        52,
-        45,
-        38,
-        31,
-        39,
-        46,
-        53,
-        60,
-        61,
-        54,
-        47,
-        55,
-        62,
-        63
-      ]);
-      var dctCos1 = 4017;
-      var dctSin1 = 799;
-      var dctCos3 = 3406;
-      var dctSin3 = 2276;
-      var dctCos6 = 1567;
-      var dctSin6 = 3784;
-      var dctSqrt2 = 5793;
-      var dctSqrt1d2 = 2896;
-      function constructor() {
-      }
-      function buildHuffmanTable(codeLengths, values2) {
-        var k = 0, code = [], i, j, length = 16;
-        while (length > 0 && !codeLengths[length - 1])
-          length--;
-        code.push({ children: [], index: 0 });
-        var p2 = code[0], q;
-        for (i = 0; i < length; i++) {
-          for (j = 0; j < codeLengths[i]; j++) {
-            p2 = code.pop();
-            p2.children[p2.index] = values2[k];
-            while (p2.index > 0) {
-              if (code.length === 0)
-                throw new Error("Could not recreate Huffman Table");
-              p2 = code.pop();
-            }
-            p2.index++;
-            code.push(p2);
-            while (code.length <= i) {
-              code.push(q = { children: [], index: 0 });
-              p2.children[p2.index] = q.children;
-              p2 = q;
-            }
-            k++;
-          }
-          if (i + 1 < length) {
-            code.push(q = { children: [], index: 0 });
-            p2.children[p2.index] = q.children;
-            p2 = q;
-          }
-        }
-        return code[0].children;
-      }
-      function decodeScan(data, offset, frame, components, resetInterval, spectralStart, spectralEnd, successivePrev, successive, opts) {
-        var precision = frame.precision;
-        var samplesPerLine = frame.samplesPerLine;
-        var scanLines = frame.scanLines;
-        var mcusPerLine = frame.mcusPerLine;
-        var progressive = frame.progressive;
-        var maxH = frame.maxH, maxV = frame.maxV;
-        var startOffset = offset, bitsData = 0, bitsCount = 0;
-        function readBit() {
-          if (bitsCount > 0) {
-            bitsCount--;
-            return bitsData >> bitsCount & 1;
-          }
-          bitsData = data[offset++];
-          if (bitsData == 255) {
-            var nextByte = data[offset++];
-            if (nextByte) {
-              throw new Error("unexpected marker: " + (bitsData << 8 | nextByte).toString(16));
-            }
-          }
-          bitsCount = 7;
-          return bitsData >>> 7;
-        }
-        function decodeHuffman(tree) {
-          var node = tree, bit;
-          while ((bit = readBit()) !== null) {
-            node = node[bit];
-            if (typeof node === "number")
-              return node;
-            if (typeof node !== "object")
-              throw new Error("invalid huffman sequence");
-          }
-          return null;
-        }
-        function receive(length) {
-          var n2 = 0;
-          while (length > 0) {
-            var bit = readBit();
-            if (bit === null) return;
-            n2 = n2 << 1 | bit;
-            length--;
-          }
-          return n2;
-        }
-        function receiveAndExtend(length) {
-          var n2 = receive(length);
-          if (n2 >= 1 << length - 1)
-            return n2;
-          return n2 + (-1 << length) + 1;
-        }
-        function decodeBaseline(component2, zz) {
-          var t2 = decodeHuffman(component2.huffmanTableDC);
-          var diff = t2 === 0 ? 0 : receiveAndExtend(t2);
-          zz[0] = component2.pred += diff;
-          var k2 = 1;
-          while (k2 < 64) {
-            var rs = decodeHuffman(component2.huffmanTableAC);
-            var s = rs & 15, r = rs >> 4;
-            if (s === 0) {
-              if (r < 15)
-                break;
-              k2 += 16;
-              continue;
-            }
-            k2 += r;
-            var z27 = dctZigZag[k2];
-            zz[z27] = receiveAndExtend(s);
-            k2++;
-          }
-        }
-        function decodeDCFirst(component2, zz) {
-          var t2 = decodeHuffman(component2.huffmanTableDC);
-          var diff = t2 === 0 ? 0 : receiveAndExtend(t2) << successive;
-          zz[0] = component2.pred += diff;
-        }
-        function decodeDCSuccessive(component2, zz) {
-          zz[0] |= readBit() << successive;
-        }
-        var eobrun = 0;
-        function decodeACFirst(component2, zz) {
-          if (eobrun > 0) {
-            eobrun--;
-            return;
-          }
-          var k2 = spectralStart, e = spectralEnd;
-          while (k2 <= e) {
-            var rs = decodeHuffman(component2.huffmanTableAC);
-            var s = rs & 15, r = rs >> 4;
-            if (s === 0) {
-              if (r < 15) {
-                eobrun = receive(r) + (1 << r) - 1;
-                break;
-              }
-              k2 += 16;
-              continue;
-            }
-            k2 += r;
-            var z27 = dctZigZag[k2];
-            zz[z27] = receiveAndExtend(s) * (1 << successive);
-            k2++;
-          }
-        }
-        var successiveACState = 0, successiveACNextValue;
-        function decodeACSuccessive(component2, zz) {
-          var k2 = spectralStart, e = spectralEnd, r = 0;
-          while (k2 <= e) {
-            var z27 = dctZigZag[k2];
-            var direction = zz[z27] < 0 ? -1 : 1;
-            switch (successiveACState) {
-              case 0:
-                var rs = decodeHuffman(component2.huffmanTableAC);
-                var s = rs & 15, r = rs >> 4;
-                if (s === 0) {
-                  if (r < 15) {
-                    eobrun = receive(r) + (1 << r);
-                    successiveACState = 4;
-                  } else {
-                    r = 16;
-                    successiveACState = 1;
-                  }
-                } else {
-                  if (s !== 1)
-                    throw new Error("invalid ACn encoding");
-                  successiveACNextValue = receiveAndExtend(s);
-                  successiveACState = r ? 2 : 3;
-                }
-                continue;
-              case 1:
-              // skipping r zero items
-              case 2:
-                if (zz[z27])
-                  zz[z27] += (readBit() << successive) * direction;
-                else {
-                  r--;
-                  if (r === 0)
-                    successiveACState = successiveACState == 2 ? 3 : 0;
-                }
-                break;
-              case 3:
-                if (zz[z27])
-                  zz[z27] += (readBit() << successive) * direction;
-                else {
-                  zz[z27] = successiveACNextValue << successive;
-                  successiveACState = 0;
-                }
-                break;
-              case 4:
-                if (zz[z27])
-                  zz[z27] += (readBit() << successive) * direction;
-                break;
-            }
-            k2++;
-          }
-          if (successiveACState === 4) {
-            eobrun--;
-            if (eobrun === 0)
-              successiveACState = 0;
-          }
-        }
-        function decodeMcu(component2, decode2, mcu2, row, col) {
-          var mcuRow = mcu2 / mcusPerLine | 0;
-          var mcuCol = mcu2 % mcusPerLine;
-          var blockRow = mcuRow * component2.v + row;
-          var blockCol = mcuCol * component2.h + col;
-          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
-            return;
-          decode2(component2, component2.blocks[blockRow][blockCol]);
-        }
-        function decodeBlock(component2, decode2, mcu2) {
-          var blockRow = mcu2 / component2.blocksPerLine | 0;
-          var blockCol = mcu2 % component2.blocksPerLine;
-          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
-            return;
-          decode2(component2, component2.blocks[blockRow][blockCol]);
-        }
-        var componentsLength = components.length;
-        var component, i, j, k, n;
-        var decodeFn;
-        if (progressive) {
-          if (spectralStart === 0)
-            decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
-          else
-            decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
-        } else {
-          decodeFn = decodeBaseline;
-        }
-        var mcu = 0, marker;
-        var mcuExpected;
-        if (componentsLength == 1) {
-          mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
-        } else {
-          mcuExpected = mcusPerLine * frame.mcusPerColumn;
-        }
-        if (!resetInterval) resetInterval = mcuExpected;
-        var h, v;
-        while (mcu < mcuExpected) {
-          for (i = 0; i < componentsLength; i++)
-            components[i].pred = 0;
-          eobrun = 0;
-          if (componentsLength == 1) {
-            component = components[0];
-            for (n = 0; n < resetInterval; n++) {
-              decodeBlock(component, decodeFn, mcu);
-              mcu++;
-            }
-          } else {
-            for (n = 0; n < resetInterval; n++) {
-              for (i = 0; i < componentsLength; i++) {
-                component = components[i];
-                h = component.h;
-                v = component.v;
-                for (j = 0; j < v; j++) {
-                  for (k = 0; k < h; k++) {
-                    decodeMcu(component, decodeFn, mcu, j, k);
-                  }
-                }
-              }
-              mcu++;
-              if (mcu === mcuExpected) break;
-            }
-          }
-          if (mcu === mcuExpected) {
-            do {
-              if (data[offset] === 255) {
-                if (data[offset + 1] !== 0) {
-                  break;
-                }
-              }
-              offset += 1;
-            } while (offset < data.length - 2);
-          }
-          bitsCount = 0;
-          marker = data[offset] << 8 | data[offset + 1];
-          if (marker < 65280) {
-            throw new Error("marker was not found");
-          }
-          if (marker >= 65488 && marker <= 65495) {
-            offset += 2;
-          } else
-            break;
-        }
-        return offset - startOffset;
-      }
-      function buildComponentData(frame, component) {
-        var lines = [];
-        var blocksPerLine = component.blocksPerLine;
-        var blocksPerColumn = component.blocksPerColumn;
-        var samplesPerLine = blocksPerLine << 3;
-        var R = new Int32Array(64), r = new Uint8Array(64);
-        function quantizeAndInverse(zz, dataOut, dataIn) {
-          var qt = component.quantizationTable;
-          var v0, v1, v2, v3, v4, v5, v6, v7, t2;
-          var p2 = dataIn;
-          var i2;
-          for (i2 = 0; i2 < 64; i2++)
-            p2[i2] = zz[i2] * qt[i2];
-          for (i2 = 0; i2 < 8; ++i2) {
-            var row = 8 * i2;
-            if (p2[1 + row] == 0 && p2[2 + row] == 0 && p2[3 + row] == 0 && p2[4 + row] == 0 && p2[5 + row] == 0 && p2[6 + row] == 0 && p2[7 + row] == 0) {
-              t2 = dctSqrt2 * p2[0 + row] + 512 >> 10;
-              p2[0 + row] = t2;
-              p2[1 + row] = t2;
-              p2[2 + row] = t2;
-              p2[3 + row] = t2;
-              p2[4 + row] = t2;
-              p2[5 + row] = t2;
-              p2[6 + row] = t2;
-              p2[7 + row] = t2;
-              continue;
-            }
-            v0 = dctSqrt2 * p2[0 + row] + 128 >> 8;
-            v1 = dctSqrt2 * p2[4 + row] + 128 >> 8;
-            v2 = p2[2 + row];
-            v3 = p2[6 + row];
-            v4 = dctSqrt1d2 * (p2[1 + row] - p2[7 + row]) + 128 >> 8;
-            v7 = dctSqrt1d2 * (p2[1 + row] + p2[7 + row]) + 128 >> 8;
-            v5 = p2[3 + row] << 4;
-            v6 = p2[5 + row] << 4;
-            t2 = v0 - v1 + 1 >> 1;
-            v0 = v0 + v1 + 1 >> 1;
-            v1 = t2;
-            t2 = v2 * dctSin6 + v3 * dctCos6 + 128 >> 8;
-            v2 = v2 * dctCos6 - v3 * dctSin6 + 128 >> 8;
-            v3 = t2;
-            t2 = v4 - v6 + 1 >> 1;
-            v4 = v4 + v6 + 1 >> 1;
-            v6 = t2;
-            t2 = v7 + v5 + 1 >> 1;
-            v5 = v7 - v5 + 1 >> 1;
-            v7 = t2;
-            t2 = v0 - v3 + 1 >> 1;
-            v0 = v0 + v3 + 1 >> 1;
-            v3 = t2;
-            t2 = v1 - v2 + 1 >> 1;
-            v1 = v1 + v2 + 1 >> 1;
-            v2 = t2;
-            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
-            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
-            v7 = t2;
-            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
-            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
-            v6 = t2;
-            p2[0 + row] = v0 + v7;
-            p2[7 + row] = v0 - v7;
-            p2[1 + row] = v1 + v6;
-            p2[6 + row] = v1 - v6;
-            p2[2 + row] = v2 + v5;
-            p2[5 + row] = v2 - v5;
-            p2[3 + row] = v3 + v4;
-            p2[4 + row] = v3 - v4;
-          }
-          for (i2 = 0; i2 < 8; ++i2) {
-            var col = i2;
-            if (p2[1 * 8 + col] == 0 && p2[2 * 8 + col] == 0 && p2[3 * 8 + col] == 0 && p2[4 * 8 + col] == 0 && p2[5 * 8 + col] == 0 && p2[6 * 8 + col] == 0 && p2[7 * 8 + col] == 0) {
-              t2 = dctSqrt2 * dataIn[i2 + 0] + 8192 >> 14;
-              p2[0 * 8 + col] = t2;
-              p2[1 * 8 + col] = t2;
-              p2[2 * 8 + col] = t2;
-              p2[3 * 8 + col] = t2;
-              p2[4 * 8 + col] = t2;
-              p2[5 * 8 + col] = t2;
-              p2[6 * 8 + col] = t2;
-              p2[7 * 8 + col] = t2;
-              continue;
-            }
-            v0 = dctSqrt2 * p2[0 * 8 + col] + 2048 >> 12;
-            v1 = dctSqrt2 * p2[4 * 8 + col] + 2048 >> 12;
-            v2 = p2[2 * 8 + col];
-            v3 = p2[6 * 8 + col];
-            v4 = dctSqrt1d2 * (p2[1 * 8 + col] - p2[7 * 8 + col]) + 2048 >> 12;
-            v7 = dctSqrt1d2 * (p2[1 * 8 + col] + p2[7 * 8 + col]) + 2048 >> 12;
-            v5 = p2[3 * 8 + col];
-            v6 = p2[5 * 8 + col];
-            t2 = v0 - v1 + 1 >> 1;
-            v0 = v0 + v1 + 1 >> 1;
-            v1 = t2;
-            t2 = v2 * dctSin6 + v3 * dctCos6 + 2048 >> 12;
-            v2 = v2 * dctCos6 - v3 * dctSin6 + 2048 >> 12;
-            v3 = t2;
-            t2 = v4 - v6 + 1 >> 1;
-            v4 = v4 + v6 + 1 >> 1;
-            v6 = t2;
-            t2 = v7 + v5 + 1 >> 1;
-            v5 = v7 - v5 + 1 >> 1;
-            v7 = t2;
-            t2 = v0 - v3 + 1 >> 1;
-            v0 = v0 + v3 + 1 >> 1;
-            v3 = t2;
-            t2 = v1 - v2 + 1 >> 1;
-            v1 = v1 + v2 + 1 >> 1;
-            v2 = t2;
-            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
-            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
-            v7 = t2;
-            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
-            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
-            v6 = t2;
-            p2[0 * 8 + col] = v0 + v7;
-            p2[7 * 8 + col] = v0 - v7;
-            p2[1 * 8 + col] = v1 + v6;
-            p2[6 * 8 + col] = v1 - v6;
-            p2[2 * 8 + col] = v2 + v5;
-            p2[5 * 8 + col] = v2 - v5;
-            p2[3 * 8 + col] = v3 + v4;
-            p2[4 * 8 + col] = v3 - v4;
-          }
-          for (i2 = 0; i2 < 64; ++i2) {
-            var sample2 = 128 + (p2[i2] + 8 >> 4);
-            dataOut[i2] = sample2 < 0 ? 0 : sample2 > 255 ? 255 : sample2;
-          }
-        }
-        requestMemoryAllocation(samplesPerLine * blocksPerColumn * 8);
-        var i, j;
-        for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
-          var scanLine = blockRow << 3;
-          for (i = 0; i < 8; i++)
-            lines.push(new Uint8Array(samplesPerLine));
-          for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
-            quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
-            var offset = 0, sample = blockCol << 3;
-            for (j = 0; j < 8; j++) {
-              var line = lines[scanLine + j];
-              for (i = 0; i < 8; i++)
-                line[sample + i] = r[offset++];
-            }
-          }
-        }
-        return lines;
-      }
-      function clampTo8bit(a) {
-        return a < 0 ? 0 : a > 255 ? 255 : a;
-      }
-      constructor.prototype = {
-        load: function load(path) {
-          var xhr = new XMLHttpRequest();
-          xhr.open("GET", path, true);
-          xhr.responseType = "arraybuffer";
-          xhr.onload = (function() {
-            var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
-            this.parse(data);
-            if (this.onload)
-              this.onload();
-          }).bind(this);
-          xhr.send(null);
-        },
-        parse: function parse(data) {
-          var maxResolutionInPixels = this.opts.maxResolutionInMP * 1e3 * 1e3;
-          var offset = 0, length = data.length;
-          function readUint16() {
-            var value = data[offset] << 8 | data[offset + 1];
-            offset += 2;
-            return value;
-          }
-          function readDataBlock() {
-            var length2 = readUint16();
-            var array = data.subarray(offset, offset + length2 - 2);
-            offset += array.length;
-            return array;
-          }
-          function prepareComponents(frame2) {
-            var maxH2 = 1, maxV2 = 1;
-            var component2, componentId2;
-            for (componentId2 in frame2.components) {
-              if (frame2.components.hasOwnProperty(componentId2)) {
-                component2 = frame2.components[componentId2];
-                if (maxH2 < component2.h) maxH2 = component2.h;
-                if (maxV2 < component2.v) maxV2 = component2.v;
-              }
-            }
-            var mcusPerLine = Math.ceil(frame2.samplesPerLine / 8 / maxH2);
-            var mcusPerColumn = Math.ceil(frame2.scanLines / 8 / maxV2);
-            for (componentId2 in frame2.components) {
-              if (frame2.components.hasOwnProperty(componentId2)) {
-                component2 = frame2.components[componentId2];
-                var blocksPerLine = Math.ceil(Math.ceil(frame2.samplesPerLine / 8) * component2.h / maxH2);
-                var blocksPerColumn = Math.ceil(Math.ceil(frame2.scanLines / 8) * component2.v / maxV2);
-                var blocksPerLineForMcu = mcusPerLine * component2.h;
-                var blocksPerColumnForMcu = mcusPerColumn * component2.v;
-                var blocksToAllocate = blocksPerColumnForMcu * blocksPerLineForMcu;
-                var blocks = [];
-                requestMemoryAllocation(blocksToAllocate * 256);
-                for (var i2 = 0; i2 < blocksPerColumnForMcu; i2++) {
-                  var row = [];
-                  for (var j2 = 0; j2 < blocksPerLineForMcu; j2++)
-                    row.push(new Int32Array(64));
-                  blocks.push(row);
-                }
-                component2.blocksPerLine = blocksPerLine;
-                component2.blocksPerColumn = blocksPerColumn;
-                component2.blocks = blocks;
-              }
-            }
-            frame2.maxH = maxH2;
-            frame2.maxV = maxV2;
-            frame2.mcusPerLine = mcusPerLine;
-            frame2.mcusPerColumn = mcusPerColumn;
-          }
-          var jfif = null;
-          var adobe = null;
-          var pixels = null;
-          var frame, resetInterval;
-          var quantizationTables = [], frames = [];
-          var huffmanTablesAC = [], huffmanTablesDC = [];
-          var fileMarker = readUint16();
-          var malformedDataOffset = -1;
-          this.comments = [];
-          if (fileMarker != 65496) {
-            throw new Error("SOI not found");
-          }
-          fileMarker = readUint16();
-          while (fileMarker != 65497) {
-            var i, j, l;
-            switch (fileMarker) {
-              case 65280:
-                break;
-              case 65504:
-              // APP0 (Application Specific)
-              case 65505:
-              // APP1
-              case 65506:
-              // APP2
-              case 65507:
-              // APP3
-              case 65508:
-              // APP4
-              case 65509:
-              // APP5
-              case 65510:
-              // APP6
-              case 65511:
-              // APP7
-              case 65512:
-              // APP8
-              case 65513:
-              // APP9
-              case 65514:
-              // APP10
-              case 65515:
-              // APP11
-              case 65516:
-              // APP12
-              case 65517:
-              // APP13
-              case 65518:
-              // APP14
-              case 65519:
-              // APP15
-              case 65534:
-                var appData = readDataBlock();
-                if (fileMarker === 65534) {
-                  var comment = String.fromCharCode.apply(null, appData);
-                  this.comments.push(comment);
-                }
-                if (fileMarker === 65504) {
-                  if (appData[0] === 74 && appData[1] === 70 && appData[2] === 73 && appData[3] === 70 && appData[4] === 0) {
-                    jfif = {
-                      version: { major: appData[5], minor: appData[6] },
-                      densityUnits: appData[7],
-                      xDensity: appData[8] << 8 | appData[9],
-                      yDensity: appData[10] << 8 | appData[11],
-                      thumbWidth: appData[12],
-                      thumbHeight: appData[13],
-                      thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
-                    };
-                  }
-                }
-                if (fileMarker === 65505) {
-                  if (appData[0] === 69 && appData[1] === 120 && appData[2] === 105 && appData[3] === 102 && appData[4] === 0) {
-                    this.exifBuffer = appData.subarray(5, appData.length);
-                  }
-                }
-                if (fileMarker === 65518) {
-                  if (appData[0] === 65 && appData[1] === 100 && appData[2] === 111 && appData[3] === 98 && appData[4] === 101 && appData[5] === 0) {
-                    adobe = {
-                      version: appData[6],
-                      flags0: appData[7] << 8 | appData[8],
-                      flags1: appData[9] << 8 | appData[10],
-                      transformCode: appData[11]
-                    };
-                  }
-                }
-                break;
-              case 65499:
-                var quantizationTablesLength = readUint16();
-                var quantizationTablesEnd = quantizationTablesLength + offset - 2;
-                while (offset < quantizationTablesEnd) {
-                  var quantizationTableSpec = data[offset++];
-                  requestMemoryAllocation(64 * 4);
-                  var tableData = new Int32Array(64);
-                  if (quantizationTableSpec >> 4 === 0) {
-                    for (j = 0; j < 64; j++) {
-                      var z27 = dctZigZag[j];
-                      tableData[z27] = data[offset++];
-                    }
-                  } else if (quantizationTableSpec >> 4 === 1) {
-                    for (j = 0; j < 64; j++) {
-                      var z27 = dctZigZag[j];
-                      tableData[z27] = readUint16();
-                    }
-                  } else
-                    throw new Error("DQT: invalid table spec");
-                  quantizationTables[quantizationTableSpec & 15] = tableData;
-                }
-                break;
-              case 65472:
-              // SOF0 (Start of Frame, Baseline DCT)
-              case 65473:
-              // SOF1 (Start of Frame, Extended DCT)
-              case 65474:
-                readUint16();
-                frame = {};
-                frame.extended = fileMarker === 65473;
-                frame.progressive = fileMarker === 65474;
-                frame.precision = data[offset++];
-                frame.scanLines = readUint16();
-                frame.samplesPerLine = readUint16();
-                frame.components = {};
-                frame.componentsOrder = [];
-                var pixelsInFrame = frame.scanLines * frame.samplesPerLine;
-                if (pixelsInFrame > maxResolutionInPixels) {
-                  var exceededAmount = Math.ceil((pixelsInFrame - maxResolutionInPixels) / 1e6);
-                  throw new Error(`maxResolutionInMP limit exceeded by ${exceededAmount}MP`);
-                }
-                var componentsCount = data[offset++], componentId;
-                var maxH = 0, maxV = 0;
-                for (i = 0; i < componentsCount; i++) {
-                  componentId = data[offset];
-                  var h = data[offset + 1] >> 4;
-                  var v = data[offset + 1] & 15;
-                  var qId = data[offset + 2];
-                  if (h <= 0 || v <= 0) {
-                    throw new Error("Invalid sampling factor, expected values above 0");
-                  }
-                  frame.componentsOrder.push(componentId);
-                  frame.components[componentId] = {
-                    h,
-                    v,
-                    quantizationIdx: qId
-                  };
-                  offset += 3;
-                }
-                prepareComponents(frame);
-                frames.push(frame);
-                break;
-              case 65476:
-                var huffmanLength = readUint16();
-                for (i = 2; i < huffmanLength; ) {
-                  var huffmanTableSpec = data[offset++];
-                  var codeLengths = new Uint8Array(16);
-                  var codeLengthSum = 0;
-                  for (j = 0; j < 16; j++, offset++) {
-                    codeLengthSum += codeLengths[j] = data[offset];
-                  }
-                  requestMemoryAllocation(16 + codeLengthSum);
-                  var huffmanValues = new Uint8Array(codeLengthSum);
-                  for (j = 0; j < codeLengthSum; j++, offset++)
-                    huffmanValues[j] = data[offset];
-                  i += 17 + codeLengthSum;
-                  (huffmanTableSpec >> 4 === 0 ? huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] = buildHuffmanTable(codeLengths, huffmanValues);
-                }
-                break;
-              case 65501:
-                readUint16();
-                resetInterval = readUint16();
-                break;
-              case 65500:
-                readUint16();
-                readUint16();
-                break;
-              case 65498:
-                var scanLength = readUint16();
-                var selectorsCount = data[offset++];
-                var components = [], component;
-                for (i = 0; i < selectorsCount; i++) {
-                  component = frame.components[data[offset++]];
-                  var tableSpec = data[offset++];
-                  component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
-                  component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
-                  components.push(component);
-                }
-                var spectralStart = data[offset++];
-                var spectralEnd = data[offset++];
-                var successiveApproximation = data[offset++];
-                var processed = decodeScan(
-                  data,
-                  offset,
-                  frame,
-                  components,
-                  resetInterval,
-                  spectralStart,
-                  spectralEnd,
-                  successiveApproximation >> 4,
-                  successiveApproximation & 15,
-                  this.opts
-                );
-                offset += processed;
-                break;
-              case 65535:
-                if (data[offset] !== 255) {
-                  offset--;
-                }
-                break;
-              default:
-                if (data[offset - 3] == 255 && data[offset - 2] >= 192 && data[offset - 2] <= 254) {
-                  offset -= 3;
-                  break;
-                } else if (fileMarker === 224 || fileMarker == 225) {
-                  if (malformedDataOffset !== -1) {
-                    throw new Error(`first unknown JPEG marker at offset ${malformedDataOffset.toString(16)}, second unknown JPEG marker ${fileMarker.toString(16)} at offset ${(offset - 1).toString(16)}`);
-                  }
-                  malformedDataOffset = offset - 1;
-                  const nextOffset = readUint16();
-                  if (data[offset + nextOffset - 2] === 255) {
-                    offset += nextOffset - 2;
-                    break;
-                  }
-                }
-                throw new Error("unknown JPEG marker " + fileMarker.toString(16));
-            }
-            fileMarker = readUint16();
-          }
-          if (frames.length != 1)
-            throw new Error("only single frame JPEGs supported");
-          for (var i = 0; i < frames.length; i++) {
-            var cp = frames[i].components;
-            for (var j in cp) {
-              cp[j].quantizationTable = quantizationTables[cp[j].quantizationIdx];
-              delete cp[j].quantizationIdx;
-            }
-          }
-          this.width = frame.samplesPerLine;
-          this.height = frame.scanLines;
-          this.jfif = jfif;
-          this.adobe = adobe;
-          this.components = [];
-          for (var i = 0; i < frame.componentsOrder.length; i++) {
-            var component = frame.components[frame.componentsOrder[i]];
-            this.components.push({
-              lines: buildComponentData(frame, component),
-              scaleX: component.h / frame.maxH,
-              scaleY: component.v / frame.maxV
-            });
-          }
-        },
-        getData: function getData(width, height) {
-          var scaleX = this.width / width, scaleY = this.height / height;
-          var component1, component2, component3, component4;
-          var component1Line, component2Line, component3Line, component4Line;
-          var x, y;
-          var offset = 0;
-          var Y, Cb, Cr, K, C2, M, Ye, R, G, B;
-          var colorTransform;
-          var dataLength = width * height * this.components.length;
-          requestMemoryAllocation(dataLength);
-          var data = new Uint8Array(dataLength);
-          switch (this.components.length) {
-            case 1:
-              component1 = this.components[0];
-              for (y = 0; y < height; y++) {
-                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
-                for (x = 0; x < width; x++) {
-                  Y = component1Line[0 | x * component1.scaleX * scaleX];
-                  data[offset++] = Y;
-                }
-              }
-              break;
-            case 2:
-              component1 = this.components[0];
-              component2 = this.components[1];
-              for (y = 0; y < height; y++) {
-                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
-                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
-                for (x = 0; x < width; x++) {
-                  Y = component1Line[0 | x * component1.scaleX * scaleX];
-                  data[offset++] = Y;
-                  Y = component2Line[0 | x * component2.scaleX * scaleX];
-                  data[offset++] = Y;
-                }
-              }
-              break;
-            case 3:
-              colorTransform = true;
-              if (this.adobe && this.adobe.transformCode)
-                colorTransform = true;
-              else if (typeof this.opts.colorTransform !== "undefined")
-                colorTransform = !!this.opts.colorTransform;
-              component1 = this.components[0];
-              component2 = this.components[1];
-              component3 = this.components[2];
-              for (y = 0; y < height; y++) {
-                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
-                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
-                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
-                for (x = 0; x < width; x++) {
-                  if (!colorTransform) {
-                    R = component1Line[0 | x * component1.scaleX * scaleX];
-                    G = component2Line[0 | x * component2.scaleX * scaleX];
-                    B = component3Line[0 | x * component3.scaleX * scaleX];
-                  } else {
-                    Y = component1Line[0 | x * component1.scaleX * scaleX];
-                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
-                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
-                    R = clampTo8bit(Y + 1.402 * (Cr - 128));
-                    G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
-                    B = clampTo8bit(Y + 1.772 * (Cb - 128));
-                  }
-                  data[offset++] = R;
-                  data[offset++] = G;
-                  data[offset++] = B;
-                }
-              }
-              break;
-            case 4:
-              if (!this.adobe)
-                throw new Error("Unsupported color mode (4 components)");
-              colorTransform = false;
-              if (this.adobe && this.adobe.transformCode)
-                colorTransform = true;
-              else if (typeof this.opts.colorTransform !== "undefined")
-                colorTransform = !!this.opts.colorTransform;
-              component1 = this.components[0];
-              component2 = this.components[1];
-              component3 = this.components[2];
-              component4 = this.components[3];
-              for (y = 0; y < height; y++) {
-                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
-                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
-                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
-                component4Line = component4.lines[0 | y * component4.scaleY * scaleY];
-                for (x = 0; x < width; x++) {
-                  if (!colorTransform) {
-                    C2 = component1Line[0 | x * component1.scaleX * scaleX];
-                    M = component2Line[0 | x * component2.scaleX * scaleX];
-                    Ye = component3Line[0 | x * component3.scaleX * scaleX];
-                    K = component4Line[0 | x * component4.scaleX * scaleX];
-                  } else {
-                    Y = component1Line[0 | x * component1.scaleX * scaleX];
-                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
-                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
-                    K = component4Line[0 | x * component4.scaleX * scaleX];
-                    C2 = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
-                    M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
-                    Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
-                  }
-                  data[offset++] = 255 - C2;
-                  data[offset++] = 255 - M;
-                  data[offset++] = 255 - Ye;
-                  data[offset++] = 255 - K;
-                }
-              }
-              break;
-            default:
-              throw new Error("Unsupported color mode");
-          }
-          return data;
-        },
-        copyToImageData: function copyToImageData(imageData, formatAsRGBA) {
-          var width = imageData.width, height = imageData.height;
-          var imageDataArray = imageData.data;
-          var data = this.getData(width, height);
-          var i = 0, j = 0, x, y;
-          var Y, K, C2, M, R, G, B;
-          switch (this.components.length) {
-            case 1:
-              for (y = 0; y < height; y++) {
-                for (x = 0; x < width; x++) {
-                  Y = data[i++];
-                  imageDataArray[j++] = Y;
-                  imageDataArray[j++] = Y;
-                  imageDataArray[j++] = Y;
-                  if (formatAsRGBA) {
-                    imageDataArray[j++] = 255;
-                  }
-                }
-              }
-              break;
-            case 3:
-              for (y = 0; y < height; y++) {
-                for (x = 0; x < width; x++) {
-                  R = data[i++];
-                  G = data[i++];
-                  B = data[i++];
-                  imageDataArray[j++] = R;
-                  imageDataArray[j++] = G;
-                  imageDataArray[j++] = B;
-                  if (formatAsRGBA) {
-                    imageDataArray[j++] = 255;
-                  }
-                }
-              }
-              break;
-            case 4:
-              for (y = 0; y < height; y++) {
-                for (x = 0; x < width; x++) {
-                  C2 = data[i++];
-                  M = data[i++];
-                  Y = data[i++];
-                  K = data[i++];
-                  R = 255 - clampTo8bit(C2 * (1 - K / 255) + K);
-                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
-                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
-                  imageDataArray[j++] = R;
-                  imageDataArray[j++] = G;
-                  imageDataArray[j++] = B;
-                  if (formatAsRGBA) {
-                    imageDataArray[j++] = 255;
-                  }
-                }
-              }
-              break;
-            default:
-              throw new Error("Unsupported color mode");
-          }
-        }
-      };
-      var totalBytesAllocated = 0;
-      var maxMemoryUsageBytes = 0;
-      function requestMemoryAllocation(increaseAmount = 0) {
-        var totalMemoryImpactBytes = totalBytesAllocated + increaseAmount;
-        if (totalMemoryImpactBytes > maxMemoryUsageBytes) {
-          var exceededAmount = Math.ceil((totalMemoryImpactBytes - maxMemoryUsageBytes) / 1024 / 1024);
-          throw new Error(`maxMemoryUsageInMB limit exceeded by at least ${exceededAmount}MB`);
-        }
-        totalBytesAllocated = totalMemoryImpactBytes;
-      }
-      constructor.resetMaxMemoryUsage = function(maxMemoryUsageBytes_) {
-        totalBytesAllocated = 0;
-        maxMemoryUsageBytes = maxMemoryUsageBytes_;
-      };
-      constructor.getBytesAllocated = function() {
-        return totalBytesAllocated;
-      };
-      constructor.requestMemoryAllocation = requestMemoryAllocation;
-      return constructor;
-    })();
-    if (typeof module !== "undefined") {
-      module.exports = decode;
-    } else if (typeof window !== "undefined") {
-      window["jpeg-js"] = window["jpeg-js"] || {};
-      window["jpeg-js"].decode = decode;
-    }
-    function decode(jpegData, userOpts = {}) {
-      var defaultOpts = {
-        // "undefined" means "Choose whether to transform colors based on the image’s color model."
-        colorTransform: void 0,
-        useTArray: false,
-        formatAsRGBA: true,
-        tolerantDecoding: true,
-        maxResolutionInMP: 100,
-        // Don't decode more than 100 megapixels
-        maxMemoryUsageInMB: 512
-        // Don't decode if memory footprint is more than 512MB
-      };
-      var opts = { ...defaultOpts, ...userOpts };
-      var arr = new Uint8Array(jpegData);
-      var decoder = new JpegImage();
-      decoder.opts = opts;
-      JpegImage.resetMaxMemoryUsage(opts.maxMemoryUsageInMB * 1024 * 1024);
-      decoder.parse(arr);
-      var channels3 = opts.formatAsRGBA ? 4 : 3;
-      var bytesNeeded = decoder.width * decoder.height * channels3;
-      try {
-        JpegImage.requestMemoryAllocation(bytesNeeded);
-        var image = {
-          width: decoder.width,
-          height: decoder.height,
-          exifBuffer: decoder.exifBuffer,
-          data: opts.useTArray ? new Uint8Array(bytesNeeded) : Buffer.alloc(bytesNeeded)
-        };
-        if (decoder.comments.length > 0) {
-          image["comments"] = decoder.comments;
-        }
-      } catch (err) {
-        if (err instanceof RangeError) {
-          throw new Error("Could not allocate enough memory for the image. Required: " + bytesNeeded);
-        }
-        if (err instanceof ReferenceError) {
-          if (err.message === "Buffer is not defined") {
-            throw new Error("Buffer is not globally defined in this environment. Consider setting useTArray to true");
-          }
-        }
-        throw err;
-      }
-      decoder.copyToImageData(image, opts.formatAsRGBA);
-      return image;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js
-var require_jpeg_js = __commonJS({
-  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js"(exports, module) {
-    var encode5 = require_encoder();
-    var decode = require_decoder();
-    module.exports = {
-      encode: encode5,
-      decode
-    };
-  }
-});
-
 // ../shared/src/alerts.ts
 function deriveAlerts(connectors2, schedules2, posts, dismissals = {}) {
   const out = [];
@@ -2748,7 +597,7 @@ function evaluateTransition(from, to, ctx, name) {
       };
     }
   }
-  if ((spec.name === "approve" || spec.name === "request_changes") && ctx.isAssignee) {
+  if ((spec.name === "approve" || spec.name === "request_changes") && ctx.isAssignee && !ctx.ownerManagedCoding) {
     return { ok: false, code: "SELF_REVIEW_BLOCKED", reason: "cannot review your own submission" };
   }
   if (spec.name === "accept" && ctx.actor.kind !== "human" && !ctx.onHumanWord) {
@@ -2805,13 +654,13 @@ function evaluateTransition(from, to, ctx, name) {
       case "orchestrator":
         return ctx.actor.kind === "agent" && ctx.actor.role === "orchestrator";
       case "reviewer":
-        return ctx.actor.kind === "agent" && ctx.actor.role === "reviewer" && ctx.isReviewerPoolMember;
+        return ctx.actor.kind === "agent" && (ctx.ownerManagedCoding ? ctx.isAssignee : ctx.actor.role === "reviewer" && ctx.isReviewerPoolMember);
       case "architect":
         return ctx.actor.kind === "agent" && ctx.actor.role === "architect";
       case "designer":
         return ctx.actor.kind === "agent" && ctx.actor.role === "designer";
       case "shipper":
-        return ctx.actor.kind === "agent" && ctx.actor.role === "shipper";
+        return ctx.ownerManagedCoding && spec.name === "claim_ship" && (ctx.actor.kind === "human" || ctx.onHumanWord === true && ctx.actor.role === "orchestrator") || ctx.actor.kind === "agent" && (ctx.ownerManagedCoding ? ctx.isAssignee : ctx.actor.role === "shipper");
     }
   });
   if (!permitted) {
@@ -2877,15 +726,13 @@ var init_states = __esm({
       { name: "approve_design", from: "design_review", to: "planning", by: ["human"] },
       { name: "cancel", from: "designing", to: "closed", by: ["orchestrator", "human"] },
       { name: "cancel", from: "design_review", to: "closed", by: ["orchestrator", "human"] },
-      // Plan lifecycle — an implementation-quality gate before execution. The
-      // orchestrator routes a non-trivial task into planning; the architect (the
-      // assignee while planning) proposes a plan; once approved it's offered to a
-      // developer who claims from plan_review. There is deliberately NO
-      // planning -> in_progress edge: a dev cannot start while the plan is unsettled.
+      // Plan lifecycle: the selected owner drafts and revises its own plan. A phase
+      // never assigns another specialist. Separate consultations can inform the plan;
+      // only human approval releases implementation.
       { name: "request_plan", from: "todo", to: "planning", by: ["orchestrator", "human"] },
       // Same reason as propose_design: under ownership the plan is drafted by an architect SUBAGENT
       // with no board identity, and the owner is the one that answers for it.
-      { name: "propose_plan", from: "planning", to: "plan_review", by: ["architect", "orchestrator"] },
+      { name: "propose_plan", from: "planning", to: "plan_review", by: ["assignee", "architect", "orchestrator"] },
       { name: "revise_plan", from: "plan_review", to: "planning", by: ["orchestrator", "human"] },
       { name: "claim", from: "plan_review", to: "in_progress", by: ["assignee"] },
       // Plan-first units (2026-08-17): a unit born WITH its work plan sits in plan_review from
@@ -3590,7 +1437,7 @@ function parseAuthCard(body) {
     const provider = typeof o["provider"] === "string" ? o["provider"] : "";
     if (!provider) return null;
     const reason = o["reason"];
-    const scope = o["scope"];
+    const scope3 = o["scope"];
     return {
       provider,
       ...reason === "expired" || reason === "unavailable" ? { reason } : {},
@@ -3599,7 +1446,7 @@ function parseAuthCard(body) {
       // the fallback door's fields (2026-09-17): the reason, whether Starter can take it, the seat
       ...typeof o["why"] === "string" ? { why: o["why"] } : {},
       ...typeof o["starter"] === "boolean" ? { starter: o["starter"] } : {},
-      ...scope && typeof scope.threadId === "string" && typeof scope.role === "string" ? { scope: { threadId: scope.threadId, role: scope.role } } : {},
+      ...scope3 && typeof scope3.threadId === "string" && typeof scope3.role === "string" ? { scope: { threadId: scope3.threadId, role: scope3.role } } : {},
       ...o["switched"] === true ? { switched: true } : {}
     };
   } catch {
@@ -4318,7 +2165,7 @@ var init_deliverables = __esm({
 // ../shared/src/stream.ts
 function isStandDown(reply) {
   const lines = reply.split("\n").map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return true;
+  if (!lines.length || lines.length === 1 && /^\(no reply\)$/i.test(lines[0])) return true;
   return SENTINEL.test(lines[0]) || SENTINEL.test(lines[lines.length - 1]);
 }
 function fenceWork(tag) {
@@ -4383,6 +2230,27 @@ var init_stream = __esm({
     CLOSED_RE = new RegExp("```" + MACHINE_TAG + "\\b[^\\n]*\\n[\\s\\S]*?```[ \\t]*\\n?", "gi");
     OPEN_RE = new RegExp("```(" + MACHINE_TAG + ")\\b[\\s\\S]*$", "i");
     SPOKEN_MIN_CHARS = 120;
+  }
+});
+
+// ../shared/src/git-author.ts
+function agentGitIdentity(identity = NEURAMESH_BOT) {
+  return {
+    GIT_AUTHOR_NAME: identity.name,
+    GIT_AUTHOR_EMAIL: identity.email,
+    GIT_COMMITTER_NAME: identity.name,
+    GIT_COMMITTER_EMAIL: identity.email
+  };
+}
+var NEURAMESH_BOT, PULL_REQUEST_SKILL;
+var init_git_author = __esm({
+  "../shared/src/git-author.ts"() {
+    "use strict";
+    NEURAMESH_BOT = {
+      name: "neuramesh[bot]",
+      email: "331048932+neuramesh[bot]@users.noreply.github.com"
+    };
+    PULL_REQUEST_SKILL = `Create a reviewable pull request on the task branch. In a NeuraMesh coding task, the host commits, pushes and opens the PR after verification. Keep code changes, tests and genuine evidence together. For agent-created commits use the NeuraMesh GitHub App account for both author and committer: ${NEURAMESH_BOT.name} <${NEURAMESH_BOT.email}>. Verify both fields with git show -s --format='%an <%ae> / %cn <%ce>' HEAD. Keep credentials out of the repository and leave the user's global Git identity alone. Report the pull request, commit and actual check outcomes. If a preview rejects the author, report the failing check and what an administrator must fix. Do not rewrite existing commits or create empty commits to force a deployment.`;
   }
 });
 
@@ -5090,6 +2958,7 @@ var init_events = __esm({
       "task.design_proposed",
       "task.design_revising",
       "task.design_approved",
+      "task.release_checklist_requested",
       "task.ship_claimed",
       "task.ship_plan_proposed",
       "task.ship_plan_revising",
@@ -5334,7 +3203,7 @@ function taskBranch(number, title) {
 function unblockNote(taskNumber2) {
   return `${UNBLOCK_MARKER} #${taskNumber2} \u2014 the retry budget starts over.`;
 }
-var ActorRefSchema, TaskRepoSchema, SHIP_RISKS, SHIP_ITEM_OWNERS, SHIP_ITEM_STATES, ShipItemSchema, ShipPlanSchema, WORK_PLAN_LEGS, WorkPlanSchema, TaskSchema, UNBLOCK_MARKER;
+var ActorRefSchema, TaskRepoSchema, SHIP_RISKS, SHIP_ITEM_OWNERS, SHIP_ITEM_STATES, ShipItemSchema, ShipPlanSchema, WORK_PLAN_LEGS, CodingDeliverySchema, WorkPlanSchema, TaskSchema, UNBLOCK_MARKER;
 var init_task = __esm({
   "../shared/src/task.ts"() {
     "use strict";
@@ -5385,7 +3254,10 @@ var init_task = __esm({
       items: z5.array(ShipItemSchema).min(1).max(20)
     });
     WORK_PLAN_LEGS = ["design", "build", "review"];
+    CodingDeliverySchema = z5.object({ visualEvidence: z5.boolean(), prepareRelease: z5.boolean() });
     WorkPlanSchema = z5.object({
+      /** Set only by the validated Agent Desk handoff. Release preparation still needs a human verdict to ship. */
+      codingDelivery: CodingDeliverySchema.optional(),
       legs: z5.array(z5.enum(WORK_PLAN_LEGS)).min(1).max(3),
       subtasks: z5.array(z5.string().min(1).max(200)).max(8).default([]),
       /** the plan prose the human reviews (markdown) — the card renders it; revisions bump version */
@@ -5440,6 +3312,7 @@ var init_task = __esm({
        * one origin (this inverts the legacy 1:1 threads.task_id upgrade); the create posts a
        * ‹task:id› unit card into it. Null on legacy rows and board-born tasks.
        */
+      permissionRunMessageId: z5.string().uuid().nullable().optional(),
       originThreadId: z5.string().nullable().default(null),
       // the authoritative, human-editable acceptance contract the reviewer gates on
       // (architect writes it into the plan; orchestrator sets it at offer otherwise).
@@ -5515,7 +3388,7 @@ function journeyFor(task, roster, beats2) {
     if (task.hasPlanDoc || state === "planning" || state === "plan_review") keys.push("plan");
     keys.push("build", "review");
   }
-  if (task.shipGate && (task.repoBacked || state === "shipping" || state === "ship_review" || state === "releasing" || state === "verifying")) keys.push("ship");
+  if ((task.shipGate || task.codingDelivery) && (task.repoBacked && (!task.codingDelivery || task.codingDelivery.prepareRelease) || state === "shipping" || state === "ship_review" || state === "releasing" || state === "verifying")) keys.push("ship");
   keys.push("accept");
   const cur = legOfState(state);
   const curIdx = cur === "past-all" ? keys.length : cur === null ? state === "done" ? keys.indexOf(keys.includes("review") ? "review" : "build") + 0.5 : -1 : keys.indexOf(cur);
@@ -5524,13 +3397,13 @@ function journeyFor(task, roster, beats2) {
       case "design":
         return roster.designer ?? null;
       case "plan":
-        return roster.architect ?? null;
+        return task.assigneeName ?? roster.architect ?? null;
       case "build":
         return task.assigneeName ?? roster.developer ?? null;
       case "review":
-        return roster.reviewer ?? null;
+        return task.codingDelivery ? task.assigneeName ?? null : roster.reviewer ?? null;
       case "ship":
-        return roster.shipper ?? null;
+        return task.codingDelivery ? task.assigneeName ?? null : roster.shipper ?? null;
       case "accept":
         return "you";
     }
@@ -5766,8 +3639,8 @@ function liveConnectors(rows2, within = REPLY_PLATFORMS) {
 function checkNeeds(needs, rows2, repo) {
   const need = needs?.find((n) => n.kind === "connector");
   const repoNeed = needs?.find((n) => n.kind === "repo");
-  const scope = need?.any ?? REPLY_PLATFORMS;
-  const live = liveConnectors(rows2, scope);
+  const scope3 = need?.any ?? REPLY_PLATFORMS;
+  const live = liveConnectors(rows2, scope3);
   const readable = live.filter(isReadable);
   const repoMissing = !!repoNeed && !repo?.slug;
   const repoUnreadable = !!repoNeed && !!repo?.slug && repo.readable === false;
@@ -5776,7 +3649,7 @@ function checkNeeds(needs, rows2, repo) {
     live,
     readable,
     unread: live.filter((p2) => !isReadable(p2)),
-    missing: scope.filter((p2) => !live.includes(p2)),
+    missing: scope3.filter((p2) => !live.includes(p2)),
     repoMissing,
     repoUnreadable
   };
@@ -6164,10 +4037,29 @@ function waitTimeoutLine(sinceMs, now) {
   const mins = Math.max(1, Math.floor((now - sinceMs) / 6e4));
   return `No answer for ${mins} ${mins === 1 ? "minute" : "minutes"}.`;
 }
+function replyFailureText(summary) {
+  if (/^agy orchestrator exited 2:/i.test(summary ?? "")) {
+    return "Gemini could not start this reply. Retry, or choose another model in the composer and retry.";
+  }
+  if (/^(?:orchestration|the chat turn|thread orchestration) timed out/i.test(summary ?? "")) return "The reply timed out. Retry to continue from this conversation.";
+  return summary || "The answer did not start.";
+}
+function replyRowsAfterPermission(rows2, decisions2) {
+  let end = rows2.length;
+  while (end) {
+    const row = rows2[end - 1];
+    if (row.author_kind !== "agent" || !row.body.includes("nmq")) break;
+    const questions = parseQuestions(row.body);
+    if (!questions.length || !questions.every((q) => q.kind === "permission" && decisions2.some((d) => d.message_id === row.id && d.question === q.question && d.status === "answered"))) break;
+    end--;
+  }
+  return end === rows2.length ? rows2 : rows2.slice(0, end);
+}
 var WAIT_THINKING, WAIT_LIMIT_MS, WAIT_RETRY, WAIT_TICK_MS;
 var init_waiting = __esm({
   "../shared/src/waiting.ts"() {
     "use strict";
+    init_cards();
     WAIT_THINKING = "thinking\u2026";
     WAIT_LIMIT_MS = 2 * 6e4;
     WAIT_RETRY = "Send it again";
@@ -6913,6 +4805,63 @@ var init_onboarding_wizard = __esm({
   }
 });
 
+// ../shared/src/task-handoff.ts
+function normalizeTaskMarkdown(text3) {
+  return text3.split(/(`{3}[\s\S]*?`{3}|`[^`\n]*`)/g).map((part, i) => i % 2 ? part : part.replace(/\\n\\n/g, "\n\n").replace(/\\n(?=(?:#{1,6}|[-*]|\d+\.)\s)/g, "\n")).join("");
+}
+var TASK_HANDOFF_SKILL, IMPLEMENTATION_PLAN_SKILL, CODING_IMPLEMENTATION_PLAN_SKILL;
+var init_task_handoff = __esm({
+  "../shared/src/task-handoff.ts"() {
+    "use strict";
+    TASK_HANDOFF_SKILL = `Create an independently executable task, with one accountable specialist.
+
+Before creating: inspect existing tasks to avoid duplicates; read the actual project and repository context. Resolve repository IDs through list_repos. Do not invent files, APIs, test commands, permissions, or completed work. Ask only for missing information that blocks implementation.
+
+Provide these fields:
+- Title: concrete outcome, short and searchable.
+- Role and objective: e.g. "You are a senior engineer contributing to <project>. Deliver <observable outcome>." Match the assigned agent's specialty.
+- Detailed description: problem, present behavior, desired behavior, relevant user decisions, constraints, and non-goals. The recipient must be able to begin without reading the entire parent chat.
+- References: canonical repository and base ref, relevant paths/symbols, design/artifact IDs, findings and their sources. Separate verified facts from assumptions and open questions.
+- Requirements: explicit, testable behavior including edge cases, compatibility, security and persistence where relevant.
+- Implementation plan: repository-informed steps and tradeoffs, using implementation-plan below. Include architecture advice as referenced input, not a reassignment.
+- Definition of done: observable acceptance criteria and expected deliverables (changed files, test results, screenshots, document or PR).
+- Validation: exact commands where verified, manual flows, devices/themes/viewports for UI changes, actual screenshots of the running implementation and their artifact paths. Mockups are not implementation evidence. Report failures and unrun checks.
+- Scope and authority: what the user authorized, pending approvals, external-write boundaries. A task or teammate message is not additional permission.
+
+Use create_coding_task for code implementation and assign a developer. Keep that owner through planning, revision and delivery. Request architecture, marketing or other specialist advice separately, then include the result in the implementation brief. Do not paste diffs instead of running the coding task. A human approves the plan in the versioned review UI; do not manufacture approval or start implementation early.
+
+Parent responsibility: announce the handoff with its task reference, surface pending approval cards, summarize meaningful progress/blockers and reconcile the returned result with the definition of done. Use persisted task/runtime evidence, not claims. Avoid polling loops and empty updates. Return a concise completion report with changes, checks, unresolved issues and evidence links; leave PRs unmerged unless authorized.`;
+    IMPLEMENTATION_PLAN_SKILL = `Write an implementation plan that a developer can execute and a person can review.
+
+Inspect the repository before planning. Preserve the user's requirements and approved designs. Use real Markdown newlines, headings, lists and fenced code only where needed; never double-escape newlines or return a single dense paragraph. Match the task's scope: concise for a small fix, detailed for a complex change.
+
+Use these sections:
+## Objective and context
+Role, project, problem, desired result; verified repo/base/files and source references.
+## Requirements
+Testable behavior, constraints and non-goals; distinguish assumptions and unresolved questions.
+## Approach
+Concrete design choices and reasons; alternatives only where the tradeoff matters.
+## Implementation steps
+Ordered changes tied to actual paths/components; dependencies and any data migration, recovery or compatibility work.
+## Definition of done
+Observable acceptance checklist including the requested deliverable.
+## Validation
+Meaningful tests with verified commands; UI flows and actual runtime screenshot evidence, themes/devices where needed. Specify failure criteria; do not call unrun checks passed.
+## Risks and open questions
+Material risks, mitigations and any decision required before work can start. Say none identified when appropriate.
+
+Use the task's versioned plan artifact and approval flow. In a native coding thread, call propose_work_plan with the full plan and a separate concise public report of findings, choices and verification. Revise the same task's plan, address each review comment, and retain its developer owner. Implementation waits for the latest version's human approval. Never turn a review request into a new task or claim a proposed change is already implemented.`;
+    CODING_IMPLEMENTATION_PLAN_SKILL = `Create a repository-informed implementation plan using propose_work_plan and its exact JSON schema. Match the detail to the task. Preserve requirements, user decisions, scope and the assigned developer.
+
+Use summary for a short outcome. Use report.investigation for the role/project context, inspected files and findings; report.decisions for the approach, tradeoffs, requirements and verification choices; report.nextStep for the actual next user decision. Use considerations for material risks, prerequisites and unresolved questions.
+
+Each steps entry must describe one concrete edit or verification command, with a real target path or command. Its label is a short action such as "Validate expense amounts" or "Test storage migration". Its description explains the intended change, relevant requirements and observable acceptance criteria. Include meaningful test commands and actual running-UI screenshot validation where authorized. Report unrun checks honestly. Document sections such as "Objective", "Requirements", "Approach" and "Definition of done" are not implementation steps: never use section headings or Markdown heading syntax as step labels. Do not turn the plan document's outline into a progress checklist.
+
+Keep the separate public report conversational and concise. The UI renders the structured plan and approval controls. Revise the same task's plan, address review comments and keep its developer owner. Wait for the latest version's human approval before implementation; a proposed plan is not completed work.`;
+  }
+});
+
 // ../shared/src/planmd.ts
 function planArtifactName(version) {
   return `implementation-plan-v${version}.md`;
@@ -6928,7 +4877,7 @@ function parsePlanRef(body) {
   const m = PLAN_REF_RE.exec(body);
   if (!m) return null;
   const prose2 = trimLineEnds(body.replace(PLAN_REF_RE, "")).replace(/\n{3,}/g, "\n\n").trim();
-  return { version: Number(m[1]), prose: prose2 };
+  return { version: Number(m[2]), prose: prose2, ...m[1] ? { taskId: m[1] } : {} };
 }
 function planPostLine(version, kind = "birth") {
   const name = planArtifactName(version);
@@ -6958,7 +4907,7 @@ function renderPlanMarkdown(p2) {
   if (p2.subtasks.length) {
     lines.push("", "## Subtasks (minted on approval)", ...p2.subtasks.map((s) => `- ${s}`));
   }
-  lines.push("", "## Approach", "", p2.approach.trim(), "");
+  lines.push("", "## Approach", "", normalizeTaskMarkdown(p2.approach).trim(), "");
   return lines.join("\n");
 }
 var PLAN_REF_RE, LEG_RANK;
@@ -6966,9 +4915,213 @@ var init_planmd = __esm({
   "../shared/src/planmd.ts"() {
     "use strict";
     init_journey();
+    init_task_handoff();
     init_linear();
-    PLAN_REF_RE = /‹plan:v(\d+)›/;
+    PLAN_REF_RE = /‹plan:(?:([0-9a-f-]{36}):)?v(\d+)›/i;
     LEG_RANK = { design: 0, build: 1, review: 2 };
+  }
+});
+
+// ../shared/src/engineering/handoff.ts
+function engineeringModeHandoff(category, toolName) {
+  return {
+    category,
+    toolName,
+    actionable: true,
+    prompt: category === "edit" ? "Continue with the implementation in Act mode. Apply the planned changes and verify them." : "Continue in Act mode with the proposed command. Review its permissions before execution.",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function canContinueEngineering(session) {
+  return session.mode === "plan" && session.state === "completed" && !session.activeActivity && !session.pendingApproval && session.pendingModeHandoff?.actionable === true;
+}
+function isEngineeringPlanReport(value) {
+  if (!value || typeof value !== "object") return false;
+  const report = value;
+  const line = (text3, max) => typeof text3 === "string" && !!text3.trim() && text3.length <= max && !/[\r\n]/.test(text3);
+  return line(report.investigation, 600) && line(report.nextStep, 300) && Array.isArray(report.decisions) && report.decisions.length >= 1 && report.decisions.length <= 4 && report.decisions.every((point2) => line(point2, 300));
+}
+function isEngineeringWorkPlan(value) {
+  if (!value || typeof value !== "object") return false;
+  const plan = value;
+  const points = (value2, min, max) => value2 === void 0 || Array.isArray(value2) && value2.length >= min && value2.length <= max && value2.every((item) => typeof item === "string" && !!item.trim() && item.length <= 600 && !/[\r\n]/.test(item));
+  return (plan.report === void 0 || isEngineeringPlanReport(plan.report)) && points(plan.keyPoints, 1, 5) && points(plan.considerations, 0, 3) && typeof plan.summary === "string" && !!plan.summary.trim() && plan.summary.length <= 8e3 && Array.isArray(plan.steps) && plan.steps.length > 0 && plan.steps.length <= 30 && plan.steps.every((step) => step && (step.action === "edit" || step.action === "command") && (step.label === void 0 || typeof step.label === "string" && !!step.label.trim() && step.label.length <= 100 && !/[\r\n]/.test(step.label)) && typeof step.target === "string" && !!step.target.trim() && step.target.length <= 2e3 && typeof step.description === "string" && !!step.description.trim() && step.description.length <= 2e3);
+}
+var init_handoff = __esm({
+  "../shared/src/engineering/handoff.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/engineering/plan-progress.ts
+function isEngineeringPlanProgress(value) {
+  if (!value || typeof value !== "object") return false;
+  const p2 = value;
+  return typeof p2.id === "string" && p2.id.length > 0 && p2.id.length <= 200 && isEngineeringWorkPlan(p2.plan) && typeof p2.started === "boolean" && Array.isArray(p2.statuses) && p2.statuses.length === p2.plan.steps.length && p2.statuses.every(status) && p2.statuses.filter((s) => s === "in_progress").length <= 1 && (p2.started || p2.statuses.every((s) => s === "pending"));
+}
+function createEngineeringPlanProgress(plan, id) {
+  return { id, plan: JSON.parse(JSON.stringify(plan)), statuses: plan.steps.map(() => "pending"), started: false };
+}
+function updateEngineeringPlanProgress(progress, updates) {
+  if (!Array.isArray(updates) || !updates.length || updates.length > progress.statuses.length) throw new Error("Supply one or more plan step updates.");
+  const statuses = [...progress.statuses];
+  const seen = /* @__PURE__ */ new Set();
+  for (const update of updates) {
+    if (!update || !Number.isInteger(update.step) || update.step < 1 || update.step > statuses.length || seen.has(update.step) || !status(update.status)) throw new Error("Each update needs a unique existing step number and a valid status.");
+    seen.add(update.step);
+    statuses[update.step - 1] = update.status;
+  }
+  if (statuses.filter((s) => s === "in_progress").length > 1) throw new Error("Only one step can be in progress. Update the previous step in the same call.");
+  return { ...progress, statuses, started: true };
+}
+function recoverEngineeringPlanProgress(messages2) {
+  return recoverEngineeringPlanReceipt(messages2)?.progress ?? null;
+}
+function recoverEngineeringPlanReceipt(messages2) {
+  if (!Array.isArray(messages2)) return null;
+  const calls = /* @__PURE__ */ new Map();
+  let progress = null;
+  let toolCallId = "";
+  for (const message2 of messages2) {
+    if (!Array.isArray(message2?.content)) continue;
+    for (const block of message2.content) {
+      if (message2.role === "assistant" && block?.type === "tool_use") calls.set(block.id, block);
+      if (block?.type !== "tool_result" || block.is_error) continue;
+      const call = calls.get(block.tool_use_id);
+      if (!call || !["propose_work_plan", "update_plan_progress"].includes(call.name)) continue;
+      calls.delete(block.tool_use_id);
+      let result;
+      try {
+        result = typeof block.content === "string" ? JSON.parse(block.content) : block.content;
+      } catch {
+        continue;
+      }
+      if (!result || result.recorded !== true) continue;
+      if (call.name === "propose_work_plan" && isEngineeringWorkPlan(call.input)) {
+        progress = isEngineeringPlanProgress(result.planProgress) ? result.planProgress : createEngineeringPlanProgress(call.input, block.tool_use_id);
+        toolCallId = block.tool_use_id;
+      } else if (call.name === "update_plan_progress" && isEngineeringPlanProgress(result.planProgress) && progress?.id === result.planProgress.id && JSON.stringify(progress.plan) === JSON.stringify(result.planProgress.plan)) {
+        progress = result.planProgress;
+        toolCallId = block.tool_use_id;
+      }
+    }
+  }
+  return progress ? { progress, toolCallId } : null;
+}
+var status, ENGINEERING_PLAN_PROGRESS_PROMPT;
+var init_plan_progress = __esm({
+  "../shared/src/engineering/plan-progress.ts"() {
+    "use strict";
+    init_handoff();
+    status = (value) => typeof value === "string" && ["pending", "in_progress", "completed"].includes(value);
+    ENGINEERING_PLAN_PROGRESS_PROMPT = "In Act mode, when executing a previously proposed work plan, use update_plan_progress before starting the first step and after each meaningful step. Use the original one-based step numbers. Mark a step completed only after its work actually succeeds; a requested approval is not completion, and a test step remains unfinished until the test result passes. Update the previous step and the next in_progress step together. Reopen a step if more work is needed. Keep steps pending when blocked or declined. Do not mark the whole plan completed merely because the turn is ending. Do not call this tool for an unrelated question or invent a plan to fill a progress indicator.";
+  }
+});
+
+// ../shared/src/coding-delivery.ts
+function requireCaptureReceipts(images, receipts, startedAt) {
+  const targets = /* @__PURE__ */ new Map();
+  for (const image of images) {
+    const [, phase, file] = image.name.split("/");
+    const view = file.replace(/\.(?:png|jpe?g)$/i, "");
+    const matching = receipts.filter((r) => r.name === image.name && r.sha256 === image.sha256 && (phase !== "after" || startedAt === void 0 || Date.parse(r.capturedAt) >= startedAt));
+    if (!matching.length) throw new Error(`Unverified screenshot ${image.name}. Capture the real application or report the blocker.`);
+    const previous = targets.get(view);
+    const current = new Set(matching.map((r) => r.target).filter((target) => !previous || previous.has(target)));
+    if (!current.size) throw new Error(`The before and after captures for ${view} used different targets. Use the same route, viewport and theme.`);
+    targets.set(view, current);
+  }
+}
+function codingTaskChecklist(task, rawPlan, rawRequirements) {
+  let plan = {};
+  let requirements = [];
+  try {
+    plan = JSON.parse(rawPlan ?? "{}") ?? {};
+  } catch {
+  }
+  try {
+    requirements = JSON.parse(rawRequirements ?? "[]");
+  } catch {
+  }
+  const approach = typeof plan.approach === "string" ? normalizeTaskMarkdown(plan.approach) : "";
+  const section4 = /^#{1,6}\s+Implementation steps\s*\n([\s\S]*?)(?=^#{1,6}\s|(?![\s\S]))/im.exec(approach)?.[1] ?? approach;
+  const items = section4.split("\n").filter((line) => /^\s*(?:\d+[.)]|[-*])\s+/.test(line)).map((line) => line.replace(/^\s*(?:\d+[.)]|[-*])\s+/, "").trim());
+  const fallback = Array.isArray(requirements) ? requirements.filter((s) => typeof s === "string" && !!s.trim()) : [];
+  const steps = items.length ? items : fallback.length ? fallback : [approach.trim() || task.title];
+  return createEngineeringPlanProgress({
+    summary: task.title.slice(0, 400),
+    steps: steps.slice(0, 30).map((text3) => ({
+      action: /^(?:test|verify|validate|run|capture|review|check)\b/i.test(text3) ? "command" : "edit",
+      target: text3.match(/`([^`\n]+)`/)?.[1]?.slice(0, 2e3) || task.title.slice(0, 2e3),
+      description: text3.slice(0, 2e3)
+    }))
+  }, `task:${task.id}:v${Number(plan.version) || 1}`);
+}
+function codingDeliveryPolicy(input, criteria) {
+  const asksForScreens = criteria.flatMap((c) => c.split(/(?<=[.!?])\s+|[\n;]/)).some((line) => /\b(?:before.and.after|screenshots?|visual verification|visual validation)\b/i.test(line) && !/\b(?:no|skip|without|not required|not applicable)\b/i.test(line) && (!/\b(?:remov(?:e|ed|ing)|delet(?:e|ed|ing)|untrack(?:ed|ing)?)\b/i.test(line) || /\b(?:capture|take|provide|attach|publish)\b[^.]*\b(?:new |fresh )?screenshots?\b/i.test(line)));
+  return { visualEvidence: input.visualEvidence === true || asksForScreens, prepareRelease: input.prepareRelease === true };
+}
+function recordedCodingDelivery(raw) {
+  if (!raw) return null;
+  try {
+    const delivery = JSON.parse(raw)?.codingDelivery;
+    return delivery && typeof delivery.visualEvidence === "boolean" && typeof delivery.prepareRelease === "boolean" ? delivery : null;
+  } catch {
+    return null;
+  }
+}
+function hasPairedValidationImages(rows2) {
+  const names = new Set(rows2.filter((row) => row.kind === "screenshot").map((row) => row.name));
+  const views = [...names].map((name) => captureName.exec(name)).filter((match) => match !== null);
+  return views.length > 0 && views.every(([, phase, view]) => views.some(([, otherPhase, otherView]) => otherPhase !== phase && otherView === view));
+}
+function validationImages(artifacts2) {
+  const views = /* @__PURE__ */ new Map();
+  for (const artifact of artifacts2) {
+    const path = captureName.exec(artifact.name);
+    if (!path || artifact.kind !== "screenshot") continue;
+    const png = path[3] === "png";
+    const prefix = png ? "data:image/png;base64," : "data:image/jpeg;base64,";
+    const data = artifact.content;
+    const invalid = () => new Error(`Invalid screenshot bytes for ${artifact.name}.`);
+    if (!data?.startsWith(prefix) || data.length > 39e4) throw invalid();
+    let bytes;
+    try {
+      bytes = atob(data.slice(prefix.length));
+    } catch {
+      throw invalid();
+    }
+    if (bytes.length < 32 || bytes.length > 29e4) throw invalid();
+    if (png ? !(bytes.startsWith("\x89PNG\r\n\n") && bytes.slice(12, 16) === "IHDR" && bytes.endsWith("IEND\xAEB`\x82")) : !(bytes.startsWith("\xFF\xD8\xFF") && bytes.endsWith("\xFF\xD9"))) throw invalid();
+    const view = views.get(path[2]) ?? {};
+    const phase = path[1];
+    if (view[phase]) throw new Error(`Duplicate ${phase} capture for ${path[2]}.`);
+    view[phase] = artifact.name;
+    views.set(path[2], view);
+  }
+  if (views.size > 8) throw new Error("Attach at most eight before and after comparisons.");
+  for (const [label, pair] of views) {
+    if (!pair.before || !pair.after) throw new Error(`Missing ${pair.before ? "after" : "before"} screenshot for ${label}.`);
+  }
+  return [...views.values()].flatMap((pair) => [pair.before, pair.after]);
+}
+var EVIDENCE_INTEGRITY, CODING_DELIVERY_SKILL, captureName, isValidationImageName;
+var init_coding_delivery = __esm({
+  "../shared/src/coding-delivery.ts"() {
+    "use strict";
+    init_plan_progress();
+    init_task_handoff();
+    EVIDENCE_INTEGRITY = `Never manufacture evidence. Only report a check, result, quote, screenshot, or observation you actually obtained from its source. A mockup, generated image, reconstructed page, or invented test log cannot verify implementation. If a check fails or cannot run, name the blocker, keep the criterion open, and distinguish any illustrative material from observed results. Never substitute generated pixels for a browser or device capture. When relaying another agent\u2019s result, attribute it and state what you independently verified.`;
+    CODING_DELIVERY_SKILL = `Use this skill when implementing and reviewing a coding task.
+${EVIDENCE_INTEGRITY}
+1. Read the approved plan and acceptance criteria. Start the recorded work plan before editing. Mark each step complete only after its check passes.
+2. For a change someone can see or interact with, capture the original behavior from the actual app before editing. Use capture_task_view for repository web pages or their actual static build. For a server-rendered site use the actual deployed preview origin and route with capture_task_view. A general coding command runs in a network-isolated shell. Use the managed browser for Chromium. Independent browser or device captures supplied by an authorized verifier can also be checked against their original bytes. If no trusted capture is available, report visual verification as blocked. Use the same route, viewport, theme and representative state for the after capture. For a new route, capture the original missing route or the original navigation flow. For a local build, capture_task_view can click a control and assert the resulting visible state. For other apps use the project\u2019s UI harness. Record the interaction you actually tested.
+3. Deliver real captures in .nm-artifacts/validation/before/ and .nm-artifacts/validation/after/. Give matching views the same descriptive filename. capture_task_view publishes its own browser capture. Inspect the returned artifact and link it. show_artifact only publishes files and cannot certify their origin. A written description, design mockup, placeholder image, or local path alone does not validate the running app.
+4. Run the requested tests. Inspect the final diff against each acceptance criterion, check error paths, and record actual commands, results and limitations. Fix failures and repeat the failed checks. When a check cannot run, report the blocker and leave that criterion open.
+5. End the task with a concise account of what changed, the verification results, and clickable links to the saved files. Keep before/after comparisons together. The host carries verified captures into the pull request. For a coding task, leave commit, push and PR creation to the host. Agent-authored commits use the NeuraMesh GitHub App bot for author and committer. Check both identities with git show before reporting delivery. If either is missing or resolves to a machine account, report the blocker. Keep existing authorship intact when reviewing a prior commit.
+6. Keep responsibility for review. If shipping is requested, prepare a release checklist with CI, rollout, rollback and a live verification step. Wait for the human to approve the release plan before executing any shipping activity.`;
+    captureName = /^validation\/(before|after)\/([a-z0-9][a-z0-9-]{0,59})\.(png|jpe?g)$/;
+    isValidationImageName = (name) => captureName.test(name);
   }
 });
 
@@ -7004,10 +5157,10 @@ function parseSkillFile(relPath, content) {
   if (!body.trim()) return null;
   return { name, description, body };
 }
-function parseSkillFiles(files) {
+function parseSkillFiles(files2) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
-  for (const f of files) {
+  for (const f of files2) {
     const sk = parseSkillFile(f.path, f.content);
     if (!sk || seen.has(sk.name)) continue;
     seen.add(sk.name);
@@ -7298,7 +5451,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.156.2", "0.156.1"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.157.0", "0.156.2"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -7870,13 +6023,16 @@ var init_commands = __esm({
       // Thread-owned work (2026-08-17): the conversation that OWNS this unit — sets
       // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
       // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
-      originThread: z8.string().uuid().optional()
+      originThread: z8.string().uuid().optional(),
+      permissionRunId: z8.string().uuid().optional(),
+      /** Agent Desk's explicit implementation handoff; home ownership is checked by the server. */
+      codingHandoff: z8.object({ requestId: z8.string().uuid(), taskId: z8.string().uuid().optional(), visualEvidence: z8.boolean().optional(), prepareRelease: z8.boolean().optional() }).optional()
     });
     taskAcceptCommand = z8.object({ type: z8.literal("task.accept"), taskId });
     taskApproveCommand = z8.object({ type: z8.literal("task.approve"), taskId });
     taskRequestChangesCommand = z8.object({ type: z8.literal("task.request_changes"), taskId, feedback: z8.string().min(1) });
     taskCancelCommand = z8.object({ type: z8.literal("task.cancel"), taskId });
-    taskBlockCommand = z8.object({ type: z8.literal("task.block"), taskId, reason: z8.string().min(1) });
+    taskBlockCommand = z8.object({ type: z8.literal("task.block"), taskId, reason: z8.string().min(1), resolution: z8.string().trim().min(1).max(2e3).optional() });
     taskUnblockCommand = z8.object({ type: z8.literal("task.unblock"), taskId });
     taskArchiveCommand = z8.object({ type: z8.literal("task.archive"), taskId });
     taskPromoteCommand = z8.object({ type: z8.literal("task.promote"), taskId });
@@ -8117,7 +6273,7 @@ function pathGlobToRe(glob) {
   return new RegExp("^" + re + "$");
 }
 function matchPathGlob(path, glob) {
-  return pathGlobToRe(glob).test(path);
+  return pathGlobToRe(glob).test(path) || glob.startsWith("**/") && pathGlobToRe(glob.slice(3)).test(path);
 }
 function canonicalPolicyHost(value) {
   const trimmed = trimEndChars(value.trim(), ".");
@@ -8238,7 +6394,16 @@ function ruleSig(r) {
 function mergePolicies(base, overrides) {
   const bySig = /* @__PURE__ */ new Map();
   for (const r of base) bySig.set(ruleSig(r), r);
-  for (const o of overrides) bySig.set(ruleSig(o), o);
+  for (const o of overrides) {
+    const key2 = ruleSig(o);
+    const prior = bySig.get(key2);
+    if (prior?.locked && !canTighten(prior.verdict, o.verdict)) continue;
+    if (prior && prior.scope !== o.scope) {
+      bySig.set(o.scope + ":" + key2, o);
+    } else {
+      bySig.set(key2, prior?.locked ? { ...o, locked: true } : o);
+    }
+  }
   return [...bySig.values()];
 }
 var POLICY_CAPABILITIES, POLICY_VERDICTS, RESTRICTIVENESS, POLICY_SCOPES, SPECIFICITY, SHELL_CLASSES, PolicySelectorSchema, PolicyRuleSchema, DEFAULT_VERDICTS, DESTRUCTIVE_RE, PIPE_TO_SHELL_RE, NETWORK_RE, BUILD_RE, TEST_RE, VCS_RE;
@@ -8929,16 +7094,16 @@ function bootstrapOpening(o) {
   const colors = o.site ? ` I also try to read the colors and fonts from ${o.site}.` : "";
   return `I write ${DOCS}. I write them from your answers.${colors} Each doc goes to ${SHELF} when it is done.`;
 }
-function bootstrapResume(files) {
-  return files.length === 1 ? `I write \`${files[0]}\` now.` : `I write the last ${files.length} docs now.`;
+function bootstrapResume(files2) {
+  return files2.length === 1 ? `I write \`${files2[0]}\` now.` : `I write the last ${files2.length} docs now.`;
 }
 function bootstrapDocStatus(file, n, total, research) {
   return `*${research ? "I research and write" : "I write"} \`${file}\` (${n}/${total})\u2026*`;
 }
-function bootstrapNudgeDone(files) {
-  const names = files.map((f) => `\`${f}\``);
+function bootstrapNudgeDone(files2) {
+  const names = files2.map((f) => `\`${f}\``);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
-  return `${list} ${files.length === 1 ? "is" : "are"} in ${SHELF}. The brand docs are complete.`;
+  return `${list} ${files2.length === 1 ? "is" : "are"} in ${SHELF}. The brand docs are complete.`;
 }
 function bootstrapClosing(schedBlock, playsBlock) {
   return `The brand docs are done. They are in ${SHELF}, and later drafts use them. Here is a first cadence. Arm the rows that you want. Nothing posts until you approve it.
@@ -10522,7 +8687,9 @@ var init_protocol = __esm({
     };
     NATIVE_TOOL_CATEGORY = {
       show_artifact: "read",
+      capture_task_view: "edit",
       list_library: "read",
+      load_skill: "read",
       read_library_doc: "read",
       list_repos: "read",
       list_repo_files: "read",
@@ -10554,37 +8721,6 @@ var init_protocol = __esm({
       apply_patch: { enabled: true, autoApprove: false },
       editor: { enabled: true, autoApprove: false }
     };
-  }
-});
-
-// ../shared/src/engineering/handoff.ts
-function engineeringModeHandoff(category, toolName) {
-  return {
-    category,
-    toolName,
-    actionable: true,
-    prompt: category === "edit" ? "Continue with the implementation in Act mode. Apply the planned changes and verify them." : "Continue in Act mode with the proposed command. Review its permissions before execution.",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-function canContinueEngineering(session) {
-  return session.mode === "plan" && session.state === "completed" && !session.activeActivity && !session.pendingApproval && session.pendingModeHandoff?.actionable === true;
-}
-function isEngineeringPlanReport(value) {
-  if (!value || typeof value !== "object") return false;
-  const report = value;
-  const line = (text3, max) => typeof text3 === "string" && !!text3.trim() && text3.length <= max && !/[\r\n]/.test(text3);
-  return line(report.investigation, 600) && line(report.nextStep, 300) && Array.isArray(report.decisions) && report.decisions.length >= 1 && report.decisions.length <= 4 && report.decisions.every((point2) => line(point2, 300));
-}
-function isEngineeringWorkPlan(value) {
-  if (!value || typeof value !== "object") return false;
-  const plan = value;
-  const points = (value2, min, max) => value2 === void 0 || Array.isArray(value2) && value2.length >= min && value2.length <= max && value2.every((item) => typeof item === "string" && !!item.trim() && item.length <= 600 && !/[\r\n]/.test(item));
-  return (plan.report === void 0 || isEngineeringPlanReport(plan.report)) && points(plan.keyPoints, 1, 5) && points(plan.considerations, 0, 3) && typeof plan.summary === "string" && !!plan.summary.trim() && plan.summary.length <= 8e3 && Array.isArray(plan.steps) && plan.steps.length > 0 && plan.steps.length <= 30 && plan.steps.every((step) => step && (step.action === "edit" || step.action === "command") && (step.label === void 0 || typeof step.label === "string" && !!step.label.trim() && step.label.length <= 100 && !/[\r\n]/.test(step.label)) && typeof step.target === "string" && !!step.target.trim() && step.target.length <= 2e3 && typeof step.description === "string" && !!step.description.trim() && step.description.length <= 2e3);
-}
-var init_handoff = __esm({
-  "../shared/src/engineering/handoff.ts"() {
-    "use strict";
   }
 });
 
@@ -11126,14 +9262,14 @@ var init_changes = __esm({
 
 // ../shared/src/engineering/review-history.ts
 function changeReviewMessage(id, changes, status2, createdAt) {
-  const files = normalizeEngineeringChanges(changes).map((change) => ({ ...change }));
+  const files2 = normalizeEngineeringChanges(changes).map((change) => ({ ...change }));
   return {
     id: `change-review-${id}`,
     role: "assistant",
     kind: "change_review",
-    body: `${files.length} file${files.length === 1 ? "" : "s"} in this change set`,
+    body: `${files2.length} file${files2.length === 1 ? "" : "s"} in this change set`,
     createdAt,
-    review: { id, status: status2, changes: files }
+    review: { id, status: status2, changes: files2 }
   };
 }
 function engineeringReviewMessages(session) {
@@ -11165,71 +9301,6 @@ var init_review_history = __esm({
   "../shared/src/engineering/review-history.ts"() {
     "use strict";
     init_changes();
-  }
-});
-
-// ../shared/src/engineering/plan-progress.ts
-function isEngineeringPlanProgress(value) {
-  if (!value || typeof value !== "object") return false;
-  const p2 = value;
-  return typeof p2.id === "string" && p2.id.length > 0 && p2.id.length <= 200 && isEngineeringWorkPlan(p2.plan) && typeof p2.started === "boolean" && Array.isArray(p2.statuses) && p2.statuses.length === p2.plan.steps.length && p2.statuses.every(status) && p2.statuses.filter((s) => s === "in_progress").length <= 1 && (p2.started || p2.statuses.every((s) => s === "pending"));
-}
-function createEngineeringPlanProgress(plan, id) {
-  return { id, plan: JSON.parse(JSON.stringify(plan)), statuses: plan.steps.map(() => "pending"), started: false };
-}
-function updateEngineeringPlanProgress(progress, updates) {
-  if (!Array.isArray(updates) || !updates.length || updates.length > progress.statuses.length) throw new Error("Supply one or more plan step updates.");
-  const statuses = [...progress.statuses];
-  const seen = /* @__PURE__ */ new Set();
-  for (const update of updates) {
-    if (!update || !Number.isInteger(update.step) || update.step < 1 || update.step > statuses.length || seen.has(update.step) || !status(update.status)) throw new Error("Each update needs a unique existing step number and a valid status.");
-    seen.add(update.step);
-    statuses[update.step - 1] = update.status;
-  }
-  if (statuses.filter((s) => s === "in_progress").length > 1) throw new Error("Only one step can be in progress. Update the previous step in the same call.");
-  return { ...progress, statuses, started: true };
-}
-function recoverEngineeringPlanProgress(messages2) {
-  return recoverEngineeringPlanReceipt(messages2)?.progress ?? null;
-}
-function recoverEngineeringPlanReceipt(messages2) {
-  if (!Array.isArray(messages2)) return null;
-  const calls = /* @__PURE__ */ new Map();
-  let progress = null;
-  let toolCallId = "";
-  for (const message2 of messages2) {
-    if (!Array.isArray(message2?.content)) continue;
-    for (const block of message2.content) {
-      if (message2.role === "assistant" && block?.type === "tool_use") calls.set(block.id, block);
-      if (block?.type !== "tool_result" || block.is_error) continue;
-      const call = calls.get(block.tool_use_id);
-      if (!call || !["propose_work_plan", "update_plan_progress"].includes(call.name)) continue;
-      calls.delete(block.tool_use_id);
-      let result;
-      try {
-        result = typeof block.content === "string" ? JSON.parse(block.content) : block.content;
-      } catch {
-        continue;
-      }
-      if (!result || result.recorded !== true) continue;
-      if (call.name === "propose_work_plan" && isEngineeringWorkPlan(call.input)) {
-        progress = isEngineeringPlanProgress(result.planProgress) ? result.planProgress : createEngineeringPlanProgress(call.input, block.tool_use_id);
-        toolCallId = block.tool_use_id;
-      } else if (call.name === "update_plan_progress" && isEngineeringPlanProgress(result.planProgress) && progress?.id === result.planProgress.id && JSON.stringify(progress.plan) === JSON.stringify(result.planProgress.plan)) {
-        progress = result.planProgress;
-        toolCallId = block.tool_use_id;
-      }
-    }
-  }
-  return progress ? { progress, toolCallId } : null;
-}
-var status, ENGINEERING_PLAN_PROGRESS_PROMPT;
-var init_plan_progress = __esm({
-  "../shared/src/engineering/plan-progress.ts"() {
-    "use strict";
-    init_handoff();
-    status = (value) => typeof value === "string" && ["pending", "in_progress", "completed"].includes(value);
-    ENGINEERING_PLAN_PROGRESS_PROMPT = "In Act mode, when executing a previously proposed work plan, use update_plan_progress before starting the first step and after each meaningful step. Use the original one-based step numbers. Mark a step completed only after its work actually succeeds; a requested approval is not completion, and a test step remains unfinished until the test result passes. Update the previous step and the next in_progress step together. Reopen a step if more work is needed. Keep steps pending when blocked or declined. Do not mark the whole plan completed merely because the turn is ending. Do not call this tool for an unrelated question or invent a plan to fill a progress indicator.";
   }
 });
 
@@ -11423,6 +9494,10 @@ function failRemoteEngineeringTransport(session, error) {
     body: engineeringSystemText(`${detail} Retry when the workspace connection is ready.`)
   };
   return { ...session, state: "resumable", activeActivity: null, pendingApproval: null, messages: [...interruptReviews(messages2), warning], updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+}
+function applyTaskEngineeringState(session, value) {
+  const live = value;
+  return live?.id === session.id && live.repo?.id === session.repo.id && Array.isArray(live.messages) ? { ...live, project: session.project, machineId: session.machineId } : session;
 }
 var withEngineeringWarning;
 var init_transport_state = __esm({
@@ -11630,29 +9705,21 @@ function applyContentEvent(session, event) {
 }
 function reduceRemoteEngineeringEvent(session, wire) {
   const type = wire["type"];
+  if (type === "task_state") return applyTaskEngineeringState(session, wire["session"]);
   if (type === "disconnected") return session.state === "streaming" || session.state === "awaiting_approval" ? failRemoteEngineeringTransport(session, wire["message"]) : session;
   session = applyEngineeringSelection(session, wire);
-  if (type === "ready") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
+  if (type === "ready" || type === "model_changed" || type === "brain_changed") {
+    const provider = engineeringSystemText(String(wire["provider"])), model2 = engineeringSystemText(String(wire["model"]));
     const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
-    return { ...session, provider, model: model2, modelOverride, brainPack, updatedAt: stamp() };
-  }
-  if (type === "model_changed") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
-    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
-    return { ...session, provider, model: model2, modelOverride, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp() };
-  }
-  if (type === "brain_changed") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
-    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    return { ...session, provider, model: model2, modelOverride: null, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp() };
+    const modelOverride = type !== "brain_changed" && typeof wire["modelId"] === "string" ? wire["modelId"] : null;
+    const messages2 = type === "ready" ? session.messages : [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)];
+    return { ...session, provider, model: model2, brainPack, modelOverride, messages: messages2, updatedAt: stamp() };
   }
   if (type === "status") return wire["status"] === "running" ? { ...session, state: "streaming", activeActivity: session.activeActivity ?? { phase: "thinking", startedAt: stamp() }, updatedAt: stamp() } : session.state === "streaming" ? { ...session, state: "idle", activeActivity: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp() } : session;
+  if (type === "followup_received" && typeof wire["id"] === "string" && typeof wire["text"] === "string") {
+    if (session.messages.some((row) => row.id === wire["id"])) return session;
+    return { ...session, messages: [...session.messages, { ...message("user", wire["text"]), id: wire["id"] }], updatedAt: stamp() };
+  }
   if (type === "plan_progress") return wire["progress"] === null || isEngineeringPlanProgress(wire["progress"]) ? { ...session, planProgress: wire["progress"], ...wire["progress"] ? { workPlan: engineeringWorkPlanText(wire["progress"].plan) } : {}, updatedAt: stamp() } : session;
   if (type === "work_plan" && session.mode === "plan" && isEngineeringWorkPlan(wire["plan"])) {
     const plan = wire["plan"];
@@ -11825,7 +9892,9 @@ function restoreEngineeringBrain(shell, snapshot) {
     const apply = (wire) => {
       session = applyRemoteEngineeringEvent(session, wire);
     };
-    if (record.type === "user.message" && typeof p2.text === "string") {
+    if (record.type === "user.message" && typeof p2.followupId === "string") {
+      apply({ type: "followup_received", id: p2.followupId, text: p2.text, attachments: p2.attachments });
+    } else if (record.type === "user.message" && typeof p2.text === "string") {
       if (isEngineeringSelection(p2.selection)) session = { ...session, agentId: p2.selection.agentId, modelOverride: p2.selection.modelId, reasoningEffort: p2.selection.reasoningEffort };
       if (typeof p2.agent?.name === "string") session = { ...session, agent: p2.agent };
       session = beginRemoteEngineeringPrompt({ ...session, state: "resumable", mode: p2.mode === "act" ? "act" : "plan" }, p2.text);
@@ -11924,6 +9993,7 @@ function restoreEngineeringConnection(input) {
     shown = snapshot.revision;
     input.restored(session);
     handle = input.open(session, observe);
+    if (closed) handle.close();
     return handle;
   })();
   void ready.catch((error) => {
@@ -11947,6 +10017,134 @@ var init_restore_connection = __esm({
   "../shared/src/engineering/restore-connection.ts"() {
     "use strict";
     init_brain_restore();
+  }
+});
+
+// ../shared/src/engineering/task-connection.ts
+function connectEngineeringTask(input) {
+  let closed = false;
+  let generation = 0;
+  let current;
+  let timer;
+  let watchdog;
+  let connected = false;
+  let retries = 0;
+  const delays = [1e3, 2e3, 4e3, 8e3, 15e3];
+  const clear = () => {
+    clearTimeout(timer);
+    clearTimeout(watchdog);
+  };
+  const attach = () => {
+    if (closed) return;
+    clear();
+    const own = ++generation;
+    connected = false;
+    let gone = false;
+    let refused;
+    const active = () => !closed && !gone && generation === own;
+    const lost = (detail) => {
+      if (!active()) return;
+      gone = true;
+      connected = false;
+      clear();
+      current?.close();
+      current = void 0;
+      if (refused || retries >= delays.length) {
+        input.changed({ phase: "offline", detail: refused ?? detail ?? "The coding task connection is unavailable." });
+        return;
+      }
+      input.changed({ phase: "reconnecting" });
+      timer = setTimeout(attach, delays[retries++]);
+    };
+    input.changed({ phase: retries ? "reconnecting" : "connecting" });
+    watchdog = setTimeout(() => lost("The coding task did not respond. Reconnect to check its latest state."), 45e3);
+    const handle = restoreEngineeringConnection({
+      workspace: input.workspace,
+      session: input.session(),
+      read: input.read,
+      restored: (session) => {
+        if (active()) input.restored(session);
+      },
+      failed: (error) => lost(error instanceof Error ? error.message : String(error)),
+      open: (session, observe) => input.open(session, (event) => {
+        if (!active()) return;
+        if (event.type === "disconnected") {
+          lost(event.message);
+          return;
+        }
+        if (event.type === "error" && !connected) refused = event.message;
+        observe(event);
+        input.event(event);
+        if (event.type === "ready" || event.type === "task_state") {
+          clearTimeout(watchdog);
+          connected = true;
+          retries = 0;
+          input.changed({ phase: "connected" });
+        }
+      }, () => lost())
+    });
+    if (active()) current = handle;
+    else handle.close();
+  };
+  attach();
+  return {
+    subId: `task-${input.session().id}`,
+    async send(command) {
+      if (closed || !connected || !current) throw new Error("Reconnect to the coding task before sending this action.");
+      await current.send(command);
+    },
+    close() {
+      closed = true;
+      generation++;
+      clear();
+      current?.close();
+      current = void 0;
+    }
+  };
+}
+var init_task_connection = __esm({
+  "../shared/src/engineering/task-connection.ts"() {
+    "use strict";
+    init_restore_connection();
+  }
+});
+
+// ../shared/src/engineering/permissions.ts
+function effectivePermission(mode, category, session, policy) {
+  if (!policy[category]) return "blocked";
+  if (mode === "plan" && (category === "edit" || category === "command")) return "blocked";
+  return session[category] ? "auto" : "ask";
+}
+var PERMISSION_LABELS, REVIEW_ENGINEERING_PERMISSIONS, RECOMMENDED_ENGINEERING_PERMISSIONS, OPEN_ENGINEERING_POLICY;
+var init_permissions = __esm({
+  "../shared/src/engineering/permissions.ts"() {
+    "use strict";
+    PERMISSION_LABELS = {
+      read: { label: "Read files", detail: "Inspect files and search the repository" },
+      edit: { label: "Edit files", detail: "Create, modify, rename, or delete files" },
+      command: { label: "Execute commands", detail: "Run shell commands and test suites" },
+      web: { label: "Fetch web content", detail: "Open URLs and search the web" },
+      mcp: { label: "Use MCP servers", detail: "Call tools exposed by connected MCP servers" }
+    };
+    REVIEW_ENGINEERING_PERMISSIONS = {
+      read: true,
+      edit: false,
+      command: false,
+      web: false,
+      mcp: false
+    };
+    RECOMMENDED_ENGINEERING_PERMISSIONS = {
+      ...REVIEW_ENGINEERING_PERMISSIONS,
+      edit: true,
+      command: true
+    };
+    OPEN_ENGINEERING_POLICY = {
+      read: true,
+      edit: true,
+      command: true,
+      web: true,
+      mcp: true
+    };
   }
 });
 
@@ -12018,14 +10216,9 @@ index 0000000..78ce3d1
 });
 
 // ../shared/src/engineering/domain.ts
-function effectivePermission(mode, category, session, policy) {
-  if (!policy[category]) return "blocked";
-  if (mode === "plan" && (category === "edit" || category === "command")) return "blocked";
-  return session[category] ? "auto" : "ask";
-}
-function createEngineeringSession(repo, title = "New Code task", project = null, machineId = null) {
+function createEngineeringSession(repo, title = "New Code task", project = null, machineId = null, permissions = RECOMMENDED_ENGINEERING_PERMISSIONS) {
   const now = stamp2();
-  const hello = msg("assistant", `Ready in **${repo.name}**. I\u2019ll begin in Plan mode and ask before any side effect.`, "plain");
+  const hello = msg("assistant", `Ready in **${repo.name}**. In Plan, I can inspect the repository. In Act, your session permissions and machine policy control what runs.`, "plain");
   const checkpoint = initialCheckpoint();
   checkpoint.messageCount = 1;
   return {
@@ -12036,7 +10229,7 @@ function createEngineeringSession(repo, title = "New Code task", project = null,
     repo,
     project,
     mode: "plan",
-    permissions: { ...RECOMMENDED_ENGINEERING_PERMISSIONS },
+    permissions: { ...permissions },
     policy: { ...OPEN_ENGINEERING_POLICY },
     state: "idle",
     activeActivity: null,
@@ -12199,35 +10392,16 @@ function resolveEngineeringApproval(session, approved) {
   if (approval.continuation === "apply") return applyProposedChanges(session);
   return finishVerification(session);
 }
-var PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, OPEN_ENGINEERING_POLICY, stamp2, uid, msg, initialCheckpoint, dismissEngineeringModeHandoff, setEngineeringBrainPack, setEngineeringMachine, setEngineeringModel;
+var stamp2, uid, msg, initialCheckpoint, dismissEngineeringModeHandoff, setEngineeringBrainPack, setEngineeringMachine, setEngineeringModel;
 var init_domain = __esm({
   "../shared/src/engineering/domain.ts"() {
     "use strict";
+    init_permissions();
+    init_permissions();
     init_demo_plan();
     init_review_history();
     init_linear();
     init_handoff();
-    PERMISSION_LABELS = {
-      read: { label: "Read files", detail: "Inspect files and search the repository" },
-      edit: { label: "Edit files", detail: "Create, modify, rename, or delete files" },
-      command: { label: "Execute commands", detail: "Run shell commands and test suites" },
-      web: { label: "Fetch web content", detail: "Open URLs and search the web" },
-      mcp: { label: "Use MCP servers", detail: "Call tools exposed by connected MCP servers" }
-    };
-    RECOMMENDED_ENGINEERING_PERMISSIONS = {
-      read: true,
-      edit: false,
-      command: false,
-      web: false,
-      mcp: false
-    };
-    OPEN_ENGINEERING_POLICY = {
-      read: true,
-      edit: true,
-      command: true,
-      web: true,
-      mcp: true
-    };
     stamp2 = () => (/* @__PURE__ */ new Date()).toISOString();
     uid = (prefix) => `${prefix}-${globalThis.crypto.randomUUID()}`;
     msg = (role, body, tone = "plain") => ({
@@ -12502,6 +10676,7 @@ var init_engineering = __esm({
     init_protocol();
     init_selection();
     init_restore_connection();
+    init_task_connection();
     init_patch();
     init_changes();
     init_domain();
@@ -12958,9 +11133,9 @@ function conversationActivity(events, liveSince) {
       const turn = current.get(turnId ?? (open.size === 1 ? [...open][0] : ""));
       const body = p2.text.trim();
       if (turn && body && !/^(?:NO_REPLY|HEARTBEAT_OK)$/.test(body)) {
-        const pending = prose2.get(turn) ?? [];
+        const pending = p2.source === "compaction" ? turn.messages : prose2.get(turn) ?? [];
         if (pending.at(-1)?.body !== body) pending.push({ id: `progress-${event.id}`, role: "assistant", body, createdAt: event.timestamp });
-        prose2.set(turn, pending);
+        if (p2.source !== "compaction") prose2.set(turn, pending);
       }
     } else if (event.type === "tool.call" && typeof p2.id === "string" && typeof p2.name === "string" && !p2.name.startsWith("mcp__")) {
       if (calls.has(p2.id)) continue;
@@ -12999,6 +11174,12 @@ var init_conversation_activity = __esm({
 });
 
 // ../shared/src/team-desk.ts
+function isCompactCommand(body, authorKind, agentName) {
+  if (authorKind !== "human") return false;
+  const text3 = body.trim();
+  const prefix = `@${agentName} `;
+  return (text3.toLowerCase().startsWith(prefix.toLowerCase()) ? text3.slice(prefix.length).trim() : text3) === "/compact";
+}
 var TEAM_TEMPLATES;
 var init_team_desk = __esm({
   "../shared/src/team-desk.ts"() {
@@ -13019,6 +11200,140 @@ var init_team_desk = __esm({
       { name: "Ledger", role: "worker", specialty: "Finance", description: "Budgets, runway scenarios, metrics and financial operations; flag assumptions and decisions requiring qualified advice." },
       { name: "Olive", role: "worker", specialty: "Operations", description: "People operations, internal processes, vendor coordination and operating checklists." }
     ];
+  }
+});
+
+// ../shared/src/skill-catalog.ts
+function uniqueWorkspaceSkills(skills2) {
+  const seen = /* @__PURE__ */ new Set();
+  return [...skills2].sort((a, b2) => (b2.version ?? 0) - (a.version ?? 0) || (b2.updated_at ?? "").localeCompare(a.updated_at ?? "") || a.id.localeCompare(b2.id)).filter((skill) => {
+    const key2 = JSON.stringify([skill.name, skill.pack_name ?? null]);
+    if (seen.has(key2)) return false;
+    seen.add(key2);
+    return true;
+  });
+}
+var init_skill_catalog = __esm({
+  "../shared/src/skill-catalog.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/permission-mode.ts
+function isPermissionMode(value) {
+  return PERMISSION_MODES.some((mode) => mode === value);
+}
+function needsReleaseApproval(action) {
+  if (action.capability === "tool.mcp") {
+    const tool = action.tool ?? "";
+    if (["web_click", "web_type", "accept_task"].includes(tool)) return true;
+    if (/(?:^|[._-])(?:publish|deploy|merge|execute_ship|approve_ship_plan)(?:$|[._-])/i.test(tool)) return true;
+    return tool.includes("__") && !/^(?:get|read|list|search|lookup|fetch)(?:_|$)/.test(tool.split("__").at(-1) ?? "");
+  }
+  if (action.capability !== "shell.exec") return false;
+  return /\b(?:gh\s+pr\s+merge|glab\s+mr\s+merge|(?:npm|pnpm|yarn|cargo)\s+publish|(?:fly|flyctl|wrangler|firebase)\s+deploy|vercel\s+(?:deploy|--prod)|kubectl\s+(?:apply|set|rollout)|helm\s+(?:install|upgrade))\b/i.test(action.command ?? "");
+}
+function decideThreadPermission(mode, kind, actions, rules) {
+  if (!actions.length) return { verdict: "deny", reason: "This tool has no recognized action." };
+  let requiresHuman;
+  for (const action of actions) {
+    const base = evaluatePolicy(action, rules);
+    if (base.verdict === "deny") return { verdict: "deny", reason: base.rationale };
+    if (needsReleaseApproval(action)) requiresHuman = "A human must approve this release action.";
+    for (const rule2 of rules) {
+      if (rule2.capability !== action.capability || !rule2.locked && rule2.id.startsWith("base.") || !matchesSelector(action, rule2.selector)) continue;
+      if (rule2.verdict === "deny") return { verdict: "deny", reason: rule2.rationale || "Blocked by workspace policy." };
+      if (rule2.verdict === "ask") requiresHuman = rule2.rationale || "A workspace rule requires approval.";
+    }
+  }
+  if (requiresHuman) return { verdict: "ask", reason: requiresHuman };
+  if (actions.every((action) => action.capability === "tool.mcp" && workspaceTools.has(action.tool ?? ""))) {
+    return { verdict: "allow", reason: "NeuraMesh workspace tool" };
+  }
+  if (mode === "turbo" || kind === "read" || kind === "edit" && mode !== "request-review") {
+    return { verdict: "allow", reason: PERMISSION_MODE_COPY[mode].label };
+  }
+  return mode === "auto-review" ? { verdict: "review", reason: "Independent action review" } : { verdict: "ask", reason: `${PERMISSION_MODE_COPY[mode].label} requires approval for this action.` };
+}
+var PERMISSION_MODES, PERMISSION_MODE_COPY, workspaceTools;
+var init_permission_mode = __esm({
+  "../shared/src/permission-mode.ts"() {
+    "use strict";
+    init_policy();
+    PERMISSION_MODES = ["request-review", "default", "auto-review", "turbo"];
+    PERMISSION_MODE_COPY = {
+      "request-review": { label: "Request Review", description: "Read files. Ask before edits, commands and connections." },
+      default: { label: "Default", description: "Read and edit files. Ask before commands and connections." },
+      "auto-review": { label: "Auto Review", description: "A separate AI reviewer checks actions that would ask. Uses workspace credits." },
+      turbo: { label: "Turbo", description: "Run permitted tools without asking." }
+    };
+    workspaceTools = /* @__PURE__ */ new Set([
+      "list_workspace",
+      "read_workspace_file",
+      "list_projects",
+      "list_agents",
+      "list_team",
+      "read_agent_thread",
+      "message_agent",
+      "recall",
+      "load_skill",
+      "list_playbooks",
+      "list_tasks",
+      "list_backlog",
+      "read_coding_tasks",
+      "task_status",
+      "list_library",
+      "read_library_doc",
+      "list_repos",
+      "list_repo_files",
+      "list_repo_changes",
+      "read_repo_file",
+      "list_whiteboards",
+      "read_whiteboard",
+      "create_whiteboard",
+      "update_whiteboard",
+      "read_drafts",
+      "draft_article",
+      "draft_posts",
+      "draft_replies",
+      "revise_posts",
+      "revise_replies",
+      "propose_angles",
+      "propose_design_round",
+      "propose_library_doc",
+      "propose_impl_plan",
+      "request_design",
+      "request_plan",
+      "request_changes",
+      "request_verdict",
+      "revise_design",
+      "revise_plan",
+      "revise_ship_plan",
+      "set_thread_title",
+      "post_thread",
+      "share_images",
+      "add_backlog_item",
+      "update_backlog_item",
+      "promote_backlog_item",
+      "add_subtask",
+      "create_project",
+      "create_agent",
+      "add_agent_to_channel",
+      "create_task",
+      "create_coding_task",
+      "open_code_session",
+      "offer_task",
+      "take_task",
+      "propose_routine",
+      "offer_routine_session",
+      "run_playbook",
+      "start_deep_work",
+      "generate_image",
+      "shelve_repo_screenshot",
+      // These tools only draft a schedule confirmation card. A human confirms the external operation.
+      "schedule_posts",
+      "unschedule_posts"
+    ]);
   }
 });
 
@@ -13053,6 +11368,8 @@ __export(src_exports, {
   CODE_SESSION_COMMANDS: () => CODE_SESSION_COMMANDS,
   CODE_SESSION_MODES: () => CODE_SESSION_MODES,
   CODE_SESSION_STATES: () => CODE_SESSION_STATES,
+  CODING_DELIVERY_SKILL: () => CODING_DELIVERY_SKILL,
+  CODING_IMPLEMENTATION_PLAN_SKILL: () => CODING_IMPLEMENTATION_PLAN_SKILL,
   COMM_RULE_CAPS: () => COMM_RULE_CAPS,
   CONNECT_PROVIDERS: () => CONNECT_PROVIDERS,
   CONTENT_PLATFORMS: () => CONTENT_PLATFORMS,
@@ -13064,6 +11381,7 @@ __export(src_exports, {
   CURRENT_MODELS: () => CURRENT_MODELS,
   CUSTOM_PACK_ID: () => CUSTOM_PACK_ID,
   CUSTOM_PACK_PREFIX: () => CUSTOM_PACK_PREFIX,
+  CodingDeliverySchema: () => CodingDeliverySchema,
   DEFAULT_ENGINEERING_AGENT: () => DEFAULT_ENGINEERING_AGENT,
   DEFAULT_GRACE_MS: () => DEFAULT_GRACE_MS,
   DEFAULT_THINKING: () => DEFAULT_THINKING,
@@ -13081,6 +11399,7 @@ __export(src_exports, {
   ENGINEERING_CLINE_TOOL_POLICIES: () => ENGINEERING_CLINE_TOOL_POLICIES,
   ENGINEERING_PLAN_PROGRESS_PROMPT: () => ENGINEERING_PLAN_PROGRESS_PROMPT,
   EVENT_TYPES: () => EVENT_TYPES,
+  EVIDENCE_INTEGRITY: () => EVIDENCE_INTEGRITY,
   EXPORT_FORMAT: () => EXPORT_FORMAT,
   EXPORT_MANIFEST_NAME: () => EXPORT_MANIFEST_NAME,
   EXPORT_REFS: () => EXPORT_REFS,
@@ -13097,6 +11416,7 @@ __export(src_exports, {
   GITHUB_WAIT_REASON: () => GITHUB_WAIT_REASON,
   HUMAN_ONLY_SIGN_OFFS: () => HUMAN_ONLY_SIGN_OFFS,
   HumanCommandSchema: () => HumanCommandSchema,
+  IMPLEMENTATION_PLAN_SKILL: () => IMPLEMENTATION_PLAN_SKILL,
   IMPORT_BATCH_MAX_BYTES: () => IMPORT_BATCH_MAX_BYTES,
   IMPORT_COLUMNS: () => IMPORT_COLUMNS,
   IMPORT_ENVELOPE_BYTES: () => IMPORT_ENVELOPE_BYTES,
@@ -13128,6 +11448,7 @@ __export(src_exports, {
   MODEL_LABELS: () => MODEL_LABELS,
   MODEL_RATES: () => MODEL_RATES,
   MONTHLY_GRANT_CREDITS: () => MONTHLY_GRANT_CREDITS,
+  NEURAMESH_BOT: () => NEURAMESH_BOT,
   NEXT_STEPS_CAP: () => NEXT_STEPS_CAP,
   NEXT_STEPS_PAGE: () => NEXT_STEPS_PAGE,
   NM_TOOLS: () => NM_TOOLS,
@@ -13139,6 +11460,8 @@ __export(src_exports, {
   PACK_PREVIEW_ROLES: () => PACK_PREVIEW_ROLES,
   PACK_SUPPORT_ROLES: () => PACK_SUPPORT_ROLES,
   PERMISSION_LABELS: () => PERMISSION_LABELS,
+  PERMISSION_MODES: () => PERMISSION_MODES,
+  PERMISSION_MODE_COPY: () => PERMISSION_MODE_COPY,
   PLAN_CHECKLIST: () => PLAN_CHECKLIST,
   PLAN_ENTITLEMENTS: () => PLAN_ENTITLEMENTS,
   PLAN_LABELS: () => PLAN_LABELS,
@@ -13149,6 +11472,7 @@ __export(src_exports, {
   POLICY_VERDICTS: () => POLICY_VERDICTS,
   PRO_SEAT_USD: () => PRO_SEAT_USD,
   PRO_TRIAL_DAYS: () => PRO_TRIAL_DAYS,
+  PULL_REQUEST_SKILL: () => PULL_REQUEST_SKILL,
   PolicyRuleSchema: () => PolicyRuleSchema,
   PolicySelectorSchema: () => PolicySelectorSchema,
   RATE_DENOMINATOR_FLOOR: () => RATE_DENOMINATOR_FLOOR,
@@ -13164,6 +11488,7 @@ __export(src_exports, {
   REPLY_PLATFORMS: () => REPLY_PLATFORMS,
   REPORT_SHAPE_DOD: () => REPORT_SHAPE_DOD,
   RETRO_RANGES: () => RETRO_RANGES,
+  REVIEW_ENGINEERING_PERMISSIONS: () => REVIEW_ENGINEERING_PERMISSIONS,
   REVIEW_LEAD_MIN: () => REVIEW_LEAD_MIN,
   ROLE_DESCRIPTION: () => ROLE_DESCRIPTION,
   ROUTINE_ASK: () => ROUTINE_ASK,
@@ -13206,6 +11531,7 @@ __export(src_exports, {
   SUPPORTED_DESKTOP_VERSIONS: () => SUPPORTED_DESKTOP_VERSIONS,
   ShipItemSchema: () => ShipItemSchema,
   ShipPlanSchema: () => ShipPlanSchema,
+  TASK_HANDOFF_SKILL: () => TASK_HANDOFF_SKILL,
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
   TEAM_TEMPLATES: () => TEAM_TEMPLATES,
@@ -13252,6 +11578,7 @@ __export(src_exports, {
   actionableByHuman: () => actionableByHuman,
   addressedIn: () => addressedIn,
   afterSettle: () => afterSettle,
+  agentGitIdentity: () => agentGitIdentity,
   agentInChannel: () => agentInChannel,
   agentRegisterCommand: () => agentRegisterCommand,
   agentTabAllows: () => agentTabAllows,
@@ -13262,6 +11589,7 @@ __export(src_exports, {
   applyRemoteEngineeringEvent: () => applyRemoteEngineeringEvent,
   applyReplyRevision: () => applyReplyRevision,
   applyShare: () => applyShare,
+  applyTaskEngineeringState: () => applyTaskEngineeringState,
   articleFacts: () => articleFacts,
   articleFrom: () => articleFrom,
   artifactMime: () => artifactMime,
@@ -13348,12 +11676,15 @@ __export(src_exports, {
   codeSessionTitle: () => codeSessionTitle,
   codeThreadStatus: () => codeThreadStatus,
   codeVendorOf: () => codeVendorOf,
+  codingDeliveryPolicy: () => codingDeliveryPolicy,
+  codingTaskChecklist: () => codingTaskChecklist,
   combinedDiff: () => combinedDiff,
   commRulesFrom: () => commRulesFrom,
   compareVersions: () => compareVersions,
   composeFailover: () => composeFailover,
   composePrompt: () => composePrompt,
   computeAlert: () => computeAlert,
+  connectEngineeringTask: () => connectEngineeringTask,
   contentAnchorCommand: () => contentAnchorCommand,
   contentApproveCommand: () => contentApproveCommand,
   contentUnscheduleCommand: () => contentUnscheduleCommand,
@@ -13373,6 +11704,7 @@ __export(src_exports, {
   day1Meta: () => day1Meta,
   day3Meta: () => day3Meta,
   day7Meta: () => day7Meta,
+  decideThreadPermission: () => decideThreadPermission,
   decisionAnswerCommand: () => decisionAnswerCommand,
   decisionDismissCommand: () => decisionDismissCommand,
   decisionHandled: () => decisionHandled,
@@ -13455,6 +11787,7 @@ __export(src_exports, {
   groupEngineeringTranscript: () => groupEngineeringTranscript,
   h1: () => h1,
   h2: () => h2,
+  hasPairedValidationImages: () => hasPairedValidationImages,
   hasWorkspaceId: () => hasWorkspaceId,
   historyRows: () => historyRows,
   hostSpeaksForOrigin: () => hostSpeaksForOrigin,
@@ -13472,6 +11805,7 @@ __export(src_exports, {
   isCloudBorn: () => isCloudBorn,
   isCloudMachineRow: () => isCloudMachineRow,
   isCodingThread: () => isCodingThread,
+  isCompactCommand: () => isCompactCommand,
   isCustomPackId: () => isCustomPackId,
   isEchoArtifact: () => isEchoArtifact,
   isEngineeringCommand: () => isEngineeringCommand,
@@ -13491,6 +11825,7 @@ __export(src_exports, {
   isLowRiskPermissionCard: () => isLowRiskPermissionCard,
   isNoisePr: () => isNoisePr,
   isPackActivatable: () => isPackActivatable,
+  isPermissionMode: () => isPermissionMode,
   isPlanDoc: () => isPlanDoc,
   isPostsFile: () => isPostsFile,
   isReadable: () => isReadable,
@@ -13505,6 +11840,7 @@ __export(src_exports, {
   isStandDown: () => isStandDown,
   isTryOnce: () => isTryOnce,
   isUnroutableTodo: () => isUnroutableTodo,
+  isValidationImageName: () => isValidationImageName,
   isVideoTier: () => isVideoTier,
   isWorkflowArtifact: () => isWorkflowArtifact,
   joinedMeta: () => joinedMeta,
@@ -13560,6 +11896,7 @@ __export(src_exports, {
   needBlock: () => needBlock,
   needCardText: () => needCardText,
   needDecisionQuestion: () => needDecisionQuestion,
+  needsReleaseApproval: () => needsReleaseApproval,
   needsYouWhy: () => needsYouWhy,
   newestSeen: () => newestSeen,
   nextFallForward: () => nextFallForward,
@@ -13571,6 +11908,7 @@ __export(src_exports, {
   normalizeDraft: () => normalizeDraft,
   normalizeEngineeringChanges: () => normalizeEngineeringChanges,
   normalizeHex: () => normalizeHex,
+  normalizeTaskMarkdown: () => normalizeTaskMarkdown,
   normalizeUrlInput: () => normalizeUrlInput,
   noticeProvider: () => noticeProvider,
   noticeWhy: () => noticeWhy,
@@ -13663,6 +12001,7 @@ __export(src_exports, {
   rateOrNull: () => rateOrNull,
   readAnswers: () => readAnswers,
   readyProviders: () => readyProviders,
+  recordedCodingDelivery: () => recordedCodingDelivery,
   recoverEngineeringPlanProgress: () => recoverEngineeringPlanProgress,
   recoverEngineeringPlanReceipt: () => recoverEngineeringPlanReceipt,
   recoverRecordedEngineeringPlan: () => recoverRecordedEngineeringPlan,
@@ -13690,15 +12029,18 @@ __export(src_exports, {
   repairCardFences: () => repairCardFences,
   repairCardJson: () => repairCardJson,
   repliesBlock: () => repliesBlock,
+  replyFailureText: () => replyFailureText,
   replyFooter: () => replyFooter,
   replyIntentUrl: () => replyIntentUrl,
   replyOpenUrl: () => replyOpenUrl,
   replyPreview: () => replyPreview,
+  replyRowsAfterPermission: () => replyRowsAfterPermission,
   repoLinkCommand: () => repoLinkCommand,
   repoint: () => repoint,
   reportFacts: () => reportFacts,
   reportFrom: () => reportFrom,
   reportTrend: () => reportTrend,
+  requireCaptureReceipts: () => requireCaptureReceipts,
   requiredProvidersForRoles: () => requiredProvidersForRoles,
   resolveEngineeringApproval: () => resolveEngineeringApproval,
   resolveInstructions: () => resolveInstructions,
@@ -13860,11 +12202,13 @@ __export(src_exports, {
   tryOnceBody: () => tryOnceBody,
   unaddressedWake: () => unaddressedWake,
   unblockNote: () => unblockNote,
+  uniqueWorkspaceSkills: () => uniqueWorkspaceSkills,
   unroutableTodos: () => unroutableTodos,
   updateEngineeringPlanProgress: () => updateEngineeringPlanProgress,
   updateReviewStatus: () => updateReviewStatus,
   usdForCredits: () => usdForCredits,
   validateWorkPlanLegs: () => validateWorkPlanLegs,
+  validationImages: () => validationImages,
   visibleStream: () => visibleStream,
   waitTimedOut: () => waitTimedOut,
   waitTimeoutLine: () => waitTimeoutLine,
@@ -13915,6 +12259,7 @@ var init_src = __esm({
     init_runs();
     init_deliverables();
     init_stream();
+    init_git_author();
     init_livestream();
     init_browser_lane();
     init_agentdesc();
@@ -13934,6 +12279,8 @@ var init_src = __esm({
     init_onboarding();
     init_onboarding_wizard();
     init_planmd();
+    init_task_handoff();
+    init_coding_delivery();
     init_skill_parse();
     init_agentcard();
     init_model_packs();
@@ -13995,8 +12342,2213 @@ var init_src = __esm({
     init_brain_endpoint();
     init_conversation_activity();
     init_team_desk();
+    init_skill_catalog();
+    init_permission_mode();
   }
 });
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js
+var require_encoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js"(exports, module) {
+    var btoa = btoa || function(buf) {
+      return Buffer.from(buf).toString("base64");
+    };
+    function JPEGEncoder(quality) {
+      var self2 = this;
+      var fround = Math.round;
+      var ffloor = Math.floor;
+      var YTable = new Array(64);
+      var UVTable = new Array(64);
+      var fdtbl_Y = new Array(64);
+      var fdtbl_UV = new Array(64);
+      var YDC_HT;
+      var UVDC_HT;
+      var YAC_HT;
+      var UVAC_HT;
+      var bitcode = new Array(65535);
+      var category = new Array(65535);
+      var outputfDCTQuant = new Array(64);
+      var DU = new Array(64);
+      var byteout = [];
+      var bytenew = 0;
+      var bytepos = 7;
+      var YDU = new Array(64);
+      var UDU = new Array(64);
+      var VDU = new Array(64);
+      var clt = new Array(256);
+      var RGB_YUV_TABLE = new Array(2048);
+      var currentQuality;
+      var ZigZag = [
+        0,
+        1,
+        5,
+        6,
+        14,
+        15,
+        27,
+        28,
+        2,
+        4,
+        7,
+        13,
+        16,
+        26,
+        29,
+        42,
+        3,
+        8,
+        12,
+        17,
+        25,
+        30,
+        41,
+        43,
+        9,
+        11,
+        18,
+        24,
+        31,
+        40,
+        44,
+        53,
+        10,
+        19,
+        23,
+        32,
+        39,
+        45,
+        52,
+        54,
+        20,
+        22,
+        33,
+        38,
+        46,
+        51,
+        55,
+        60,
+        21,
+        34,
+        37,
+        47,
+        50,
+        56,
+        59,
+        61,
+        35,
+        36,
+        48,
+        49,
+        57,
+        58,
+        62,
+        63
+      ];
+      var std_dc_luminance_nrcodes = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
+      var std_dc_luminance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_luminance_nrcodes = [0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 125];
+      var std_ac_luminance_values = [
+        1,
+        2,
+        3,
+        0,
+        4,
+        17,
+        5,
+        18,
+        33,
+        49,
+        65,
+        6,
+        19,
+        81,
+        97,
+        7,
+        34,
+        113,
+        20,
+        50,
+        129,
+        145,
+        161,
+        8,
+        35,
+        66,
+        177,
+        193,
+        21,
+        82,
+        209,
+        240,
+        36,
+        51,
+        98,
+        114,
+        130,
+        9,
+        10,
+        22,
+        23,
+        24,
+        25,
+        26,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      var std_dc_chrominance_nrcodes = [0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0];
+      var std_dc_chrominance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_chrominance_nrcodes = [0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 119];
+      var std_ac_chrominance_values = [
+        0,
+        1,
+        2,
+        3,
+        17,
+        4,
+        5,
+        33,
+        49,
+        6,
+        18,
+        65,
+        81,
+        7,
+        97,
+        113,
+        19,
+        34,
+        50,
+        129,
+        8,
+        20,
+        66,
+        145,
+        161,
+        177,
+        193,
+        9,
+        35,
+        51,
+        82,
+        240,
+        21,
+        98,
+        114,
+        209,
+        10,
+        22,
+        36,
+        52,
+        225,
+        37,
+        241,
+        23,
+        24,
+        25,
+        26,
+        38,
+        39,
+        40,
+        41,
+        42,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      function initQuantTables(sf) {
+        var YQT = [
+          16,
+          11,
+          10,
+          16,
+          24,
+          40,
+          51,
+          61,
+          12,
+          12,
+          14,
+          19,
+          26,
+          58,
+          60,
+          55,
+          14,
+          13,
+          16,
+          24,
+          40,
+          57,
+          69,
+          56,
+          14,
+          17,
+          22,
+          29,
+          51,
+          87,
+          80,
+          62,
+          18,
+          22,
+          37,
+          56,
+          68,
+          109,
+          103,
+          77,
+          24,
+          35,
+          55,
+          64,
+          81,
+          104,
+          113,
+          92,
+          49,
+          64,
+          78,
+          87,
+          103,
+          121,
+          120,
+          101,
+          72,
+          92,
+          95,
+          98,
+          112,
+          100,
+          103,
+          99
+        ];
+        for (var i = 0; i < 64; i++) {
+          var t2 = ffloor((YQT[i] * sf + 50) / 100);
+          if (t2 < 1) {
+            t2 = 1;
+          } else if (t2 > 255) {
+            t2 = 255;
+          }
+          YTable[ZigZag[i]] = t2;
+        }
+        var UVQT = [
+          17,
+          18,
+          24,
+          47,
+          99,
+          99,
+          99,
+          99,
+          18,
+          21,
+          26,
+          66,
+          99,
+          99,
+          99,
+          99,
+          24,
+          26,
+          56,
+          99,
+          99,
+          99,
+          99,
+          99,
+          47,
+          66,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99
+        ];
+        for (var j = 0; j < 64; j++) {
+          var u = ffloor((UVQT[j] * sf + 50) / 100);
+          if (u < 1) {
+            u = 1;
+          } else if (u > 255) {
+            u = 255;
+          }
+          UVTable[ZigZag[j]] = u;
+        }
+        var aasf = [
+          1,
+          1.387039845,
+          1.306562965,
+          1.175875602,
+          1,
+          0.785694958,
+          0.5411961,
+          0.275899379
+        ];
+        var k = 0;
+        for (var row = 0; row < 8; row++) {
+          for (var col = 0; col < 8; col++) {
+            fdtbl_Y[k] = 1 / (YTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            fdtbl_UV[k] = 1 / (UVTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            k++;
+          }
+        }
+      }
+      function computeHuffmanTbl(nrcodes, std_table) {
+        var codevalue = 0;
+        var pos_in_table = 0;
+        var HT = new Array();
+        for (var k = 1; k <= 16; k++) {
+          for (var j = 1; j <= nrcodes[k]; j++) {
+            HT[std_table[pos_in_table]] = [];
+            HT[std_table[pos_in_table]][0] = codevalue;
+            HT[std_table[pos_in_table]][1] = k;
+            pos_in_table++;
+            codevalue++;
+          }
+          codevalue *= 2;
+        }
+        return HT;
+      }
+      function initHuffmanTbl() {
+        YDC_HT = computeHuffmanTbl(std_dc_luminance_nrcodes, std_dc_luminance_values);
+        UVDC_HT = computeHuffmanTbl(std_dc_chrominance_nrcodes, std_dc_chrominance_values);
+        YAC_HT = computeHuffmanTbl(std_ac_luminance_nrcodes, std_ac_luminance_values);
+        UVAC_HT = computeHuffmanTbl(std_ac_chrominance_nrcodes, std_ac_chrominance_values);
+      }
+      function initCategoryNumber() {
+        var nrlower = 1;
+        var nrupper = 2;
+        for (var cat = 1; cat <= 15; cat++) {
+          for (var nr = nrlower; nr < nrupper; nr++) {
+            category[32767 + nr] = cat;
+            bitcode[32767 + nr] = [];
+            bitcode[32767 + nr][1] = cat;
+            bitcode[32767 + nr][0] = nr;
+          }
+          for (var nrneg = -(nrupper - 1); nrneg <= -nrlower; nrneg++) {
+            category[32767 + nrneg] = cat;
+            bitcode[32767 + nrneg] = [];
+            bitcode[32767 + nrneg][1] = cat;
+            bitcode[32767 + nrneg][0] = nrupper - 1 + nrneg;
+          }
+          nrlower <<= 1;
+          nrupper <<= 1;
+        }
+      }
+      function initRGBYUVTable() {
+        for (var i = 0; i < 256; i++) {
+          RGB_YUV_TABLE[i] = 19595 * i;
+          RGB_YUV_TABLE[i + 256 >> 0] = 38470 * i;
+          RGB_YUV_TABLE[i + 512 >> 0] = 7471 * i + 32768;
+          RGB_YUV_TABLE[i + 768 >> 0] = -11059 * i;
+          RGB_YUV_TABLE[i + 1024 >> 0] = -21709 * i;
+          RGB_YUV_TABLE[i + 1280 >> 0] = 32768 * i + 8421375;
+          RGB_YUV_TABLE[i + 1536 >> 0] = -27439 * i;
+          RGB_YUV_TABLE[i + 1792 >> 0] = -5329 * i;
+        }
+      }
+      function writeBits(bs) {
+        var value = bs[0];
+        var posval = bs[1] - 1;
+        while (posval >= 0) {
+          if (value & 1 << posval) {
+            bytenew |= 1 << bytepos;
+          }
+          posval--;
+          bytepos--;
+          if (bytepos < 0) {
+            if (bytenew == 255) {
+              writeByte(255);
+              writeByte(0);
+            } else {
+              writeByte(bytenew);
+            }
+            bytepos = 7;
+            bytenew = 0;
+          }
+        }
+      }
+      function writeByte(value) {
+        byteout.push(value);
+      }
+      function writeWord(value) {
+        writeByte(value >> 8 & 255);
+        writeByte(value & 255);
+      }
+      function fDCTQuant(data, fdtbl) {
+        var d0, d1, d2, d3, d4, d5, d6, d7;
+        var dataOff = 0;
+        var i;
+        var I8 = 8;
+        var I64 = 64;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 1];
+          d2 = data[dataOff + 2];
+          d3 = data[dataOff + 3];
+          d4 = data[dataOff + 4];
+          d5 = data[dataOff + 5];
+          d6 = data[dataOff + 6];
+          d7 = data[dataOff + 7];
+          var tmp0 = d0 + d7;
+          var tmp7 = d0 - d7;
+          var tmp1 = d1 + d6;
+          var tmp6 = d1 - d6;
+          var tmp2 = d2 + d5;
+          var tmp5 = d2 - d5;
+          var tmp3 = d3 + d4;
+          var tmp4 = d3 - d4;
+          var tmp10 = tmp0 + tmp3;
+          var tmp13 = tmp0 - tmp3;
+          var tmp11 = tmp1 + tmp2;
+          var tmp12 = tmp1 - tmp2;
+          data[dataOff] = tmp10 + tmp11;
+          data[dataOff + 4] = tmp10 - tmp11;
+          var z1 = (tmp12 + tmp13) * 0.707106781;
+          data[dataOff + 2] = tmp13 + z1;
+          data[dataOff + 6] = tmp13 - z1;
+          tmp10 = tmp4 + tmp5;
+          tmp11 = tmp5 + tmp6;
+          tmp12 = tmp6 + tmp7;
+          var z52 = (tmp10 - tmp12) * 0.382683433;
+          var z210 = 0.5411961 * tmp10 + z52;
+          var z42 = 1.306562965 * tmp12 + z52;
+          var z32 = tmp11 * 0.707106781;
+          var z112 = tmp7 + z32;
+          var z132 = tmp7 - z32;
+          data[dataOff + 5] = z132 + z210;
+          data[dataOff + 3] = z132 - z210;
+          data[dataOff + 1] = z112 + z42;
+          data[dataOff + 7] = z112 - z42;
+          dataOff += 8;
+        }
+        dataOff = 0;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 8];
+          d2 = data[dataOff + 16];
+          d3 = data[dataOff + 24];
+          d4 = data[dataOff + 32];
+          d5 = data[dataOff + 40];
+          d6 = data[dataOff + 48];
+          d7 = data[dataOff + 56];
+          var tmp0p2 = d0 + d7;
+          var tmp7p2 = d0 - d7;
+          var tmp1p2 = d1 + d6;
+          var tmp6p2 = d1 - d6;
+          var tmp2p2 = d2 + d5;
+          var tmp5p2 = d2 - d5;
+          var tmp3p2 = d3 + d4;
+          var tmp4p2 = d3 - d4;
+          var tmp10p2 = tmp0p2 + tmp3p2;
+          var tmp13p2 = tmp0p2 - tmp3p2;
+          var tmp11p2 = tmp1p2 + tmp2p2;
+          var tmp12p2 = tmp1p2 - tmp2p2;
+          data[dataOff] = tmp10p2 + tmp11p2;
+          data[dataOff + 32] = tmp10p2 - tmp11p2;
+          var z1p2 = (tmp12p2 + tmp13p2) * 0.707106781;
+          data[dataOff + 16] = tmp13p2 + z1p2;
+          data[dataOff + 48] = tmp13p2 - z1p2;
+          tmp10p2 = tmp4p2 + tmp5p2;
+          tmp11p2 = tmp5p2 + tmp6p2;
+          tmp12p2 = tmp6p2 + tmp7p2;
+          var z5p2 = (tmp10p2 - tmp12p2) * 0.382683433;
+          var z2p2 = 0.5411961 * tmp10p2 + z5p2;
+          var z4p2 = 1.306562965 * tmp12p2 + z5p2;
+          var z3p2 = tmp11p2 * 0.707106781;
+          var z11p2 = tmp7p2 + z3p2;
+          var z13p2 = tmp7p2 - z3p2;
+          data[dataOff + 40] = z13p2 + z2p2;
+          data[dataOff + 24] = z13p2 - z2p2;
+          data[dataOff + 8] = z11p2 + z4p2;
+          data[dataOff + 56] = z11p2 - z4p2;
+          dataOff++;
+        }
+        var fDCTQuant2;
+        for (i = 0; i < I64; ++i) {
+          fDCTQuant2 = data[i] * fdtbl[i];
+          outputfDCTQuant[i] = fDCTQuant2 > 0 ? fDCTQuant2 + 0.5 | 0 : fDCTQuant2 - 0.5 | 0;
+        }
+        return outputfDCTQuant;
+      }
+      function writeAPP0() {
+        writeWord(65504);
+        writeWord(16);
+        writeByte(74);
+        writeByte(70);
+        writeByte(73);
+        writeByte(70);
+        writeByte(0);
+        writeByte(1);
+        writeByte(1);
+        writeByte(0);
+        writeWord(1);
+        writeWord(1);
+        writeByte(0);
+        writeByte(0);
+      }
+      function writeAPP1(exifBuffer) {
+        if (!exifBuffer) return;
+        writeWord(65505);
+        if (exifBuffer[0] === 69 && exifBuffer[1] === 120 && exifBuffer[2] === 105 && exifBuffer[3] === 102) {
+          writeWord(exifBuffer.length + 2);
+        } else {
+          writeWord(exifBuffer.length + 5 + 2);
+          writeByte(69);
+          writeByte(120);
+          writeByte(105);
+          writeByte(102);
+          writeByte(0);
+        }
+        for (var i = 0; i < exifBuffer.length; i++) {
+          writeByte(exifBuffer[i]);
+        }
+      }
+      function writeSOF0(width, height) {
+        writeWord(65472);
+        writeWord(17);
+        writeByte(8);
+        writeWord(height);
+        writeWord(width);
+        writeByte(3);
+        writeByte(1);
+        writeByte(17);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(1);
+        writeByte(3);
+        writeByte(17);
+        writeByte(1);
+      }
+      function writeDQT() {
+        writeWord(65499);
+        writeWord(132);
+        writeByte(0);
+        for (var i = 0; i < 64; i++) {
+          writeByte(YTable[i]);
+        }
+        writeByte(1);
+        for (var j = 0; j < 64; j++) {
+          writeByte(UVTable[j]);
+        }
+      }
+      function writeDHT() {
+        writeWord(65476);
+        writeWord(418);
+        writeByte(0);
+        for (var i = 0; i < 16; i++) {
+          writeByte(std_dc_luminance_nrcodes[i + 1]);
+        }
+        for (var j = 0; j <= 11; j++) {
+          writeByte(std_dc_luminance_values[j]);
+        }
+        writeByte(16);
+        for (var k = 0; k < 16; k++) {
+          writeByte(std_ac_luminance_nrcodes[k + 1]);
+        }
+        for (var l = 0; l <= 161; l++) {
+          writeByte(std_ac_luminance_values[l]);
+        }
+        writeByte(1);
+        for (var m = 0; m < 16; m++) {
+          writeByte(std_dc_chrominance_nrcodes[m + 1]);
+        }
+        for (var n = 0; n <= 11; n++) {
+          writeByte(std_dc_chrominance_values[n]);
+        }
+        writeByte(17);
+        for (var o = 0; o < 16; o++) {
+          writeByte(std_ac_chrominance_nrcodes[o + 1]);
+        }
+        for (var p2 = 0; p2 <= 161; p2++) {
+          writeByte(std_ac_chrominance_values[p2]);
+        }
+      }
+      function writeCOM(comments) {
+        if (typeof comments === "undefined" || comments.constructor !== Array) return;
+        comments.forEach((e) => {
+          if (typeof e !== "string") return;
+          writeWord(65534);
+          var l = e.length;
+          writeWord(l + 2);
+          var i;
+          for (i = 0; i < l; i++)
+            writeByte(e.charCodeAt(i));
+        });
+      }
+      function writeSOS() {
+        writeWord(65498);
+        writeWord(12);
+        writeByte(3);
+        writeByte(1);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(3);
+        writeByte(17);
+        writeByte(0);
+        writeByte(63);
+        writeByte(0);
+      }
+      function processDU(CDU, fdtbl, DC, HTDC, HTAC) {
+        var EOB = HTAC[0];
+        var M16zeroes = HTAC[240];
+        var pos;
+        var I16 = 16;
+        var I63 = 63;
+        var I64 = 64;
+        var DU_DCT = fDCTQuant(CDU, fdtbl);
+        for (var j = 0; j < I64; ++j) {
+          DU[ZigZag[j]] = DU_DCT[j];
+        }
+        var Diff2 = DU[0] - DC;
+        DC = DU[0];
+        if (Diff2 == 0) {
+          writeBits(HTDC[0]);
+        } else {
+          pos = 32767 + Diff2;
+          writeBits(HTDC[category[pos]]);
+          writeBits(bitcode[pos]);
+        }
+        var end0pos = 63;
+        for (; end0pos > 0 && DU[end0pos] == 0; end0pos--) {
+        }
+        ;
+        if (end0pos == 0) {
+          writeBits(EOB);
+          return DC;
+        }
+        var i = 1;
+        var lng;
+        while (i <= end0pos) {
+          var startpos = i;
+          for (; DU[i] == 0 && i <= end0pos; ++i) {
+          }
+          var nrzeroes = i - startpos;
+          if (nrzeroes >= I16) {
+            lng = nrzeroes >> 4;
+            for (var nrmarker = 1; nrmarker <= lng; ++nrmarker)
+              writeBits(M16zeroes);
+            nrzeroes = nrzeroes & 15;
+          }
+          pos = 32767 + DU[i];
+          writeBits(HTAC[(nrzeroes << 4) + category[pos]]);
+          writeBits(bitcode[pos]);
+          i++;
+        }
+        if (end0pos != I63) {
+          writeBits(EOB);
+        }
+        return DC;
+      }
+      function initCharLookupTable() {
+        var sfcc = String.fromCharCode;
+        for (var i = 0; i < 256; i++) {
+          clt[i] = sfcc(i);
+        }
+      }
+      this.encode = function(image, quality2) {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (quality2) setQuality(quality2);
+        byteout = new Array();
+        bytenew = 0;
+        bytepos = 7;
+        writeWord(65496);
+        writeAPP0();
+        writeCOM(image.comments);
+        writeAPP1(image.exifBuffer);
+        writeDQT();
+        writeSOF0(image.width, image.height);
+        writeDHT();
+        writeSOS();
+        var DCY = 0;
+        var DCU = 0;
+        var DCV = 0;
+        bytenew = 0;
+        bytepos = 7;
+        this.encode.displayName = "_encode_";
+        var imageData = image.data;
+        var width = image.width;
+        var height = image.height;
+        var quadWidth = width * 4;
+        var tripleWidth = width * 3;
+        var x, y = 0;
+        var r, g, b2;
+        var start, p2, col, row, pos;
+        while (y < height) {
+          x = 0;
+          while (x < quadWidth) {
+            start = quadWidth * y + x;
+            p2 = start;
+            col = -1;
+            row = 0;
+            for (pos = 0; pos < 64; pos++) {
+              row = pos >> 3;
+              col = (pos & 7) * 4;
+              p2 = start + row * quadWidth + col;
+              if (y + row >= height) {
+                p2 -= quadWidth * (y + 1 + row - height);
+              }
+              if (x + col >= quadWidth) {
+                p2 -= x + col - quadWidth + 4;
+              }
+              r = imageData[p2++];
+              g = imageData[p2++];
+              b2 = imageData[p2++];
+              YDU[pos] = (RGB_YUV_TABLE[r] + RGB_YUV_TABLE[g + 256 >> 0] + RGB_YUV_TABLE[b2 + 512 >> 0] >> 16) - 128;
+              UDU[pos] = (RGB_YUV_TABLE[r + 768 >> 0] + RGB_YUV_TABLE[g + 1024 >> 0] + RGB_YUV_TABLE[b2 + 1280 >> 0] >> 16) - 128;
+              VDU[pos] = (RGB_YUV_TABLE[r + 1280 >> 0] + RGB_YUV_TABLE[g + 1536 >> 0] + RGB_YUV_TABLE[b2 + 1792 >> 0] >> 16) - 128;
+            }
+            DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
+            DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
+            DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
+            x += 32;
+          }
+          y += 8;
+        }
+        if (bytepos >= 0) {
+          var fillbits = [];
+          fillbits[1] = bytepos + 1;
+          fillbits[0] = (1 << bytepos + 1) - 1;
+          writeBits(fillbits);
+        }
+        writeWord(65497);
+        if (typeof module === "undefined") return new Uint8Array(byteout);
+        return Buffer.from(byteout);
+        var jpegDataUri = "data:image/jpeg;base64," + btoa(byteout.join(""));
+        byteout = [];
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+        return jpegDataUri;
+      };
+      function setQuality(quality2) {
+        if (quality2 <= 0) {
+          quality2 = 1;
+        }
+        if (quality2 > 100) {
+          quality2 = 100;
+        }
+        if (currentQuality == quality2) return;
+        var sf = 0;
+        if (quality2 < 50) {
+          sf = Math.floor(5e3 / quality2);
+        } else {
+          sf = Math.floor(200 - quality2 * 2);
+        }
+        initQuantTables(sf);
+        currentQuality = quality2;
+      }
+      function init() {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (!quality) quality = 50;
+        initCharLookupTable();
+        initHuffmanTbl();
+        initCategoryNumber();
+        initRGBYUVTable();
+        setQuality(quality);
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+      }
+      init();
+    }
+    if (typeof module !== "undefined") {
+      module.exports = encode5;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].encode = encode5;
+    }
+    function encode5(imgData, qu) {
+      if (typeof qu === "undefined") qu = 50;
+      var encoder = new JPEGEncoder(qu);
+      var data = encoder.encode(imgData, qu);
+      return {
+        data,
+        width: imgData.width,
+        height: imgData.height
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js
+var require_decoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js"(exports, module) {
+    var JpegImage = (function jpegImage() {
+      "use strict";
+      var dctZigZag = new Int32Array([
+        0,
+        1,
+        8,
+        16,
+        9,
+        2,
+        3,
+        10,
+        17,
+        24,
+        32,
+        25,
+        18,
+        11,
+        4,
+        5,
+        12,
+        19,
+        26,
+        33,
+        40,
+        48,
+        41,
+        34,
+        27,
+        20,
+        13,
+        6,
+        7,
+        14,
+        21,
+        28,
+        35,
+        42,
+        49,
+        56,
+        57,
+        50,
+        43,
+        36,
+        29,
+        22,
+        15,
+        23,
+        30,
+        37,
+        44,
+        51,
+        58,
+        59,
+        52,
+        45,
+        38,
+        31,
+        39,
+        46,
+        53,
+        60,
+        61,
+        54,
+        47,
+        55,
+        62,
+        63
+      ]);
+      var dctCos1 = 4017;
+      var dctSin1 = 799;
+      var dctCos3 = 3406;
+      var dctSin3 = 2276;
+      var dctCos6 = 1567;
+      var dctSin6 = 3784;
+      var dctSqrt2 = 5793;
+      var dctSqrt1d2 = 2896;
+      function constructor() {
+      }
+      function buildHuffmanTable(codeLengths, values2) {
+        var k = 0, code = [], i, j, length = 16;
+        while (length > 0 && !codeLengths[length - 1])
+          length--;
+        code.push({ children: [], index: 0 });
+        var p2 = code[0], q;
+        for (i = 0; i < length; i++) {
+          for (j = 0; j < codeLengths[i]; j++) {
+            p2 = code.pop();
+            p2.children[p2.index] = values2[k];
+            while (p2.index > 0) {
+              if (code.length === 0)
+                throw new Error("Could not recreate Huffman Table");
+              p2 = code.pop();
+            }
+            p2.index++;
+            code.push(p2);
+            while (code.length <= i) {
+              code.push(q = { children: [], index: 0 });
+              p2.children[p2.index] = q.children;
+              p2 = q;
+            }
+            k++;
+          }
+          if (i + 1 < length) {
+            code.push(q = { children: [], index: 0 });
+            p2.children[p2.index] = q.children;
+            p2 = q;
+          }
+        }
+        return code[0].children;
+      }
+      function decodeScan(data, offset, frame, components, resetInterval, spectralStart, spectralEnd, successivePrev, successive, opts) {
+        var precision = frame.precision;
+        var samplesPerLine = frame.samplesPerLine;
+        var scanLines = frame.scanLines;
+        var mcusPerLine = frame.mcusPerLine;
+        var progressive = frame.progressive;
+        var maxH = frame.maxH, maxV = frame.maxV;
+        var startOffset = offset, bitsData = 0, bitsCount = 0;
+        function readBit() {
+          if (bitsCount > 0) {
+            bitsCount--;
+            return bitsData >> bitsCount & 1;
+          }
+          bitsData = data[offset++];
+          if (bitsData == 255) {
+            var nextByte = data[offset++];
+            if (nextByte) {
+              throw new Error("unexpected marker: " + (bitsData << 8 | nextByte).toString(16));
+            }
+          }
+          bitsCount = 7;
+          return bitsData >>> 7;
+        }
+        function decodeHuffman(tree) {
+          var node = tree, bit;
+          while ((bit = readBit()) !== null) {
+            node = node[bit];
+            if (typeof node === "number")
+              return node;
+            if (typeof node !== "object")
+              throw new Error("invalid huffman sequence");
+          }
+          return null;
+        }
+        function receive(length) {
+          var n2 = 0;
+          while (length > 0) {
+            var bit = readBit();
+            if (bit === null) return;
+            n2 = n2 << 1 | bit;
+            length--;
+          }
+          return n2;
+        }
+        function receiveAndExtend(length) {
+          var n2 = receive(length);
+          if (n2 >= 1 << length - 1)
+            return n2;
+          return n2 + (-1 << length) + 1;
+        }
+        function decodeBaseline(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2);
+          zz[0] = component2.pred += diff;
+          var k2 = 1;
+          while (k2 < 64) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15)
+                break;
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z30 = dctZigZag[k2];
+            zz[z30] = receiveAndExtend(s);
+            k2++;
+          }
+        }
+        function decodeDCFirst(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2) << successive;
+          zz[0] = component2.pred += diff;
+        }
+        function decodeDCSuccessive(component2, zz) {
+          zz[0] |= readBit() << successive;
+        }
+        var eobrun = 0;
+        function decodeACFirst(component2, zz) {
+          if (eobrun > 0) {
+            eobrun--;
+            return;
+          }
+          var k2 = spectralStart, e = spectralEnd;
+          while (k2 <= e) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15) {
+                eobrun = receive(r) + (1 << r) - 1;
+                break;
+              }
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z30 = dctZigZag[k2];
+            zz[z30] = receiveAndExtend(s) * (1 << successive);
+            k2++;
+          }
+        }
+        var successiveACState = 0, successiveACNextValue;
+        function decodeACSuccessive(component2, zz) {
+          var k2 = spectralStart, e = spectralEnd, r = 0;
+          while (k2 <= e) {
+            var z30 = dctZigZag[k2];
+            var direction = zz[z30] < 0 ? -1 : 1;
+            switch (successiveACState) {
+              case 0:
+                var rs = decodeHuffman(component2.huffmanTableAC);
+                var s = rs & 15, r = rs >> 4;
+                if (s === 0) {
+                  if (r < 15) {
+                    eobrun = receive(r) + (1 << r);
+                    successiveACState = 4;
+                  } else {
+                    r = 16;
+                    successiveACState = 1;
+                  }
+                } else {
+                  if (s !== 1)
+                    throw new Error("invalid ACn encoding");
+                  successiveACNextValue = receiveAndExtend(s);
+                  successiveACState = r ? 2 : 3;
+                }
+                continue;
+              case 1:
+              // skipping r zero items
+              case 2:
+                if (zz[z30])
+                  zz[z30] += (readBit() << successive) * direction;
+                else {
+                  r--;
+                  if (r === 0)
+                    successiveACState = successiveACState == 2 ? 3 : 0;
+                }
+                break;
+              case 3:
+                if (zz[z30])
+                  zz[z30] += (readBit() << successive) * direction;
+                else {
+                  zz[z30] = successiveACNextValue << successive;
+                  successiveACState = 0;
+                }
+                break;
+              case 4:
+                if (zz[z30])
+                  zz[z30] += (readBit() << successive) * direction;
+                break;
+            }
+            k2++;
+          }
+          if (successiveACState === 4) {
+            eobrun--;
+            if (eobrun === 0)
+              successiveACState = 0;
+          }
+        }
+        function decodeMcu(component2, decode2, mcu2, row, col) {
+          var mcuRow = mcu2 / mcusPerLine | 0;
+          var mcuCol = mcu2 % mcusPerLine;
+          var blockRow = mcuRow * component2.v + row;
+          var blockCol = mcuCol * component2.h + col;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        function decodeBlock(component2, decode2, mcu2) {
+          var blockRow = mcu2 / component2.blocksPerLine | 0;
+          var blockCol = mcu2 % component2.blocksPerLine;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        var componentsLength = components.length;
+        var component, i, j, k, n;
+        var decodeFn;
+        if (progressive) {
+          if (spectralStart === 0)
+            decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
+          else
+            decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+        } else {
+          decodeFn = decodeBaseline;
+        }
+        var mcu = 0, marker;
+        var mcuExpected;
+        if (componentsLength == 1) {
+          mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
+        } else {
+          mcuExpected = mcusPerLine * frame.mcusPerColumn;
+        }
+        if (!resetInterval) resetInterval = mcuExpected;
+        var h, v;
+        while (mcu < mcuExpected) {
+          for (i = 0; i < componentsLength; i++)
+            components[i].pred = 0;
+          eobrun = 0;
+          if (componentsLength == 1) {
+            component = components[0];
+            for (n = 0; n < resetInterval; n++) {
+              decodeBlock(component, decodeFn, mcu);
+              mcu++;
+            }
+          } else {
+            for (n = 0; n < resetInterval; n++) {
+              for (i = 0; i < componentsLength; i++) {
+                component = components[i];
+                h = component.h;
+                v = component.v;
+                for (j = 0; j < v; j++) {
+                  for (k = 0; k < h; k++) {
+                    decodeMcu(component, decodeFn, mcu, j, k);
+                  }
+                }
+              }
+              mcu++;
+              if (mcu === mcuExpected) break;
+            }
+          }
+          if (mcu === mcuExpected) {
+            do {
+              if (data[offset] === 255) {
+                if (data[offset + 1] !== 0) {
+                  break;
+                }
+              }
+              offset += 1;
+            } while (offset < data.length - 2);
+          }
+          bitsCount = 0;
+          marker = data[offset] << 8 | data[offset + 1];
+          if (marker < 65280) {
+            throw new Error("marker was not found");
+          }
+          if (marker >= 65488 && marker <= 65495) {
+            offset += 2;
+          } else
+            break;
+        }
+        return offset - startOffset;
+      }
+      function buildComponentData(frame, component) {
+        var lines = [];
+        var blocksPerLine = component.blocksPerLine;
+        var blocksPerColumn = component.blocksPerColumn;
+        var samplesPerLine = blocksPerLine << 3;
+        var R = new Int32Array(64), r = new Uint8Array(64);
+        function quantizeAndInverse(zz, dataOut, dataIn) {
+          var qt = component.quantizationTable;
+          var v0, v1, v2, v3, v4, v5, v6, v7, t2;
+          var p2 = dataIn;
+          var i2;
+          for (i2 = 0; i2 < 64; i2++)
+            p2[i2] = zz[i2] * qt[i2];
+          for (i2 = 0; i2 < 8; ++i2) {
+            var row = 8 * i2;
+            if (p2[1 + row] == 0 && p2[2 + row] == 0 && p2[3 + row] == 0 && p2[4 + row] == 0 && p2[5 + row] == 0 && p2[6 + row] == 0 && p2[7 + row] == 0) {
+              t2 = dctSqrt2 * p2[0 + row] + 512 >> 10;
+              p2[0 + row] = t2;
+              p2[1 + row] = t2;
+              p2[2 + row] = t2;
+              p2[3 + row] = t2;
+              p2[4 + row] = t2;
+              p2[5 + row] = t2;
+              p2[6 + row] = t2;
+              p2[7 + row] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 + row] + 128 >> 8;
+            v1 = dctSqrt2 * p2[4 + row] + 128 >> 8;
+            v2 = p2[2 + row];
+            v3 = p2[6 + row];
+            v4 = dctSqrt1d2 * (p2[1 + row] - p2[7 + row]) + 128 >> 8;
+            v7 = dctSqrt1d2 * (p2[1 + row] + p2[7 + row]) + 128 >> 8;
+            v5 = p2[3 + row] << 4;
+            v6 = p2[5 + row] << 4;
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 128 >> 8;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 128 >> 8;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 + row] = v0 + v7;
+            p2[7 + row] = v0 - v7;
+            p2[1 + row] = v1 + v6;
+            p2[6 + row] = v1 - v6;
+            p2[2 + row] = v2 + v5;
+            p2[5 + row] = v2 - v5;
+            p2[3 + row] = v3 + v4;
+            p2[4 + row] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 8; ++i2) {
+            var col = i2;
+            if (p2[1 * 8 + col] == 0 && p2[2 * 8 + col] == 0 && p2[3 * 8 + col] == 0 && p2[4 * 8 + col] == 0 && p2[5 * 8 + col] == 0 && p2[6 * 8 + col] == 0 && p2[7 * 8 + col] == 0) {
+              t2 = dctSqrt2 * dataIn[i2 + 0] + 8192 >> 14;
+              p2[0 * 8 + col] = t2;
+              p2[1 * 8 + col] = t2;
+              p2[2 * 8 + col] = t2;
+              p2[3 * 8 + col] = t2;
+              p2[4 * 8 + col] = t2;
+              p2[5 * 8 + col] = t2;
+              p2[6 * 8 + col] = t2;
+              p2[7 * 8 + col] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 * 8 + col] + 2048 >> 12;
+            v1 = dctSqrt2 * p2[4 * 8 + col] + 2048 >> 12;
+            v2 = p2[2 * 8 + col];
+            v3 = p2[6 * 8 + col];
+            v4 = dctSqrt1d2 * (p2[1 * 8 + col] - p2[7 * 8 + col]) + 2048 >> 12;
+            v7 = dctSqrt1d2 * (p2[1 * 8 + col] + p2[7 * 8 + col]) + 2048 >> 12;
+            v5 = p2[3 * 8 + col];
+            v6 = p2[5 * 8 + col];
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 2048 >> 12;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 2048 >> 12;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 * 8 + col] = v0 + v7;
+            p2[7 * 8 + col] = v0 - v7;
+            p2[1 * 8 + col] = v1 + v6;
+            p2[6 * 8 + col] = v1 - v6;
+            p2[2 * 8 + col] = v2 + v5;
+            p2[5 * 8 + col] = v2 - v5;
+            p2[3 * 8 + col] = v3 + v4;
+            p2[4 * 8 + col] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 64; ++i2) {
+            var sample2 = 128 + (p2[i2] + 8 >> 4);
+            dataOut[i2] = sample2 < 0 ? 0 : sample2 > 255 ? 255 : sample2;
+          }
+        }
+        requestMemoryAllocation(samplesPerLine * blocksPerColumn * 8);
+        var i, j;
+        for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
+          var scanLine = blockRow << 3;
+          for (i = 0; i < 8; i++)
+            lines.push(new Uint8Array(samplesPerLine));
+          for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
+            quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
+            var offset = 0, sample = blockCol << 3;
+            for (j = 0; j < 8; j++) {
+              var line = lines[scanLine + j];
+              for (i = 0; i < 8; i++)
+                line[sample + i] = r[offset++];
+            }
+          }
+        }
+        return lines;
+      }
+      function clampTo8bit(a) {
+        return a < 0 ? 0 : a > 255 ? 255 : a;
+      }
+      constructor.prototype = {
+        load: function load(path) {
+          var xhr = new XMLHttpRequest();
+          xhr.open("GET", path, true);
+          xhr.responseType = "arraybuffer";
+          xhr.onload = (function() {
+            var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
+            this.parse(data);
+            if (this.onload)
+              this.onload();
+          }).bind(this);
+          xhr.send(null);
+        },
+        parse: function parse(data) {
+          var maxResolutionInPixels = this.opts.maxResolutionInMP * 1e3 * 1e3;
+          var offset = 0, length = data.length;
+          function readUint16() {
+            var value = data[offset] << 8 | data[offset + 1];
+            offset += 2;
+            return value;
+          }
+          function readDataBlock() {
+            var length2 = readUint16();
+            var array = data.subarray(offset, offset + length2 - 2);
+            offset += array.length;
+            return array;
+          }
+          function prepareComponents(frame2) {
+            var maxH2 = 1, maxV2 = 1;
+            var component2, componentId2;
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                if (maxH2 < component2.h) maxH2 = component2.h;
+                if (maxV2 < component2.v) maxV2 = component2.v;
+              }
+            }
+            var mcusPerLine = Math.ceil(frame2.samplesPerLine / 8 / maxH2);
+            var mcusPerColumn = Math.ceil(frame2.scanLines / 8 / maxV2);
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                var blocksPerLine = Math.ceil(Math.ceil(frame2.samplesPerLine / 8) * component2.h / maxH2);
+                var blocksPerColumn = Math.ceil(Math.ceil(frame2.scanLines / 8) * component2.v / maxV2);
+                var blocksPerLineForMcu = mcusPerLine * component2.h;
+                var blocksPerColumnForMcu = mcusPerColumn * component2.v;
+                var blocksToAllocate = blocksPerColumnForMcu * blocksPerLineForMcu;
+                var blocks = [];
+                requestMemoryAllocation(blocksToAllocate * 256);
+                for (var i2 = 0; i2 < blocksPerColumnForMcu; i2++) {
+                  var row = [];
+                  for (var j2 = 0; j2 < blocksPerLineForMcu; j2++)
+                    row.push(new Int32Array(64));
+                  blocks.push(row);
+                }
+                component2.blocksPerLine = blocksPerLine;
+                component2.blocksPerColumn = blocksPerColumn;
+                component2.blocks = blocks;
+              }
+            }
+            frame2.maxH = maxH2;
+            frame2.maxV = maxV2;
+            frame2.mcusPerLine = mcusPerLine;
+            frame2.mcusPerColumn = mcusPerColumn;
+          }
+          var jfif = null;
+          var adobe = null;
+          var pixels = null;
+          var frame, resetInterval;
+          var quantizationTables = [], frames = [];
+          var huffmanTablesAC = [], huffmanTablesDC = [];
+          var fileMarker = readUint16();
+          var malformedDataOffset = -1;
+          this.comments = [];
+          if (fileMarker != 65496) {
+            throw new Error("SOI not found");
+          }
+          fileMarker = readUint16();
+          while (fileMarker != 65497) {
+            var i, j, l;
+            switch (fileMarker) {
+              case 65280:
+                break;
+              case 65504:
+              // APP0 (Application Specific)
+              case 65505:
+              // APP1
+              case 65506:
+              // APP2
+              case 65507:
+              // APP3
+              case 65508:
+              // APP4
+              case 65509:
+              // APP5
+              case 65510:
+              // APP6
+              case 65511:
+              // APP7
+              case 65512:
+              // APP8
+              case 65513:
+              // APP9
+              case 65514:
+              // APP10
+              case 65515:
+              // APP11
+              case 65516:
+              // APP12
+              case 65517:
+              // APP13
+              case 65518:
+              // APP14
+              case 65519:
+              // APP15
+              case 65534:
+                var appData = readDataBlock();
+                if (fileMarker === 65534) {
+                  var comment = String.fromCharCode.apply(null, appData);
+                  this.comments.push(comment);
+                }
+                if (fileMarker === 65504) {
+                  if (appData[0] === 74 && appData[1] === 70 && appData[2] === 73 && appData[3] === 70 && appData[4] === 0) {
+                    jfif = {
+                      version: { major: appData[5], minor: appData[6] },
+                      densityUnits: appData[7],
+                      xDensity: appData[8] << 8 | appData[9],
+                      yDensity: appData[10] << 8 | appData[11],
+                      thumbWidth: appData[12],
+                      thumbHeight: appData[13],
+                      thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
+                    };
+                  }
+                }
+                if (fileMarker === 65505) {
+                  if (appData[0] === 69 && appData[1] === 120 && appData[2] === 105 && appData[3] === 102 && appData[4] === 0) {
+                    this.exifBuffer = appData.subarray(5, appData.length);
+                  }
+                }
+                if (fileMarker === 65518) {
+                  if (appData[0] === 65 && appData[1] === 100 && appData[2] === 111 && appData[3] === 98 && appData[4] === 101 && appData[5] === 0) {
+                    adobe = {
+                      version: appData[6],
+                      flags0: appData[7] << 8 | appData[8],
+                      flags1: appData[9] << 8 | appData[10],
+                      transformCode: appData[11]
+                    };
+                  }
+                }
+                break;
+              case 65499:
+                var quantizationTablesLength = readUint16();
+                var quantizationTablesEnd = quantizationTablesLength + offset - 2;
+                while (offset < quantizationTablesEnd) {
+                  var quantizationTableSpec = data[offset++];
+                  requestMemoryAllocation(64 * 4);
+                  var tableData = new Int32Array(64);
+                  if (quantizationTableSpec >> 4 === 0) {
+                    for (j = 0; j < 64; j++) {
+                      var z30 = dctZigZag[j];
+                      tableData[z30] = data[offset++];
+                    }
+                  } else if (quantizationTableSpec >> 4 === 1) {
+                    for (j = 0; j < 64; j++) {
+                      var z30 = dctZigZag[j];
+                      tableData[z30] = readUint16();
+                    }
+                  } else
+                    throw new Error("DQT: invalid table spec");
+                  quantizationTables[quantizationTableSpec & 15] = tableData;
+                }
+                break;
+              case 65472:
+              // SOF0 (Start of Frame, Baseline DCT)
+              case 65473:
+              // SOF1 (Start of Frame, Extended DCT)
+              case 65474:
+                readUint16();
+                frame = {};
+                frame.extended = fileMarker === 65473;
+                frame.progressive = fileMarker === 65474;
+                frame.precision = data[offset++];
+                frame.scanLines = readUint16();
+                frame.samplesPerLine = readUint16();
+                frame.components = {};
+                frame.componentsOrder = [];
+                var pixelsInFrame = frame.scanLines * frame.samplesPerLine;
+                if (pixelsInFrame > maxResolutionInPixels) {
+                  var exceededAmount = Math.ceil((pixelsInFrame - maxResolutionInPixels) / 1e6);
+                  throw new Error(`maxResolutionInMP limit exceeded by ${exceededAmount}MP`);
+                }
+                var componentsCount = data[offset++], componentId;
+                var maxH = 0, maxV = 0;
+                for (i = 0; i < componentsCount; i++) {
+                  componentId = data[offset];
+                  var h = data[offset + 1] >> 4;
+                  var v = data[offset + 1] & 15;
+                  var qId = data[offset + 2];
+                  if (h <= 0 || v <= 0) {
+                    throw new Error("Invalid sampling factor, expected values above 0");
+                  }
+                  frame.componentsOrder.push(componentId);
+                  frame.components[componentId] = {
+                    h,
+                    v,
+                    quantizationIdx: qId
+                  };
+                  offset += 3;
+                }
+                prepareComponents(frame);
+                frames.push(frame);
+                break;
+              case 65476:
+                var huffmanLength = readUint16();
+                for (i = 2; i < huffmanLength; ) {
+                  var huffmanTableSpec = data[offset++];
+                  var codeLengths = new Uint8Array(16);
+                  var codeLengthSum = 0;
+                  for (j = 0; j < 16; j++, offset++) {
+                    codeLengthSum += codeLengths[j] = data[offset];
+                  }
+                  requestMemoryAllocation(16 + codeLengthSum);
+                  var huffmanValues = new Uint8Array(codeLengthSum);
+                  for (j = 0; j < codeLengthSum; j++, offset++)
+                    huffmanValues[j] = data[offset];
+                  i += 17 + codeLengthSum;
+                  (huffmanTableSpec >> 4 === 0 ? huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] = buildHuffmanTable(codeLengths, huffmanValues);
+                }
+                break;
+              case 65501:
+                readUint16();
+                resetInterval = readUint16();
+                break;
+              case 65500:
+                readUint16();
+                readUint16();
+                break;
+              case 65498:
+                var scanLength = readUint16();
+                var selectorsCount = data[offset++];
+                var components = [], component;
+                for (i = 0; i < selectorsCount; i++) {
+                  component = frame.components[data[offset++]];
+                  var tableSpec = data[offset++];
+                  component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
+                  component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
+                  components.push(component);
+                }
+                var spectralStart = data[offset++];
+                var spectralEnd = data[offset++];
+                var successiveApproximation = data[offset++];
+                var processed = decodeScan(
+                  data,
+                  offset,
+                  frame,
+                  components,
+                  resetInterval,
+                  spectralStart,
+                  spectralEnd,
+                  successiveApproximation >> 4,
+                  successiveApproximation & 15,
+                  this.opts
+                );
+                offset += processed;
+                break;
+              case 65535:
+                if (data[offset] !== 255) {
+                  offset--;
+                }
+                break;
+              default:
+                if (data[offset - 3] == 255 && data[offset - 2] >= 192 && data[offset - 2] <= 254) {
+                  offset -= 3;
+                  break;
+                } else if (fileMarker === 224 || fileMarker == 225) {
+                  if (malformedDataOffset !== -1) {
+                    throw new Error(`first unknown JPEG marker at offset ${malformedDataOffset.toString(16)}, second unknown JPEG marker ${fileMarker.toString(16)} at offset ${(offset - 1).toString(16)}`);
+                  }
+                  malformedDataOffset = offset - 1;
+                  const nextOffset = readUint16();
+                  if (data[offset + nextOffset - 2] === 255) {
+                    offset += nextOffset - 2;
+                    break;
+                  }
+                }
+                throw new Error("unknown JPEG marker " + fileMarker.toString(16));
+            }
+            fileMarker = readUint16();
+          }
+          if (frames.length != 1)
+            throw new Error("only single frame JPEGs supported");
+          for (var i = 0; i < frames.length; i++) {
+            var cp = frames[i].components;
+            for (var j in cp) {
+              cp[j].quantizationTable = quantizationTables[cp[j].quantizationIdx];
+              delete cp[j].quantizationIdx;
+            }
+          }
+          this.width = frame.samplesPerLine;
+          this.height = frame.scanLines;
+          this.jfif = jfif;
+          this.adobe = adobe;
+          this.components = [];
+          for (var i = 0; i < frame.componentsOrder.length; i++) {
+            var component = frame.components[frame.componentsOrder[i]];
+            this.components.push({
+              lines: buildComponentData(frame, component),
+              scaleX: component.h / frame.maxH,
+              scaleY: component.v / frame.maxV
+            });
+          }
+        },
+        getData: function getData(width, height) {
+          var scaleX = this.width / width, scaleY = this.height / height;
+          var component1, component2, component3, component4;
+          var component1Line, component2Line, component3Line, component4Line;
+          var x, y;
+          var offset = 0;
+          var Y, Cb, Cr, K, C2, M, Ye, R, G, B;
+          var colorTransform;
+          var dataLength = width * height * this.components.length;
+          requestMemoryAllocation(dataLength);
+          var data = new Uint8Array(dataLength);
+          switch (this.components.length) {
+            case 1:
+              component1 = this.components[0];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 2:
+              component1 = this.components[0];
+              component2 = this.components[1];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                  Y = component2Line[0 | x * component2.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 3:
+              colorTransform = true;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    R = component1Line[0 | x * component1.scaleX * scaleX];
+                    G = component2Line[0 | x * component2.scaleX * scaleX];
+                    B = component3Line[0 | x * component3.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    R = clampTo8bit(Y + 1.402 * (Cr - 128));
+                    G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    B = clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = R;
+                  data[offset++] = G;
+                  data[offset++] = B;
+                }
+              }
+              break;
+            case 4:
+              if (!this.adobe)
+                throw new Error("Unsupported color mode (4 components)");
+              colorTransform = false;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              component4 = this.components[3];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                component4Line = component4.lines[0 | y * component4.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    C2 = component1Line[0 | x * component1.scaleX * scaleX];
+                    M = component2Line[0 | x * component2.scaleX * scaleX];
+                    Ye = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                    C2 = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
+                    M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = 255 - C2;
+                  data[offset++] = 255 - M;
+                  data[offset++] = 255 - Ye;
+                  data[offset++] = 255 - K;
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+          return data;
+        },
+        copyToImageData: function copyToImageData(imageData, formatAsRGBA) {
+          var width = imageData.width, height = imageData.height;
+          var imageDataArray = imageData.data;
+          var data = this.getData(width, height);
+          var i = 0, j = 0, x, y;
+          var Y, K, C2, M, R, G, B;
+          switch (this.components.length) {
+            case 1:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  Y = data[i++];
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 3:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  R = data[i++];
+                  G = data[i++];
+                  B = data[i++];
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 4:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  C2 = data[i++];
+                  M = data[i++];
+                  Y = data[i++];
+                  K = data[i++];
+                  R = 255 - clampTo8bit(C2 * (1 - K / 255) + K);
+                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+        }
+      };
+      var totalBytesAllocated = 0;
+      var maxMemoryUsageBytes = 0;
+      function requestMemoryAllocation(increaseAmount = 0) {
+        var totalMemoryImpactBytes = totalBytesAllocated + increaseAmount;
+        if (totalMemoryImpactBytes > maxMemoryUsageBytes) {
+          var exceededAmount = Math.ceil((totalMemoryImpactBytes - maxMemoryUsageBytes) / 1024 / 1024);
+          throw new Error(`maxMemoryUsageInMB limit exceeded by at least ${exceededAmount}MB`);
+        }
+        totalBytesAllocated = totalMemoryImpactBytes;
+      }
+      constructor.resetMaxMemoryUsage = function(maxMemoryUsageBytes_) {
+        totalBytesAllocated = 0;
+        maxMemoryUsageBytes = maxMemoryUsageBytes_;
+      };
+      constructor.getBytesAllocated = function() {
+        return totalBytesAllocated;
+      };
+      constructor.requestMemoryAllocation = requestMemoryAllocation;
+      return constructor;
+    })();
+    if (typeof module !== "undefined") {
+      module.exports = decode;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].decode = decode;
+    }
+    function decode(jpegData, userOpts = {}) {
+      var defaultOpts = {
+        // "undefined" means "Choose whether to transform colors based on the image’s color model."
+        colorTransform: void 0,
+        useTArray: false,
+        formatAsRGBA: true,
+        tolerantDecoding: true,
+        maxResolutionInMP: 100,
+        // Don't decode more than 100 megapixels
+        maxMemoryUsageInMB: 512
+        // Don't decode if memory footprint is more than 512MB
+      };
+      var opts = { ...defaultOpts, ...userOpts };
+      var arr = new Uint8Array(jpegData);
+      var decoder = new JpegImage();
+      decoder.opts = opts;
+      JpegImage.resetMaxMemoryUsage(opts.maxMemoryUsageInMB * 1024 * 1024);
+      decoder.parse(arr);
+      var channels3 = opts.formatAsRGBA ? 4 : 3;
+      var bytesNeeded = decoder.width * decoder.height * channels3;
+      try {
+        JpegImage.requestMemoryAllocation(bytesNeeded);
+        var image = {
+          width: decoder.width,
+          height: decoder.height,
+          exifBuffer: decoder.exifBuffer,
+          data: opts.useTArray ? new Uint8Array(bytesNeeded) : Buffer.alloc(bytesNeeded)
+        };
+        if (decoder.comments.length > 0) {
+          image["comments"] = decoder.comments;
+        }
+      } catch (err) {
+        if (err instanceof RangeError) {
+          throw new Error("Could not allocate enough memory for the image. Required: " + bytesNeeded);
+        }
+        if (err instanceof ReferenceError) {
+          if (err.message === "Buffer is not defined") {
+            throw new Error("Buffer is not globally defined in this environment. Consider setting useTArray to true");
+          }
+        }
+        throw err;
+      }
+      decoder.copyToImageData(image, opts.formatAsRGBA);
+      return image;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js
+var require_jpeg_js = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js"(exports, module) {
+    var encode5 = require_encoder();
+    var decode = require_decoder();
+    module.exports = {
+      encode: encode5,
+      decode
+    };
+  }
+});
+
+// src/message-input.ts
+init_src();
+import { z as z11 } from "zod";
+var MessageInputSchema = z11.object({
+  // Client-supplied id keeps optimistic local rows identical to server rows
+  // (PowerSync echo-back would otherwise duplicate-then-swap them).
+  id: z11.string().uuid().optional(),
+  workspace: z11.string().min(1),
+  channel: z11.string().min(1).optional(),
+  project: z11.string().uuid().optional(),
+  // may be empty when the message carries only attachments (no caption)
+  body: z11.string(),
+  taskId: z11.string().min(1).optional(),
+  // the conversation thread this message belongs to (conversation-first shell). A
+  // fresh client-generated id births the thread transactionally with the message.
+  threadId: z11.string().uuid().optional(),
+  // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
+  // A later message carrying it is ignored — the mode is the thread's, and changing it is
+  // thread.set_mode (human-only), never a side effect of typing.
+  threadMode: z11.enum(["tasks", "chat"]).optional(),
+  // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
+  // the same birth-time contract as threadMode above, and for the same reason. Moving it
+  // afterwards is thread.set_brain (human-only), never a side effect of typing.
+  brainOverride: z11.record(z11.string(), z11.string()).nullable().optional(),
+  // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
+  // referenced, never moved — it keeps its place in the feed and grows a replies footer.
+  rootMessageId: z11.string().uuid().optional(),
+  // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
+  // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
+  // card list a routine's runs without pattern-matching the marker in its opening line.
+  scheduleId: z11.string().uuid().optional(),
+  permissionMode: z11.enum(PERMISSION_MODES).optional(),
+  schedulePermission: z11.string().uuid().optional(),
+  // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
+  // births the thread — the same birth-time contract as the three above. Moving the machine
+  // afterwards is thread.set_machine (human-only); the origin never moves.
+  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
+  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
+  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
+  threadMachineId: z11.string().uuid().nullable().optional(),
+  threadOrigin: z11.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z11.enum(["chat", "coding"]).optional(),
+  // the message this reply ANSWERS (agent wake replies) — the server enforces one
+  // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
+  replyTo: z11.string().uuid().optional(),
+  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
+  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
+  // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
+  routineCard: z11.literal(true).optional(),
+  needCard: z11.literal(true).optional()
+}).refine((v) => !!v.channel || !!v.project, { message: "A project is required." });
 
 // src/publication-image.ts
 var jpeg = __toESM(require_jpeg_js(), 1);
@@ -14304,7 +14856,7 @@ async function publicationImage(media, platform) {
 
 // src/app.ts
 init_src();
-import { createHash as createHash10, randomBytes as randomBytes8 } from "node:crypto";
+import { createHash as createHash12, randomBytes as randomBytes8 } from "node:crypto";
 
 // src/need-cards.ts
 init_src();
@@ -15262,16 +15814,18 @@ async function sessionTitleSql(sql, workspace, scheduleId, body) {
 var ROUTINE_TAKEN = "This session already holds a routine. Open a new session for another one.";
 async function existingHomeRoutineSql(sql, ws, input) {
   if (!input.session) return null;
-  const [home] = await sql`select home_agent_id from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
   if (!home?.["home_agent_id"]) return null;
+  if (home["archived_at"]) throw new DomainError("CONFLICT", "Create this routine in the agent\u2019s current conversation.");
   const [existing] = await sql`select id from schedules where owner_home_thread_id=${input.session.threadId}::uuid and title=${input.title} and payload->>'prompt'=${input.prompt} and cadence=${input.cadence} and at_time=${input.atTime} and tz=${input.tz} and weekday is not distinct from ${input.weekday}::integer`;
   return existing ? { id: existing["id"] } : null;
 }
 async function linkRoutineSessionSql(sql, ws, scheduleId, input, insertEvent) {
   const s = input.session;
   if (!s) return;
-  const [home] = await sql`select home_agent_id from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
   if (home?.["home_agent_id"]) {
+    if (home["archived_at"]) throw new DomainError("CONFLICT", "Create this routine in the agent\u2019s current conversation.");
     await sql`update schedules set owner_home_thread_id=${s.threadId}::uuid, agent_id=${home["home_agent_id"]}::uuid where id=${scheduleId}::uuid`;
     await sql`insert into messages(id,workspace_id,channel_id,thread_id,author_kind,author_id,body)
       values(${s.dividerId}::uuid,${ws}::uuid,${input.channelId}::uuid,${s.threadId}::uuid,${s.author.kind}::actor_kind,${s.author.id}::uuid,${ROUTINE_SCHEDULED_MARKER})`;
@@ -15413,7 +15967,7 @@ var MemAnnounceStore = class {
     this.installations = this.installations.filter((i) => i.installationId !== installationId);
   }
   async installationsForWorkspace(workspaceId) {
-    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos: repos2, selection }) => ({ installationId, account, repos: repos2, selection }));
+    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos: repos2, selection: selection2 }) => ({ installationId, account, repos: repos2, selection: selection2 }));
   }
 };
 var rowOf = (r) => ({
@@ -15854,12 +16408,12 @@ async function setThreadSettledSql(sql, workspace, threadId, settled) {
 async function latestHumanWordSql(sql, taskId3) {
   const rows2 = await sql`select m.id, m.created_at, m.body
     from messages m join tasks t on t.id = ${taskId3}::uuid and m.workspace_id = t.workspace_id
-    where m.author_kind = 'human'
+    where m.author_kind = 'human' and m.schedule_id is null and not m.machine_authored
       and (m.task_id = t.id or m.thread_id in (select th.id from threads th where th.task_id = t.id))
       and m.created_at > coalesce(t.approved_at, t.updated_at)
     order by m.created_at desc limit 50`;
   const row = rows2.find((r) => !isCardOrMarker(r.body));
-  return row ? { id: row.id, createdAt: row.created_at } : null;
+  return row && isAcceptWord(row.body) ? { id: row.id, createdAt: row.created_at } : null;
 }
 function settleMemoryThread(threads2, workspace, threadId, settled) {
   const t2 = threads2.find((x) => x.id === threadId && x.workspace === workspace);
@@ -15868,9 +16422,9 @@ function settleMemoryThread(threads2, workspace, threadId, settled) {
 }
 function pickHumanWord(messages2, threads2, taskId3, since) {
   const threadIds = new Set(threads2.filter((t2) => t2.taskId === taskId3).map((t2) => t2.id));
-  const words2 = messages2.filter((m) => m.author.kind === "human" && !isCardOrMarker(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
+  const words2 = messages2.filter((m) => m.author.kind === "human" && !m.scheduleId && !m.machineAuthored && !isCardOrMarker(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
   const w = words2[0];
-  return w ? { id: w.id, createdAt: w.createdAt } : null;
+  return w && isAcceptWord(w.body) ? { id: w.id, createdAt: w.createdAt } : null;
 }
 
 // src/store/content-anchor.ts
@@ -15906,6 +16460,13 @@ function threadRoutineIdMem(threads2, schedules2, channels3, workspace, threadId
   const t2 = threads2.find((x) => x.id === threadId && x.workspace === workspace);
   const s = t2?.scheduleId ? schedules2.find((x) => x.id === t2.scheduleId) : void 0;
   return s && isRoutineSchedule(s.payload, channels3.find((c) => c.id === s.channelId)?.kind) ? s.id : null;
+}
+
+// src/store/task-owner.ts
+function requireTaskOwner(ownerId, agentId) {
+  if (ownerId && ownerId !== agentId) {
+    throw new DomainError("NOT_PERMITTED", "This task already has an owner. Create a separate task for another specialist.");
+  }
 }
 
 // src/store/memory.ts
@@ -16340,10 +16901,12 @@ var MemoryStore = class {
     if (!task) throw new DomainError("NOT_FOUND", `task ${taskId3} not found`);
     if (task.state !== "todo" && task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", "only todo or plan_review tasks can be offered");
     const agentId = await this.resolveOffer(task.workspace, task.channel, agentName);
+    requireTaskOwner(task.assignee?.id ?? task.offeredAgentId, agentId);
     const boundRepo = repo ? { id: repo.id, baseRef: repo.baseRef, branch: taskBranch(task.number, task.title) } : task.repo;
     this.tasks.set(taskId3, {
       ...task,
       offeredAgentId: agentId,
+      assignee: { kind: "agent", id: agentId },
       repo: boundRepo,
       ...checklist?.length ? { requirements: checklist, requirementsConfirmed: true } : {},
       ...dod ? { definitionOfDone: dod } : {},
@@ -16639,7 +17202,7 @@ var MemoryStore = class {
     this.events.push(event);
     for (const d of decisions2 ?? []) {
       for (const prior2 of this.decisionRows) {
-        if (prior2.status === "open" && prior2.workspace === msg2.workspace && prior2.channel === msg2.channel && prior2.taskId === (msg2.taskId ?? null) && prior2.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior2.messageId)?.threadId ?? null) === (msg2.threadId ?? null))) {
+        if (!d.requiresExactAnswer && !prior2.requiresExactAnswer && prior2.status === "open" && prior2.workspace === msg2.workspace && prior2.channel === msg2.channel && prior2.taskId === (msg2.taskId ?? null) && prior2.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior2.messageId)?.threadId ?? null) === (msg2.threadId ?? null))) {
           prior2.status = "dismissed";
           prior2.answeredAt = (/* @__PURE__ */ new Date()).toISOString();
         }
@@ -16654,6 +17217,7 @@ var MemoryStore = class {
         question: d.question,
         options: d.options,
         allowOther: d.allowOther,
+        requiresExactAnswer: d.requiresExactAnswer,
         status: "open",
         answer: null,
         answeredBy: null,
@@ -16664,7 +17228,7 @@ var MemoryStore = class {
     if (msg2.author.kind === "human") {
       for (const [question, answer] of readAnswers([msg2.body])) {
         for (const row of this.decisionRows) {
-          if (row.status === "open" && row.workspace === msg2.workspace && row.channel === msg2.channel && row.taskId === (msg2.taskId ?? null) && row.question === question) {
+          if (!row.requiresExactAnswer && row.status === "open" && row.workspace === msg2.workspace && row.channel === msg2.channel && row.taskId === (msg2.taskId ?? null) && row.question === question) {
             row.status = "answered";
             row.answer = answer;
             row.answeredBy = { kind: msg2.author.kind, id: msg2.author.id };
@@ -17762,659 +18326,19 @@ function slugify(name) {
 function taskTarget(task) {
   return `task:${task.number}`;
 }
-
-// src/handler/fsm.ts
-init_src();
-var TRANSITION_OF = {
-  "task.claim": { to: "in_progress", name: "claim" },
-  "task.submit": { to: "in_review", name: "submit" },
-  "task.request_changes": { to: "in_progress", name: "request_changes" },
-  "task.approve": { to: "done", name: "approve" },
-  "task.accept": { to: "accepted", name: "accept" },
-  "task.block": { to: "blocked", name: "block" },
-  "task.unblock": { to: "in_progress", name: "unblock" },
-  "task.cancel": { to: "closed", name: "cancel" },
-  "task.archive": { to: "closed", name: "archive" },
-  "task.promote": { to: "todo", name: "promote" },
-  "task.reopen": { to: "todo", name: "reopen" },
-  "task.request_plan": { to: "planning", name: "request_plan" },
-  "task.propose_plan": { to: "plan_review", name: "propose_plan" },
-  "task.revise_plan": { to: "planning", name: "revise_plan" },
-  "task.request_design": { to: "designing", name: "request_design" },
-  "task.propose_design": { to: "design_review", name: "propose_design" },
-  "task.revise_design": { to: "designing", name: "revise_design" },
-  "task.approve_design": { to: "planning", name: "approve_design" },
-  "task.claim_ship": { to: "shipping", name: "claim_ship" },
-  "task.propose_ship_plan": { to: "ship_review", name: "propose_ship_plan" },
-  "task.revise_ship_plan": { to: "shipping", name: "revise_ship_plan" },
-  "task.approve_ship_plan": { to: "releasing", name: "approve_ship_plan" },
-  "task.execute_ship": { to: "verifying", name: "execute_ship" },
-  "task.confirm_release": { to: "accepted", name: "confirm_release" },
-  "task.finish_subtask": { to: "done", name: "finish" }
-};
-var SUBTASK_GATED = /* @__PURE__ */ new Set(["task.submit", "task.accept", "task.approve_ship_plan", "task.execute_ship", "task.confirm_release"]);
-var DOD_EDITABLE_STATES = /* @__PURE__ */ new Set(["backlog", "todo", "designing", "design_review", "planning", "plan_review", "in_progress", "in_review", "blocked"]);
-function setDefinitionOfDone(task, actor, dod) {
-  const mayEdit = actor.kind === "human" || actor.role === "orchestrator" || actor.role === "architect";
-  if (!mayEdit) throw new DomainError("NOT_PERMITTED", "the Definition of Done is set by humans, the orchestrator, or the architect");
-  if (!DOD_EDITABLE_STATES.has(task.state)) {
-    throw new DomainError("ILLEGAL_TRANSITION", `the Definition of Done is frozen once a task is ${task.state}`);
-  }
-  const next = { ...task, definitionOfDone: dod, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.dod_set",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    // the contract text isn't secret, but keep the event a metadata pointer
-    payload: { length: dod.length }
-  });
-  return { task: next, events: [event] };
-}
-function mayCheckShipItem(actor, item) {
-  if (actor.kind === "human") return true;
-  if (actor.role === "shipper") return item.owner !== "human";
-  return item.owner === "agent" && item.agentId === actor.id;
-}
-function checkShipItem(task, actor, cmd) {
-  if (task.state !== "releasing" && task.state !== "verifying") {
-    throw new DomainError("ILLEGAL_TRANSITION", `the release checklist is live while a task is releasing or verifying \u2014 #${task.number} is ${task.state}`);
-  }
-  const plan = task.shipPlan;
-  if (!plan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan`);
-  const item = plan.items.find((i) => i.id === cmd.itemId);
-  if (!item) throw new DomainError("NOT_FOUND", `release checklist item ${cmd.itemId} not found`);
-  if (!mayCheckShipItem(actor, item)) {
-    throw new DomainError("NOT_PERMITTED", `"${item.title}" is ${item.owner === "human" ? "a human step \u2014 only a person may check it" : `owned by ${item.owner === "agent" ? "its delegated agent or the shipper" : "the shipper"}`}`);
-  }
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const items = plan.items.map(
-    (i) => i.id === cmd.itemId ? {
-      ...i,
-      state: cmd.state,
-      checkedBy: cmd.state === "pending" ? null : { kind: actor.kind, id: actor.id },
-      checkedAt: cmd.state === "pending" ? null : now,
-      note: cmd.note ?? i.note
-    } : i
-  );
-  const next = { ...task, shipPlan: { ...plan, items }, version: task.version + 1, updatedAt: now };
-  const event = createEvent({
-    type: "task.ship_item_checked",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { itemId: cmd.itemId, title: item.title, state: cmd.state, pending: shipItemsPending(next.shipPlan) }
-  });
-  return { task: next, events: [event] };
-}
-function addShipItem(task, actor, cmd) {
-  const mayAdd = actor.kind === "human" || actor.role === "orchestrator" || actor.role === "shipper";
-  if (!mayAdd) throw new DomainError("NOT_PERMITTED", "release checklist items are added by humans, the orchestrator, or the shipper");
-  if (task.state !== "ship_review" && task.state !== "releasing") {
-    throw new DomainError("ILLEGAL_TRANSITION", `items can be added while the plan is under review or releasing \u2014 #${task.number} is ${task.state}`);
-  }
-  const plan = task.shipPlan;
-  if (!plan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan`);
-  if (plan.items.length >= 20) throw new DomainError("INVALID_INPUT", "the release checklist is capped at 20 items");
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const item = {
-    id: `add-${plan.items.length + 1}-${Date.now().toString(36)}`,
-    title: cmd.title,
-    detail: cmd.detail ?? "",
-    owner: cmd.owner,
-    agentId: cmd.owner === "agent" ? cmd.agentId ?? null : null,
-    auto: null,
-    state: "pending",
-    checkedBy: null,
-    checkedAt: null,
-    note: ""
-  };
-  const next = { ...task, shipPlan: { ...plan, items: [...plan.items, item] }, version: task.version + 1, updatedAt: now };
-  const event = createEvent({
-    type: "task.ship_item_added",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { itemId: item.id, title: item.title, owner: item.owner }
-  });
-  return { task: next, events: [event] };
-}
-var DETAILS_EDITABLE_STATES = /* @__PURE__ */ new Set(["backlog", "todo"]);
-function updateDetails(task, actor, cmd) {
-  const mayEdit = actor.kind === "human" || actor.role === "orchestrator";
-  if (!mayEdit) throw new DomainError("NOT_PERMITTED", "task details are edited by humans or the orchestrator");
-  if (!DETAILS_EDITABLE_STATES.has(task.state)) {
-    throw new DomainError("ILLEGAL_TRANSITION", `details are frozen once a task is ${task.state} \u2014 post to the thread instead`);
-  }
-  if (cmd.title === void 0 && cmd.description === void 0 && cmd.kind === void 0) {
-    throw new DomainError("INVALID_INPUT", "nothing to update \u2014 pass a title, description, and/or kind");
-  }
-  const next = {
-    ...task,
-    title: cmd.title ?? task.title,
-    description: cmd.description ?? task.description,
-    // re-categorize a mis-triaged item while it's still pre-work (docs/16)
-    kind: cmd.kind ?? task.kind,
-    version: task.version + 1,
-    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  const event = createEvent({
-    type: "task.details_updated",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    // metadata pointer only — the text itself lives on the task row
-    payload: { titleChanged: cmd.title !== void 0, descriptionChanged: cmd.description !== void 0 }
-  });
-  return { task: next, events: [event] };
-}
-function selectDesignProvider(task, actor, provider) {
-  if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "the design canvas is chosen by a human");
-  if (task.state !== "designing") {
-    throw new DomainError("ILLEGAL_TRANSITION", `the design canvas is chosen after Iris picks up the task \u2014 #${task.number} is ${task.state}`);
-  }
-  const next = { ...task, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.design_provider_selected",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { provider }
-  });
-  return { task: next, events: [event] };
-}
-function confirmRequirements(task, actor, checklist) {
-  if (task.state !== "in_progress") {
-    throw new DomainError("ILLEGAL_TRANSITION", "requirements are confirmed after claiming, before work");
-  }
-  if (!sameActor(task.assignee, actor)) {
-    throw new DomainError("NOT_PERMITTED", "only the assignee confirms requirements");
-  }
-  const next = { ...task, requirements: checklist, requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.requirements_confirmed",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { checklist }
-  });
-  return { task: next, events: [event] };
-}
-function approvePlan(task, actor) {
-  if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "implementation-plan approval is a human sign-off");
-  if (task.state !== "plan_review") {
-    throw new DomainError("ILLEGAL_TRANSITION", `a plan is approved from plan_review, not ${task.state}`);
-  }
-  if (task.planApprovedAt) return { task, events: [] };
-  const next = { ...task, planApprovedAt: (/* @__PURE__ */ new Date()).toISOString(), requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.plan_approved",
-    source: actorAddress(actor),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: {}
-  });
-  return { task: next, events: [event] };
-}
-function transition(task, actor, cmd, subtasksPending = 0, planVersion = 0, onHumanWord = false) {
-  const target = TRANSITION_OF[cmd.type];
-  if (!target) throw new DomainError("NOT_FOUND", `unknown command ${cmd.type}`);
-  if (cmd.type === "task.claim" && task.state !== "todo" && task.state !== "plan_review") {
-    throw new DomainError("ALREADY_CLAIMED", `task ${task.number} is ${task.state}`);
-  }
-  if (cmd.type === "task.claim" && task.state === "plan_review" && task.workPlan?.legs.includes("design")) {
-    throw new DomainError("INVALID_INPUT", `#${task.number} declares a design leg \u2014 the design round runs first (request_design); build is claimed after the approved design returns it to todo`);
-  }
-  if (cmd.type === "task.submit" && !task.requirementsConfirmed && task.parentTaskId === null) {
-    throw new DomainError("REQUIREMENTS_NOT_CONFIRMED", "confirm requirements before submitting");
-  }
-  const to = cmd.type === "task.unblock" ? task.blockedFrom ?? target.to : cmd.type === "task.approve_design" && task.workPlan ? "todo" : target.to;
-  const claiming = cmd.type === "task.claim";
-  const ctx = {
-    actor,
-    isAssignee: claiming ? task.assignee === null || sameActor(task.assignee, actor) : sameActor(task.assignee, actor),
-    isCreator: sameActor(task.creator, actor),
-    // Reviewer-pool membership comes from the channel registry once the DB
-    // layer lands (week 2); until then the agent's role is the pool.
-    isReviewerPoolMember: actor.kind === "agent" && actor.role === "reviewer",
-    artifactCount: cmd.type === "task.submit" ? cmd.artifacts.length : task.artifactCount,
-    repoBacked: task.repo !== null,
-    pushedSha: cmd.type === "task.submit" ? cmd.sha ?? null : task.submittedSha,
-    // ship gate (docs/23): execute_ship is structurally refused until the plan is
-    // human-approved and every checklist item is checked or n/a
-    shipPlanApproved: task.shipPlan?.status === "approved",
-    planApproved: !!task.planApprovedAt,
-    shipItemsPending: shipItemsPending(task.shipPlan),
-    // subtasks (docs/24): a subtask row lives the lean claim/finish/cancel life;
-    // a parent with open subtasks can't pass its next gate
-    isSubtask: task.parentTaskId !== null,
-    subtasksPending,
-    // setup flows: a setup task is a human checklist — finish/cancel only
-    isSetup: task.kind === "setup",
-    // plan-first units (2026-08-17): an approved work plan that omits review makes this a
-    // lean unit — finish is its road to the accept gate (never repo-backed, by validation)
-    leanUnit: !!task.workPlan && !task.workPlan.legs.includes("review") && task.parentTaskId === null,
-    // accept on the human's word (2026-09-08): proven by the handler against the thread, never claimed
-    onHumanWord
-  };
-  const verdict = evaluateTransition(task.state, to, ctx, target.name);
-  if (!verdict.ok) throw new DomainError(verdict.code, verdict.reason);
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const next = { ...task, state: to, version: task.version + 1, updatedAt: now };
-  if (verdict.spec.name === "block") next.blockedFrom = task.state;
-  if (verdict.spec.name === "unblock") next.blockedFrom = null;
-  if (verdict.spec.name === "claim") next.assignee = { kind: actor.kind, id: actor.id };
-  if (verdict.spec.name === "request_plan" && cmd.type === "task.request_plan" && cmd.architect) next.assignee = { kind: "agent", id: cmd.architect };
-  if (verdict.spec.name === "request_design" && cmd.type === "task.request_design" && cmd.designer) next.assignee = { kind: "agent", id: cmd.designer };
-  if (verdict.spec.name === "approve_design") next.assignee = null;
-  if (cmd.type === "task.request_plan" || cmd.type === "task.request_design") {
-    const k = cmd.kind ?? task.kind;
-    if (!k) throw new DomainError("INVALID_INPUT", `categorize #${task.number} (set a kind: bug/feature/\u2026) before routing it`);
-    next.kind = k;
-  }
-  if (verdict.spec.name === "submit" && cmd.type === "task.submit") {
-    next.artifactCount = task.artifactCount + cmd.artifacts.length;
-    next.submittedSha = cmd.sha ?? null;
-    if (cmd.prUrl) next.prUrl = cmd.prUrl;
-    if (cmd.prNumber) next.prNumber = cmd.prNumber;
-  }
-  if (verdict.spec.name === "propose_plan") next.artifactCount = task.artifactCount + 1;
-  if (verdict.spec.name === "propose_design" && cmd.type === "task.propose_design") next.artifactCount = task.artifactCount + cmd.mockups.length;
-  const events = [
-    createEvent({
-      type: TRANSITION_EVENT[verdict.spec.name],
-      source: actorAddress(actor),
-      target: taskTarget(task),
-      workspace: task.workspace,
-      payload: payloadFor(cmd)
-    })
-  ];
-  if (verdict.spec.name === "submit" && cmd.type === "task.submit") {
-    events.push(
-      createEvent({
-        type: "task.review_requested",
-        source: actorAddress(actor),
-        target: taskTarget(task),
-        workspace: task.workspace,
-        payload: { dispatch: "auto", pool: "channel-reviewers" },
-        inReplyTo: events[0].id
-      })
-    );
-    return { task: next, events, artifacts: cmd.artifacts };
-  }
-  if (verdict.spec.name === "propose_plan" && cmd.type === "task.propose_plan") {
-    const name = implementationPlanName(planVersion || nextPlanVersion([]));
-    if (cmd.legs || task.workPlan) {
-      const legs = cmd.legs ?? task.workPlan?.legs ?? ["build", "review"];
-      const bad = validateWorkPlanLegs(legs, task.repo !== null);
-      if (bad) throw new DomainError("INVALID_INPUT", bad);
-      next.workPlan = {
-        legs: [...legs],
-        subtasks: cmd.subtasks ?? task.workPlan?.subtasks ?? [],
-        approach: cmd.plan,
-        version: (task.workPlan?.version ?? 0) + 1,
-        proposedAt: now
-      };
-      next.planApprovedAt = null;
-    }
-    return { task: next, events, artifacts: [{ kind: "doc", name, content: cmd.plan }] };
-  }
-  if (verdict.spec.name === "propose_design" && cmd.type === "task.propose_design") {
-    const artifacts2 = cmd.mockups.map((m) => ({ kind: "design", name: designMockupName(cmd.round, m.name), content: m.html }));
-    return { task: next, events, artifacts: artifacts2 };
-  }
-  if (verdict.spec.name === "approve_design") {
-    return { task: next, events, promoteLatestDesignRound: true };
-  }
-  if (verdict.spec.name === "propose_ship_plan" && cmd.type === "task.propose_ship_plan") {
-    const now2 = (/* @__PURE__ */ new Date()).toISOString();
-    const plan = {
-      round: cmd.round,
-      risk: cmd.risk,
-      summary: cmd.summary,
-      status: "draft",
-      // a fresh draft answers every redraft request so far — the counter restarts
-      // with the plan object it belongs to
-      revisions: 0,
-      shipperId: actor.id,
-      approvedBy: null,
-      approvedAt: null,
-      items: cmd.items.map((i) => ({
-        id: i.id,
-        title: i.title,
-        detail: i.detail,
-        owner: i.owner,
-        agentId: i.owner === "agent" ? i.agentId ?? null : null,
-        auto: i.auto ?? null,
-        // host-verified items (CI already settled green) may arrive pre-checked
-        state: i.state,
-        checkedBy: i.state === "done" ? { kind: actor.kind, id: actor.id } : null,
-        checkedAt: i.state === "done" ? now2 : null,
-        note: i.note
-      }))
-    };
-    next.shipPlan = plan;
-    next.artifactCount = task.artifactCount + 1;
-    return { task: next, events, artifacts: [{ kind: "ship", name: shipPlanName(cmd.round), content: cmd.report }] };
-  }
-  if (verdict.spec.name === "revise_ship_plan" && task.shipPlan) {
-    next.shipPlan = { ...task.shipPlan, status: "draft", revisions: (task.shipPlan.revisions ?? 0) + 1 };
-  }
-  if (verdict.spec.name === "approve_ship_plan") {
-    if (!task.shipPlan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan to approve`);
-    next.shipPlan = { ...task.shipPlan, status: "approved", approvedBy: actor.id, approvedAt: (/* @__PURE__ */ new Date()).toISOString() };
-    return { task: next, events, promoteLatestShipRound: true };
-  }
-  if (verdict.spec.name === "finish" && cmd.type === "task.finish_subtask") {
-    const arts = (cmd.artifacts ?? []).map((a) => ({ kind: a.kind, name: a.name, content: a.content }));
-    if (arts.length) {
-      return { task: next, events, artifacts: arts, ...task.parentTaskId ? { artifactTaskId: task.parentTaskId } : {} };
-    }
-    return { task: next, events };
-  }
-  if (to === "accepted" || to === "closed") return { task: next, events, dismissOpenDecisions: true };
-  return { task: next, events };
-}
-function nextPlanVersion(existingNames) {
-  const highest = existingNames.reduce((max, n) => {
-    const v = Number(/^implementation-plan-v(\d+)\.md$/i.exec(n)?.[1] ?? 0);
-    return v > max ? v : max;
-  }, 0);
-  return highest + 1;
-}
-var implementationPlanName = (version) => `implementation-plan-v${version}.md`;
-function designMockupName(round, name) {
-  const slug = name.toLowerCase().replace(/\.html?$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "mockup";
-  return `design-mockup-v${round}-${slug}.html`;
-}
-function payloadFor(cmd) {
-  switch (cmd.type) {
-    case "task.submit":
-      return { artifacts: cmd.artifacts.map(({ kind, name }) => ({ kind, name })), sha: cmd.sha ?? null };
-    case "task.request_changes":
-      return { feedback: cmd.feedback };
-    case "task.revise_plan":
-      return { feedback: cmd.feedback };
-    case "task.revise_design":
-      return { feedback: cmd.feedback };
-    case "task.revise_ship_plan":
-      return { feedback: cmd.feedback };
-    case "task.propose_ship_plan":
-      return { round: cmd.round, risk: cmd.risk, items: cmd.items.map(({ id, title, owner }) => ({ id, title, owner })), ...cmd.summary ? { summary: cmd.summary } : {} };
-    case "task.finish_subtask":
-      return { ...cmd.note ? { note: cmd.note } : {}, artifacts: (cmd.artifacts ?? []).map(({ kind, name }) => ({ kind, name })) };
-    case "task.confirm_release":
-      return cmd.note ? { note: cmd.note } : {};
-    case "task.block":
-      return { reason: cmd.reason };
-    case "task.request_plan":
-      return { ...cmd.architect ? { architect: cmd.architect } : {}, ...cmd.kind ? { kind: cmd.kind } : {} };
-    case "task.request_design":
-      return { ...cmd.designer ? { designer: cmd.designer } : {}, ...cmd.kind ? { kind: cmd.kind } : {}, ...cmd.provider ? { provider: cmd.provider } : {} };
-    case "task.propose_design":
-      return { round: cmd.round, mockups: cmd.mockups.map((m) => designMockupName(cmd.round, m.name)), ...cmd.summary ? { summary: cmd.summary } : {} };
-    default:
-      return {};
+function requireHumanAuthority(actor, cmd) {
+  if (["decision.answer", "decision.dismiss", "task.approve_ship_plan", "content.approve", "policy.set", "policy.delete"].includes(cmd.type) || cmd.type === "task.accept" && actor.kind === "human") {
+    throw new DomainError("HUMAN_ONLY", "This approval needs a signed-in person.");
   }
 }
 
-// src/handler/planfollowup.ts
+// src/handler/coding-handoff.ts
 init_src();
-async function postPlanMessage(store2, task, actor, version, kind) {
-  await store2.postMessage(
-    {
-      id: crypto.randomUUID(),
-      workspace: task.workspace,
-      channel: task.channel,
-      taskId: task.id,
-      threadId: null,
-      author: { kind: actor.kind, id: actor.id },
-      body: planMessage(version, kind),
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    createEvent({
-      type: "message.posted",
-      source: actorAddress(actor),
-      target: taskTarget(task),
-      workspace: task.workspace,
-      payload: { preview: `implementation plan v${version} \u2014 #${task.number}` }
-    })
-  ).catch(() => {
-  });
-}
-async function planRevisionFollowup(store2, actor, cmd, outcome) {
-  if (cmd.type !== "task.propose_plan" || !outcome.events.length || !outcome.task.workPlan) return;
-  const v = outcome.task.workPlan.version;
-  await postPlanMessage(store2, outcome.task, actor, v, "revised");
-}
-function routinePlanApprove(task, scheduleId) {
-  if (task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine plan auto-approve fires from plan_review, not ${task.state}`);
-  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed plans are approved by a human, routine or not");
-  if (task.planApprovedAt) return { task, events: [] };
-  const next = { ...task, planApprovedAt: (/* @__PURE__ */ new Date()).toISOString(), requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.plan_approved",
-    source: formatAddress({ kind: "machine", id: "routine" }),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { routine: true, scheduleId }
-  });
-  return { task: next, events: [event] };
-}
-function routineAccept(task, scheduleId) {
-  if (task.state !== "done") throw new DomainError("ILLEGAL_TRANSITION", `a routine auto-accept fires from done, not ${task.state}`);
-  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed work is accepted by a human, routine or not");
-  const next = { ...task, state: "accepted", version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  const event = createEvent({
-    type: "task.accepted",
-    source: formatAddress({ kind: "machine", id: "routine" }),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { routine: true, scheduleId }
-  });
-  return { task: next, events: [event] };
-}
-async function routineAcceptFollowup(store2, cmd, outcome) {
-  if (cmd.type !== "task.approve" || outcome.task.state !== "done" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
-  if (!scheduleId) return outcome;
-  const accepted = await store2.mutate(cmd.taskId, async (t2) => routineAccept(t2, scheduleId)).catch(() => null);
-  return accepted ? { ...accepted, events: [...outcome.events, ...accepted.events] } : outcome;
-}
-async function routinePlanFollowup(store2, cmd, outcome) {
-  if (cmd.type !== "task.propose_plan" || outcome.task.state !== "plan_review" || outcome.task.planApprovedAt || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
-  if (!scheduleId) return outcome;
-  const approved = await store2.mutate(outcome.task.id, async (t2) => routinePlanApprove(t2, scheduleId)).catch(() => null);
-  return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
-}
-function routineDesignApprove(task, scheduleId, round) {
-  if (task.state !== "design_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine design auto-approve fires from design_review, not ${task.state}`);
-  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed design rounds are approved by a human, routine or not");
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const next = { ...task, state: task.workPlan ? "todo" : "planning", assignee: null, version: task.version + 1, updatedAt: now };
-  const event = createEvent({
-    type: "task.design_approved",
-    source: formatAddress({ kind: "machine", id: "routine" }),
-    target: taskTarget(task),
-    workspace: task.workspace,
-    payload: { routine: true, scheduleId, round }
-  });
-  return { task: next, events: [event], promoteLatestDesignRound: true };
-}
-async function routineDesignFollowup(store2, cmd, outcome) {
-  if (cmd.type !== "task.propose_design" || outcome.task.state !== "design_review" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
-  if (!scheduleId) return outcome;
-  const approved = await store2.mutate(outcome.task.id, async (t2) => routineDesignApprove(t2, scheduleId, cmd.round)).catch(() => null);
-  if (!approved) return outcome;
-  const task = approved.task;
-  await store2.postMessage(
-    {
-      id: crypto.randomUUID(),
-      workspace: task.workspace,
-      channel: task.channel,
-      taskId: task.id,
-      threadId: null,
-      author: { kind: task.creator.kind, id: task.creator.id },
-      body: `\u2713 Design round ${cmd.round} auto-approved \xB7 routine run. The round is the visual contract for the work. The build starts now.`,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    createEvent({ type: "message.posted", source: formatAddress({ kind: "machine", id: "routine" }), target: taskTarget(task), workspace: task.workspace, payload: { preview: `design round ${cmd.round} auto-approved \u2014 #${task.number}` } })
-  ).catch(() => {
-  });
-  return { ...approved, events: [...outcome.events, ...approved.events] };
-}
-
-// src/handler/channel.ts
-init_src();
-async function channelCommands(store2, actor, cmd) {
-  if (cmd.type === "channel.assign") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "projects are managed by humans or the orchestrator");
-    const { id } = await store2.assignChannel(
-      cmd.channel,
-      cmd.project,
-      (workspace) => createEvent({
-        type: "project.updated",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "project", slug: cmd.project }),
-        workspace,
-        payload: { channel: cmd.channel }
-      })
-    );
-    return { ok: true, channelId: id };
-  }
-  if (cmd.type === "channel.create") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
-    const event = createEvent({
-      type: "channel.created",
-      source: actorAddress(actor),
-      target: formatAddress({ kind: "channel", slug: cmd.slug }),
-      workspace: cmd.workspace,
-      payload: { slug: cmd.slug, project: cmd.project, topic: cmd.topic }
-    });
-    const { id, slug } = await store2.createChannel(
-      { workspace: cmd.workspace, projectId: cmd.project, slug: cmd.slug, topic: cmd.topic, createdByKind: actor.kind, createdBy: actor.id },
-      event
-    );
-    return { ok: true, channelId: id, slug };
-  }
-  if (cmd.type === "channel.rename") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
-    if (cmd.slug === void 0 && cmd.topic === void 0) throw new DomainError("INVALID_INPUT", "nothing to rename");
-    const { id, slug } = await store2.renameChannel(
-      cmd.channel,
-      { slug: cmd.slug, topic: cmd.topic },
-      (workspace) => createEvent({
-        type: "channel.renamed",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.slug ?? cmd.channel }),
-        workspace,
-        payload: { channel: cmd.channel, slug: cmd.slug ?? null, topic: cmd.topic ?? null }
-      })
-    );
-    return { ok: true, channelId: id, slug };
-  }
-  if (cmd.type === "channel.set_thread_mode") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
-    const { id } = await store2.setChannelThreadMode(
-      cmd.channel,
-      cmd.mode,
-      (workspace) => createEvent({
-        type: "channel.thread_mode_set",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.channel }),
-        workspace,
-        payload: { channel: cmd.channel, mode: cmd.mode }
-      })
-    );
-    return { ok: true, channelId: id };
-  }
-  if (cmd.type === "channel.set_kind") {
-    if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "a room changes trade only by a human");
-    const { id } = await store2.setChannelKind(
-      cmd.channel,
-      cmd.kind,
-      (workspace) => createEvent({
-        type: "channel.kind_set",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.channel }),
-        workspace,
-        payload: { channel: cmd.channel, kind: cmd.kind }
-      })
-    );
-    return { ok: true, channelId: id };
-  }
-  if (cmd.type === "channel.delete") {
-    if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "channels are deleted by a human");
-    const { id } = await store2.deleteChannel(
-      cmd.channel,
-      (workspace) => createEvent({
-        type: "channel.deleted",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.channel }),
-        workspace,
-        payload: {}
-      })
-    );
-    console.log(`channel_deleted id=${cmd.channel} by=${actor.id}`);
-    return { ok: true, channelId: id };
-  }
-  if (cmd.type === "channel.add_agent" || cmd.type === "channel.remove_agent") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channel membership is managed by humans or the orchestrator");
-    const add = cmd.type === "channel.add_agent";
-    const fn = add ? store2.addAgentToChannel.bind(store2) : store2.removeAgentFromChannel.bind(store2);
-    const { agentId, channelId } = await fn(
-      cmd.workspace,
-      cmd.channel,
-      cmd.agent,
-      (workspace) => createEvent({
-        type: "agent.channels_synced",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.channel }),
-        workspace,
-        payload: { agent: cmd.agent, channel: cmd.channel, op: add ? "add" : "remove" }
-      }),
-      { kind: actor.kind, id: actor.id }
-    );
-    console.log(`agent_channel_${add ? "added" : "removed"} agent=${cmd.agent} channel=${cmd.channel} by=${actor.id}`);
-    return { ok: true, agentId, channelId };
-  }
-  if (cmd.type === "channel.add_person" || cmd.type === "channel.remove_person") {
-    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
-    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channel membership is managed by humans or the orchestrator");
-    const add = cmd.type === "channel.add_person";
-    const fn = add ? store2.addPersonToChannel.bind(store2) : store2.removePersonFromChannel.bind(store2);
-    const { userId, channelId } = await fn(
-      cmd.workspace,
-      cmd.channel,
-      cmd.person,
-      (workspace) => createEvent({
-        type: "channel.people_synced",
-        source: actorAddress(actor),
-        target: formatAddress({ kind: "channel", slug: cmd.channel }),
-        workspace,
-        payload: { person: cmd.person, channel: cmd.channel, op: add ? "add" : "remove" }
-      }),
-      actor.kind === "human" ? actor.id : null
-    );
-    console.log(`channel_person_${add ? "added" : "removed"} person=${cmd.person} channel=${cmd.channel} by=${actor.id}`);
-    return { ok: true, userId, channelId };
-  }
-  return void 0;
-}
-
-// src/handler/workspace.ts
-init_src();
+import { createHash as createHash5 } from "node:crypto";
 
 // src/credits.ts
 init_src();
-import { z as z13 } from "zod";
+import { z as z14 } from "zod";
 
 // src/credit-ledger.ts
 init_src();
@@ -18762,11 +18686,11 @@ function trialReminderFromEvent(event) {
 }
 
 // src/fleet.ts
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 
 // src/fleet-claims.ts
 import { createHash as createHash4, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
-import { z as z11 } from "zod";
+import { z as z12 } from "zod";
 
 // src/machine-auth.ts
 import { createHash as createHash3, createPrivateKey, createPublicKey as createPublicKey2, randomBytes as randomBytes5, sign as cryptoSign } from "node:crypto";
@@ -18858,8 +18782,8 @@ function poolTokenOk(presented) {
   if (!expected || !presented) return false;
   return timingSafeEqual3(digest(expected), digest(presented));
 }
-var BindSchema = z11.object({ pod: z11.string().min(1).max(253), uid: z11.string().min(1).max(64) });
-var BootstrapSchema = z11.object({ poolToken: z11.string().min(1), pod: z11.string().min(1).max(253), uid: z11.string().min(1).max(64) });
+var BindSchema = z12.object({ pod: z12.string().min(1).max(253), uid: z12.string().min(1).max(64) });
+var BootstrapSchema = z12.object({ poolToken: z12.string().min(1), pod: z12.string().min(1).max(253), uid: z12.string().min(1).max(64) });
 function claimRoutes(app, store2) {
   const fleetSecretOk = (auth) => {
     const secret = process.env["FLEET_SECRET"];
@@ -18869,7 +18793,7 @@ function claimRoutes(app, store2) {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     const sql = sqlOf(store2);
     if (!sql) return c.json({ error: "fleet not served by this store" }, 501);
-    const id = z11.string().uuid().safeParse(c.req.param("id"));
+    const id = z12.string().uuid().safeParse(c.req.param("id"));
     if (!id.success) return c.json({ error: "invalid machine id" }, 400);
     const body = BindSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
@@ -18948,11 +18872,11 @@ function rowsToDesired(rows2) {
   for (const ws of byWorkspace.values()) ws.quotaPvcCount = String(Math.max(Number(ws.quotaPvcCount), ws.machines.length + 1));
   return { workspaces: [...byWorkspace.values()] };
 }
-var CreateMachineSchema = z12.object({
-  workspaceId: z12.string().uuid(),
-  kind: z12.enum(["member", "runner"]),
-  ownerUserId: z12.string().uuid(),
-  name: z12.string().min(1).max(60)
+var CreateMachineSchema = z13.object({
+  workspaceId: z13.string().uuid(),
+  kind: z13.enum(["member", "runner"]),
+  ownerUserId: z13.string().uuid(),
+  name: z13.string().min(1).max(60)
 });
 function fleetRoutes(app, store2) {
   const fleetSecretOk = (auth) => {
@@ -18983,7 +18907,7 @@ function fleetRoutes(app, store2) {
   app.post("/internal/machines/:id/token", async (c) => {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     if (!store2.rotateMachineToken) return c.json({ error: "fleet not served by this store" }, 501);
-    const id = z12.string().uuid().safeParse(c.req.param("id"));
+    const id = z13.string().uuid().safeParse(c.req.param("id"));
     if (!id.success) return c.json({ error: "invalid machine id" }, 400);
     const { token, hash } = mintMachineToken();
     const row = await store2.rotateMachineToken(id.data, hash);
@@ -19352,15 +19276,16 @@ function ledgerFor(store2) {
     refundFilm: (w, split, note) => refundFilm(sql, w, split, note)
   };
 }
-var GenerateSchema = z13.object({
-  workspace: z13.string().uuid(),
+var GenerateSchema = z14.object({
+  workspace: z14.string().uuid(),
   /** the turn, already assembled by the caller — this proxy is a transport, not a prompt author */
-  contents: z13.unknown(),
-  system: z13.string().optional(),
-  tools: z13.unknown().optional(),
+  contents: z14.unknown(),
+  system: z14.string().optional(),
+  tools: z14.unknown().optional(),
   /** the machine shows the turn's thought summaries. only on request: an older machine joins every
    *  part's text, so a thought part would print in its reply */
-  thoughts: z13.boolean().optional()
+  thoughts: z14.boolean().optional(),
+  purpose: z14.literal("action-review").optional()
 });
 var STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
 var houseBrainServes = () => !localMode() && !!process.env["STARTER_GOOGLE_API_KEY"];
@@ -19385,7 +19310,7 @@ function starterRequest(b2) {
     contents: b2.contents,
     ...b2.system ? { systemInstruction: { parts: [{ text: b2.system }] } } : {},
     ...b2.tools ? { tools: b2.tools } : {},
-    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...b2.thoughts ? { includeThoughts: true } : {} } }
+    generationConfig: { ...b2.purpose === "action-review" ? { maxOutputTokens: 160, responseMimeType: "application/json" } : {}, thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...b2.thoughts ? { includeThoughts: true } : {} } }
   };
 }
 async function chargeStarterCall(ledger, workspace, usage) {
@@ -19402,6 +19327,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
     const res = await fetchFn(`${STARTER_MODEL_URL}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": pre.key },
+      ...pre.body.purpose === "action-review" ? { signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(2500)]) } : {},
       body: JSON.stringify(starterRequest(pre.body))
     });
     const payload = await res.json().catch(() => ({}));
@@ -19505,6 +19431,894 @@ async function billingCaller(store2, actor, workspace) {
   if (!billingEnabled()) return { refusal: { error: "billing not configured", code: "NOT_FOUND" }, status: 404 };
   return { workspace };
 }
+
+// src/store/coding-task-thread.ts
+async function taskMessageAddress(sql, message2) {
+  if (!message2.taskId) return message2.channel;
+  const [task] = await sql`select t.channel_id,c.slug from tasks t join channels c on c.id=t.channel_id
+    where t.id=${message2.taskId}::uuid and t.workspace_id=${message2.workspace}::uuid`;
+  if (!task) throw new DomainError("NOT_FOUND", "Task not found in this workspace.");
+  if (message2.channel && message2.channel !== task["channel_id"] && message2.channel !== task["slug"]) {
+    throw new DomainError("CONFLICT", "The task belongs to another conversation context.");
+  }
+  return String(task["channel_id"]);
+}
+async function createCodingTaskThread(sql, taskId3, owner) {
+  const [task] = await sql`select * from tasks where id=${taskId3}::uuid`;
+  if (!task) throw new Error("Coding task not found.");
+  if (task["offered_agent_id"]) {
+    await sql`insert into project_agents(workspace_id,project_id,agent_id) values(${task["workspace_id"]}::uuid,${task["project_id"]}::uuid,${task["offered_agent_id"]}::uuid) on conflict do nothing`;
+    await sql`insert into agent_channels(agent_id,channel_id) values(${task["offered_agent_id"]}::uuid,${task["channel_id"]}::uuid) on conflict do nothing`;
+  }
+  const [home] = await sql`select brain_override,origin,machine_id,home_thinking from threads
+    where workspace_id=${task["workspace_id"]}::uuid and project_id=${task["project_id"]}::uuid
+      and home_agent_id=${task["offered_agent_id"]}::uuid and created_by=${`human:${owner}`} and archived_at is null
+    order by created_at limit 1`;
+  const [thread] = await sql`insert into threads(workspace_id,channel_id,project_id,task_id,title,description,created_by,kind,mode,titled_at,brain_override,origin,machine_id,home_thinking)
+    values(${task["workspace_id"]}::uuid,${task["channel_id"]}::uuid,${task["project_id"]}::uuid,${taskId3}::uuid,${task["title"]},${task["description"]},${`human:${owner}`},'coding','tasks',now(),${home?.["brain_override"] ? sql.json(home["brain_override"]) : null},${home?.["origin"] ?? null},${home?.["machine_id"] ?? null}::uuid,${home?.["home_thinking"] ?? null})
+    on conflict(task_id) where task_id is not null do update set kind='coding',mode='tasks',created_by=excluded.created_by returning id,root_message_id`;
+  await sql`update messages set thread_id=${thread["id"]}::uuid where task_id=${taskId3}::uuid and thread_id is null`;
+  if (!thread["root_message_id"]) {
+    const [message2] = await sql`insert into messages(workspace_id,channel_id,task_id,thread_id,author_kind,author_id,body)
+      values(${task["workspace_id"]}::uuid,${task["channel_id"]}::uuid,${taskId3}::uuid,${thread["id"]}::uuid,${task["creator_kind"]}::actor_kind,${task["creator_id"]}::uuid,
+        ${`Implementation handoff: ${task["title"]}
+
+${task["description"]}
+
+The coding agent picks this up after the implementation plan is approved here. Progress and the result are also reported to the parent agent thread.`}) returning id`;
+    await sql`update threads set root_message_id=${message2["id"]}::uuid where id=${thread["id"]}::uuid`;
+  }
+  return String(thread["id"]);
+}
+async function bindCodingTaskMessage(sql, message2) {
+  if (!message2.taskId || message2.threadId) return message2;
+  const [thread] = await sql`select id from threads where task_id=${message2.taskId}::uuid and workspace_id=${message2.workspace}::uuid and channel_id=${message2.channel}::uuid and kind='coding'`;
+  return thread ? { ...message2, threadId: String(thread["id"]) } : message2;
+}
+
+// src/handler/planfollowup.ts
+init_src();
+async function authorizedSchedule(store2, task) {
+  if (!task.originThreadId) return null;
+  const sql = sqlOf(store2);
+  if (!sql) return store2.getThreadRoutineId(task.workspace, task.originThreadId);
+  if (task.permissionRunMessageId) {
+    const [claim] = await sql`select p.schedule_id from permission_schedule_claims p join schedules s on s.id=p.schedule_id
+      where s.workspace_id=${task.workspace} and p.message_id=${task.permissionRunMessageId}`;
+    return claim?.schedule_id ?? null;
+  }
+  const [legacy] = await sql`select payload->>'scheduleId' as id from events
+    where workspace_id=${task.workspace} and task_id=${task.id} and type='task.created' and payload->'routine'='true'::jsonb limit 1`;
+  return legacy?.id ?? null;
+}
+async function postPlanMessage(store2, task, actor, version, kind) {
+  await store2.postMessage(
+    {
+      id: crypto.randomUUID(),
+      workspace: task.workspace,
+      channel: task.channel,
+      taskId: task.id,
+      threadId: null,
+      author: { kind: actor.kind, id: actor.id },
+      body: planMessage(version, kind),
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    createEvent({
+      type: "message.posted",
+      source: actorAddress(actor),
+      target: taskTarget(task),
+      workspace: task.workspace,
+      payload: { preview: `implementation plan v${version} \u2014 #${task.number}` }
+    })
+  ).catch(() => {
+  });
+}
+async function planRevisionFollowup(store2, actor, cmd, outcome) {
+  if (cmd.type !== "task.propose_plan" || !outcome.events.length || !outcome.task.workPlan) return;
+  const v = outcome.task.workPlan.version;
+  await postPlanMessage(store2, outcome.task, actor, v, "revised");
+}
+function routinePlanApprove(task, scheduleId) {
+  if (task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine plan auto-approve fires from plan_review, not ${task.state}`);
+  if (task.repo && !task.permissionRunMessageId) throw new DomainError("NOT_PERMITTED", "repo-backed plans are approved by a human, routine or not");
+  if (task.planApprovedAt) return { task, events: [] };
+  const next = { ...task, planApprovedAt: (/* @__PURE__ */ new Date()).toISOString(), requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.plan_approved",
+    source: formatAddress({ kind: "machine", id: "routine" }),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { routine: true, scheduleId }
+  });
+  return { task: next, events: [event] };
+}
+function routineAccept(task, scheduleId) {
+  if (task.state !== "done") throw new DomainError("ILLEGAL_TRANSITION", `a routine auto-accept fires from done, not ${task.state}`);
+  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed work is accepted by a human, routine or not");
+  const next = { ...task, state: "accepted", version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.accepted",
+    source: formatAddress({ kind: "machine", id: "routine" }),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { routine: true, scheduleId }
+  });
+  return { task: next, events: [event] };
+}
+async function routineAcceptFollowup(store2, cmd, outcome) {
+  if (cmd.type !== "task.approve" || outcome.task.state !== "done" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await authorizedSchedule(store2, outcome.task);
+  if (!scheduleId) return outcome;
+  const accepted = await store2.mutate(cmd.taskId, async (t2) => routineAccept(t2, scheduleId)).catch(() => null);
+  return accepted ? { ...accepted, events: [...outcome.events, ...accepted.events] } : outcome;
+}
+async function routinePlanFollowup(store2, cmd, outcome) {
+  if (cmd.type !== "task.propose_plan" || outcome.task.state !== "plan_review" || outcome.task.planApprovedAt || outcome.task.repo && !outcome.task.permissionRunMessageId || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await authorizedSchedule(store2, outcome.task);
+  if (!scheduleId) return outcome;
+  const approved = await store2.mutate(outcome.task.id, async (t2) => routinePlanApprove(t2, scheduleId)).catch(() => null);
+  return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
+}
+function routineDesignApprove(task, scheduleId, round) {
+  if (task.state !== "design_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine design auto-approve fires from design_review, not ${task.state}`);
+  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed design rounds are approved by a human, routine or not");
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const next = { ...task, state: task.workPlan ? "todo" : "planning", assignee: null, version: task.version + 1, updatedAt: now };
+  const event = createEvent({
+    type: "task.design_approved",
+    source: formatAddress({ kind: "machine", id: "routine" }),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { routine: true, scheduleId, round }
+  });
+  return { task: next, events: [event], promoteLatestDesignRound: true };
+}
+async function routineDesignFollowup(store2, cmd, outcome) {
+  if (cmd.type !== "task.propose_design" || outcome.task.state !== "design_review" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await authorizedSchedule(store2, outcome.task);
+  if (!scheduleId) return outcome;
+  const approved = await store2.mutate(outcome.task.id, async (t2) => routineDesignApprove(t2, scheduleId, cmd.round)).catch(() => null);
+  if (!approved) return outcome;
+  const task = approved.task;
+  await store2.postMessage(
+    {
+      id: crypto.randomUUID(),
+      workspace: task.workspace,
+      channel: task.channel,
+      taskId: task.id,
+      threadId: null,
+      author: { kind: task.creator.kind, id: task.creator.id },
+      body: `\u2713 Design round ${cmd.round} auto-approved \xB7 routine run. The round is the visual contract for the work. The build starts now.`,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    createEvent({ type: "message.posted", source: formatAddress({ kind: "machine", id: "routine" }), target: taskTarget(task), workspace: task.workspace, payload: { preview: `design round ${cmd.round} auto-approved \u2014 #${task.number}` } })
+  ).catch(() => {
+  });
+  return { ...approved, events: [...outcome.events, ...approved.events] };
+}
+
+// src/handler/coding-handoff.ts
+async function validateCodingHandoff(store2, actor, cmd, verifiedMessage) {
+  if (!cmd.codingHandoff) return null;
+  const sql = sqlOf(store2);
+  if (!sql || actor.kind !== "agent" || !cmd.originThread || !cmd.repo || cmd.thread || cmd.parent || cmd.backlog || !cmd.plan || !["bug", "feature", "refactor", "chore"].includes(cmd.kind ?? "")) {
+    throw new DomainError("INVALID_INPUT", "A coding handoff needs an agent home, project repository, implementation plan and code task kind.");
+  }
+  const invalidPlan = validateWorkPlanLegs(cmd.plan.legs, true);
+  if (invalidPlan) throw new DomainError("INVALID_INPUT", invalidPlan);
+  const [home] = await sql`select t.project_id,t.channel_id,t.created_by from threads t
+    join agents a on a.id=${actor.id}::uuid and a.workspace_id=t.workspace_id and a.retired_at is null
+    join channels c on c.id=t.channel_id
+    where t.id=${cmd.originThread}::uuid and t.workspace_id=${cmd.workspace}::uuid
+      and ((t.home_agent_id=a.id and exists(select 1 from project_agents pa where pa.project_id=t.project_id and pa.agent_id=a.id))
+        or (${verifiedMessage ?? null}::uuid is not null and t.home_agent_id is null and a.role='orchestrator'
+          and exists(select 1 from agent_channels ac where ac.agent_id=a.id and ac.channel_id=t.channel_id)))
+      and t.archived_at is null
+      and (c.id::text=${cmd.channel} or c.slug=${cmd.channel})`;
+  if (!home || !String(home["created_by"]).startsWith("human:")) throw new DomainError("NOT_PERMITTED", "Create coding work from your own active agent thread.");
+  const owner = String(home["created_by"]).slice(6);
+  const [member] = await sql`select 1 from workspace_members where workspace_id=${cmd.workspace}::uuid and user_id=${owner}::uuid`;
+  const [repo] = await sql`select r.id from repos r join project_repos pr on pr.repo_id=r.id
+    where r.id=${cmd.repo.id}::uuid and pr.project_id=${home["project_id"]}::uuid and r.workspace_id=${cmd.workspace}::uuid`;
+  if (!member || !repo) throw new DomainError("NOT_PERMITTED", "Use a repository attached to this project and an active workspace member.");
+  if (cmd.project && cmd.project !== home["project_id"]) throw new DomainError("NOT_PERMITTED", "A coding task belongs to its parent agent project.");
+  const [coder] = await sql`select a.id from agents a
+    where a.workspace_id=${cmd.workspace}::uuid and a.retired_at is null and a.role='developer'
+      and (${cmd.offerTo ?? null}::text is null or a.id::text=${cmd.offerTo ?? null} or a.name=${cmd.offerTo ?? null})
+    order by exists(select 1 from project_agents pa where pa.project_id=${home["project_id"]}::uuid and pa.agent_id=a.id) desc,
+      (a.role='developer') desc, (lower(a.name)='patch') desc, a.created_at limit 1`;
+  if (!coder) throw new DomainError("NOT_FOUND", "Add a developer agent to this workspace before handing off implementation.");
+  return { owner, agentId: String(coder["id"]), project: String(home["project_id"]), channel: String(home["channel_id"]) };
+}
+async function adoptCodingTask(store2, actor, cmd, scope3, scheduledMessage) {
+  const taskId3 = cmd.codingHandoff?.taskId;
+  if (!taskId3) return null;
+  const sql = sqlOf(store2);
+  const changed = await sql.begin(async (tx) => {
+    const q = tx;
+    const [task2] = await q`select t.*,th.kind as thread_kind,th.created_by as thread_owner from tasks t left join threads th on th.task_id=t.id where t.id=${taskId3}::uuid for update of t`;
+    if (!task2 || task2["workspace_id"] !== cmd.workspace || task2["project_id"] !== scope3.project || task2["origin_thread_id"] && task2["origin_thread_id"] !== cmd.originThread) throw new DomainError("NOT_PERMITTED", "Choose an unstarted task owned by this agent thread or unowned in this project.");
+    if (task2["thread_owner"] && String(task2["thread_owner"]).startsWith("human:") && task2["thread_owner"] !== `human:${scope3.owner}`) throw new DomainError("NOT_PERMITTED", "Keep this task with its existing conversation owner.");
+    if (task2["thread_kind"] === "coding" && task2["origin_thread_id"] === cmd.originThread) return false;
+    if (!["backlog", "todo", "planning", "plan_review"].includes(task2["state"]) || task2["assignee_id"] || task2["submitted_sha"] || task2["pr_number"]) throw new DomainError("INVALID_INPUT", "This task already has implementation work. Stop or finish that run before changing its runtime.");
+    if (task2["repo_id"] && task2["repo_id"] !== cmd.repo.id) throw new DomainError("INVALID_INPUT", "Keep the existing task repository.");
+    if (task2["state"] === "backlog") await q`update tasks set state='todo' where id=${taskId3}::uuid`;
+    if (["backlog", "todo"].includes(task2["state"])) await q`update tasks set state='planning' where id=${taskId3}::uuid`;
+    const version = (task2["work_plan"]?.version ?? 0) + 1;
+    await q`update tasks set origin_thread_id=${cmd.originThread}::uuid,repo_id=${cmd.repo.id}::uuid,base_ref=${cmd.repo.baseRef},
+      branch=${task2["branch"] ?? taskBranch(task2["number"], task2["title"])},state='plan_review',kind=${cmd.kind}::task_kind,
+      permission_run_message_id=${scheduledMessage ?? null}::uuid,plan_approved_at=case when ${!!scheduledMessage} then now() else null end,assignee_kind='agent',assignee_id=${scope3.agentId}::uuid,offered_agent_id=${scope3.agentId}::uuid,requirements=${q.json(cmd.checklist ?? [])},requirements_confirmed=true,
+      work_plan=${q.json({ ...cmd.plan, codingDelivery: codingDeliveryPolicy(cmd.codingHandoff, [cmd.title, cmd.description, ...cmd.checklist ?? []]), version, proposedAt: (/* @__PURE__ */ new Date()).toISOString() })},updated_at=now(),version=version+1 where id=${taskId3}::uuid`;
+    await q`insert into project_agents(workspace_id,project_id,agent_id) values(${cmd.workspace}::uuid,${scope3.project}::uuid,${scope3.agentId}::uuid) on conflict do nothing`;
+    await q`insert into agent_channels(agent_id,channel_id) values(${scope3.agentId}::uuid,${scope3.channel}::uuid) on conflict do nothing`;
+    await createCodingTaskThread(q, taskId3, scope3.owner);
+    await q`select nm_coding_task_report(${taskId3}::uuid,'task','plan_review')`;
+    await q`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body) values(${cmd.workspace}::uuid,${scope3.channel}::uuid,${cmd.originThread}::uuid,'agent',${actor.id}::uuid,${`\u2039task:${taskId3}\u203A`})`;
+    const event = createEvent({ type: "task.plan_proposed", source: formatAddress(actor), target: `task:${task2["number"]}`, workspace: cmd.workspace, payload: { codingHandoff: true, originThread: cmd.originThread, version, ...scheduledMessage ? { scheduledMessage } : {} } });
+    await q`insert into events(id,workspace_id,type,source,target,channel_id,task_id,payload) values(${event.id},${cmd.workspace}::uuid,${event.type},${event.source},${event.target},${scope3.channel}::uuid,${taskId3}::uuid,${q.json(event.payload)})`;
+    return true;
+  });
+  const task = await store2.getTask(taskId3);
+  if (!task) throw new DomainError("NOT_FOUND", "Coding task not found.");
+  if (changed && task.workPlan) {
+    const p2 = task.workPlan;
+    await store2.mutate(task.id, async (current) => ({ task: current, events: [], artifacts: [{ kind: "doc", name: planArtifactName(p2.version), content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: p2.legs, subtasks: p2.subtasks, approach: p2.approach, version: p2.version, repo: true }) }] }));
+    await postPlanMessage(store2, task, actor, p2.version, "birth");
+  }
+  return { task, events: [] };
+}
+function requestCodingChecklist(task, actor) {
+  if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "Only a person can request release preparation.");
+  const plan = task.workPlan;
+  if (!plan?.codingDelivery || !task.prNumber || task.parentTaskId) throw new DomainError("INVALID_INPUT", "A coding task with a pull request is required.");
+  if (!["in_review", "done"].includes(task.state)) throw new DomainError("ILLEGAL_TRANSITION", "Release preparation can be requested during implementation review.");
+  if (plan.codingDelivery.prepareRelease) return { task, events: [], unchanged: true };
+  const next = {
+    ...task,
+    workPlan: { ...plan, codingDelivery: { ...plan.codingDelivery, prepareRelease: true } },
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    version: task.version + 1
+  };
+  return { task: next, events: [createEvent({
+    type: "task.release_checklist_requested",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { prNumber: task.prNumber }
+  })] };
+}
+async function requireReleasePreparation(store2, actor, taskId3) {
+  const t2 = await store2.getTask(taskId3);
+  if (!t2) throw new DomainError("NOT_FOUND", `task ${taskId3} not found`);
+  if (t2.workPlan?.codingDelivery && !t2.workPlan.codingDelivery.prepareRelease && actor.kind !== "human") {
+    throw new DomainError("HUMAN_ONLY", "Ask the person to request a release checklist for this coding task.");
+  }
+  if (!t2.prNumber) {
+    throw new DomainError("INVALID_INPUT", "the ship gate covers repo-backed tasks with an open pull request \u2014 a human accept ships this one directly");
+  }
+  if (!t2.workPlan?.codingDelivery && !await store2.shipGate(taskId3)) {
+    throw new DomainError("NOT_PERMITTED", "the release gate is off for this project \u2014 a human accept merges it directly");
+  }
+}
+async function verifyCodingScreenshots(store2, taskId3, images, reviewedRevision) {
+  const sql = sqlOf(store2);
+  const rows2 = sql ? await sql`select b.capture,b.object_ref,b.created_at from brain_artifacts b
+    join threads th on th.id=b.thread_id and th.workspace_id=b.workspace_id
+    where th.task_id=${taskId3}::uuid and th.kind='coding' and b.capture is not null` : [];
+  const receipts = rows2.map((row) => ({ ...row["capture"], sha256: row["object_ref"].sha256, capturedAt: new Date(row["created_at"]).toISOString() }));
+  const names = validationImages(images);
+  if (!names.length) throw new Error("Attach verified before and after screenshots of the implementation.");
+  if (reviewedRevision) {
+    const external = receipts.filter((r) => r.source === "independent-observer" && r.reviewedRevision === reviewedRevision);
+    if (names.every((name) => external.some((r) => r.name === name))) {
+      const pairs = names.map((name) => external.filter((r) => r.name === name).at(-1));
+      requireCaptureReceipts(pairs, external);
+      return;
+    }
+  }
+  requireCaptureReceipts(images.filter((i) => i.kind === "screenshot" && names.includes(i.name)).map((image) => ({
+    name: image.name,
+    sha256: createHash5("sha256").update(Buffer.from(image.content.split(",")[1], "base64")).digest("hex")
+  })), receipts);
+}
+async function assertSubmittedVisualEvidence(store2, taskId3, submission) {
+  const task = await store2.getTask(taskId3);
+  const delivery = task?.workPlan?.codingDelivery;
+  if (!delivery || !delivery.visualEvidence && !submission?.some((a) => a.kind === "screenshot" && isValidationImageName(a.name))) return;
+  try {
+    if (submission) await verifyCodingScreenshots(store2, taskId3, submission);
+    else {
+      const rows2 = await store2.listArtifacts(taskId3);
+      const latest = new Map(rows2.filter((row) => row.kind === "screenshot").map((row) => [row.name, row]));
+      await verifyCodingScreenshots(store2, taskId3, [...latest.values()], task?.submittedSha);
+    }
+  } catch (error) {
+    throw new DomainError(submission ? "EVIDENCE_REQUIRED" : "INVALID_INPUT", error instanceof Error ? error.message : "Visual validation is incomplete.");
+  }
+}
+async function wantsCodingRelease(store2, taskId3, wordId) {
+  const sql = sqlOf(store2);
+  if (!sql) return false;
+  const [word] = await sql`select m.body from messages m join tasks t on t.id=${taskId3}::uuid
+    where m.id=${wordId}::uuid and t.work_plan ? 'codingDelivery' and t.pr_number is not null
+      and m.workspace_id=t.workspace_id and m.author_kind='human' and m.schedule_id is null and not m.machine_authored`;
+  return !!word && isAcceptWord(word["body"]) && /\b(?:merge|land|ship)\b/i.test(word["body"]);
+}
+
+// src/handler/unblock-review.ts
+async function submittedReviewVersion(store2, taskId3) {
+  const task = await store2.getTask(taskId3);
+  if (task?.state !== "blocked" || task.blockedFrom !== "in_progress" || !task.submittedSha || !task.prNumber) return null;
+  const events = (await store2.listEvents(`task:${task.number}`)).filter((e) => e.workspace === task.workspace);
+  const blocked = events.findLast((e) => e.type === "task.blocked");
+  if (!/^execution failed \d+× — no work product — nothing changed in the worktree\b/.test(String(blocked?.payload.reason))) return null;
+  const submission = events.findLastIndex((e) => e.type === "task.submitted");
+  if (submission < 0 || events[submission]?.payload.sha !== task.submittedSha) return null;
+  const review = events.slice(submission + 1).findLast((e) => e.type === "task.changes_requested" || e.type === "task.approved");
+  return review?.type === "task.changes_requested" && review.source.startsWith("agent:") && /^CI is red on the pull request — `[^\n`]+` failed\. Fix it so the checks pass, then re-submit\.$/.test(String(review.payload.feedback)) ? task.version : null;
+}
+async function prepareReviewTransition(store2, cmd) {
+  if (cmd.type === "task.submit") await assertSubmittedVisualEvidence(store2, cmd.taskId, cmd.artifacts);
+  if (cmd.type === "task.approve") await assertSubmittedVisualEvidence(store2, cmd.taskId);
+  return cmd.type === "task.unblock" ? submittedReviewVersion(store2, cmd.taskId) : null;
+}
+
+// src/handler/fsm.ts
+init_src();
+init_src();
+var TRANSITION_OF = {
+  "task.claim": { to: "in_progress", name: "claim" },
+  "task.submit": { to: "in_review", name: "submit" },
+  "task.request_changes": { to: "in_progress", name: "request_changes" },
+  "task.approve": { to: "done", name: "approve" },
+  "task.accept": { to: "accepted", name: "accept" },
+  "task.block": { to: "blocked", name: "block" },
+  "task.unblock": { to: "in_progress", name: "unblock" },
+  "task.cancel": { to: "closed", name: "cancel" },
+  "task.archive": { to: "closed", name: "archive" },
+  "task.promote": { to: "todo", name: "promote" },
+  "task.reopen": { to: "todo", name: "reopen" },
+  "task.request_plan": { to: "planning", name: "request_plan" },
+  "task.propose_plan": { to: "plan_review", name: "propose_plan" },
+  "task.revise_plan": { to: "planning", name: "revise_plan" },
+  "task.request_design": { to: "designing", name: "request_design" },
+  "task.propose_design": { to: "design_review", name: "propose_design" },
+  "task.revise_design": { to: "designing", name: "revise_design" },
+  "task.approve_design": { to: "planning", name: "approve_design" },
+  "task.claim_ship": { to: "shipping", name: "claim_ship" },
+  "task.propose_ship_plan": { to: "ship_review", name: "propose_ship_plan" },
+  "task.revise_ship_plan": { to: "shipping", name: "revise_ship_plan" },
+  "task.approve_ship_plan": { to: "releasing", name: "approve_ship_plan" },
+  "task.execute_ship": { to: "verifying", name: "execute_ship" },
+  "task.confirm_release": { to: "accepted", name: "confirm_release" },
+  "task.finish_subtask": { to: "done", name: "finish" }
+};
+var SUBTASK_GATED = /* @__PURE__ */ new Set(["task.submit", "task.accept", "task.approve_ship_plan", "task.execute_ship", "task.confirm_release"]);
+var DOD_EDITABLE_STATES = /* @__PURE__ */ new Set(["backlog", "todo", "designing", "design_review", "planning", "plan_review", "in_progress", "in_review", "blocked"]);
+function setDefinitionOfDone(task, actor, dod) {
+  const ownsPlan = (task.state === "planning" || task.state === "plan_review") && !task.planApprovedAt && (sameActor(task.assignee, actor) || !task.assignee && actor.kind === "agent" && task.offeredAgentId === actor.id);
+  const mayEdit = actor.kind === "human" || actor.role === "orchestrator" || actor.role === "architect" || ownsPlan;
+  if (!mayEdit) throw new DomainError("NOT_PERMITTED", "the Definition of Done is set by humans, the orchestrator, or the architect");
+  if (!DOD_EDITABLE_STATES.has(task.state)) {
+    throw new DomainError("ILLEGAL_TRANSITION", `the Definition of Done is frozen once a task is ${task.state}`);
+  }
+  const next = { ...task, definitionOfDone: dod, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.dod_set",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    // the contract text isn't secret, but keep the event a metadata pointer
+    payload: { length: dod.length }
+  });
+  return { task: next, events: [event] };
+}
+function mayCheckShipItem(actor, item) {
+  if (actor.kind === "human") return true;
+  if (actor.role === "shipper") return item.owner !== "human";
+  return item.owner === "agent" && item.agentId === actor.id;
+}
+function checkShipItem(task, actor, cmd) {
+  if (task.state !== "releasing" && task.state !== "verifying") {
+    throw new DomainError("ILLEGAL_TRANSITION", `the release checklist is live while a task is releasing or verifying \u2014 #${task.number} is ${task.state}`);
+  }
+  const plan = task.shipPlan;
+  if (!plan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan`);
+  const item = plan.items.find((i) => i.id === cmd.itemId);
+  if (!item) throw new DomainError("NOT_FOUND", `release checklist item ${cmd.itemId} not found`);
+  const ownerShips = task.workPlan?.codingDelivery && actor.kind === "agent" && actor.id === task.assignee?.id && actor.id === plan.shipperId;
+  const canCheck = task.workPlan?.codingDelivery && actor.kind === "agent" ? ownerShips && item.owner !== "human" || item.owner === "agent" && item.agentId === actor.id : mayCheckShipItem(actor, item);
+  if (!canCheck) {
+    throw new DomainError("NOT_PERMITTED", `"${item.title}" is ${item.owner === "human" ? "a human step \u2014 only a person may check it" : `owned by ${item.owner === "agent" ? "its delegated agent or the shipper" : "the shipper"}`}`);
+  }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const items = plan.items.map(
+    (i) => i.id === cmd.itemId ? {
+      ...i,
+      state: cmd.state,
+      checkedBy: cmd.state === "pending" ? null : { kind: actor.kind, id: actor.id },
+      checkedAt: cmd.state === "pending" ? null : now,
+      note: cmd.note ?? i.note
+    } : i
+  );
+  const next = { ...task, shipPlan: { ...plan, items }, version: task.version + 1, updatedAt: now };
+  const event = createEvent({
+    type: "task.ship_item_checked",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { itemId: cmd.itemId, title: item.title, state: cmd.state, pending: shipItemsPending(next.shipPlan) }
+  });
+  return { task: next, events: [event] };
+}
+function addShipItem(task, actor, cmd) {
+  const mayAdd = actor.kind === "human" || (task.workPlan?.codingDelivery ? task.assignee?.id === actor.id : actor.role === "orchestrator" || actor.role === "shipper");
+  if (!mayAdd) throw new DomainError("NOT_PERMITTED", "release checklist items are added by humans, the orchestrator, or the shipper");
+  if (task.state !== "ship_review" && task.state !== "releasing") {
+    throw new DomainError("ILLEGAL_TRANSITION", `items can be added while the plan is under review or releasing \u2014 #${task.number} is ${task.state}`);
+  }
+  const plan = task.shipPlan;
+  if (!plan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan`);
+  if (plan.items.length >= 20) throw new DomainError("INVALID_INPUT", "the release checklist is capped at 20 items");
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const item = {
+    id: `add-${plan.items.length + 1}-${Date.now().toString(36)}`,
+    title: cmd.title,
+    detail: cmd.detail ?? "",
+    owner: cmd.owner,
+    agentId: cmd.owner === "agent" ? cmd.agentId ?? null : null,
+    auto: null,
+    state: "pending",
+    checkedBy: null,
+    checkedAt: null,
+    note: ""
+  };
+  const next = { ...task, shipPlan: { ...plan, items: [...plan.items, item] }, version: task.version + 1, updatedAt: now };
+  const event = createEvent({
+    type: "task.ship_item_added",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { itemId: item.id, title: item.title, owner: item.owner }
+  });
+  return { task: next, events: [event] };
+}
+var DETAILS_EDITABLE_STATES = /* @__PURE__ */ new Set(["backlog", "todo"]);
+function updateDetails(task, actor, cmd) {
+  const mayEdit = actor.kind === "human" || actor.role === "orchestrator";
+  if (!mayEdit) throw new DomainError("NOT_PERMITTED", "task details are edited by humans or the orchestrator");
+  if (!DETAILS_EDITABLE_STATES.has(task.state)) {
+    throw new DomainError("ILLEGAL_TRANSITION", `details are frozen once a task is ${task.state} \u2014 post to the thread instead`);
+  }
+  if (cmd.title === void 0 && cmd.description === void 0 && cmd.kind === void 0) {
+    throw new DomainError("INVALID_INPUT", "nothing to update \u2014 pass a title, description, and/or kind");
+  }
+  const next = {
+    ...task,
+    title: cmd.title ?? task.title,
+    description: cmd.description ?? task.description,
+    // re-categorize a mis-triaged item while it's still pre-work (docs/16)
+    kind: cmd.kind ?? task.kind,
+    version: task.version + 1,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const event = createEvent({
+    type: "task.details_updated",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    // metadata pointer only — the text itself lives on the task row
+    payload: { titleChanged: cmd.title !== void 0, descriptionChanged: cmd.description !== void 0 }
+  });
+  return { task: next, events: [event] };
+}
+function selectDesignProvider(task, actor, provider) {
+  if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "the design canvas is chosen by a human");
+  if (task.state !== "designing") {
+    throw new DomainError("ILLEGAL_TRANSITION", `the design canvas is chosen after Iris picks up the task \u2014 #${task.number} is ${task.state}`);
+  }
+  const next = { ...task, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.design_provider_selected",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { provider }
+  });
+  return { task: next, events: [event] };
+}
+function confirmRequirements(task, actor, checklist) {
+  if (task.state !== "in_progress") {
+    throw new DomainError("ILLEGAL_TRANSITION", "requirements are confirmed after claiming, before work");
+  }
+  if (!sameActor(task.assignee, actor)) {
+    throw new DomainError("NOT_PERMITTED", "only the assignee confirms requirements");
+  }
+  const next = { ...task, requirements: checklist, requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.requirements_confirmed",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { checklist }
+  });
+  return { task: next, events: [event] };
+}
+function approvePlan(task, actor) {
+  if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "implementation-plan approval is a human sign-off");
+  if (task.state !== "plan_review") {
+    throw new DomainError("ILLEGAL_TRANSITION", `a plan is approved from plan_review, not ${task.state}`);
+  }
+  if (task.planApprovedAt) return { task, events: [] };
+  const next = { ...task, planApprovedAt: (/* @__PURE__ */ new Date()).toISOString(), requirementsConfirmed: true, version: task.version + 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const event = createEvent({
+    type: "task.plan_approved",
+    source: actorAddress(actor),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: {}
+  });
+  return { task: next, events: [event] };
+}
+function transition(task, actor, cmd, subtasksPending = 0, planVersion = 0, onHumanWord = false) {
+  const target = TRANSITION_OF[cmd.type];
+  if (!target) throw new DomainError("NOT_FOUND", `unknown command ${cmd.type}`);
+  if (cmd.type === "task.claim" && task.state !== "todo" && task.state !== "plan_review") {
+    throw new DomainError("ALREADY_CLAIMED", `task ${task.number} is ${task.state}`);
+  }
+  if (cmd.type === "task.claim" && task.state === "plan_review" && task.workPlan?.legs.includes("design")) {
+    throw new DomainError("INVALID_INPUT", `#${task.number} declares a design leg \u2014 the design round runs first (request_design); build is claimed after the approved design returns it to todo`);
+  }
+  if (cmd.type === "task.submit" && !task.requirementsConfirmed && task.parentTaskId === null) {
+    throw new DomainError("REQUIREMENTS_NOT_CONFIRMED", "confirm requirements before submitting");
+  }
+  if (cmd.type === "task.submit" && task.workPlan?.codingDelivery?.visualEvidence) {
+    try {
+      if (!validationImages(cmd.artifacts).length) throw new Error("Capture and attach before and after screenshots of the implementation.");
+    } catch (error) {
+      throw new DomainError("EVIDENCE_REQUIRED", error instanceof Error ? error.message : "Visual evidence is missing.");
+    }
+  }
+  const to = cmd.type === "task.unblock" ? task.blockedFrom ?? target.to : cmd.type === "task.approve_design" && task.workPlan ? "todo" : target.to;
+  const owner = task.assignee ?? (task.offeredAgentId ? { kind: "agent", id: task.offeredAgentId } : null);
+  if (cmd.type === "task.propose_plan" && owner && actor.kind !== "human" && !sameActor(owner, actor)) {
+    throw new DomainError("NOT_PERMITTED", "The assigned agent revises this plan. Request specialist input separately; do not take over the task.");
+  }
+  const claiming = cmd.type === "task.claim";
+  const ctx = {
+    actor,
+    isAssignee: claiming ? owner === null || sameActor(owner, actor) : sameActor(owner, actor),
+    isCreator: sameActor(task.creator, actor),
+    ownerManagedCoding: !!task.workPlan?.codingDelivery,
+    // Reviewer-pool membership comes from the channel registry once the DB
+    // layer lands (week 2); until then the agent's role is the pool.
+    isReviewerPoolMember: actor.kind === "agent" && actor.role === "reviewer",
+    artifactCount: cmd.type === "task.submit" ? cmd.artifacts.length : task.artifactCount,
+    repoBacked: task.repo !== null,
+    pushedSha: cmd.type === "task.submit" ? cmd.sha ?? null : task.submittedSha,
+    // ship gate (docs/23): execute_ship is structurally refused until the plan is
+    // human-approved and every checklist item is checked or n/a
+    shipPlanApproved: task.shipPlan?.status === "approved",
+    planApproved: !!task.planApprovedAt,
+    shipItemsPending: shipItemsPending(task.shipPlan),
+    // subtasks (docs/24): a subtask row lives the lean claim/finish/cancel life;
+    // a parent with open subtasks can't pass its next gate
+    isSubtask: task.parentTaskId !== null,
+    subtasksPending,
+    // setup flows: a setup task is a human checklist — finish/cancel only
+    isSetup: task.kind === "setup",
+    // plan-first units (2026-08-17): an approved work plan that omits review makes this a
+    // lean unit — finish is its road to the accept gate (never repo-backed, by validation)
+    leanUnit: !!task.workPlan && !task.workPlan.legs.includes("review") && task.parentTaskId === null,
+    // accept on the human's word (2026-09-08): proven by the handler against the thread, never claimed
+    onHumanWord
+  };
+  const verdict = evaluateTransition(task.state, to, ctx, target.name);
+  if (!verdict.ok) throw new DomainError(verdict.code, verdict.reason);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const next = { ...task, state: to, version: task.version + 1, updatedAt: now };
+  if (verdict.spec.name === "block") next.blockedFrom = task.state;
+  if (verdict.spec.name === "unblock") next.blockedFrom = null;
+  if (verdict.spec.name === "claim_ship" && next.workPlan?.codingDelivery) next.workPlan = { ...next.workPlan, codingDelivery: { ...next.workPlan.codingDelivery, prepareRelease: true } };
+  if (verdict.spec.name === "claim") next.assignee = { kind: actor.kind, id: actor.id };
+  if (verdict.spec.name === "revise_plan" || verdict.spec.name === "request_plan") next.planApprovedAt = null;
+  if (cmd.type === "task.request_plan" || cmd.type === "task.request_design") {
+    const k = cmd.kind ?? task.kind;
+    if (!k) throw new DomainError("INVALID_INPUT", `categorize #${task.number} (set a kind: bug/feature/\u2026) before routing it`);
+    next.kind = k;
+  }
+  if (verdict.spec.name === "submit" && cmd.type === "task.submit") {
+    next.artifactCount = task.artifactCount + cmd.artifacts.length;
+    next.submittedSha = cmd.sha ?? null;
+    if (cmd.prUrl) next.prUrl = cmd.prUrl;
+    if (cmd.prNumber) next.prNumber = cmd.prNumber;
+  }
+  if (verdict.spec.name === "propose_plan") next.artifactCount = task.artifactCount + 1;
+  if (verdict.spec.name === "propose_design" && cmd.type === "task.propose_design") next.artifactCount = task.artifactCount + cmd.mockups.length;
+  const events = [
+    createEvent({
+      type: TRANSITION_EVENT[verdict.spec.name],
+      source: actorAddress(actor),
+      target: taskTarget(task),
+      workspace: task.workspace,
+      payload: payloadFor(cmd)
+    })
+  ];
+  if (verdict.spec.name === "submit" && cmd.type === "task.submit") {
+    events.push(
+      createEvent({
+        type: "task.review_requested",
+        source: actorAddress(actor),
+        target: taskTarget(task),
+        workspace: task.workspace,
+        payload: { dispatch: "auto", pool: "channel-reviewers" },
+        inReplyTo: events[0].id
+      })
+    );
+    return { task: next, events, artifacts: cmd.artifacts };
+  }
+  if (verdict.spec.name === "propose_plan" && cmd.type === "task.propose_plan") {
+    const name = implementationPlanName(planVersion || nextPlanVersion([]));
+    if (cmd.legs || task.workPlan) {
+      const legs = cmd.legs ?? task.workPlan?.legs ?? ["build", "review"];
+      const bad = validateWorkPlanLegs(legs, task.repo !== null);
+      if (bad) throw new DomainError("INVALID_INPUT", bad);
+      next.workPlan = {
+        ...task.workPlan?.codingDelivery ? { codingDelivery: task.workPlan.codingDelivery } : {},
+        legs: [...legs],
+        subtasks: cmd.subtasks ?? task.workPlan?.subtasks ?? [],
+        approach: cmd.plan,
+        version: (task.workPlan?.version ?? 0) + 1,
+        proposedAt: now
+      };
+      next.planApprovedAt = null;
+    }
+    return { task: next, events, artifacts: [{ kind: "doc", name, content: cmd.plan }] };
+  }
+  if (verdict.spec.name === "propose_design" && cmd.type === "task.propose_design") {
+    const artifacts2 = cmd.mockups.map((m) => ({ kind: "design", name: designMockupName(cmd.round, m.name), content: m.html }));
+    return { task: next, events, artifacts: artifacts2 };
+  }
+  if (verdict.spec.name === "approve_design") {
+    return { task: next, events, promoteLatestDesignRound: true };
+  }
+  if (verdict.spec.name === "propose_ship_plan" && cmd.type === "task.propose_ship_plan") {
+    const now2 = (/* @__PURE__ */ new Date()).toISOString();
+    const plan = {
+      round: cmd.round,
+      risk: cmd.risk,
+      summary: cmd.summary,
+      status: "draft",
+      // a fresh draft answers every redraft request so far — the counter restarts
+      // with the plan object it belongs to
+      revisions: 0,
+      shipperId: actor.id,
+      approvedBy: null,
+      approvedAt: null,
+      items: cmd.items.map((i) => ({
+        id: i.id,
+        title: i.title,
+        detail: i.detail,
+        owner: i.owner,
+        agentId: i.owner === "agent" ? i.agentId ?? null : null,
+        auto: i.auto ?? null,
+        // host-verified items (CI already settled green) may arrive pre-checked
+        state: i.state,
+        checkedBy: i.state === "done" ? { kind: actor.kind, id: actor.id } : null,
+        checkedAt: i.state === "done" ? now2 : null,
+        note: i.note
+      }))
+    };
+    next.shipPlan = plan;
+    next.artifactCount = task.artifactCount + 1;
+    return { task: next, events, artifacts: [{ kind: "ship", name: shipPlanName(cmd.round), content: cmd.report }] };
+  }
+  if (verdict.spec.name === "revise_ship_plan" && task.shipPlan) {
+    next.shipPlan = { ...task.shipPlan, status: "draft", revisions: (task.shipPlan.revisions ?? 0) + 1 };
+  }
+  if (verdict.spec.name === "approve_ship_plan") {
+    if (!task.shipPlan) throw new DomainError("NOT_FOUND", `task ${task.number} has no release plan to approve`);
+    next.shipPlan = { ...task.shipPlan, status: "approved", approvedBy: actor.id, approvedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    return { task: next, events, promoteLatestShipRound: true };
+  }
+  if (verdict.spec.name === "finish" && cmd.type === "task.finish_subtask") {
+    const arts = (cmd.artifacts ?? []).map((a) => ({ kind: a.kind, name: a.name, content: a.content }));
+    if (arts.length) {
+      return { task: next, events, artifacts: arts, ...task.parentTaskId ? { artifactTaskId: task.parentTaskId } : {} };
+    }
+    return { task: next, events };
+  }
+  if (to === "accepted" || to === "closed") return { task: next, events, dismissOpenDecisions: true };
+  return { task: next, events };
+}
+function nextPlanVersion(existingNames) {
+  const highest = existingNames.reduce((max, n) => {
+    const v = Number(/^implementation-plan-v(\d+)\.md$/i.exec(n)?.[1] ?? 0);
+    return v > max ? v : max;
+  }, 0);
+  return highest + 1;
+}
+var implementationPlanName = (version) => `implementation-plan-v${version}.md`;
+function designMockupName(round, name) {
+  const slug = name.toLowerCase().replace(/\.html?$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "mockup";
+  return `design-mockup-v${round}-${slug}.html`;
+}
+function payloadFor(cmd) {
+  switch (cmd.type) {
+    case "task.submit":
+      return { artifacts: cmd.artifacts.map(({ kind, name }) => ({ kind, name })), sha: cmd.sha ?? null };
+    case "task.request_changes":
+      return { feedback: cmd.feedback };
+    case "task.revise_plan":
+      return { feedback: cmd.feedback };
+    case "task.revise_design":
+      return { feedback: cmd.feedback };
+    case "task.revise_ship_plan":
+      return { feedback: cmd.feedback };
+    case "task.propose_ship_plan":
+      return { round: cmd.round, risk: cmd.risk, items: cmd.items.map(({ id, title, owner }) => ({ id, title, owner })), ...cmd.summary ? { summary: cmd.summary } : {} };
+    case "task.finish_subtask":
+      return { ...cmd.note ? { note: cmd.note } : {}, artifacts: (cmd.artifacts ?? []).map(({ kind, name }) => ({ kind, name })) };
+    case "task.confirm_release":
+      return cmd.note ? { note: cmd.note } : {};
+    case "task.block":
+      return { reason: cmd.reason, ...cmd.resolution ? { resolution: cmd.resolution } : {} };
+    case "task.request_plan":
+      return { ...cmd.architect ? { architect: cmd.architect } : {}, ...cmd.kind ? { kind: cmd.kind } : {} };
+    case "task.request_design":
+      return { ...cmd.designer ? { designer: cmd.designer } : {}, ...cmd.kind ? { kind: cmd.kind } : {}, ...cmd.provider ? { provider: cmd.provider } : {} };
+    case "task.propose_design":
+      return { round: cmd.round, mockups: cmd.mockups.map((m) => designMockupName(cmd.round, m.name)), ...cmd.summary ? { summary: cmd.summary } : {} };
+    default:
+      return {};
+  }
+}
+
+// src/handler/channel.ts
+init_src();
+async function channelCommands(store2, actor, cmd) {
+  if (cmd.type === "channel.assign") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "projects are managed by humans or the orchestrator");
+    const { id } = await store2.assignChannel(
+      cmd.channel,
+      cmd.project,
+      (workspace) => createEvent({
+        type: "project.updated",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "project", slug: cmd.project }),
+        workspace,
+        payload: { channel: cmd.channel }
+      })
+    );
+    return { ok: true, channelId: id };
+  }
+  if (cmd.type === "channel.create") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
+    const event = createEvent({
+      type: "channel.created",
+      source: actorAddress(actor),
+      target: formatAddress({ kind: "channel", slug: cmd.slug }),
+      workspace: cmd.workspace,
+      payload: { slug: cmd.slug, project: cmd.project, topic: cmd.topic }
+    });
+    const { id, slug } = await store2.createChannel(
+      { workspace: cmd.workspace, projectId: cmd.project, slug: cmd.slug, topic: cmd.topic, createdByKind: actor.kind, createdBy: actor.id },
+      event
+    );
+    return { ok: true, channelId: id, slug };
+  }
+  if (cmd.type === "channel.rename") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
+    if (cmd.slug === void 0 && cmd.topic === void 0) throw new DomainError("INVALID_INPUT", "nothing to rename");
+    const { id, slug } = await store2.renameChannel(
+      cmd.channel,
+      { slug: cmd.slug, topic: cmd.topic },
+      (workspace) => createEvent({
+        type: "channel.renamed",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.slug ?? cmd.channel }),
+        workspace,
+        payload: { channel: cmd.channel, slug: cmd.slug ?? null, topic: cmd.topic ?? null }
+      })
+    );
+    return { ok: true, channelId: id, slug };
+  }
+  if (cmd.type === "channel.set_thread_mode") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channels are managed by humans or the orchestrator");
+    const { id } = await store2.setChannelThreadMode(
+      cmd.channel,
+      cmd.mode,
+      (workspace) => createEvent({
+        type: "channel.thread_mode_set",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.channel }),
+        workspace,
+        payload: { channel: cmd.channel, mode: cmd.mode }
+      })
+    );
+    return { ok: true, channelId: id };
+  }
+  if (cmd.type === "channel.set_kind") {
+    if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "a room changes trade only by a human");
+    const { id } = await store2.setChannelKind(
+      cmd.channel,
+      cmd.kind,
+      (workspace) => createEvent({
+        type: "channel.kind_set",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.channel }),
+        workspace,
+        payload: { channel: cmd.channel, kind: cmd.kind }
+      })
+    );
+    return { ok: true, channelId: id };
+  }
+  if (cmd.type === "channel.delete") {
+    if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "channels are deleted by a human");
+    const { id } = await store2.deleteChannel(
+      cmd.channel,
+      (workspace) => createEvent({
+        type: "channel.deleted",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.channel }),
+        workspace,
+        payload: {}
+      })
+    );
+    console.log(`channel_deleted id=${cmd.channel} by=${actor.id}`);
+    return { ok: true, channelId: id };
+  }
+  if (cmd.type === "channel.add_agent" || cmd.type === "channel.remove_agent") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channel membership is managed by humans or the orchestrator");
+    const add = cmd.type === "channel.add_agent";
+    const fn = add ? store2.addAgentToChannel.bind(store2) : store2.removeAgentFromChannel.bind(store2);
+    const { agentId, channelId } = await fn(
+      cmd.workspace,
+      cmd.channel,
+      cmd.agent,
+      (workspace) => createEvent({
+        type: "agent.channels_synced",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.channel }),
+        workspace,
+        payload: { agent: cmd.agent, channel: cmd.channel, op: add ? "add" : "remove" }
+      }),
+      { kind: actor.kind, id: actor.id }
+    );
+    console.log(`agent_channel_${add ? "added" : "removed"} agent=${cmd.agent} channel=${cmd.channel} by=${actor.id}`);
+    return { ok: true, agentId, channelId };
+  }
+  if (cmd.type === "channel.add_person" || cmd.type === "channel.remove_person") {
+    const mayManage = actor.kind === "human" || actor.role === "orchestrator";
+    if (!mayManage) throw new DomainError("NOT_PERMITTED", "channel membership is managed by humans or the orchestrator");
+    const add = cmd.type === "channel.add_person";
+    const fn = add ? store2.addPersonToChannel.bind(store2) : store2.removePersonFromChannel.bind(store2);
+    const { userId, channelId } = await fn(
+      cmd.workspace,
+      cmd.channel,
+      cmd.person,
+      (workspace) => createEvent({
+        type: "channel.people_synced",
+        source: actorAddress(actor),
+        target: formatAddress({ kind: "channel", slug: cmd.channel }),
+        workspace,
+        payload: { person: cmd.person, channel: cmd.channel, op: add ? "add" : "remove" }
+      }),
+      actor.kind === "human" ? actor.id : null
+    );
+    console.log(`channel_person_${add ? "added" : "removed"} person=${cmd.person} channel=${cmd.channel} by=${actor.id}`);
+    return { ok: true, userId, channelId };
+  }
+  return void 0;
+}
+
+// src/handler/workspace.ts
+init_src();
 
 // src/member-machines.ts
 var fleetOn = () => process.env["FLEET_AUTOPROVISION"] !== "off";
@@ -20098,13 +20912,13 @@ async function connectorCommands(store2, actor, cmd) {
 init_src();
 
 // src/brain-objects.ts
-import { createHash as createHash5, randomUUID } from "node:crypto";
+import { createHash as createHash6, randomUUID } from "node:crypto";
 import { link, mkdir, readFile as readFile2, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { GoogleAuth } from "google-auth-library";
-var brainHash = (bytes) => createHash5("sha256").update(bytes).digest("hex");
+var brainHash = (bytes) => createHash6("sha256").update(bytes).digest("hex");
 function verified(bytes, ref) {
   if (bytes.length !== ref.sizeBytes || brainHash(bytes) !== ref.sha256) throw new Error("Brain object checksum does not match");
   return bytes;
@@ -20431,7 +21245,7 @@ function brainActivityProjection(value) {
   if (!p2 || typeof p2 !== "object") return void 0;
   if (event.type === "assistant.message" && (typeof p2.text !== "string" || typeof p2.turnId !== "string" || p2.actorId)) return void 0;
   if (event.type === "tool.call" && (typeof p2.name !== "string" || p2.name.startsWith("mcp__"))) return void 0;
-  const fields = event.type === "turn.open" ? ["turnId", "agentId", "kind"] : event.type === "turn.settle" ? ["turnId", "state"] : event.type === "assistant.message" ? ["text", "turnId"] : event.type === "tool.call" ? ["id", "name", "input", "turnId"] : ["id", "name", "output", "ok", "isError", "turnId"];
+  const fields = event.type === "turn.open" ? ["turnId", "agentId", "kind"] : event.type === "turn.settle" ? ["turnId", "state"] : event.type === "assistant.message" ? p2.source === "compaction" ? ["text", "turnId", "source"] : ["text", "turnId"] : event.type === "tool.call" ? ["id", "name", "input", "turnId"] : ["id", "name", "output", "ok", "isError", "turnId"];
   return {
     id: event.id,
     type: event.type,
@@ -20541,16 +21355,16 @@ var BrainStore = class {
   objects;
   async commit(actor, threadId, input) {
     await brainThreadAccess(this.sql, actor, input.workspace, threadId);
-    const digest2 = brainHash(canonicalJson(input));
+    const digest3 = brainHash(canonicalJson(input));
     const previous = await this.sql`select revision, commit_id, request_sha256 from brain_commits where thread_id = ${threadId}::uuid and commit_id = ${input.commitId}::uuid`;
     const retry = (row) => {
-      if (row.request_sha256 !== digest2) throw new BrainError("BRAIN_COMMIT_REUSED", "This commit ID names different content. Use a new commit ID.");
-      return { ok: true, revision: Number(row.revision), commitId: row.commit_id, sha256: digest2, duplicate: true };
+      if (row.request_sha256 !== digest3) throw new BrainError("BRAIN_COMMIT_REUSED", "This commit ID names different content. Use a new commit ID.");
+      return { ok: true, revision: Number(row.revision), commitId: row.commit_id, sha256: digest3, duplicate: true };
     };
     if (previous[0]) return retry(previous[0]);
     const uniqueIds = new Set(input.events.map((e) => e.id));
     if (uniqueIds.size !== input.events.length) throw new BrainError("BRAIN_EVENT_REUSED", "Each event in a commit needs a unique ID.", 400);
-    const prefix = `v1/workspaces/${input.workspace}/threads/${threadId}/commits/${input.commitId}/${digest2}`;
+    const prefix = `v1/workspaces/${input.workspace}/threads/${threadId}/commits/${input.commitId}/${digest3}`;
     const segment = await this.objects.put(`${prefix}/events.jsonl`, Buffer.from(input.events.map((e) => JSON.stringify(e)).join("\n") + (input.events.length ? "\n" : "")), "application/x-ndjson");
     const snapshot = input.runtimeMessages !== void 0 || input.metadata !== void 0 ? await this.objects.put(`${prefix}/runtime.json`, Buffer.from(JSON.stringify({ runtimeMessages: input.runtimeMessages, metadata: input.metadata })), "application/json") : null;
     return this.sql.begin(async (transaction) => {
@@ -20572,12 +21386,12 @@ var BrainStore = class {
       }
       const next = revision + 1;
       await tx`insert into brain_commits (thread_id, revision, commit_id, workspace_id, device_id, actor_kind, actor_id, request_sha256, segment, snapshot, event_count)
-        values (${threadId}::uuid, ${next}, ${input.commitId}::uuid, ${input.workspace}::uuid, ${input.deviceId}, ${actor.kind}::actor_kind, ${actor.id}::uuid, ${digest2}, ${tx.json(segment)}, ${snapshot ? tx.json(snapshot) : null}, ${input.events.length})`;
+        values (${threadId}::uuid, ${next}, ${input.commitId}::uuid, ${input.workspace}::uuid, ${input.deviceId}, ${actor.kind}::actor_kind, ${actor.id}::uuid, ${digest3}, ${tx.json(segment)}, ${snapshot ? tx.json(snapshot) : null}, ${input.events.length})`;
       if (input.events.length) await tx`insert into brain_event_ids ${tx(input.events.map((e) => ({ thread_id: threadId, event_id: e.id, revision: next })))}`;
-      const event = createEvent({ type: "brain.committed", workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/thread/${threadId}`, payload: { threadId, revision: next, commitId: input.commitId, eventCount: input.events.length, sha256: digest2 } });
+      const event = createEvent({ type: "brain.committed", workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/thread/${threadId}`, payload: { threadId, revision: next, commitId: input.commitId, eventCount: input.events.length, sha256: digest3 } });
       await tx`insert into events (id, workspace_id, type, source, target, payload)
         values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)})`;
-      return { ok: true, revision: next, commitId: input.commitId, sha256: digest2, duplicate: false };
+      return { ok: true, revision: next, commitId: input.commitId, sha256: digest3, duplicate: false };
     });
   }
   async read(actor, workspace, threadId, compact = false, since) {
@@ -20618,17 +21432,27 @@ var BrainStore = class {
   }
   async artifacts(actor, workspace, threadId) {
     await brainThreadAccess(this.sql, actor, workspace, threadId);
-    const rows2 = await this.sql`select a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.thread_id = ${threadId}::uuid and b.workspace_id = ${workspace}::uuid order by b.created_at`;
-    return rows2.map((r) => ({ id: r["id"], name: r["name"], kind: r["kind"], tags: r["tags"], mime: r["mime"], sizeBytes: Number(r["size_bytes"]), sha256: r["content_hash"], createdAt: new Date(r["created_at"]).toISOString(), storagePath: `brain:${r["id"]}`, url: `/v1/brain/artifacts/${r["id"]}?workspace=${workspace}` }));
+    const rows2 = await this.sql`select a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at,b.capture,b.created_at as captured_at,b.object_ref from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.thread_id = ${threadId}::uuid and b.workspace_id = ${workspace}::uuid order by b.created_at`;
+    return rows2.map((r) => ({ id: r["id"], name: r["name"], ...r["capture"] ? { capture: { ...r["capture"], sha256: r["object_ref"].sha256, capturedAt: new Date(r["captured_at"]).toISOString() } } : {}, kind: r["kind"], tags: r["tags"], mime: r["mime"], sizeBytes: Number(r["size_bytes"]), sha256: r["content_hash"], createdAt: new Date(r["created_at"]).toISOString(), storagePath: `brain:${r["id"]}`, url: `/v1/brain/artifacts/${r["id"]}?workspace=${workspace}` }));
   }
   async artifact(actor, input) {
-    const scope = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
-    if (input.channel && input.channel !== scope.channel_id) throw new BrainError("NOT_FOUND", "The artifact channel does not belong to this thread.", 404);
+    if (input.capture && (actor.kind !== "human" || !/^validation\/(before|after)\/[a-z0-9][a-z0-9-]{0,59}\.(?:png|jpg)$/.test(input.name) || !["image/png", "image/jpeg"].includes(input.mime))) {
+      throw new BrainError("NOT_PERMITTED", "A capture receipt requires an authenticated capture publisher and a validation image.", 403);
+    }
+    const scope3 = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
+    if (input.capture?.source === "independent-observer" && input.capture.reviewedRevision) {
+      const [reviewed] = await this.sql`select id from tasks where id=${scope3.task_id}::uuid and workspace_id=${input.workspace}::uuid and submitted_sha=${input.capture.reviewedRevision}`;
+      if (!reviewed) throw new BrainError("INVALID_INPUT", "The independent capture must match the submitted revision of this task.", 400);
+    }
+    if (input.channel && input.channel !== scope3.channel_id) throw new BrainError("NOT_FOUND", "The artifact channel does not belong to this thread.", 404);
     const bytes = brainArtifactBytes(input.contentBase64);
+    if (input.capture && (bytes.length < 24 || (input.mime === "image/png" ? !bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")) || bytes.toString("ascii", 12, 16) !== "IHDR" || !bytes.subarray(-8).equals(Buffer.from("49454e44ae426082", "hex")) : !bytes.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex")) || !bytes.subarray(-2).equals(Buffer.from("ffd9", "hex"))))) {
+      throw new BrainError("INVALID_INPUT", "The capture bytes must match their image format.", 400);
+    }
     const sha256 = brainHash(bytes);
     if (input.sha256 && input.sha256 !== sha256) throw new BrainError("BRAIN_CHECKSUM_MISMATCH", "The artifact checksum does not match its bytes.", 400);
-    brainArtifactInline(bytes, input.mime, input.workspace, scope.kind === "coding");
-    const digest2 = brainHash(canonicalJson({ workspace: input.workspace, threadId: input.threadId, id: input.id, name: input.name, mime: input.mime, sha256, messageId: input.messageId, kind: input.kind, tags: input.tags, channel: input.channel }));
+    brainArtifactInline(bytes, input.mime, input.workspace, scope3.kind === "coding");
+    const digest3 = brainHash(canonicalJson({ workspace: input.workspace, threadId: input.threadId, id: input.id, name: input.name, mime: input.mime, sha256, messageId: input.messageId, kind: input.kind, tags: input.tags, channel: input.channel, ...input.capture ? { capture: input.capture } : {} }));
     const ref = await this.objects.put(`v1/workspaces/${input.workspace}/threads/${input.threadId}/artifacts/${input.id}/${sha256}`, bytes, input.mime);
     await this.sql.begin(async (transaction) => {
       const tx = transaction;
@@ -20637,7 +21461,7 @@ var BrainStore = class {
       const inline = brainArtifactInline(bytes, input.mime, input.workspace, thread.kind === "coding");
       const [existing] = await tx`select request_sha256 from brain_artifacts where artifact_id = ${input.id}::uuid`;
       if (existing) {
-        if (existing["request_sha256"] !== digest2) throw new BrainError("BRAIN_ARTIFACT_REUSED", "This artifact ID names different content. Use a new artifact ID.");
+        if (existing["request_sha256"] !== digest3) throw new BrainError("BRAIN_ARTIFACT_REUSED", "This artifact ID names different content. Use a new artifact ID.");
         return;
       }
       let messageId = input.messageId;
@@ -20649,7 +21473,7 @@ var BrainStore = class {
       if (collision.length) throw new BrainError("BRAIN_ARTIFACT_REUSED", "This artifact ID already exists. Use a new artifact ID.");
       await tx`insert into artifacts (id, workspace_id, channel_id, project_id, task_id, message_id, kind, name, mime, tags, content_hash, storage_path, size_bytes, inline_content, created_by_kind, created_by)
         values (${input.id}::uuid, ${input.workspace}::uuid, ${thread.channel_id}::uuid, ${thread.project_id}::uuid, ${thread.task_id}::uuid, ${messageId ?? null}::uuid, ${input.kind ?? (input.mime.startsWith("image/") ? "screenshot" : "file")}::artifact_kind, ${input.name}, ${input.mime}, ${input.tags ?? []}, ${sha256}, ${`brain:${input.id}`}, ${bytes.length}, ${inline}, ${actor.kind}::actor_kind, ${actor.id}::uuid)`;
-      await tx`insert into brain_artifacts (artifact_id, thread_id, workspace_id, object_ref, request_sha256) values (${input.id}::uuid, ${input.threadId}::uuid, ${input.workspace}::uuid, ${tx.json(ref)}, ${digest2})`;
+      await tx`insert into brain_artifacts (artifact_id, thread_id, workspace_id, object_ref, request_sha256, capture) values (${input.id}::uuid, ${input.threadId}::uuid, ${input.workspace}::uuid, ${tx.json(ref)}, ${digest3}, ${input.capture ? tx.json({ ...input.capture, name: input.name }) : null})`;
       const event = createEvent({ type: "brain.artifact_created", workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/artifact/${input.id}`, payload: { artifactId: input.id, threadId: input.threadId, sha256, sizeBytes: bytes.length } });
       await tx`insert into events (id, workspace_id, type, source, target, payload)
         values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)})`;
@@ -20922,6 +21746,7 @@ async function machineCommands(store2, actor, cmd) {
       activeSeconds: cmd.activeSeconds ?? 0,
       busy: cmd.busy ?? false,
       ...cmd.runtimes ? { runtimes: cmd.runtimes } : {},
+      ...cmd.permissionVersion ? { permissionVersion: cmd.permissionVersion } : {},
       ...cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}
     });
     if (!beat) throw new DomainError("NOT_FOUND", "no machine you may beat has this id");
@@ -21431,7 +22256,7 @@ async function routineSession(store2, actor, workspace, channel, threadId) {
     })
   };
 }
-async function scheduleCommands(store2, actor, cmd) {
+async function scheduleCommands(store2, actor, cmd, machineWorkspace2) {
   if (cmd.type === "schedule.create") {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "schedules are armed by a human \u2014 agents propose, humans arm");
     const { workspace } = await store2.channelWorkspace(cmd.channel);
@@ -21502,7 +22327,7 @@ async function scheduleCommands(store2, actor, cmd) {
     return { ok: true, scheduleId: id, nextRunAt };
   }
   if (cmd.type === "schedule.claim_run") {
-    const { claimed } = await store2.claimScheduleRun(
+    const claim = await store2.claimScheduleRun(
       cmd.schedule,
       cmd.runCount,
       cmd.nextRunAt,
@@ -21512,9 +22337,10 @@ async function scheduleCommands(store2, actor, cmd) {
         target: formatAddress({ kind: "resource", type: "schedule", id: cmd.schedule }),
         workspace: ws,
         payload: { schedule: cmd.schedule, runCount: cmd.runCount, nextRunAt: cmd.nextRunAt }
-      })
+      }),
+      { actor, machineWorkspace: machineWorkspace2 }
     );
-    return { ok: true, claimed };
+    return { ok: true, ...claim };
   }
   if (cmd.type === "schedule.run_now") {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a person runs a routine now. agents wait for its slot");
@@ -22057,6 +22883,7 @@ async function insertCodeSession(sql, input, event) {
 async function patchCodeSession(sql, id, patch, ended, event) {
   const cols = columnsOf(patch);
   await sql.begin(async (tx) => {
+    await tx`select revision from local_sync_state where singleton and enabled for update`;
     const [thread] = await tx`select title, titled_at from threads where id = ${id}::uuid for update`;
     if (patch.title !== void 0 && thread?.["titled_at"]) cols["title"] = thread["title"];
     await tx`update code_sessions set ${tx({ ...cols, updated_at: (/* @__PURE__ */ new Date()).toISOString(), ended_at: ended ? (/* @__PURE__ */ new Date()).toISOString() : null })} where id = ${id}::uuid`;
@@ -22153,19 +22980,90 @@ async function codeSessionCommands(store2, actor, cmd) {
   };
 }
 
+// src/store/permission-run.ts
+import { createHash as createHash7, randomUUID as randomUUID2 } from "node:crypto";
+var digest2 = (value) => createHash7("sha256").update(value).digest("hex");
+async function issueSchedulePermission(sql, schedule, slot, workspace, authority) {
+  if (!authority) return;
+  if (authority.machineWorkspace && authority.machineWorkspace !== workspace) throw new DomainError("NOT_PERMITTED", "This schedule belongs to another workspace.");
+  if (!authority.machineWorkspace) {
+    if (authority.actor.kind !== "human") return;
+    const [owner] = await sql`select 1 from schedules s join workspace_members m on m.workspace_id=s.workspace_id
+      where s.id=${schedule} and m.user_id=${authority.actor.id} and s.created_by_kind='human'
+        and s.created_by=m.user_id::text`;
+    if (!owner) return;
+  }
+  const token = randomUUID2();
+  await sql`insert into permission_schedule_claims(schedule_id,slot,token_hash) values(${schedule},${slot},${digest2(token)})`;
+  return token;
+}
+async function bindSchedulePermission(sql, message2) {
+  if (!message2.schedulePermission) return;
+  const claimed = await sql`update permission_schedule_claims p set token_hash=null,message_id=${message2.id}
+    from schedules s,threads t where s.id=p.schedule_id and s.id=${message2.scheduleId ?? null} and s.workspace_id=${message2.workspace}
+      and t.id=${message2.threadId ?? null} and t.workspace_id=s.workspace_id and t.channel_id=${message2.channel}
+      and (s.owner_home_thread_id=t.id or (s.owner_home_thread_id is null and s.channel_id=t.channel_id and t.schedule_id=s.id))
+      and p.expires_at>now() and p.token_hash=${digest2(message2.schedulePermission)} and p.message_id is null returning p.slot`;
+  if (!claimed.length) throw new DomainError("NOT_PERMITTED", "The automation slot does not authorize this thread.");
+}
+async function scheduledWake(sql, workspace, thread, runId, agent, machineId, memberId) {
+  if (!machineId && !memberId) return null;
+  const [row] = await sql`select s.id as schedule,m.id as message from runs r
+    join messages m on m.id=r.trigger_message_id and m.thread_id=r.thread_id and m.workspace_id=r.workspace_id
+    join permission_schedule_claims p on p.message_id=m.id join schedules s on s.id=p.schedule_id and s.workspace_id=r.workspace_id
+    where r.id=${runId} and r.workspace_id=${workspace} and r.thread_id=${thread} and r.agent_id=${agent}
+      and (r.machine_id=${machineId ?? null} or (${memberId ?? null}::uuid is not null and s.created_by=${memberId ?? null}
+        and exists(select 1 from machines m join workspace_members wm on wm.workspace_id=m.workspace_id and wm.user_id=m.owner_user_id
+          where m.id=r.machine_id and m.workspace_id=r.workspace_id and m.owner_user_id=${memberId ?? null})))
+      and r.state='running' and r.kind='wake'`;
+  return row ? { schedule: String(row.schedule), message: String(row.message) } : null;
+}
+async function claimSchedule(db, scheduleId, runCount, nextRunAt, makeEvent, insertEvent, authority) {
+  return db.begin(async (_tx) => {
+    const sql = _tx;
+    const [row] = await sql`update schedules
+        set run_count = run_count + 1, next_run_at = ${nextRunAt}, last_run_at = now(),
+            status = case when ${nextRunAt}::timestamptz is null then 'done' else status end
+        where id = ${scheduleId}::uuid and run_count = ${runCount} and status = 'active'
+        returning workspace_id`;
+    if (!row) {
+      const [exists] = await sql`select 1 from schedules where id = ${scheduleId}::uuid`;
+      if (!exists) throw new DomainError("NOT_FOUND", "schedule not found");
+      return { claimed: false };
+    }
+    await insertEvent(sql, makeEvent(row["workspace_id"]));
+    const schedulePermission = await issueSchedulePermission(sql, scheduleId, runCount, String(row["workspace_id"]), authority);
+    return { claimed: true, ...schedulePermission ? { schedulePermission } : {} };
+  });
+}
+
 // src/handler/createtask.ts
 init_src();
+init_src();
 var CODE_KINDS = /* @__PURE__ */ new Set(["bug", "feature", "refactor", "chore"]);
-async function createTask(store2, actor, cmd) {
-  const mayCreate = actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
-  if (!mayCreate) {
-    throw new DomainError("NOT_PERMITTED", "only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)");
-  }
+async function createTask(store2, actor, cmd, machineId, memberId) {
   if (actor.kind === "agent") {
     const rules = commRulesFrom(await store2.getCommRules(cmd.workspace).catch(() => null));
     if (rules.noEmdash) {
       cmd = { ...cmd, title: scrubEmdash(cmd.title), description: scrubEmdash(cmd.description) };
     }
+  }
+  const sql = sqlOf(store2);
+  const scheduled = sql && actor.kind === "agent" && cmd.originThread && cmd.permissionRunId ? await scheduledWake(sql, cmd.workspace, cmd.originThread, cmd.permissionRunId, actor.id, machineId, memberId) : null;
+  const coding = await validateCodingHandoff(store2, actor, cmd, scheduled?.message);
+  if (coding) {
+    cmd = { ...cmd, project: coding.project, channel: coding.channel };
+    const adopted = await adoptCodingTask(store2, actor, cmd, coding, scheduled?.message);
+    if (adopted) return adopted;
+    const prior = await store2.getTask(cmd.codingHandoff.requestId);
+    if (prior) {
+      if (prior.workspace !== cmd.workspace || prior.originThreadId !== cmd.originThread || prior.creator.id !== actor.id || prior.title !== cmd.title || prior.description !== cmd.description || prior.repo?.id !== cmd.repo?.id) throw new DomainError("INVALID_INPUT", "This coding request ID was already used for different work.");
+      return { task: prior, events: [] };
+    }
+  }
+  const mayCreate = !!coding || actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
+  if (!mayCreate) {
+    throw new DomainError("NOT_PERMITTED", "only humans or the channel orchestrator create tasks (any teammate may add a backlog item or a subtask)");
   }
   if (cmd.backlog && cmd.offerTo) {
     throw new DomainError("INVALID_INPUT", "a backlog item cannot be offered \u2014 promote it to todo first");
@@ -22176,7 +23074,7 @@ async function createTask(store2, actor, cmd) {
   if (cmd.thread && await store2.getThreadMode(cmd.workspace, cmd.thread) === "chat") {
     throw new DomainError("CHAT_THREAD", "this conversation has Tasks turned off \u2014 turn it on in the thread's composer, then ask again");
   }
-  if (cmd.originThread && await store2.getThreadMode(cmd.workspace, cmd.originThread) === "chat") {
+  if (!coding && cmd.originThread && await store2.getThreadMode(cmd.workspace, cmd.originThread) === "chat") {
     throw new DomainError("CHAT_THREAD", "this conversation has Tasks turned off \u2014 a chat thread cannot own board work");
   }
   const workPlanInput = !cmd.backlog && !cmd.parent && cmd.plan ? cmd.plan : null;
@@ -22184,8 +23082,8 @@ async function createTask(store2, actor, cmd) {
     const bad = validateWorkPlanLegs(workPlanInput.legs, !!cmd.repo);
     if (bad) throw new DomainError("INVALID_INPUT", bad);
   }
-  const routineScheduleId = workPlanInput && cmd.originThread ? await store2.getThreadRoutineId(cmd.workspace, cmd.originThread) : null;
-  const routine = !!routineScheduleId && !cmd.repo;
+  const routineScheduleId = !sql && workPlanInput && cmd.originThread ? await store2.getThreadRoutineId(cmd.workspace, cmd.originThread) : null;
+  const routine = !!scheduled || !!routineScheduleId && !cmd.repo && !cmd.permissionRunId;
   const playbookRun = !!cmd.playbook && !cmd.repo && !!workPlanInput;
   const handsOff = routine || playbookRun;
   if (cmd.offerTo && !cmd.kind && !cmd.parent) {
@@ -22230,11 +23128,11 @@ async function createTask(store2, actor, cmd) {
   if (actor.kind === "agent" && !cmd.backlog && !cmd.parent && !workPlanInput) {
     throw new DomainError("INVALID_INPUT", "PLAN_FIRST: a live task starts with its implementation plan \u2014 pass plan:{legs, subtasks, approach} so the human reviews it in the unit's thread before work begins");
   }
-  const offeredAgentId = cmd.offerTo ? await store2.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
+  const offeredAgentId = coding ? coding.agentId : cmd.offerTo ? await store2.resolveOffer(cmd.workspace, cmd.channel, cmd.offerTo) : null;
   const number = await store2.nextTaskNumber(cmd.workspace);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const task = {
-    id: crypto.randomUUID(),
+    id: coding ? cmd.codingHandoff.requestId : crypto.randomUUID(),
     workspace: cmd.workspace,
     // a subtask lives in its parent's channel BY CONSTRUCTION — inherited, not
     // validated (callers pass channel ids or slugs; the parent's slug is truth)
@@ -22246,7 +23144,7 @@ async function createTask(store2, actor, cmd) {
     state: cmd.backlog ? "backlog" : workPlanInput ? "plan_review" : "todo",
     kind: cmd.kind ?? null,
     creator: { kind: actor.kind, id: actor.id },
-    assignee: null,
+    assignee: offeredAgentId ? { kind: "agent", id: offeredAgentId } : null,
     offeredAgentId,
     requirements: cmd.checklist ?? null,
     definitionOfDone: cmd.definitionOfDone ?? "",
@@ -22262,7 +23160,8 @@ async function createTask(store2, actor, cmd) {
     // routine-born unit is born past both gates (see `routine` above).
     requirementsConfirmed: !!cmd.checklist?.length || !!parent || handsOff,
     planApprovedAt: handsOff ? now : null,
-    workPlan: workPlanInput ? { legs: workPlanInput.legs, subtasks: workPlanInput.subtasks ?? [], approach: workPlanInput.approach, version: 1, proposedAt: now } : null,
+    workPlan: workPlanInput ? { ...coding && cmd.codingHandoff ? { codingDelivery: codingDeliveryPolicy(cmd.codingHandoff, [cmd.title, cmd.description, ...cmd.checklist ?? []]) } : {}, legs: workPlanInput.legs, subtasks: workPlanInput.subtasks ?? [], approach: workPlanInput.approach, version: 1, proposedAt: now } : null,
+    permissionRunMessageId: scheduled?.message ?? (parent?.assignee?.id === actor.id && parent.assignee.kind === actor.kind ? parent.permissionRunMessageId : null) ?? null,
     originThreadId: cmd.originThread ?? null,
     shipPlan: null,
     parentTaskId: parent?.id ?? null,
@@ -22275,7 +23174,7 @@ async function createTask(store2, actor, cmd) {
     source: actorAddress(actor),
     target: taskTarget(task),
     workspace: task.workspace,
-    payload: { title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...task.kind ? { kind: task.kind } : {}, ...cmd.backlog ? { backlog: true } : {}, ...parent ? { parent: parent.id, parentNumber: parent.number } : {}, ...task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}, ...task.originThreadId ? { originThread: task.originThreadId } : {}, ...routine ? { routine: true, scheduleId: routineScheduleId } : {}, ...playbookRun ? { playbook: cmd.playbook } : {} }
+    payload: { ...coding ? { codingOwner: coding.owner } : {}, title: task.title, channel: task.channel, project: task.project, repo: task.repo, offeredTo: cmd.offerTo ?? null, ...task.kind ? { kind: task.kind } : {}, ...cmd.backlog ? { backlog: true } : {}, ...parent ? { parent: parent.id, parentNumber: parent.number } : {}, ...task.workPlan ? { planFirst: true, legs: task.workPlan.legs } : {}, ...task.originThreadId ? { originThread: task.originThreadId } : {}, ...routine ? { routine: true, scheduleId: scheduled?.schedule ?? routineScheduleId } : {}, ...playbookRun ? { playbook: cmd.playbook } : {} }
   });
   await store2.createTask(task, event);
   if (cmd.thread) await store2.linkThreadTask(cmd.workspace, cmd.thread, task.id).catch(() => {
@@ -22338,7 +23237,8 @@ async function createTask(store2, actor, cmd) {
 function isTaskCommand(c) {
   return typeof c.taskId === "string";
 }
-async function executeCommand(store2, actor, cmd) {
+async function executeCommand(store2, actor, cmd, machine, memberId) {
+  if (machine) requireHumanAuthority(actor, cmd);
   await requireCommandActivation(store2, cmd);
   {
     const r = await machineCommands(store2, actor, cmd);
@@ -22397,7 +23297,7 @@ async function executeCommand(store2, actor, cmd) {
     if (r !== void 0) return r;
   }
   {
-    const r = await scheduleCommands(store2, actor, cmd);
+    const r = await scheduleCommands(store2, actor, cmd, machine?.workspaceId);
     if (r !== void 0) return r;
   }
   {
@@ -22440,7 +23340,7 @@ async function executeCommand(store2, actor, cmd) {
     const r = await channelCommands(store2, actor, cmd);
     if (r !== void 0) return r;
   }
-  if (cmd.type === "task.create") return createTask(store2, actor, cmd);
+  if (cmd.type === "task.create") return createTask(store2, actor, cmd, machine?.id, memberId);
   if (cmd.type === "task.offer") {
     const mayOffer = actor.kind === "human" || actor.role === "orchestrator";
     if (!mayOffer) throw new DomainError("NOT_PERMITTED", "tasks are offered by humans or the orchestrator");
@@ -22475,7 +23375,8 @@ async function executeCommand(store2, actor, cmd) {
     const task = await store2.getTask(cmd.taskId);
     if (!task) throw new DomainError("NOT_FOUND", `task ${cmd.taskId} not found`);
     const owners = BEAT_PHASE_ROLES[task.state] ?? [];
-    if (!actor.role || !owners.includes(actor.role)) {
+    const ownsPhase = sameActor(task.assignee, actor) || !task.assignee && task.offeredAgentId === actor.id;
+    if (!actor.role || !owners.includes(actor.role) && !ownsPhase) {
       throw new DomainError("NOT_PERMITTED", `only the ${owners.join("/") || "assigned agent"} may set beats while a task is ${task.state}`);
     }
     if (cmd.type === "beats.declare") {
@@ -22558,23 +23459,18 @@ async function executeCommand(store2, actor, cmd) {
     return { workspaceId: joined.workspaceId, workspaceName: joined.workspaceName, role: joined.role };
   }
   if (!isTaskCommand(cmd)) throw new DomainError("INVALID_INPUT", `unhandled command ${cmd.type}`);
-  if (cmd.type === "task.claim_ship") {
-    const t2 = await store2.getTask(cmd.taskId);
-    if (!t2) throw new DomainError("NOT_FOUND", `task ${cmd.taskId} not found`);
-    if (!t2.prNumber) {
-      throw new DomainError("INVALID_INPUT", "the ship gate covers repo-backed tasks with an open pull request \u2014 a human accept ships this one directly");
-    }
-    if (!await store2.shipGate(cmd.taskId)) {
-      throw new DomainError("NOT_PERMITTED", "the release gate is off for this project \u2014 a human accept merges it directly");
-    }
-  }
+  const recheckVersion = await prepareReviewTransition(store2, cmd);
+  if (cmd.type === "task.claim_ship") await requireReleasePreparation(store2, actor, cmd.taskId);
   const subtasksPending = SUBTASK_GATED.has(cmd.type) ? await store2.pendingSubtasks(cmd.taskId) : 0;
   const planVersion = cmd.type === "task.propose_plan" ? nextPlanVersion((await store2.listArtifacts(cmd.taskId)).map((a) => a.name)) : 0;
   const word = cmd.type === "task.accept" && actor.kind !== "human" ? await store2.latestHumanWord(cmd.taskId) : null;
   if (cmd.type === "task.accept" && actor.kind !== "human" && !word) {
     throw new DomainError("HUMAN_ONLY", "accept needs the human's word: nobody typed in this thread since the review verdict, and a card click is no word");
   }
+  const releaseWord = word && await wantsCodingRelease(store2, cmd.taskId, word.id);
   let outcome = await store2.mutate(cmd.taskId, async (task) => {
+    if (releaseWord && task.state === "done" && task.workPlan?.codingDelivery) return transition(task, actor, { type: "task.claim_ship", taskId: task.id }, 0, 0, true);
+    if (cmd.type === "task.request_release_checklist") return requestCodingChecklist(task, actor);
     if (cmd.type === "task.confirm_requirements") return confirmRequirements(task, actor, cmd.checklist);
     if (cmd.type === "task.approve_plan") return approvePlan(task, actor);
     if (cmd.type === "task.set_definition_of_done") return setDefinitionOfDone(task, actor, cmd.dod);
@@ -22582,7 +23478,8 @@ async function executeCommand(store2, actor, cmd) {
     if (cmd.type === "task.select_design_provider") return selectDesignProvider(task, actor, cmd.provider);
     if (cmd.type === "task.check_ship_item") return checkShipItem(task, actor, cmd);
     if (cmd.type === "task.add_ship_item") return addShipItem(task, actor, cmd);
-    return transition(task, actor, cmd, subtasksPending, planVersion, !!word);
+    const from = task.version === recheckVersion ? { ...task, blockedFrom: "in_review" } : task;
+    return transition(from, actor, cmd, subtasksPending, planVersion, !!word);
   });
   if (word) Object.assign(outcome, { onWord: word });
   await planRevisionFollowup(store2, actor, cmd, outcome);
@@ -22866,8 +23763,8 @@ function cronRoutes(app, store2, push2) {
 
 // src/announce.ts
 import { cors } from "hono/cors";
-import { createHash as createHash7 } from "node:crypto";
-import { z as z20 } from "zod";
+import { createHash as createHash9 } from "node:crypto";
+import { z as z21 } from "zod";
 
 // src/announce-job.ts
 init_src();
@@ -23506,66 +24403,66 @@ async function runAnnounceJob(ann, row, deps) {
 init_src();
 
 // ../shared/src/command-union-marketing.ts
-import { z as z15 } from "zod";
+import { z as z16 } from "zod";
 
 // ../shared/src/command-union-schedule.ts
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 var SCHEDULE_RUN_COMMANDS = [
   // the daemon's atomic claim of a due run: counter CAS (ship-stage lesson) so two machines
   // never double-fire. nextRunAt is the claimer's recomputed advance (null = done).
-  z14.object({
-    type: z14.literal("schedule.claim_run"),
-    schedule: z14.string().min(1),
-    runCount: z14.number().int().min(0),
-    nextRunAt: z14.string().datetime().nullable()
+  z15.object({
+    type: z15.literal("schedule.claim_run"),
+    schedule: z15.string().min(1),
+    runCount: z15.number().int().min(0),
+    nextRunAt: z15.string().datetime().nullable()
   }),
   // the fire's outcome → schedules.last_error (the attention bar's truth); null = the next clean run clears it
-  z14.object({ type: z14.literal("schedule.mark_result"), schedule: z14.string().min(1), error: z14.string().max(500).nullable() }),
+  z15.object({ type: z15.literal("schedule.mark_result"), schedule: z15.string().min(1), error: z15.string().max(500).nullable() }),
   // Run now (routine sessions, 2026-09-28): a person makes the schedule due at once, and the next tick
   // fires it into its session. Human-only in the handler, refused on a paused or finished row.
-  z14.object({ type: z14.literal("schedule.run_now"), schedule: z14.string().min(1) }),
+  z15.object({ type: z15.literal("schedule.run_now"), schedule: z15.string().min(1) }),
   // the release routine's cursor (docs/design/release-drafts-2026-09 §4.2): the lane that FINISHED a
   // scan writes where the next window starts, plus one ledger line (a quiet day is a row too). Any
   // authenticated teammate, like claim_run and mark_result: the row is the truth, the Routines
   // ledger its reader. Refused on a row that is not a release routine.
-  z14.object({
-    type: z14.literal("schedule.set_cursor"),
-    schedule: z14.string().min(1),
-    cursor: z14.object({ at: z14.string().datetime(), tag: z14.string().max(120).nullable() }),
-    log: z14.object({ at: z14.string().datetime(), key: z14.string().max(120).nullable(), note: z14.string().trim().min(1).max(300) }).nullable().optional()
+  z15.object({
+    type: z15.literal("schedule.set_cursor"),
+    schedule: z15.string().min(1),
+    cursor: z15.object({ at: z15.string().datetime(), tag: z15.string().max(120).nullable() }),
+    log: z15.object({ at: z15.string().datetime(), key: z15.string().max(120).nullable(), note: z15.string().trim().min(1).max(300) }).nullable().optional()
   })
 ];
-var MARKETING_RELEASES = z14.object({
-  repoId: z14.string().min(1).nullable().optional(),
-  slug: z14.string().trim().max(200).nullable().optional(),
+var MARKETING_RELEASES = z15.object({
+  repoId: z15.string().min(1).nullable().optional(),
+  slug: z15.string().trim().max(200).nullable().optional(),
   // owner/name, for the titles
-  now: z14.boolean(),
-  watch: z14.boolean(),
-  at: z14.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-  tz: z14.string().max(64).optional()
+  now: z15.boolean(),
+  watch: z15.boolean(),
+  at: z15.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  tz: z15.string().max(64).optional()
 });
-var SETUP_RELEASES_VALUE = z14.object({
-  repoId: z14.string().min(1).nullable().optional(),
-  slug: z14.string().trim().max(200).nullable().optional(),
-  now: z14.boolean().optional(),
-  watch: z14.boolean().optional()
+var SETUP_RELEASES_VALUE = z15.object({
+  repoId: z15.string().min(1).nullable().optional(),
+  slug: z15.string().trim().max(200).nullable().optional(),
+  now: z15.boolean().optional(),
+  watch: z15.boolean().optional()
 });
 
 // ../shared/src/command-union-marketing.ts
 var MARKETING_COMMANDS = [
   // Start or resume project-owned marketing setup without changing the project's conversation kind.
-  z15.object({ type: z15.literal("marketing.start"), project: z15.string().uuid() }),
+  z16.object({ type: z16.literal("marketing.start"), project: z16.string().uuid() }),
   // marketing HQ setup (marketing-channel plan §4.3): point the room at the product. Writes the
   // profile onto channels.marketing and fans out the bootstrap task ("Build the brand foundation")
   // through the ordinary task path, so triage/staffing take it from there. Human-only; FREE on
   // every plan by design (round 2), and so is the daily release watch it plants (2026-10-03).
-  z15.object({
-    type: z15.literal("marketing.setup"),
-    channel: z15.string().min(1),
+  z16.object({
+    type: z16.literal("marketing.setup"),
+    channel: z16.string().min(1),
     // channel id
-    website: z15.string().trim().max(400).optional(),
-    focus: z15.array(z15.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
-    goal: z15.string().trim().max(300).optional(),
+    website: z16.string().trim().max(400).optional(),
+    focus: z16.array(z16.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
+    goal: z16.string().trim().max(300).optional(),
     // the human's stated aim, in their words
     // step 5, release drafts (docs/design/release-drafts-2026-09 §4.7): the repository to watch,
     // draft the latest release now (a free one-shot), watch daily (a Team routine)
@@ -23574,47 +24471,47 @@ var MARKETING_COMMANDS = [
   // flip one marketing MCP integration on the room (marketing.mcp.<provider>) — the daemon
   // attaches the enabled servers to marketer research runs with MACHINE-LOCAL creds
   // (integrations-and-skills-plan.md: read paths local, publish custody stays ours)
-  z15.object({
-    type: z15.literal("marketing.set_integration"),
-    channel: z15.string().min(1),
+  z16.object({
+    type: z16.literal("marketing.set_integration"),
+    channel: z16.string().min(1),
     // channel id
-    provider: z15.enum(["posthog", "x", "meta", "tiktok"]),
-    enabled: z15.boolean()
+    provider: z16.enum(["posthog", "x", "meta", "tiktok"]),
+    enabled: z16.boolean()
   }),
   // one answered SETUP-FLOW step (shared/setupflows.ts), written as it lands — what makes an
   // abandoned wizard resumable. flow/step must name a registered flow; the value's shape is
   // checked against the step in the handler (a website string vs a focus array). Human-only:
   // setup is the human's checklist by construction, like the flow's completing command.
-  z15.object({
-    type: z15.literal("setup.step"),
-    channel: z15.string().min(1),
+  z16.object({
+    type: z16.literal("setup.step"),
+    channel: z16.string().min(1),
     // channel id
-    flow: z15.string().min(1),
+    flow: z16.string().min(1),
     // the registered flow id, e.g. 'marketing.v1'
-    step: z15.string().min(1),
+    step: z16.string().min(1),
     // a step id of that flow
-    value: z15.union([z15.string().trim().max(400), z15.array(z15.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
+    value: z16.union([z16.string().trim().max(400), z16.array(z16.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
   }),
   // release-day backfill (idempotent, daemon boot): setup tasks for flow-bearing rooms that
   // predate setup flows and were never configured. Returns how many were created.
-  z15.object({ type: z15.literal("setup.backfill"), workspace: z15.string().min(1) })
+  z16.object({ type: z16.literal("setup.backfill"), workspace: z16.string().min(1) })
 ];
 
 // ../shared/src/command-union.ts
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // ../shared/src/command-union-machine.ts
 init_commands_code();
-import { z as z16 } from "zod";
-var runtimes = z16.array(z16.string().min(1).max(40)).max(12).optional();
+import { z as z17 } from "zod";
+var runtimes = z17.array(z17.string().min(1).max(40)).max(12).optional();
 var MACHINE_COMMANDS = [
-  z16.object({
-    type: z16.literal("machine.register"),
-    workspace: z16.string().min(1),
-    name: z16.string().min(1),
-    platform: z16.string().min(1).default("darwin"),
-    daemonVersion: z16.string().min(1).default("0.0.0"),
-    transfer: z16.boolean().optional(),
+  z17.object({
+    type: z17.literal("machine.register"),
+    workspace: z17.string().min(1),
+    name: z17.string().min(1),
+    platform: z17.string().min(1).default("darwin"),
+    daemonVersion: z17.string().min(1).default("0.0.0"),
+    transfer: z17.boolean().optional(),
     // Free: re-point this member's single machine to me (the other stops syncing)
     // What this host can actually serve right now — a Claude/Codex/agy login present, or a key
     // available (0114). Published because capability has to be visible ACROSS machines: a host
@@ -23629,18 +24526,18 @@ var MACHINE_COMMANDS = [
   // while it sleeps (member-machines plan §4).
   // daemonVersion: the same reason — a cloud machine's image names its commit (NM_IMAGE_SHA) and
   // the beat is the only place it can say so. Optional: an older machine beats without it.
-  z16.object({ type: z16.literal("machine.heartbeat"), machineId: z16.string().min(1), activeSeconds: z16.number().int().min(0).max(3600).optional(), busy: z16.boolean().optional(), runtimes, daemonVersion: z16.string().min(1).max(64).optional() }),
+  z17.object({ type: z17.literal("machine.heartbeat"), machineId: z17.string().min(1), activeSeconds: z17.number().int().min(0).max(3600).optional(), busy: z17.boolean().optional(), runtimes, permissionVersion: z17.literal(1).optional(), daemonVersion: z17.string().min(1).max(64).optional() }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
-  z16.object({ type: z16.literal("machine.provision"), workspace: z16.string().min(1) }),
+  z17.object({ type: z17.literal("machine.provision"), workspace: z17.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC
-  z16.object({ type: z16.literal("machine.remove"), workspace: z16.string().min(1), machineId: z16.string().uuid() }),
+  z17.object({ type: z17.literal("machine.remove"), workspace: z17.string().min(1), machineId: z17.string().uuid() }),
   // wake ONE machine — a person from a surface, or a daemon whose ladder found a lent sleeper
   // forUserId: the member the work came FROM when a daemon asks — the ladder's origin — so a
   // member's own machine wakes for their request even when they lend it to nobody
-  z16.object({ type: z16.literal("machine.wake"), workspace: z16.string().min(1), machineId: z16.string().uuid(), forUserId: z16.string().uuid().optional() }),
+  z17.object({ type: z17.literal("machine.wake"), workspace: z17.string().min(1), machineId: z17.string().uuid(), forUserId: z17.string().uuid().optional() }),
   // a login is about to land on a claim runner (round §4.2, D2): give it a disk of its own first.
   // HUMAN_ONLY, from the terminal's sign-in flows; a no-op answer for a machine already on a volume
-  z16.object({ type: z16.literal("machine.promote"), workspace: z16.string().min(1), machineId: z16.string().uuid() }),
+  z17.object({ type: z17.literal("machine.promote"), workspace: z17.string().min(1), machineId: z17.string().uuid() }),
   // the Code-session rows a host and a client keep (commands-code.ts) ride the same spread
   ...CODE_SESSION_COMMANDS
 ];
@@ -23649,10 +24546,10 @@ var MACHINE_COMMANDS = [
 init_command_union_replies();
 init_command_union_models();
 init_src();
-var modelId = z17.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
-var packId = z17.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
-var customPackId = z17.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
-var packRoles = z17.object({
+var modelId = z18.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
+var packId = z18.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
+var customPackId = z18.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
+var packRoles = z18.object({
   worker: modelId,
   developer: modelId,
   reviewer: modelId,
@@ -23664,50 +24561,50 @@ var packRoles = z17.object({
   shipper: modelId,
   marketer: modelId
 }).refine((r) => r.worker === r.developer, { message: "worker aliases developer \u2014 their models must match" });
-var ActorSchema = z17.object({
-  kind: z17.enum(["human", "agent"]),
-  id: z17.string().min(1),
-  role: z17.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
+var ActorSchema = z18.object({
+  kind: z18.enum(["human", "agent"]),
+  id: z18.string().min(1),
+  role: z18.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
 });
-var taskId2 = z17.string().min(1);
-var taskKind = z17.enum(TASK_KINDS.filter((k) => k !== "setup"));
-var ArtifactInputSchema = z17.object({
-  kind: z17.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
-  name: z17.string().min(1),
+var taskId2 = z18.string().min(1);
+var taskKind = z18.enum(TASK_KINDS.filter((k) => k !== "setup"));
+var ArtifactInputSchema = z18.object({
+  kind: z18.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
+  name: z18.string().min(1),
   // small text artifacts (diffs, notes) inline; binary/large go to Storage later
-  content: z17.string().max(4e5).optional()
+  content: z18.string().max(4e5).optional()
 });
-var CommandSchema = z17.discriminatedUnion("type", [
+var CommandSchema = z18.discriminatedUnion("type", [
   taskCreateCommand,
-  z17.object({
-    type: z17.literal("task.offer"),
+  z18.object({
+    type: z18.literal("task.offer"),
     taskId: taskId2,
-    offerTo: z17.string().min(1),
+    offerTo: z18.string().min(1),
     // intake resolution may bind the repo the thread conversation settled on
-    repo: z17.object({ id: z17.string().min(1), baseRef: z17.string().min(1).default("main") }).optional(),
+    repo: z18.object({ id: z18.string().min(1), baseRef: z18.string().min(1).default("main") }).optional(),
     // the resolved requirement checks from the thread — recorded as confirmed
-    checklist: z17.array(z17.string().min(1)).optional(),
+    checklist: z18.array(z18.string().min(1)).optional(),
     // the Definition of Done the orchestrator settled on for this offer
-    definitionOfDone: z17.string().max(2e4).optional(),
+    definitionOfDone: z18.string().max(2e4).optional(),
     // work-type label (docs/16) — the handler requires the task to be labeled at
     // offer (this kind, or one already on the task); it never gates the route.
     kind: taskKind.optional()
   }),
-  z17.object({ type: z17.literal("task.claim"), taskId: taskId2 }),
-  z17.object({
-    type: z17.literal("task.confirm_requirements"),
+  z18.object({ type: z18.literal("task.claim"), taskId: taskId2 }),
+  z18.object({
+    type: z18.literal("task.confirm_requirements"),
     taskId: taskId2,
-    checklist: z17.array(z17.string().min(1)).min(1)
+    checklist: z18.array(z18.string().min(1)).min(1)
   }),
-  z17.object({
-    type: z17.literal("task.submit"),
+  z18.object({
+    type: z18.literal("task.submit"),
     taskId: taskId2,
-    artifacts: z17.array(ArtifactInputSchema).default([]),
-    sha: z17.string().min(1).optional(),
+    artifacts: z18.array(ArtifactInputSchema).default([]),
+    sha: z18.string().min(1).optional(),
     // repo-backed work opens a PR — its url/number ride the submit so the reviewer
     // can gate on CI and the merge-on-accept watch can squash-merge it.
-    prUrl: z17.string().min(1).optional(),
-    prNumber: z17.number().int().positive().optional()
+    prUrl: z18.string().min(1).optional(),
+    prNumber: z18.number().int().positive().optional()
   }),
   taskRequestChangesCommand,
   taskApproveCommand,
@@ -23730,16 +24627,16 @@ var CommandSchema = z17.discriminatedUnion("type", [
   taskRequestPlanCommand,
   // the architect's final plan rides in as markdown — attached as a reviewable
   // 'doc' artifact (implementation-plan.md) when the task enters plan_review
-  z17.object({
-    type: z17.literal("task.propose_plan"),
+  z18.object({
+    type: z18.literal("task.propose_plan"),
     taskId: taskId2,
-    plan: z17.string().min(1).max(6e4),
+    plan: z18.string().min(1).max(6e4),
     // Plan-first units (2026-08-17): a revise round may also update the STRUCTURE — the
     // declared legs and proposed subtasks — not just the prose. Floored by validateWorkPlanLegs
     // in the reducer; re-proposing always clears planApprovedAt (a changed plan needs a fresh
     // human sign-off, never an inherited one).
-    legs: z17.array(z17.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
-    subtasks: z17.array(z17.string().min(1).max(200)).max(8).optional()
+    legs: z18.array(z18.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
+    subtasks: z18.array(z18.string().min(1).max(200)).max(8).optional()
   }),
   taskRevisePlanCommand,
   // Design lifecycle (visual-quality gate BEFORE planning — docs/14). request_design
@@ -23749,14 +24646,14 @@ var CommandSchema = z17.discriminatedUnion("type", [
   // is the HUMAN sign-off (enforced) that releases the task into planning.
   taskRequestDesignCommand,
   taskSelectDesignProviderCommand,
-  z17.object({
-    type: z17.literal("task.propose_design"),
+  z18.object({
+    type: z18.literal("task.propose_design"),
     taskId: taskId2,
-    summary: z17.string().max(2e3).optional(),
+    summary: z18.string().max(2e3).optional(),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
     // — cosmetic versioning for artifact names; the FSM/kind are what's enforced
-    round: z17.number().int().min(1).max(99).default(1),
-    mockups: z17.array(z17.object({ name: z17.string().min(1).max(120), html: z17.string().min(1).max(3e5) })).min(1).max(6)
+    round: z18.number().int().min(1).max(99).default(1),
+    mockups: z18.array(z18.object({ name: z18.string().min(1).max(120), html: z18.string().min(1).max(3e5) })).min(1).max(6)
   }),
   taskReviseDesignCommand,
   taskApproveDesignCommand,
@@ -23767,26 +24664,27 @@ var CommandSchema = z17.discriminatedUnion("type", [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
-  z17.object({ type: z17.literal("task.claim_ship"), taskId: taskId2 }),
-  z17.object({
-    type: z17.literal("task.propose_ship_plan"),
+  z18.object({ type: z18.literal("task.request_release_checklist"), taskId: taskId2 }),
+  z18.object({ type: z18.literal("task.claim_ship"), taskId: taskId2 }),
+  z18.object({
+    type: z18.literal("task.propose_ship_plan"),
     taskId: taskId2,
-    report: z17.string().min(1).max(6e4),
-    risk: z17.enum(SHIP_RISKS),
-    summary: z17.string().max(2e3).default(""),
+    report: z18.string().min(1).max(6e4),
+    risk: z18.enum(SHIP_RISKS),
+    summary: z18.string().max(2e3).default(""),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
-    round: z17.number().int().min(1).max(99).default(1),
-    items: z17.array(
-      z17.object({
-        id: z17.string().min(1).max(40),
-        title: z17.string().min(1).max(300),
-        detail: z17.string().max(2e3).default(""),
-        owner: z17.enum(SHIP_ITEM_OWNERS),
-        agentId: z17.string().min(1).optional(),
+    round: z18.number().int().min(1).max(99).default(1),
+    items: z18.array(
+      z18.object({
+        id: z18.string().min(1).max(40),
+        title: z18.string().min(1).max(300),
+        detail: z18.string().max(2e3).default(""),
+        owner: z18.enum(SHIP_ITEM_OWNERS),
+        agentId: z18.string().min(1).optional(),
         // 'ci' items are host-verified (gh pr checks) — may arrive pre-checked
-        auto: z17.enum(["ci"]).optional(),
-        state: z17.enum(["pending", "done"]).default("pending"),
-        note: z17.string().max(500).default("")
+        auto: z18.enum(["ci"]).optional(),
+        state: z18.enum(["pending", "done"]).default("pending"),
+        note: z18.string().max(500).default("")
       })
     ).min(1).max(20)
   }),
@@ -23795,162 +24693,162 @@ var CommandSchema = z17.discriminatedUnion("type", [
   taskCheckShipItemCommand,
   taskAddShipItemCommand,
   taskFinishSubtaskCommand,
-  z17.object({ type: z17.literal("task.execute_ship"), taskId: taskId2 }),
+  z18.object({ type: z18.literal("task.execute_ship"), taskId: taskId2 }),
   // confirm_release: the host's verifying watch reports the release landed —
   // post-merge CI on the merge commit + release workflows settled green — moving
   // verifying → accepted. Issued as the shipper by the machine that merged;
   // a red/pending verdict never sends it (the human's accept is the override).
-  z17.object({ type: z17.literal("task.confirm_release"), taskId: taskId2, note: z17.string().max(2e3).default("") }),
+  z18.object({ type: z18.literal("task.confirm_release"), taskId: taskId2, note: z18.string().max(2e3).default("") }),
   // Set/edit the task's Definition of Done (the acceptance contract the reviewer
   // gates on). Humans or the orchestrator, while the task is still open.
   taskSetDefinitionOfDoneCommand,
   // Beats (docs/17): an agent declares the ordered steps for the phase it just picked up,
   // then advances them live. The handler gates on the agent's role owning the current phase;
   // beats are DESCRIPTIVE and never gate an FSM transition.
-  z17.object({
-    type: z17.literal("beats.declare"),
+  z18.object({
+    type: z18.literal("beats.declare"),
     taskId: taskId2,
-    phase: z17.enum(TASK_STATES),
-    items: z17.array(z17.string().min(1).max(200)).min(1).max(12)
+    phase: z18.enum(TASK_STATES),
+    items: z18.array(z18.string().min(1).max(200)).min(1).max(12)
   }),
-  z17.object({ type: z17.literal("beats.advance"), taskId: taskId2, seq: z17.number().int().min(0), status: z17.enum(BEAT_STATUSES) }),
+  z18.object({ type: z18.literal("beats.advance"), taskId: taskId2, seq: z18.number().int().min(0), status: z18.enum(BEAT_STATUSES) }),
   // Runs (docs/29): the durable row behind a stretch of agent work. `run.open` mints it (an
   // agent, always — a human never opens a run), `run.step` bumps the live line + progress,
   // `run.settle` closes it into a terminal state. Descriptive, never gating.
   // The third of the four human gates (docs/29 §4d). Not a transition: approving does not move the
   // task, it unlocks the edge OUT of plan_review — the same shape as confirm_requirements, because
   // both the owned and the delegated path need the claim that follows to stay exactly as it is.
-  z17.object({
-    type: z17.literal("task.approve_plan"),
-    taskId: z17.string().min(1)
+  z18.object({
+    type: z18.literal("task.approve_plan"),
+    taskId: z18.string().min(1)
   }),
-  z17.object({
-    type: z17.literal("run.open"),
-    id: z17.string().uuid().optional(),
+  z18.object({
+    type: z18.literal("run.open"),
+    id: z18.string().uuid().optional(),
     // caller-minted so the daemon can address it before the round trip
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1),
-    threadId: z17.string().min(1).optional(),
-    runTaskId: z17.string().min(1).optional(),
-    parentRunId: z17.string().min(1).optional(),
-    kind: z17.enum(RUN_KINDS),
-    title: z17.string().min(1).max(200),
-    total: z17.number().int().min(0).max(64).default(0),
-    step: z17.string().max(200).optional(),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1),
+    threadId: z18.string().min(1).optional(),
+    runTaskId: z18.string().min(1).optional(),
+    parentRunId: z18.string().min(1).optional(),
+    kind: z18.enum(RUN_KINDS),
+    title: z18.string().min(1).max(200),
+    total: z18.number().int().min(0).max(64).default(0),
+    step: z18.string().max(200).optional(),
     // which config this run is seated on — `role·model[·@specialist]` (0103). Leg runs only.
-    seat: z17.string().max(160).optional(),
+    seat: z18.string().max(160).optional(),
     // The WAKE LEASE (0114). Set to the message this run answers and the open becomes a claim:
     // one host per (agent, trigger) wins, the rest get `won: false` and stand down BEFORE
     // spending a token. Omitted for task/sweep runs, which their own claim already dedupes.
-    triggerMessageId: z17.string().uuid().optional(),
+    triggerMessageId: z18.string().uuid().optional(),
     // which member's machine is actually serving this run — the thing that makes shared compute
     // legible ("patch is working on bob's laptop") and billing attributable
-    machineId: z17.string().uuid().optional()
+    machineId: z18.string().uuid().optional()
   }),
-  z17.object({
-    type: z17.literal("run.step"),
-    runId: z17.string().min(1),
-    step: z17.string().max(200).optional(),
-    done: z17.number().int().min(0).max(64).optional(),
-    total: z17.number().int().min(0).max(64).optional()
+  z18.object({
+    type: z18.literal("run.step"),
+    runId: z18.string().min(1),
+    step: z18.string().max(200).optional(),
+    done: z18.number().int().min(0).max(64).optional(),
+    total: z18.number().int().min(0).max(64).optional()
   }),
-  z17.object({
-    type: z17.literal("run.settle"),
-    runId: z17.string().min(1),
-    state: z17.enum(RUN_SETTLE_STATES),
+  z18.object({
+    type: z18.literal("run.settle"),
+    runId: z18.string().min(1),
+    state: z18.enum(RUN_SETTLE_STATES),
     // includes `parked` — settleable, but NOT terminal
-    summary: z17.string().max(600).optional()
+    summary: z18.string().max(600).optional()
   }),
   // the machine commands live in commands-machine.ts (member-machines round, 2026-09-03): this
   // file sits at its size-ratchet cap and the kind grew three verbs
   ...MACHINE_COMMANDS,
-  z17.object({
-    type: z17.literal("agent.register"),
-    workspace: z17.string().min(1),
-    machineId: z17.string().min(1),
-    name: z17.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-    role: z17.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
+  z18.object({
+    type: z18.literal("agent.register"),
+    workspace: z18.string().min(1),
+    machineId: z18.string().min(1),
+    name: z18.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
+    role: z18.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
     model: modelId.default("claude-opus-4-8"),
-    runtime: z17.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
-    emoji: z17.string().min(1).max(8).optional(),
+    runtime: z18.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
+    emoji: z18.string().min(1).max(8).optional(),
     // persona face; omitted → client derives from name
     // The two agent strings (0110). `description` is the ROUTING signal — third person, what it
     // does + when to route here — read by the orchestrator in list_agents and published on the
     // A2A card. `brief` is the INSTRUCTIONS: second person, how the work is done, injected into
     // every turn this agent takes. Two readers, two caps.
-    description: z17.string().min(1).max(280).optional(),
-    brief: z17.string().min(1).max(2e3).optional(),
-    channels: z17.array(z17.string().min(1)).min(1)
+    description: z18.string().min(1).max(280).optional(),
+    brief: z18.string().min(1).max(2e3).optional(),
+    channels: z18.array(z18.string().min(1)).min(1)
   }),
   // edit a registered agent's brain (model/provider), name, description or instructions — the
   // daemon re-reads them live. role stays immutable (FSM/permissions depend on it).
-  z17.object({
-    type: z17.literal("agent.update"),
-    agent: z17.string().min(1),
+  z18.object({
+    type: z18.literal("agent.update"),
+    agent: z18.string().min(1),
     // agent id
     model: modelId.optional(),
-    runtime: z17.enum(["claude-code", "codex", "gemini"]).optional(),
-    name: z17.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
+    runtime: z18.enum(["claude-code", "codex", "gemini"]).optional(),
+    name: z18.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
     // '' clears either string back to null (the UI's empty field must be able to mean "none")
-    description: z17.string().max(280).optional(),
-    brief: z17.string().max(2e3).optional(),
+    description: z18.string().max(280).optional(),
+    brief: z18.string().max(2e3).optional(),
     // provenance: 'manual' = a human pinned this brain (pack-apply must skip it); 'pack' = pack-managed.
     // The handler stamps 'manual' on a human model edit when the caller doesn't set it explicitly.
-    modelSource: z17.enum(["pack", "manual"]).optional()
+    modelSource: z18.enum(["pack", "manual"]).optional()
   }),
   // Retire an agent (HUMAN-ONLY, soft): it leaves the active roster — daemon stops
   // hosting it, selection pools skip it, its A2A card unpublishes — but the row and
   // every event/task attribution stay, so derived history (docs/13) never orphans.
   // Refused while the agent has open work. agent.register with the same name rehires.
-  z17.object({
-    type: z17.literal("agent.retire"),
-    agent: z17.string().min(1)
+  z18.object({
+    type: z18.literal("agent.retire"),
+    agent: z18.string().min(1)
     /* agent id */
   }),
   // Consume an external A2A agent: fetch its Agent Card by URL, register it as a
   // 'remote' agent (no local machine) the host delegates to over A2A JSON-RPC.
-  z17.object({
-    type: z17.literal("agent.connect_remote"),
-    workspace: z17.string().min(1),
-    channels: z17.array(z17.string().min(1)).min(1),
-    cardUrl: z17.string().min(1)
+  z18.object({
+    type: z18.literal("agent.connect_remote"),
+    workspace: z18.string().min(1),
+    channels: z18.array(z18.string().min(1)).min(1),
+    cardUrl: z18.string().min(1)
     // the agent's /.well-known/a2a/agent-card.json or card URL
   }),
-  z17.object({
-    type: z17.literal("agent.set_status"),
-    agentId: z17.string().min(1),
-    status: z17.enum(["online", "offline", "thinking", "working"])
+  z18.object({
+    type: z18.literal("agent.set_status"),
+    agentId: z18.string().min(1),
+    status: z18.enum(["online", "offline", "thinking", "working"])
   }),
-  z17.object({ type: z17.literal("artifact.promote"), artifactId: z17.string().min(1) }),
+  z18.object({ type: z18.literal("artifact.promote"), artifactId: z18.string().min(1) }),
   // Deleting a file (2026-08-18). HUMAN_ONLY, and REFUSED for anything a gate resolves against —
   // a design round, an implementation or release plan, a reviewer's diff, a test report. See
   // `isGateArtifact` in @neuramesh/shared: the client hides the control from the same predicate,
   // but the refusal lives here, because "don't delete the evidence" must be impossible rather
   // than discouraged (doctrine §4).
-  z17.object({ type: z17.literal("artifact.delete"), artifactId: z17.string().min(1) }),
-  z17.object({
-    type: z17.literal("memory.refresh_block"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1),
-    kind: z17.enum(["channel_summary", "project_brief"]).default("channel_summary"),
-    content: z17.string().min(1).max(4e3),
-    basisCount: z17.number().int().nonnegative().default(0)
+  z18.object({ type: z18.literal("artifact.delete"), artifactId: z18.string().min(1) }),
+  z18.object({
+    type: z18.literal("memory.refresh_block"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1),
+    kind: z18.enum(["channel_summary", "project_brief"]).default("channel_summary"),
+    content: z18.string().min(1).max(4e3),
+    basisCount: z18.number().int().nonnegative().default(0)
   }),
-  z17.object({
-    type: z17.literal("memory.upsert_fact"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1),
-    content: z17.string().min(8).max(600),
-    basisCount: z17.number().int().nonnegative().default(0)
+  z18.object({
+    type: z18.literal("memory.upsert_fact"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1),
+    content: z18.string().min(8).max(600),
+    basisCount: z18.number().int().nonnegative().default(0)
   }),
   // A lesson: the durable norm a review correction taught (e.g. "evidence renders
   // attach as artifacts — mock HTML never gets committed"). The one memory write ANY
   // teammate may make — the agent that was just corrected holds the freshest version.
-  z17.object({
-    type: z17.literal("memory.record_lesson"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1),
-    content: z17.string().min(12).max(500),
+  z18.object({
+    type: z18.literal("memory.record_lesson"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1),
+    content: z18.string().min(12).max(500),
     taskId: taskId2.optional()
     // provenance: the task whose review taught it
   }),
@@ -23958,278 +24856,278 @@ var CommandSchema = z17.discriminatedUnion("type", [
   // provenance stay; valid_until closes). supersededBy names the successor when a
   // correction was recorded but the reconcile's overlap check missed the rewrite,
   // so the supersession chain stays intact either way.
-  z17.object({
-    type: z17.literal("memory.retire_fact"),
-    factId: z17.string().uuid(),
-    supersededBy: z17.string().uuid().optional()
+  z18.object({
+    type: z18.literal("memory.retire_fact"),
+    factId: z18.string().uuid(),
+    supersededBy: z18.string().uuid().optional()
   }),
-  z17.object({
-    type: z17.literal("workspace.create"),
-    name: z17.string().min(1).max(60),
-    slug: z17.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
+  z18.object({
+    type: z18.literal("workspace.create"),
+    name: z18.string().min(1).max(60),
+    slug: z18.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
   }),
-  z17.object({ type: z17.literal("workspace.delete"), workspace: z17.string().min(1) }),
-  z17.object({ type: z17.literal("account.delete") }),
+  z18.object({ type: z18.literal("workspace.delete"), workspace: z18.string().min(1) }),
+  z18.object({ type: z18.literal("account.delete") }),
   // An invite is a pending row + an email; the invitee authenticates through Clerk and the
   // verified-email claim attaches them (docs/27 §1d). No password: the old one created a
   // Supabase auth user that Clerk would never accept, for an identity that never got a
   // membership. `password` is accepted-and-ignored for one release so an older desktop build
   // doesn't hard-fail zod validation mid-rollout.
-  z17.object({
-    type: z17.literal("workspace.invite"),
-    workspace: z17.string().min(1),
-    email: z17.string().email(),
-    password: z17.string().optional(),
-    memberRole: z17.enum(["member", "admin"]).default("member")
+  z18.object({
+    type: z18.literal("workspace.invite"),
+    workspace: z18.string().min(1),
+    email: z18.string().email(),
+    password: z18.string().optional(),
+    memberRole: z18.enum(["member", "admin"]).default("member")
   }),
-  z17.object({ type: z17.literal("workspace.revoke_invite"), workspace: z17.string().min(1), invite: z17.string().uuid() }),
+  z18.object({ type: z18.literal("workspace.revoke_invite"), workspace: z18.string().min(1), invite: z18.string().uuid() }),
   // Answering an invitation (0113). No `workspace` field on purpose: the invite id resolves its
   // own workspace, and taking one from the caller would invite a mismatch to reason about. The
   // server re-verifies the caller's email against the invite — the id is a handle, not a key.
-  z17.object({ type: z17.literal("workspace.accept_invite"), invite: z17.string().uuid() }),
-  z17.object({ type: z17.literal("workspace.decline_invite"), invite: z17.string().uuid() }),
+  z18.object({ type: z18.literal("workspace.accept_invite"), invite: z18.string().uuid() }),
+  z18.object({ type: z18.literal("workspace.decline_invite"), invite: z18.string().uuid() }),
   // Membership exits. `leave` acts on the caller; `remove_member` on someone else — kept apart
   // so the owner rules can differ (you may not leave as owner; nobody may remove the owner).
-  z17.object({ type: z17.literal("workspace.leave"), workspace: z17.string().min(1) }),
-  z17.object({ type: z17.literal("workspace.remove_member"), workspace: z17.string().min(1), member: z17.string().uuid() }),
+  z18.object({ type: z18.literal("workspace.leave"), workspace: z18.string().min(1) }),
+  z18.object({ type: z18.literal("workspace.remove_member"), workspace: z18.string().min(1), member: z18.string().uuid() }),
   // workspace-level settings (Workspace settings UI). autoFailover = the provider-auth
   // failover policy: when a preferred subscription login is down, false (default) surfaces
   // an auth card (no surprise spend); true fails over to a provided API key automatically.
-  z17.object({
-    type: z17.literal("workspace.update"),
-    workspace: z17.string().min(1),
-    autoFailover: z17.boolean().optional(),
+  z18.object({
+    type: z18.literal("workspace.update"),
+    workspace: z18.string().min(1),
+    autoFailover: z18.boolean().optional(),
     activeModelPack: packId.optional(),
     // the workspace's voice (docs/design/agent-comm-rules-2026-08) — HUMAN-only in the handler; null reads as defaults-ON
-    commRules: z17.object({ ste100: z17.boolean().optional(), noEmdash: z17.boolean().optional(), custom: z17.array(z17.string().min(1).max(200)).max(8).optional() }).optional(),
+    commRules: z18.object({ ste100: z18.boolean().optional(), noEmdash: z18.boolean().optional(), custom: z18.array(z18.string().min(1).max(200)).max(8).optional() }).optional(),
     // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
-    videoTier: z17.enum(["starter", "xpress", "premium"]).nullable().optional()
+    videoTier: z18.enum(["starter", "xpress", "premium"]).nullable().optional()
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
-  z17.object({ type: z17.literal("workspace.sync_agents"), workspace: z17.string().min(1) }),
+  z18.object({ type: z18.literal("workspace.sync_agents"), workspace: z18.string().min(1) }),
   // Custom brains (user-authored model packs): save = create (packId omitted; the server
   // mints `custom:<uuid>`) or update (packId present). Human-only in the handler, like
   // workspace.update. Activation stays a separate workspace.update {activeModelPack}.
-  z17.object({
-    type: z17.literal("modelpack.save"),
-    workspace: z17.string().min(1),
+  z18.object({
+    type: z18.literal("modelpack.save"),
+    workspace: z18.string().min(1),
     packId: customPackId.optional(),
-    name: z17.string().trim().min(1).max(40),
+    name: z18.string().trim().min(1).max(40),
     roles: packRoles
   }),
-  z17.object({ type: z17.literal("modelpack.delete"), workspace: z17.string().min(1), packId: customPackId }),
+  z18.object({ type: z18.literal("modelpack.delete"), workspace: z18.string().min(1), packId: customPackId }),
   // Agent permission policy (Phase 1): humans configure allow/ask/deny rules per scope.
   // setPolicy upserts by id (absent id = insert a new rule); selector is the shared DSL.
-  z17.object({
-    type: z17.literal("policy.set"),
-    workspace: z17.string().min(1),
-    id: z17.string().min(1).optional(),
-    scope: z17.enum(POLICY_SCOPES),
-    projectId: z17.string().min(1).nullable().optional(),
-    channelId: z17.string().min(1).nullable().optional(),
-    agentId: z17.string().min(1).nullable().optional(),
-    capability: z17.enum(POLICY_CAPABILITIES),
+  z18.object({
+    type: z18.literal("policy.set"),
+    workspace: z18.string().min(1),
+    id: z18.string().min(1).optional(),
+    scope: z18.enum(POLICY_SCOPES),
+    projectId: z18.string().min(1).nullable().optional(),
+    channelId: z18.string().min(1).nullable().optional(),
+    agentId: z18.string().min(1).nullable().optional(),
+    capability: z18.enum(POLICY_CAPABILITIES),
     selector: PolicySelectorSchema,
-    verdict: z17.enum(POLICY_VERDICTS),
-    rationale: z17.string().max(400).optional(),
-    locked: z17.boolean().optional()
+    verdict: z18.enum(POLICY_VERDICTS),
+    rationale: z18.string().max(400).optional(),
+    locked: z18.boolean().optional()
   }),
-  z17.object({ type: z17.literal("policy.delete"), workspace: z17.string().min(1), policyId: z17.string().min(1) }),
-  z17.object({
-    type: z17.literal("skill.create"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1).optional(),
+  z18.object({ type: z18.literal("policy.delete"), workspace: z18.string().min(1), policyId: z18.string().min(1) }),
+  z18.object({
+    type: z18.literal("skill.create"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1).optional(),
     // omitted/global scope = workspace-wide
-    name: z17.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z17.string().min(1).max(300),
-    scope: z17.enum(["channel", "global"]).default("channel"),
-    body: z17.string().min(1).max(4e4),
-    packId: z17.string().min(1).optional(),
+    name: z18.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z18.string().min(1).max(300),
+    scope: z18.enum(["channel", "global"]).default("channel"),
+    body: z18.string().min(1).max(4e4),
+    packId: z18.string().min(1).optional(),
     // bind into a skill pack (importer/seed use)
-    enabled: z17.boolean().default(true)
+    enabled: z18.boolean().default(true)
   }),
   // toggle a single skill's discoverability without deleting it (greyed in UI)
-  z17.object({ type: z17.literal("skill.set_enabled"), skillId: z17.string().min(1), enabled: z17.boolean() }),
-  z17.object({
-    type: z17.literal("skill.update"),
-    skillId: z17.string().min(1),
-    description: z17.string().min(1).max(300).optional(),
-    body: z17.string().min(1).max(4e4).optional(),
-    scope: z17.enum(["channel", "global"]).optional()
+  z18.object({ type: z18.literal("skill.set_enabled"), skillId: z18.string().min(1), enabled: z18.boolean() }),
+  z18.object({
+    type: z18.literal("skill.update"),
+    skillId: z18.string().min(1),
+    description: z18.string().min(1).max(300).optional(),
+    body: z18.string().min(1).max(4e4).optional(),
+    scope: z18.enum(["channel", "global"]).optional()
   }),
-  z17.object({ type: z17.literal("skill.deprecate"), skillId: z17.string().min(1) }),
+  z18.object({ type: z18.literal("skill.deprecate"), skillId: z18.string().min(1) }),
   // agent self-learning: any agent proposes a reusable procedure it discovered
   // → lands as draft for orchestrator/human curation (dedups onto an existing
   // draft of the same name+scope rather than spamming).
-  z17.object({
-    type: z17.literal("skill.propose"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1).optional(),
-    name: z17.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z17.string().min(1).max(300),
-    scope: z17.enum(["channel", "global"]).default("channel"),
-    body: z17.string().min(1).max(4e4)
+  z18.object({
+    type: z18.literal("skill.propose"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1).optional(),
+    name: z18.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z18.string().min(1).max(300),
+    scope: z18.enum(["channel", "global"]).default("channel"),
+    body: z18.string().min(1).max(4e4)
   }),
   // curation gate: promote a draft to active (supersedes a same-name active).
-  z17.object({ type: z17.literal("skill.promote"), skillId: z17.string().min(1) }),
+  z18.object({ type: z18.literal("skill.promote"), skillId: z18.string().min(1) }),
   // Skill packs: a versioned bundle of skills. create opens an 'importing' row;
   // the Curator (or the bundled seed path) commits the parsed skills atomically.
-  z17.object({
-    type: z17.literal("skillpack.create"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1),
-    name: z17.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z17.string().max(300).default(""),
-    sourceUrl: z17.string().max(400).default(""),
-    sourceRef: z17.string().min(1).max(120).default("main"),
-    origin: z17.enum(["bundled", "imported"]).default("imported")
+  z18.object({
+    type: z18.literal("skillpack.create"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1),
+    name: z18.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z18.string().max(300).default(""),
+    sourceUrl: z18.string().max(400).default(""),
+    sourceRef: z18.string().min(1).max(120).default("main"),
+    origin: z18.enum(["bundled", "imported"]).default("imported")
   }),
-  z17.object({
-    type: z17.literal("skillpack.commit"),
-    packId: z17.string().min(1),
-    version: z17.string().max(120).default(""),
-    skills: z17.array(
-      z17.object({
-        name: z17.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-        description: z17.string().max(300).default(""),
-        body: z17.string().min(1).max(4e4)
+  z18.object({
+    type: z18.literal("skillpack.commit"),
+    packId: z18.string().min(1),
+    version: z18.string().max(120).default(""),
+    skills: z18.array(
+      z18.object({
+        name: z18.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+        description: z18.string().max(300).default(""),
+        body: z18.string().min(1).max(4e4)
       })
     ).max(300)
   }),
-  z17.object({
-    type: z17.literal("skillpack.update"),
+  z18.object({
+    type: z18.literal("skillpack.update"),
     // importer progress + terminal states
-    packId: z17.string().min(1),
-    status: z17.enum(["importing", "ready", "error"]).optional(),
-    step: z17.string().max(120).optional(),
-    progress: z17.number().int().min(0).max(100).optional(),
-    error: z17.string().max(2e3).optional(),
-    description: z17.string().max(300).optional()
+    packId: z18.string().min(1),
+    status: z18.enum(["importing", "ready", "error"]).optional(),
+    step: z18.string().max(120).optional(),
+    progress: z18.number().int().min(0).max(100).optional(),
+    error: z18.string().max(2e3).optional(),
+    description: z18.string().max(300).optional()
   }),
-  z17.object({ type: z17.literal("skillpack.set_enabled"), packId: z17.string().min(1), enabled: z17.boolean() }),
-  z17.object({ type: z17.literal("skillpack.remove"), packId: z17.string().min(1) }),
+  z18.object({ type: z18.literal("skillpack.set_enabled"), packId: z18.string().min(1), enabled: z18.boolean() }),
+  z18.object({ type: z18.literal("skillpack.remove"), packId: z18.string().min(1) }),
   // idempotently seed the bundled default packs into a channel (backfills existing #dev);
   // kind picks the seed list — marketing rooms get marketing-core
-  z17.object({ type: z17.literal("skillpack.seed_defaults"), workspace: z17.string().min(1), channel: z17.string().min(1), kind: z17.enum(["build", "marketing"]).optional() }),
+  z18.object({ type: z18.literal("skillpack.seed_defaults"), workspace: z18.string().min(1), channel: z18.string().min(1), kind: z18.enum(["build", "marketing"]).optional() }),
   // register a GitHub repo to the workspace so tasks can bind + push to it.
   // Metadata only — no tokens stored; the executing machine's own git creds
   // authenticate at clone/push (platform never holds repo write tokens).
-  z17.object({
-    type: z17.literal("repo.link"),
-    workspace: z17.string().min(1),
-    channel: z17.string().min(1).optional(),
+  z18.object({
+    type: z18.literal("repo.link"),
+    workspace: z18.string().min(1),
+    channel: z18.string().min(1).optional(),
     // attach to this channel's default project
-    project: z17.string().min(1).optional(),
+    project: z18.string().min(1).optional(),
     // …or attach directly to this project (code workspace)
-    url: z17.string().min(1).optional(),
+    url: z18.string().min(1).optional(),
     // github/gitlab URL — or use localPath
-    localPath: z17.string().min(1).optional(),
+    localPath: z18.string().min(1).optional(),
     // a local folder on the machine → provider 'local'
-    name: z17.string().min(1).optional(),
+    name: z18.string().min(1).optional(),
     // display name for a local folder
-    defaultBranch: z17.string().min(1).default("main")
+    defaultBranch: z18.string().min(1).default("main")
   }),
   // Projects are the work axis: workspace-scoped initiatives that OWN channels
   // (1:N — a channel belongs to one project). create may move existing channels in.
-  z17.object({
-    type: z17.literal("project.create"),
-    workspace: z17.string().min(1),
-    name: z17.string().min(1).max(80),
+  z18.object({
+    type: z18.literal("project.create"),
+    workspace: z18.string().min(1),
+    name: z18.string().min(1).max(80),
     // the slug is set at creation (immutable after); omitted = derived from the name.
-    slug: z17.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    description: z17.string().max(2e3).default(""),
+    slug: z18.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    description: z18.string().max(2e3).default(""),
     // project identity — the site the project ships, and a small logo detected from it
     // (or from the repo folder) on the user's machine. The logo is a compact data: URL
     // (icon resized client-side) or an https URL; capped well under the inline sync limit.
-    website: z17.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z17.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    channels: z17.array(z17.string().min(1)).default([]),
+    website: z18.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z18.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    channels: z18.array(z18.string().min(1)).default([]),
     // channel ids to move into the new project
-    newChannels: z17.array(z17.string().min(1)).default([])
+    newChannels: z18.array(z18.string().min(1)).default([])
     // slugs of fresh channels to create in the new project
   }),
   // Conversation threads (the conversation-first shell): refine the heuristic title or
   // add a description — the orchestrator does this after its first reply; humans may too.
-  z17.object({
-    type: z17.literal("thread.update"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid(),
-    title: z17.string().min(1).max(120).optional(),
-    description: z17.string().max(2e3).optional()
+  z18.object({
+    type: z18.literal("thread.update"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid(),
+    title: z18.string().min(1).max(120).optional(),
+    description: z18.string().max(2e3).optional()
   }),
   // docs/34 — the Tasks toggle, moved on a conversation that already exists. HUMAN_ONLY: this
   // is the line between "the agent is talking to me" and "the agent is filing work", and an
   // agent must never be able to move its own conversation onto the board. Both directions are
   // legal — chat → tasks escalates in place (the next message triages), tasks → chat stops the
   // routing without touching whatever task the thread already carries.
-  z17.object({
-    type: z17.literal("thread.set_mode"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid(),
-    mode: z17.enum(THREAD_MODES)
+  z18.object({
+    type: z18.literal("thread.set_mode"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid(),
+    mode: z18.enum(THREAD_MODES)
   }),
   // WHERE A SESSION RUNS (0134, rule D9): move a conversation's designated machine. Human-only,
   // like the mode: an agent steering a conversation onto a machine is the confused-deputy shape.
   // Null = no designation (the ladder's origin rung and the member's standing choices decide).
-  z17.object({
-    type: z17.literal("thread.set_machine"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid(),
-    machineId: z17.string().uuid().nullable()
+  z18.object({
+    type: z18.literal("thread.set_machine"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid(),
+    machineId: z18.string().uuid().nullable()
   }),
   // Compute choice (0118): where THIS member's requests run — a default machine for new
   // conversations plus per-agent overrides. Self-only by construction: the handler writes the
   // ACTOR's row, so the payload cannot name another member. Null machine = back to origin
   // affinity. Advisory routing (shouldClaim reads it); the wake lease stays the enforcement.
-  z17.object({
-    type: z17.literal("member.set_compute"),
-    workspace: z17.string().min(1),
-    machine: z17.string().uuid().nullable().optional(),
-    agents: z17.record(z17.string().uuid(), z17.string().uuid()).optional(),
+  z18.object({
+    type: z18.literal("member.set_compute"),
+    workspace: z18.string().min(1),
+    machine: z18.string().uuid().nullable().optional(),
+    agents: z18.record(z18.string().uuid(), z18.string().uuid()).optional(),
     // consent (0119): members this one lends their machines to. '*' = the whole workspace.
-    shares: z17.array(z17.union([z17.literal("*"), z17.string().uuid()])).max(200).optional(),
+    shares: z18.array(z18.union([z18.literal("*"), z18.string().uuid()])).max(200).optional(),
     // rule D9 (2026-09-04): where sessions started on this member's desktop run — 'here' or 'auto'
-    desktopSessions: z17.enum(["here", "auto"]).optional()
+    desktopSessions: z18.enum(["here", "auto"]).optional()
   }),
   // ONE lend/revoke, as INTENT. The client used to compute the resulting set, which meant
   // expanding '*' from its own replica — and on a stale one that silently dropped everyone it had
   // not synced yet (live, 2026-08-14). The server has the real roster.
-  z17.object({
-    type: z17.literal("member.share_compute"),
-    workspace: z17.string().min(1),
-    member: z17.string().uuid(),
-    on: z17.boolean()
+  z18.object({
+    type: z18.literal("member.share_compute"),
+    workspace: z18.string().min(1),
+    member: z18.string().uuid(),
+    on: z18.boolean()
   }),
   // Auto-filing (0109): move a conversation into the room it belongs in. The orchestrator does
   // this during the triage turn it already runs, so the human never has to pick a room; a human
   // can correct it any time. Every rule lives in `canFileConversation` (packages/shared/filing.ts)
   // so the gate is one pure function both this handler and the daemon read.
-  z17.object({
-    type: z17.literal("thread.move"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid(),
-    channel: z17.string().uuid(),
+  z18.object({
+    type: z18.literal("thread.move"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid(),
+    channel: z18.string().uuid(),
     // the one clause shown beside Undo. Required of an agent (a move with no stated reason is a
     // move you cannot argue with); optional for a human, whose reason is that they said so.
-    reason: z17.string().min(1).max(200).optional()
+    reason: z18.string().min(1).max(200).optional()
   }),
   // Archiving a conversation (0108). HUMAN_ONLY: it is the human's own filing, and an agent that
   // could archive a thread could hide a conversation the human is waiting on. Chat threads only —
   // enforced in the handler, because a TASK thread's life belongs to the board, not to a list.
-  z17.object({
-    type: z17.literal("thread.archive"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid()
+  z18.object({
+    type: z18.literal("thread.archive"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid()
   }),
-  z17.object({
-    type: z17.literal("thread.unarchive"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid()
+  z18.object({
+    type: z18.literal("thread.unarchive"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid()
   }),
   // Settle (0137): settled_at and nothing else, HUMAN_ONLY, any thread (shared/threadstatus.ts). One line: the file's cap.
-  z17.object({ type: z17.literal("thread.settle"), workspace: z17.string().min(1), threadId: z17.string().uuid() }),
-  z17.object({ type: z17.literal("thread.unsettle"), workspace: z17.string().min(1), threadId: z17.string().uuid() }),
+  z18.object({ type: z18.literal("thread.settle"), workspace: z18.string().min(1), threadId: z18.string().uuid() }),
+  z18.object({ type: z18.literal("thread.unsettle"), workspace: z18.string().min(1), threadId: z18.string().uuid() }),
   // docs/10 §15 — the thread brain override: which MODEL each role runs in THIS conversation.
   // HUMAN_ONLY, like every other spend of money the human did not ask for: an agent that could
   // set its own model could move itself onto the most expensive one in the catalog.
@@ -24237,99 +25135,99 @@ var CommandSchema = z17.discriminatedUnion("type", [
   // `override: null` is Reset — the WHOLE override, never a per-role clear (ruling 7). The role
   // keys and model values are validated in the handler against the same allow-list the packs
   // use, so an unknown model is a 400 rather than a seat that fails at run time.
-  z17.object({
-    type: z17.literal("thread.set_brain"),
-    workspace: z17.string().min(1),
-    threadId: z17.string().uuid(),
-    override: z17.record(z17.string(), z17.string()).nullable()
+  z18.object({
+    type: z18.literal("thread.set_brain"),
+    workspace: z18.string().min(1),
+    threadId: z18.string().uuid(),
+    override: z18.record(z18.string(), z18.string()).nullable()
   }),
-  z17.object({
-    type: z17.literal("project.update"),
-    project: z17.string().min(1),
-    name: z17.string().min(1).max(80).optional(),
-    description: z17.string().max(2e3).optional(),
+  z18.object({
+    type: z18.literal("project.update"),
+    project: z18.string().min(1),
+    name: z18.string().min(1).max(80).optional(),
+    description: z18.string().max(2e3).optional(),
     // '' clears the stored value (omitted = keep) — same shape as project.create
-    website: z17.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z17.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    autoOpenPr: z17.boolean().optional(),
-    runCiBeforeMerge: z17.boolean().optional(),
+    website: z18.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z18.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    autoOpenPr: z18.boolean().optional(),
+    runCiBeforeMerge: z18.boolean().optional(),
     // the release gate (docs/23): reviewer-approved, PR-backed tasks get a
     // production-readiness plan from the channel shipper before merging.
     // Defaults ON — null/absent reads as true everywhere.
-    shipGate: z17.boolean().optional(),
+    shipGate: z18.boolean().optional(),
     // per-project brains (docs/10): overrides the workspace pack for work in this
     // project. '' clears the override (back to inherit); omitted keeps it.
-    modelPack: z17.union([packId, z17.literal("")]).optional()
+    modelPack: z18.union([packId, z18.literal("")]).optional()
   }),
   // move a channel into a project (1:N ownership)
-  z17.object({
-    type: z17.literal("channel.assign"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("channel.assign"),
+    channel: z18.string().min(1),
     // channel id
-    project: z17.string().min(1)
+    project: z18.string().min(1)
     // project id
   }),
   // create a fresh room in a project (slug unique per project; topic optional)
-  z17.object({
-    type: z17.literal("channel.create"),
-    workspace: z17.string().min(1),
-    project: z17.string().min(1),
+  z18.object({
+    type: z18.literal("channel.create"),
+    workspace: z18.string().min(1),
+    project: z18.string().min(1),
     // owning project id
-    slug: z17.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
-    topic: z17.string().max(280).default("")
+    slug: z18.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
+    topic: z18.string().max(280).default("")
   }),
   // rename a room — slug and/or topic. Safe because a channel is identified by its
   // id, not its slug (everything refs the uuid); the slug is a per-project label.
-  z17.object({
-    type: z17.literal("channel.rename"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("channel.rename"),
+    channel: z18.string().min(1),
     // channel id
-    slug: z17.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    topic: z17.string().max(280).optional()
+    slug: z18.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    topic: z18.string().max(280).optional()
   }),
   // set a room's threads mode (docs/03 §5, docs/20): 'on' (default) keeps task replies in
   // their threads (the channel reads as digests); 'off' widens the channel feed to show thread
   // traffic inline. A view lens, never a reroute — every message keeps its task_id.
-  z17.object({
-    type: z17.literal("channel.set_thread_mode"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("channel.set_thread_mode"),
+    channel: z18.string().min(1),
     // channel id
-    mode: z17.enum(["on", "off"])
+    mode: z18.enum(["on", "off"])
   }),
   // what the room is for (docs/design/marketing-channel-2026-07): 'build' runs today's
   // chat + board; 'marketing' runs the growth HQ (Feed · Calendar · Library). A lens plus
   // a toolbelt, never a silo — ACL, FSM, and artifacts are untouched. Human-only: rooms
   // change trade by the settings Kind row or the one-time #marketing upgrade prompt.
-  z17.object({
-    type: z17.literal("channel.set_kind"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("channel.set_kind"),
+    channel: z18.string().min(1),
     // channel id
-    kind: z17.enum(["build", "marketing"])
+    kind: z18.enum(["build", "marketing"])
   }),
   // permanently delete a room + everything in it (messages, tasks, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z17.object({ type: z17.literal("channel.delete"), channel: z17.string().min(1) }),
+  z18.object({ type: z18.literal("channel.delete"), channel: z18.string().min(1) }),
   // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive. Arming
   // is human-only, on every plan since 2026-10-03 (the Pro trial pays for its runs in credits);
   // agents may only propose (a card). 'once' carries its exact runAt; recurring carries local time + IANA tz
   // (+ weekday for weekly) and the server computes next_run_at via the shared cadence brain.
-  z17.object({
-    type: z17.literal("schedule.create"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("schedule.create"),
+    channel: z18.string().min(1),
     // channel id
-    title: z17.string().trim().min(1).max(200),
-    prompt: z17.string().trim().min(1).max(4e3),
+    title: z18.string().trim().min(1).max(200),
+    prompt: z18.string().trim().min(1).max(4e3),
     // what the run asks the agent to do
-    cadence: z17.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z17.string().datetime().optional(),
+    cadence: z18.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z18.string().datetime().optional(),
     // once only
-    atTime: z17.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    atTime: z18.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     // recurring, default 09:00
-    tz: z17.string().max(64).optional(),
+    tz: z18.string().max(64).optional(),
     // IANA, from the arming client
-    weekday: z17.number().int().min(0).max(6).optional(),
+    weekday: z18.number().int().min(0).max(6).optional(),
     // weekly only
-    agent: z17.string().min(1).optional(),
+    agent: z18.string().min(1).optional(),
     // agent name; defaults to the room's marketer at run time
     // A ROUTINE (the universal launcher) rather than a marketing content schedule. The two share
     // this table, and the firing path used to tell them apart by CHANNEL KIND — so a routine armed
@@ -24337,27 +25235,27 @@ var CommandSchema = z17.discriminatedUnion("type", [
     // instead of its own conversation. The distinction belongs to the row, not to the room.
     // THE ROUTINE WRITER (docs/design/routine-writer-2026-10): `thread` is the session rex wrote the routine
     // in. The routine runs in it from now on, and the server posts the divider there. Implies `routine`.
-    routine: z17.boolean().optional(),
-    thread: z17.string().uuid().optional(),
+    routine: z18.boolean().optional(),
+    thread: z18.string().uuid().optional(),
     replyGap: REPLY_GAP_FIELD.optional()
     // the Replies part's queue gap
   }),
-  z17.object({ type: z17.literal("schedule.set_status"), schedule: z17.string().min(1), status: z17.enum(["active", "paused"]) }),
-  z17.object({ type: z17.literal("schedule.delete"), schedule: z17.string().min(1) }),
+  z18.object({ type: z18.literal("schedule.set_status"), schedule: z18.string().min(1), status: z18.enum(["active", "paused"]) }),
+  z18.object({ type: z18.literal("schedule.delete"), schedule: z18.string().min(1) }),
   // edit an armed schedule in place (round 20): title/prompt/cadence/time — next_run_at
   // recomputes from the same cadence brain create uses; run_count is untouched (this is an
   // edit, not a claim). HUMAN_ONLY like the rest of schedule management.
-  z17.object({
-    type: z17.literal("schedule.update"),
-    schedule: z17.string().min(1),
-    title: z17.string().trim().min(1).max(200),
-    prompt: z17.string().trim().min(1).max(4e3),
-    cadence: z17.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z17.string().datetime().optional(),
+  z18.object({
+    type: z18.literal("schedule.update"),
+    schedule: z18.string().min(1),
+    title: z18.string().trim().min(1).max(200),
+    prompt: z18.string().trim().min(1).max(4e3),
+    cadence: z18.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z18.string().datetime().optional(),
     // once only
-    atTime: z17.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-    tz: z17.string().max(64).optional(),
-    weekday: z17.number().int().min(0).max(6).optional(),
+    atTime: z18.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    tz: z18.string().max(64).optional(),
+    weekday: z18.number().int().min(0).max(6).optional(),
     replyGap: REPLY_GAP_FIELD.nullable().optional()
     // null: the routine drafts only
   }),
@@ -24370,173 +25268,173 @@ var CommandSchema = z17.discriminatedUnion("type", [
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
-  z17.object({
-    type: z17.literal("content.create"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("content.create"),
+    channel: z18.string().min(1),
     // channel id
-    task: z17.string().min(1).optional(),
+    task: z18.string().min(1).optional(),
     // the content task (kind:'content') this draft delivers — renders inline in its thread
     // …or the CONVERSATION this draft was written in (0115). A social-post ask does not need a
     // board row, and before this the card could only exist on a task — which is why an agent
     // asked for drafts in a thread had to propose one. Either anchor renders the same card.
-    thread: z17.string().min(1).optional(),
-    platform: z17.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
-    body: z17.string().trim().min(1).max(1e4),
-    schedule: z17.string().min(1).optional(),
+    thread: z18.string().min(1).optional(),
+    platform: z18.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
+    body: z18.string().trim().min(1).max(1e4),
+    schedule: z18.string().min(1).optional(),
     // the schedule row this draft came from
     // the slot this draft is FOR (draft-ahead: the tick runs ~30min early; approve
     // keeps this time unless overridden, and the calendar places the draft chip on it)
-    slotAt: z17.string().datetime().optional(),
+    slotAt: z18.string().datetime().optional(),
     // the public image URL the post publishes with (REQUIRED by Instagram; optional context elsewhere)
-    mediaUrl: z17.string().url().max(2e3).optional(),
+    mediaUrl: z18.string().url().max(2e3).optional(),
     // the visual the marketer described. Kept OUT of the body (where it would publish verbatim
     // and break the character count) and stored beside the post — it is what the image generator
     // draws from, and what the card shows when generation didn't happen.
-    imageBrief: z17.string().trim().max(2e3).optional(),
+    imageBrief: z18.string().trim().max(2e3).optional(),
     // inline preview of the generated image: a downscaled data: URI that replicates with the
     // draft so the card shows the real picture (the 0048 chat-attachment precedent — thumbnail
     // travels, full bytes stay on the machine that made them). Bounded to protect the replica.
-    thumb: z17.string().startsWith("data:image/").max(2e5).optional(),
+    thumb: z18.string().startsWith("data:image/").max(2e5).optional(),
     // why a briefed draft has no image (generation failed / capped) — shown ON the card with a
     // Try-again, instead of the reason being buried in the marketer's summary message
-    imageError: z17.string().trim().max(600).optional(),
+    imageError: z18.string().trim().max(600).optional(),
     // a VIDEO post's creator script (the UGC round): the body is the caption that posts with the
     // video, the script is what the creator films. Kept in media.script, never in the body.
     // `frame`: the shelf image the film shows as the product (brand-grounding plan §6), by name. `seconds`: the film's length (video-rung plan §8), the human's pick on the angle card or their word; the door holds it inside the tier's range
-    script: z17.string().trim().min(1).max(1e4).optional(),
-    frame: z17.string().trim().min(1).max(200).optional(),
-    seconds: z17.number().int().min(1).max(60).optional()
+    script: z18.string().trim().min(1).max(1e4).optional(),
+    frame: z18.string().trim().min(1).max(200).optional(),
+    seconds: z18.number().int().min(1).max(60).optional()
   }),
   // the human tweaks a draft's text/media before approving (calendar preview edit) — never
   // a published item, and agents never rewrite what a human is reviewing. mediaUrl: a url
   // sets it, '' clears it, absent leaves it alone.
-  z17.object({ type: z17.literal("content.update"), item: z17.string().min(1), body: z17.string().trim().min(1).max(1e4), mediaUrl: z17.union([z17.string().url().max(2e3), z17.literal("")]).optional() }),
+  z18.object({ type: z18.literal("content.update"), item: z18.string().min(1), body: z18.string().trim().min(1).max(1e4), mediaUrl: z18.union([z18.string().url().max(2e3), z18.literal("")]).optional() }),
   // the MARKETER revises its own still-unpublished draft after a human requests a change (§4.5).
   // Editing a draft is still DRAFTING — "agents draft, humans publish" — so this is agent-allowed,
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z17.object({
-    type: z17.literal("content.revise"),
-    item: z17.string().min(1),
-    body: z17.string().trim().min(1).max(1e4).optional(),
-    imageBrief: z17.string().trim().max(2e3).optional(),
-    script: z17.string().trim().min(1).max(1e4).optional(),
-    frame: z17.string().trim().max(200).nullable().optional(),
-    seconds: z17.number().int().min(1).max(60).nullable().optional(),
+  z18.object({
+    type: z18.literal("content.revise"),
+    item: z18.string().min(1),
+    body: z18.string().trim().min(1).max(1e4).optional(),
+    imageBrief: z18.string().trim().max(2e3).optional(),
+    script: z18.string().trim().min(1).max(1e4).optional(),
+    frame: z18.string().trim().max(200).nullable().optional(),
+    seconds: z18.number().int().min(1).max(60).nullable().optional(),
     // the film's facts (the video rung): what filmed it, for how long, at what price; the machine's own-key lane writes them, the server's lane writes them itself
-    videoMeta: z17.object({ tier: z17.string().max(40), model: z17.string().max(80), seconds: z17.number().int().min(1).max(60), credits: z17.number().int().min(0), at: z17.string().datetime(), frame: z17.string().max(200).nullable().optional(), frameUsed: z17.boolean().optional() }).optional(),
-    videoErrorCode: z17.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
-    thumb: z17.string().startsWith("data:image/").max(2e5).optional(),
-    imageError: z17.union([z17.string().trim().max(600), z17.literal("")]).optional(),
-    videoError: z17.union([z17.string().trim().max(600), z17.literal("")]).optional()
+    videoMeta: z18.object({ tier: z18.string().max(40), model: z18.string().max(80), seconds: z18.number().int().min(1).max(60), credits: z18.number().int().min(0), at: z18.string().datetime(), frame: z18.string().max(200).nullable().optional(), frameUsed: z18.boolean().optional() }).optional(),
+    videoErrorCode: z18.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
+    thumb: z18.string().startsWith("data:image/").max(2e5).optional(),
+    imageError: z18.union([z18.string().trim().max(600), z18.literal("")]).optional(),
+    videoError: z18.union([z18.string().trim().max(600), z18.literal("")]).optional()
   }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
   // fetchable. The bytes ride in as a data: URI and become /media/<id>, HMAC-gated.
   // a video rides the same lane (the UGC film, 2026-09-18): `data:video/mp4` bytes, one media per draft
-  z17.object({ type: z17.literal("content.attach_media"), item: z17.string().min(1), dataUrl: z17.string().regex(/^data:(?:image|video)\//).max(23e6) }),
+  z18.object({ type: z18.literal("content.attach_media"), item: z18.string().min(1), dataUrl: z18.string().regex(/^data:(?:image|video)\//).max(23e6) }),
   // remove a draft/scheduled item from the calendar entirely (published stays, it's history)
-  z17.object({ type: z17.literal("content.delete"), item: z17.string().min(1) }),
-  z17.object({
-    type: z17.literal("content.approve"),
-    item: z17.string().min(1),
-    scheduledAt: z17.string().datetime().optional()
+  z18.object({ type: z18.literal("content.delete"), item: z18.string().min(1) }),
+  z18.object({
+    type: z18.literal("content.approve"),
+    item: z18.string().min(1),
+    scheduledAt: z18.string().datetime().optional()
     // default: one hour out
   }),
-  z17.object({ type: z17.literal("content.unschedule"), item: z17.string().min(1) }),
+  z18.object({ type: z18.literal("content.unschedule"), item: z18.string().min(1) }),
   // a draft with no conversation moves into the session its first picture ask opened (HUMAN_ONLY)
   contentAnchorCommand,
   // connectors (marketing-channel plan §4.8): connecting is the OAuth round-trip (no command);
   // disconnecting is a human call — revokes the row and deletes the sealed secret.
-  z17.object({ type: z17.literal("connector.disconnect"), connector: z17.string().min(1) }),
+  z18.object({ type: z18.literal("connector.disconnect"), connector: z18.string().min(1) }),
   // a plain channel artifact (no task): the marketing bootstrap's conversational doc drops
   // (round 4 — the analysis is a CONVERSATION, not a task) and any future channel-scoped file.
-  z17.object({
-    type: z17.literal("artifact.create"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("artifact.create"),
+    channel: z18.string().min(1),
     // channel id
-    kind: z17.enum(["doc", "file"]).default("doc"),
-    name: z17.string().trim().min(1).max(200),
-    inlineContent: z17.string().min(1).max(3e5),
-    mime: z17.string().max(100).optional(),
-    tags: z17.array(z17.string().trim().min(1).max(40)).max(8).optional()
+    kind: z18.enum(["doc", "file"]).default("doc"),
+    name: z18.string().trim().min(1).max(200),
+    inlineContent: z18.string().min(1).max(3e5),
+    mime: z18.string().max(100).optional(),
+    tags: z18.array(z18.string().trim().min(1).max(40)).max(8).optional()
     // tags e.g. ['brand'] — the rail filters on it
   }),
   // Whiteboards (docs/38). create is the AGENT door — a board born from a generation source
   // (mermaid for flow/sequence/class, or an element-skeleton JSON string; strings only — the
   // lowest common schema every runtime's tool layer speaks). Humans create boards through the
   // local-first row path (/v1/whiteboards), never this command.
-  z17.object({
-    type: z17.literal("whiteboard.create"),
-    channel: z17.string().min(1),
+  z18.object({
+    type: z18.literal("whiteboard.create"),
+    channel: z18.string().min(1),
     // channel id — the board's filing
-    threadId: z17.string().optional(),
+    threadId: z18.string().optional(),
     // provenance: the session that asked for it
-    taskId: z17.string().optional(),
+    taskId: z18.string().optional(),
     // provenance: the task it evidences
-    title: z17.string().trim().min(1).max(WB_TITLE_MAX),
-    mermaid: z17.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z17.string().min(1).max(WB_SCENE_MAX).optional()
+    title: z18.string().trim().min(1).max(WB_TITLE_MAX),
+    mermaid: z18.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z18.string().min(1).max(WB_SCENE_MAX).optional()
   }),
   // update is three shapes over one strict rev guard (baseRev must equal the board's rev, else
   // WHITEBOARD_STALE — the caller re-reads and reapplies): a new generation SOURCE (agent edit),
   // MATERIALIZE (the first desktop to render converts source → scene + snapshot and clears it),
   // or a TITLE-only rename. The LWW autosave path is /v1/whiteboards PATCH, not this command.
-  z17.object({
-    type: z17.literal("whiteboard.update"),
-    whiteboardId: z17.string().min(1),
-    baseRev: z17.number().int().min(1),
-    title: z17.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-    mermaid: z17.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z17.string().min(1).max(WB_SCENE_MAX).optional(),
-    scene: z17.string().min(1).max(WB_SCENE_MAX).optional(),
-    snapshotSvg: z17.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
-    clearSource: z17.boolean().optional()
+  z18.object({
+    type: z18.literal("whiteboard.update"),
+    whiteboardId: z18.string().min(1),
+    baseRev: z18.number().int().min(1),
+    title: z18.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+    mermaid: z18.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z18.string().min(1).max(WB_SCENE_MAX).optional(),
+    scene: z18.string().min(1).max(WB_SCENE_MAX).optional(),
+    snapshotSvg: z18.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
+    clearSource: z18.boolean().optional()
   }),
   ...MARKETING_COMMANDS,
   // add / remove an agent's membership in a channel (the agent_channels row). Agents are
   // workspace-scoped but only see a channel's context once added here — humans (the live-panel
   // "+") or the orchestrator (the "add @agent to #channel?" card). agent = id or name; channel = id or slug.
-  z17.object({ type: z17.literal("channel.add_agent"), workspace: z17.string().min(1), channel: z17.string().min(1), agent: z17.string().min(1) }),
-  z17.object({ type: z17.literal("channel.remove_agent"), workspace: z17.string().min(1), channel: z17.string().min(1), agent: z17.string().min(1) }),
+  z18.object({ type: z18.literal("channel.add_agent"), workspace: z18.string().min(1), channel: z18.string().min(1), agent: z18.string().min(1) }),
+  z18.object({ type: z18.literal("channel.remove_agent"), workspace: z18.string().min(1), channel: z18.string().min(1), agent: z18.string().min(1) }),
   // channel people roster (0094): which humans the room's rail lists. `person` is an
   // nm_users id. A ROSTER, not an ACL — membership here grants nothing and gates nothing.
-  z17.object({ type: z17.literal("channel.add_person"), workspace: z17.string().min(1), channel: z17.string().min(1), person: z17.string().min(1) }),
-  z17.object({ type: z17.literal("channel.remove_person"), workspace: z17.string().min(1), channel: z17.string().min(1), person: z17.string().min(1) }),
+  z18.object({ type: z18.literal("channel.add_person"), workspace: z18.string().min(1), channel: z18.string().min(1), person: z18.string().min(1) }),
+  z18.object({ type: z18.literal("channel.remove_person"), workspace: z18.string().min(1), channel: z18.string().min(1), person: z18.string().min(1) }),
   // pin/unpin a channel message so it stands out and can be found later
   messagePinCommand,
   // Card revisions (reply-radar): a card whose state lives in its body is rewritten IN PLACE,
   // never re-posted beside itself; the handler requires the new body to still carry a fence.
-  z17.object({ type: z17.literal("message.revise_card"), message: z17.string().min(1), body: z17.string().min(1).max(6e4) }),
+  z18.object({ type: z18.literal("message.revise_card"), message: z18.string().min(1), body: z18.string().min(1).max(6e4) }),
   // decisions (docs/12 slice 2): answer/dismiss an agent's nmq card — human-only, exactly-once
   decisionAnswerCommand,
   decisionDismissCommand,
-  z17.object({ type: z17.literal("project.archive"), project: z17.string().min(1) }),
-  z17.object({ type: z17.literal("project.unarchive"), project: z17.string().min(1) }),
+  z18.object({ type: z18.literal("project.archive"), project: z18.string().min(1) }),
+  z18.object({ type: z18.literal("project.unarchive"), project: z18.string().min(1) }),
   // permanently delete an ARCHIVED project + everything in it (rooms, tasks, messages, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z17.object({ type: z17.literal("project.delete"), project: z17.string().min(1) }),
-  z17.object({
-    type: z17.literal("credential.set"),
-    workspace: z17.string().min(1),
-    provider: z17.string().min(1).default("anthropic"),
-    scope: z17.enum(["workspace", "agent"]),
-    agentId: z17.string().min(1).optional(),
+  z18.object({ type: z18.literal("project.delete"), project: z18.string().min(1) }),
+  z18.object({
+    type: z18.literal("credential.set"),
+    workspace: z18.string().min(1),
+    provider: z18.string().min(1).default("anthropic"),
+    scope: z18.enum(["workspace", "agent"]),
+    agentId: z18.string().min(1).optional(),
     // token is required for apikey mode (validated in the handler). In subscription mode the
     // login lives in the provider CLI, so a token is optional there — but if supplied it's kept
     // as the FAILOVER key (used only when the subscription is down and Auto failover is on).
-    token: z17.string().min(8).optional(),
-    authMode: z17.enum(["apikey", "subscription"]).default("apikey")
+    token: z18.string().min(8).optional(),
+    authMode: z18.enum(["apikey", "subscription"]).default("apikey")
   }),
   // a member edits their OWN profile — the display name shown on their messages and
   // in the channel/people lists. The handler scopes the write to actor.id, so a
   // member can only ever change their own row (no target user id is accepted).
-  z17.object({
-    type: z17.literal("member.update_profile"),
-    workspace: z17.string().min(1),
-    displayName: z17.string().trim().min(1).max(60)
+  z18.object({
+    type: z18.literal("member.update_profile"),
+    workspace: z18.string().min(1),
+    displayName: z18.string().trim().min(1).max(60)
   })
 ]);
 
@@ -24559,8 +25457,8 @@ async function claimAnnouncement(store2, ann, actor, workspace, row) {
   await run(store2, actor, { type: "setup.step", channel: channelId, flow: "marketing.v1", step: "product", value: website }).catch(() => void 0);
   if (repoId) await run(store2, actor, { type: "setup.step", channel: channelId, flow: "marketing.v1", step: "releases", value: { repoId, slug: row.repo, now: false, watch: false } }).catch(() => void 0);
   const threadId = crypto.randomUUID();
-  const digest2 = row.digest;
-  const scan = digest2?.candidate ? { candidates: [digest2.candidate], skipped: [], cursor: { at: row.createdAt, tag: digest2.candidate.tag } } : null;
+  const digest3 = row.digest;
+  const scan = digest3?.candidate ? { candidates: [digest3.candidate], skipped: [], cursor: { at: row.createdAt, tag: digest3.candidate.tag } } : null;
   const tag = row.tag ?? "the latest release";
   const body = scan ? `Release drafts \xB7 ${tag} \xB7 ${row.repo}
 
@@ -24590,10 +25488,10 @@ Drafted at neuramesh.app/announce.`;
 
 // src/github-connect.ts
 init_src();
-import { z as z19 } from "zod";
+import { z as z20 } from "zod";
 
 // src/github-proof.ts
-import { createHash as createHash6, createHmac as createHmac5, randomBytes as randomBytes6 } from "node:crypto";
+import { createHash as createHash8, createHmac as createHmac5, randomBytes as randomBytes6 } from "node:crypto";
 var UA3 = "neuramesh-announce";
 function ownerProofConfigured(env = process.env) {
   return githubAppConfigured(env) && !!env["GITHUB_APP_CLIENT_ID"] && !!env["GITHUB_APP_CLIENT_SECRET"] && !!env["NM_CONNECTOR_KEY"];
@@ -24619,7 +25517,7 @@ var proofRedirectUri = () => `${HQ_URL}/github/callback`;
 var grantStartUrl = (channel) => `${HQ_URL}/github/start${channel ? `?${new URLSearchParams({ channel }).toString()}` : ""}`;
 var pkceVerifier = (state) => createHmac5("sha256", keyBytes()).update(`github-pkce:${state}`).digest("base64url");
 function authorizeUrl(state, env = process.env) {
-  const challenge = createHash6("sha256").update(pkceVerifier(state)).digest("base64url");
+  const challenge = createHash8("sha256").update(pkceVerifier(state)).digest("base64url");
   const q = new URLSearchParams({ client_id: env["GITHUB_APP_CLIENT_ID"] ?? "", redirect_uri: proofRedirectUri(), state, code_challenge: challenge, code_challenge_method: "S256" });
   return `https://github.com/login/oauth/authorize?${q.toString()}`;
 }
@@ -24783,7 +25681,7 @@ async function dropAuthorization(token, what, fetchFn, env = process.env) {
 }
 
 // src/github-prove.ts
-import { z as z18 } from "zod";
+import { z as z19 } from "zod";
 
 // src/github-resolve.ts
 init_src();
@@ -25354,7 +26252,7 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
 }
 
 // src/github-prove.ts
-var Body = z18.object({ code: z18.string().nullish(), error: z18.string().nullish(), state: z18.string().min(1) });
+var Body = z19.object({ code: z19.string().nullish(), error: z19.string().nullish(), state: z19.string().min(1) });
 async function proveGrant(store2, actor, body, fetchFn) {
   try {
     const grant = await checked(store2, actor, body);
@@ -25422,20 +26320,21 @@ async function unlisted(slug, login, token, found, fetchFn) {
 }
 
 // src/github-write.ts
+init_src();
 var RUN_WRITE_PERMISSIONS = { contents: "write", pull_requests: "write", metadata: "read", checks: "read", statuses: "read", actions: "read" };
 var botIdentity = null;
 async function commitIdentity(fetchFn, token) {
   const login = `${appSlug()}[bot]`;
+  if (login === NEURAMESH_BOT.name) return NEURAMESH_BOT;
   if (botIdentity?.name === login) return botIdentity;
-  const fallback = { name: login, email: `${login}@users.noreply.github.com` };
   try {
     const r = await fetchFn(`https://api.github.com/users/${encodeURIComponent(login)}`, { headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "neuramesh-announce" } });
-    const id = r.ok ? (await r.json()).id : void 0;
-    if (!id) return fallback;
-    botIdentity = { name: login, email: `${id}+${login}@users.noreply.github.com` };
+    const account = r.ok ? await r.json() : null;
+    if (!account?.id || account.login !== login || account.type !== "Bot") throw new Error("Unverified GitHub App author.");
+    botIdentity = { name: login, email: `${account.id}+${login}@users.noreply.github.com` };
     return botIdentity;
   } catch {
-    return fallback;
+    throw new Error(`Could not verify the GitHub bot account ${login}. Check the configured App slug and retry.`);
   }
 }
 function githubWriteRoutes(app, store2, fetchFn) {
@@ -25574,7 +26473,7 @@ function githubApiRoutes(app, store2, opts = {}) {
   app.post("/v1/github/resolve", async (c) => {
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
-    const body = z19.object({ channel: z19.string().min(1), repo: z19.string().min(1).optional(), client: z19.string().nullish() }).safeParse(await c.req.json().catch(() => null));
+    const body = z20.object({ channel: z20.string().min(1), repo: z20.string().min(1).optional(), client: z20.string().nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
     const { workspace } = await store2.channelWorkspace(body.data.channel).catch(() => ({ workspace: null }));
@@ -25597,7 +26496,7 @@ function githubApiRoutes(app, store2, opts = {}) {
     if (!channel) return { status: 400, body: { error: "channel is required", code: "INVALID_INPUT" } };
     if (!githubAppConfigured() || !ann()) return { status: 501, body: { error: "GitHub connecting is not configured on this server", code: "NOT_CONFIGURED" } };
     const repoId = c.req.query("repo");
-    if (repoId && !z19.string().uuid().safeParse(repoId).success) return { status: 400, body: { error: "invalid repository id", code: "INVALID_INPUT" } };
+    if (repoId && !z20.string().uuid().safeParse(repoId).success) return { status: 400, body: { error: "invalid repository id", code: "INVALID_INPUT" } };
     const repo = await ann().repoForChannel(channel, repoId);
     const slug = repo ? slugOf(repo) : null;
     if (!repo || !slug) return { status: 409, body: { error: "this room's project has no GitHub repository", code: "NO_REPO" } };
@@ -25659,7 +26558,7 @@ function githubApiRoutes(app, store2, opts = {}) {
   app.post("/v1/repo/shelve", async (c) => {
     const o = await open(c);
     if (isRefusal(o)) return c.json(o.body, o.status);
-    const body = z19.object({ path: z19.string().trim().min(1).max(400), name: z19.string().trim().min(1).max(120).optional() }).safeParse(await c.req.json().catch(() => null));
+    const body = z20.object({ path: z20.string().trim().min(1).max(400), name: z20.string().trim().min(1).max(120).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "name the image file: { path, name? }", code: "INVALID_INPUT" }, 400);
     const channel = c.req.query("channel");
     const actor = c.get("actor");
@@ -25689,13 +26588,13 @@ var cap = (name, fallback) => {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-var ipHashOf = (ip) => ip ? createHash7("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
+var ipHashOf = (ip) => ip ? createHash9("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
 var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
 };
-var CreateSchema = z20.object({ repo: z20.string().min(3).max(200), tag: z20.string().max(120).nullable().optional(), website: z20.string().trim().min(3).max(400), email: z20.string().trim().max(200) });
-var DetectSchema = z20.object({ repo: z20.string().min(3).max(200) });
+var CreateSchema = z21.object({ repo: z21.string().min(3).max(200), tag: z21.string().max(120).nullable().optional(), website: z21.string().trim().min(3).max(400), email: z21.string().trim().max(200) });
+var DetectSchema = z21.object({ repo: z21.string().min(3).max(200) });
 async function latestOf(slug, token, fetchFn) {
   const rel = await githubGet(`/repos/${slug}/releases?per_page=5`, { token, fetchFn });
   const rows2 = rel.status === 200 && Array.isArray(rel.json) ? rel.json : [];
@@ -25722,7 +26621,7 @@ function announceView(row, brief) {
     drafts: row.posts.length ? "ready" : s === "drafting" ? "wait" : "next",
     card: row.imageMime ? "ready" : "next"
   };
-  const digest2 = row.digest;
+  const digest3 = row.digest;
   return {
     id: row.id,
     status: s,
@@ -25731,7 +26630,7 @@ function announceView(row, brief) {
     website: row.website,
     email: maskEmail(row.email),
     steps,
-    latest: digest2?.candidate ? { tag: digest2.candidate.tag ?? row.tag, name: digest2.candidate.name, publishedAt: digest2.candidate.publishedAt } : null,
+    latest: digest3?.candidate ? { tag: digest3.candidate.tag ?? row.tag, name: digest3.candidate.name, publishedAt: digest3.candidate.publishedAt } : null,
     brief,
     posts: row.posts.map((p2) => ({ platform: p2.platform, body: p2.body, image: p2.platform === "instagram" && !!row.imageMime })),
     error: row.error,
@@ -25831,7 +26730,7 @@ function announceClaimRoute(app, store2, opts = {}) {
     if (!ann) return c.json({ error: "announcements not served by this store" }, 501);
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person claims a draft set", code: "HUMAN_ONLY" }, 403);
-    const body = z20.object({ workspace: z20.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z21.object({ workspace: z21.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     if (!await actorInWorkspace(store2, actor, body.data.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const row = await ann.get(c.req.param("id"));
@@ -25845,10 +26744,10 @@ function announceClaimRoute(app, store2, opts = {}) {
 
 // src/relay.ts
 import { timingSafeEqual as timingSafeEqual6 } from "node:crypto";
-import { z as z21 } from "zod";
-var ValidateMachineSchema = z21.object({ token: z21.string().min(1) });
-var ValidateClientSchema = z21.object({ clerkToken: z21.string().min(1), machineId: z21.string().uuid() });
-var DevRelayUserSchema = z21.string().uuid();
+import { z as z22 } from "zod";
+var ValidateMachineSchema = z22.object({ token: z22.string().min(1) });
+var ValidateClientSchema = z22.object({ clerkToken: z22.string().min(1), machineId: z22.string().uuid() });
+var DevRelayUserSchema = z22.string().uuid();
 function devRelayUser(token) {
   if (process.env["NM_ALLOW_DEV_RELAY"] !== "1") return null;
   const expected = process.env["NM_DEV_RELAY_TOKEN"];
@@ -25927,13 +26826,13 @@ async function resolveBearerActor(store2, userId, rawHeader) {
 }
 
 // src/local-auth.ts
-import { createHash as createHash8, createHmac as createHmac6, randomBytes as randomBytes7 } from "node:crypto";
+import { createHash as createHash10, createHmac as createHmac6, randomBytes as randomBytes7 } from "node:crypto";
 var LOCAL_USER = { clerkUserId: "local", email: "local@neuramesh.local" };
 var LOCAL_SYNC_KID = "nm-local";
 var LOCAL_SYNC_AUD = "powersync-local";
 var LOCAL_SYNC_TTL_SECONDS = 6 * 3600;
 function hashLocalToken(token) {
-  return createHash8("sha256").update(token).digest("hex");
+  return createHash10("sha256").update(token).digest("hex");
 }
 async function localUserIdForBearer(store2, bearer) {
   if (!localMode() || !bearer.startsWith("nmh_")) return null;
@@ -25943,12 +26842,12 @@ async function resolveTokenLane(store2, bearer, rawHeader) {
   if (bearer.startsWith("nmm_")) {
     const header = ActorSchema.safeParse(safeJson(rawHeader ?? "null"));
     const resolved = await resolveMachineActor(store2, bearer, header.success ? header.data : null);
-    return resolved ? { actor: resolved.actor } : { status: 401, code: "AUTH_FAILED", error: "unknown machine token" };
+    return resolved ? resolved : { status: 401, code: "AUTH_FAILED", error: "unknown machine token" };
   }
   const userId = await localUserIdForBearer(store2, bearer);
   if (!userId) return { status: 401, code: "AUTH_FAILED", error: "unknown local token" };
   const actor = await resolveBearerActor(store2, userId, rawHeader);
-  return actor ? { actor } : { status: 403, code: "FORBIDDEN", error: "this account cannot act as that agent" };
+  return actor ? { actor, memberId: userId } : { status: 403, code: "FORBIDDEN", error: "this account cannot act as that agent" };
 }
 var b64 = (v) => Buffer.from(JSON.stringify(v)).toString("base64url");
 function signLocalSyncToken(sub, keyB64url, nowMs = Date.now()) {
@@ -26033,7 +26932,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z26 } from "zod";
+import { z as z29 } from "zod";
 
 // src/trial.ts
 init_src();
@@ -26259,7 +27158,7 @@ function exportRoutes(app, store2) {
 
 // src/import.ts
 init_src();
-import { z as z22 } from "zod";
+import { z as z23 } from "zod";
 
 // src/import-batch.ts
 init_src();
@@ -26366,9 +27265,9 @@ ${r["name"]}`;
 async function suffixSlugs(sql, ws, table, fresh) {
   if (!fresh.length) return;
   const taken = /* @__PURE__ */ new Map();
-  const bucket = (scope) => {
-    let set = taken.get(scope);
-    if (!set) taken.set(scope, set = /* @__PURE__ */ new Set());
+  const bucket = (scope3) => {
+    let set = taken.get(scope3);
+    if (!set) taken.set(scope3, set = /* @__PURE__ */ new Set());
     return set;
   };
   const scopeOf = (r) => table === "channels" ? String(r["project_id"]) : "";
@@ -26450,26 +27349,26 @@ async function slugMapOf(sql, ws, table, ids, sent) {
 
 // src/import.ts
 var UUID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-var uuid = z22.string().uuid();
+var uuid = z23.string().uuid();
 var PRO_REFUSAL = "This workspace needs Pro. Get Pro to migrate a workspace into it.";
 var STORAGE_REFUSAL = "Not enough storage on this plan. Delete files in this workspace, or migrate a smaller workspace.";
 var SIZE_REFUSAL = "The batch is over 4 MB. Send smaller batches.";
-var ManifestSchema = z22.object({
-  format: z22.literal(EXPORT_FORMAT),
-  version: z22.literal(EXPORT_VERSION),
-  workspace: z22.object({ id: z22.string(), name: z22.string(), slug: z22.string() }),
-  exportedAt: z22.string(),
-  counts: z22.record(z22.number().int().min(0))
+var ManifestSchema = z23.object({
+  format: z23.literal(EXPORT_FORMAT),
+  version: z23.literal(EXPORT_VERSION),
+  workspace: z23.object({ id: z23.string(), name: z23.string(), slug: z23.string() }),
+  exportedAt: z23.string(),
+  counts: z23.record(z23.number().int().min(0))
 });
-var ImportBatchSchema = z22.object({
+var ImportBatchSchema = z23.object({
   importId: uuid,
-  seq: z22.number().int().min(0),
-  table: z22.enum(EXPORT_TABLES),
-  rows: z22.array(z22.object({ id: uuid }).passthrough()),
-  first: z22.object({ manifest: ManifestSchema, totalBytes: z22.number().int().min(0) }).optional(),
-  links: z22.literal(true).optional(),
-  idMap: z22.record(uuid, uuid).optional(),
-  last: z22.literal(true).optional()
+  seq: z23.number().int().min(0),
+  table: z23.enum(EXPORT_TABLES),
+  rows: z23.array(z23.object({ id: uuid }).passthrough()),
+  first: z23.object({ manifest: ManifestSchema, totalBytes: z23.number().int().min(0) }).optional(),
+  links: z23.literal(true).optional(),
+  idMap: z23.record(uuid, uuid).optional(),
+  last: z23.literal(true).optional()
 }).superRefine((b2, ctx) => {
   if (b2.first && (b2.seq !== 0 || b2.rows.length)) ctx.addIssue({ code: "custom", message: "The opening batch has seq 0 and no rows." });
   if (b2.links && !lateKeys(b2.table).length) ctx.addIssue({ code: "custom", message: `${b2.table} has no link pass.` });
@@ -26568,12 +27467,12 @@ function contentMediaRoute(app, store2) {
   app.get("/v1/content/media/:id", async (c) => {
     const sql = sqlOf(store2);
     if (sql) {
-      const [scope] = await sql`select m.workspace_id, i.channel_id from content_media m join content_items i on i.id = m.content_item_id where m.id = ${c.req.param("id")}::uuid`;
-      if (!scope) return c.json({ error: "not found" }, 404);
+      const [scope3] = await sql`select m.workspace_id, i.channel_id from content_media m join content_items i on i.id = m.content_item_id where m.id = ${c.req.param("id")}::uuid`;
+      if (!scope3) return c.json({ error: "not found" }, 404);
       const actor = c.get("actor");
-      if (!await actorInWorkspace(store2, actor, scope["workspace_id"])) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+      if (!await actorInWorkspace(store2, actor, scope3["workspace_id"])) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
       if (actor.kind === "agent") {
-        const registration = await sql`select 1 from agent_channels ac join agents a on a.id = ac.agent_id where ac.agent_id = ${actor.id}::uuid and ac.channel_id = ${scope["channel_id"]}::uuid and a.retired_at is null`;
+        const registration = await sql`select 1 from agent_channels ac join agents a on a.id = ac.agent_id where ac.agent_id = ${actor.id}::uuid and ac.channel_id = ${scope3["channel_id"]}::uuid and a.retired_at is null`;
         if (!registration.length) return c.json({ error: "not your channel", code: "NOT_PERMITTED" }, 403);
       }
     }
@@ -26588,31 +27487,32 @@ function contentMediaRoute(app, store2) {
 
 // src/brain-routes.ts
 import { compress } from "hono/compress";
-import { z as z23 } from "zod";
-var CommitSchema = z23.object({
-  workspace: z23.string().uuid(),
-  commitId: z23.string().uuid(),
-  expectedRevision: z23.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1),
-  deviceId: z23.string().min(1).max(256),
-  events: z23.array(z23.object({ id: z23.string().min(1).max(256), type: z23.string().min(1).max(128), timestamp: z23.string().datetime({ offset: true }) }).passthrough()).max(4096),
-  runtimeMessages: z23.array(z23.unknown()).optional(),
-  metadata: z23.record(z23.unknown()).optional(),
-  artifactIds: z23.array(z23.string().uuid()).max(256).optional()
+import { z as z24 } from "zod";
+var CommitSchema = z24.object({
+  workspace: z24.string().uuid(),
+  commitId: z24.string().uuid(),
+  expectedRevision: z24.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1),
+  deviceId: z24.string().min(1).max(256),
+  events: z24.array(z24.object({ id: z24.string().min(1).max(256), type: z24.string().min(1).max(128), timestamp: z24.string().datetime({ offset: true }) }).passthrough()).max(4096),
+  runtimeMessages: z24.array(z24.unknown()).optional(),
+  metadata: z24.record(z24.unknown()).optional(),
+  artifactIds: z24.array(z24.string().uuid()).max(256).optional()
 }).strict();
-var ArtifactSchema = z23.object({
-  workspace: z23.string().uuid(),
-  threadId: z23.string().uuid(),
-  id: z23.string().uuid(),
-  name: z23.string().min(1).max(512),
-  mime: z23.string().max(255).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
-  contentBase64: z23.string(),
-  sha256: z23.string().regex(/^[a-f0-9]{64}$/).optional(),
-  messageId: z23.string().uuid().optional(),
-  kind: z23.enum(["screenshot", "file", "doc", "diff", "test_report", "design", "ship"]).optional(),
-  tags: z23.array(z23.string().min(1).max(100)).max(50).optional(),
-  channel: z23.string().uuid().optional()
+var ArtifactSchema = z24.object({
+  capture: z24.object({ source: z24.enum(["managed-browser", "independent-observer"]), target: z24.string().min(1).max(2e3), reviewedRevision: z24.string().regex(/^[a-f0-9]{40}$/).optional() }).strict().optional(),
+  workspace: z24.string().uuid(),
+  threadId: z24.string().uuid(),
+  id: z24.string().uuid(),
+  name: z24.string().min(1).max(512),
+  mime: z24.string().max(255).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
+  contentBase64: z24.string(),
+  sha256: z24.string().regex(/^[a-f0-9]{64}$/).optional(),
+  messageId: z24.string().uuid().optional(),
+  kind: z24.enum(["screenshot", "file", "doc", "diff", "test_report", "design", "ship"]).optional(),
+  tags: z24.array(z24.string().min(1).max(100)).max(50).optional(),
+  channel: z24.string().uuid().optional()
 }).strict();
-var ScopeSchema = z23.object({ workspace: z23.string().uuid(), id: z23.string().uuid() });
+var ScopeSchema = z24.object({ workspace: z24.string().uuid(), id: z24.string().uuid() });
 async function boundedJson(request2, limit) {
   if (Number(request2.headers.get("content-length") ?? 0) > limit) throw new BrainError("TOO_LARGE", "This brain upload exceeds the request limit.", 413);
   const reader = request2.body?.getReader();
@@ -26655,20 +27555,20 @@ function brainRoutes(app, store2, options = {}) {
   };
   app.post("/v1/brain/threads/:id/commits", async (c) => {
     const parsed = CommitSchema.safeParse(await boundedJson(c.req.raw, 16 * 1024 * 1024));
-    if (!parsed.success || !z23.string().uuid().safeParse(c.req.param("id")).success) return c.json({ error: "Supply a valid brain commit.", code: "INVALID_INPUT" }, 400);
+    if (!parsed.success || !z24.string().uuid().safeParse(c.req.param("id")).success) return c.json({ error: "Supply a valid brain commit.", code: "INVALID_INPUT" }, 400);
     await machineScope(c.req.header("authorization"), parsed.data.workspace);
     return c.json(await service().commit(c.get("actor"), c.req.param("id"), parsed.data));
   });
   app.get("/v1/brain/threads/:id", compress(), async (c) => {
-    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
-    if (!scope.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
-    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    const scope3 = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope3.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope3.data.workspace);
     c.header("cache-control", "no-store");
     c.header("vary", "Accept-Encoding");
     const format = c.req.query("format");
     const held = c.req.query("since");
     const since = held !== void 0 && /^\d{1,12}$/.test(held) ? Number(held) : void 0;
-    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "activity" ? "activity" : format === "compact" || format === "compact-decoded", since);
+    const snapshot = await service().read(c.get("actor"), scope3.data.workspace, scope3.data.id, format === "activity" ? "activity" : format === "compact" || format === "compact-decoded", since);
     if ("unchanged" in snapshot && snapshot.unchanged) return c.json(snapshot);
     return c.json(format === "decoded" || format === "compact-decoded" ? decodedBrainSnapshot(snapshot, format === "compact-decoded" ? 64 * 1024 * 1024 : void 0) : snapshot);
   });
@@ -26679,17 +27579,17 @@ function brainRoutes(app, store2, options = {}) {
     return c.json(await service().artifact(c.get("actor"), parsed.data));
   });
   app.get("/v1/brain/threads/:id/artifacts", async (c) => {
-    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
-    if (!scope.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
-    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    const scope3 = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope3.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope3.data.workspace);
     c.header("cache-control", "no-store");
-    return c.json({ artifacts: await service().artifacts(c.get("actor"), scope.data.workspace, scope.data.id) });
+    return c.json({ artifacts: await service().artifacts(c.get("actor"), scope3.data.workspace, scope3.data.id) });
   });
   app.get("/v1/brain/artifacts/:id", async (c) => {
-    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
-    if (!scope.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
-    await machineScope(c.req.header("authorization"), scope.data.workspace);
-    const result = await service().download(c.get("actor"), scope.data.workspace, scope.data.id);
+    const scope3 = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope3.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope3.data.workspace);
+    const result = await service().download(c.get("actor"), scope3.data.workspace, scope3.data.id);
     return new Response(new Uint8Array(result.bytes), { headers: {
       "content-type": result.ref.mime,
       "content-length": String(result.bytes.length),
@@ -26701,17 +27601,17 @@ function brainRoutes(app, store2, options = {}) {
     } });
   });
   app.get("/v1/brain/artifacts/:id/metadata", async (c) => {
-    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
-    if (!scope.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
-    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    const scope3 = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope3.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope3.data.workspace);
     c.header("cache-control", "no-store");
-    return c.json(await service().artifactMetadata(c.get("actor"), scope.data.workspace, scope.data.id));
+    return c.json(await service().artifactMetadata(c.get("actor"), scope3.data.workspace, scope3.data.id));
   });
   app.get("/v1/brain/artifacts/:id/preview", async (c) => {
-    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
-    if (!scope.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
-    await machineScope(c.req.header("authorization"), scope.data.workspace);
-    const result = await service().download(c.get("actor"), scope.data.workspace, scope.data.id, true);
+    const scope3 = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope3.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope3.data.workspace);
+    const result = await service().download(c.get("actor"), scope3.data.workspace, scope3.data.id, true);
     return new Response(new Uint8Array(result.bytes), { headers: {
       "content-type": result.ref.mime,
       "content-length": String(result.bytes.length),
@@ -26723,9 +27623,148 @@ function brainRoutes(app, store2, options = {}) {
   });
 }
 
+// src/thread-followups.ts
+import { z as z25 } from "zod";
+var scope = z25.object({ workspace: z25.string().uuid(), threadId: z25.string().uuid() });
+var write = scope.extend({ id: z25.string().uuid() });
+var workerScope = z25.object({ workspace: z25.string().uuid(), id: z25.string().uuid() });
+var files = z25.array(z25.object({ id: z25.string().uuid(), name: z25.string().min(1).max(255), mime: z25.string().max(255) })).max(24).default([]);
+function validated(schema2, input) {
+  const parsed = schema2.safeParse(input);
+  if (!parsed.success) throw new BrainError("INVALID_INPUT", "Invalid follow-up request.", 400);
+  return parsed.data;
+}
+var display = ["id", "body", "state", "error", "requested_steer", "created_at"];
+function threadFollowupRoutes(app, store2) {
+  const db = () => {
+    const sql = sqlOf(store2);
+    if (!sql) throw new BrainError("UNAVAILABLE", "Follow-ups need the persistent store.", 503);
+    return sql;
+  };
+  const human = (actor, machine2) => {
+    if (machine2 || actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "Only a person can send or redirect a follow-up.", 403);
+    return actor.id;
+  };
+  const machine = (m, workspace) => {
+    if (!m || m.workspaceId !== workspace) throw new BrainError("NOT_PERMITTED", "This machine cannot deliver these prompts.", 403);
+    return m.id;
+  };
+  app.get("/v1/thread-followups", async (c) => {
+    const { workspace, threadId } = validated(scope, c.req.query()), actor = c.get("actor"), sql = db();
+    const author = human(actor, c.get("machine"));
+    await brainThreadAccess(sql, actor, workspace, threadId);
+    c.header("Cache-Control", "private, no-store");
+    return c.json(await sql`select ${sql([...display])} from thread_followups where workspace_id=${workspace} and thread_id=${threadId}
+      and author_id=${author} and state not in ('delivered','cancelled') order by created_at,id`);
+  });
+  app.post("/v1/thread-followups", async (c) => {
+    const { workspace, threadId, id, body, attachments } = validated(write.extend({ body: z25.string().trim().min(1).max(64e3), attachments: files }), await c.req.json());
+    const actor = c.get("actor"), author = human(actor, c.get("machine")), sql = db();
+    await brainThreadAccess(sql, actor, workspace, threadId);
+    const [row] = await sql`insert into thread_followups(id,workspace_id,thread_id,author_id,body,attachments,after_message_id,machine_id)
+      select ${id},w.id,t.id,${author},${body},${sql.json(attachments ?? [])},
+      (select m.id from messages m where t.kind='chat' and t.task_id is null and m.thread_id=t.id
+       and m.author_kind='human' and not m.applied_followup order by m.created_at desc,m.id desc limit 1),
+      coalesce(r.machine_id,cs.machine_id,t.machine_id,w.primary_machine_id)
+      from workspaces w join threads t on t.workspace_id=w.id and t.id=${threadId}
+      left join code_sessions cs on cs.workspace_id=w.id and cs.thread_id=t.id
+      left join lateral (select machine_id from runs where workspace_id=w.id and (thread_id=t.id or task_id=t.task_id)
+         and state in ('running','parked') order by started_at desc limit 1) r on true
+      where w.id=${workspace} and t.archived_at is null
+        and (not exists(select 1 from messages m where m.id=${id}) or exists(select 1 from thread_followups f where f.id=${id}))
+      on conflict(id) do update set id=excluded.id where thread_followups.workspace_id=excluded.workspace_id and
+        thread_followups.thread_id=excluded.thread_id and thread_followups.author_id=excluded.author_id and thread_followups.body=excluded.body and thread_followups.attachments=excluded.attachments
+      returning ${sql([...display])}`;
+    if (!row) throw new BrainError("CONFLICT", "The follow-up could not be queued in this conversation.", 409);
+    fireWakeBump(store2, workspace);
+    return c.json(row);
+  });
+  app.post("/v1/thread-followups/action", async (c) => {
+    const { workspace, threadId, id, action } = validated(write.extend({ action: z25.enum(["steer", "remove"]) }), await c.req.json());
+    const actor = c.get("actor"), author = human(actor, c.get("machine")), sql = db();
+    await brainThreadAccess(sql, actor, workspace, threadId);
+    const [row] = await sql`update thread_followups set state=${action === "remove" ? "cancelled" : "steer"}, requested_steer=${action === "steer"},error=null,updated_at=now()
+      where id=${id} and workspace_id=${workspace} and thread_id=${threadId} and author_id=${author} and state in ('queued','steer','failed') returning id`;
+    if (!row) throw new BrainError("CONFLICT", "This prompt has already been picked up. Refresh its status.", 409);
+    if (action === "steer") fireWakeBump(store2, workspace);
+    return c.json({ ok: true });
+  });
+  app.get("/v1/thread-followups/pending", async (c) => {
+    const { workspace } = validated(scope.pick({ workspace: true }), c.req.query()), host = machine(c.get("machine"), workspace), sql = db();
+    c.header("Cache-Control", "no-store");
+    await sql`update thread_followups set state='failed',error='Delivery was not confirmed. Check the conversation before retrying.',updated_at=now()
+      where workspace_id=${workspace} and machine_id=${host} and state='applying' and updated_at<now()-interval '2 minutes'`;
+    return c.json(await sql`select distinct on (f.thread_id) f.id,f.thread_id,f.author_id,f.body,f.attachments,f.requested_steer,t.kind,t.task_id,
+      (exists(select 1 from runs r where r.workspace_id=f.workspace_id and (r.thread_id=t.id or r.task_id=t.task_id) and r.state in ('running','parked'))
+       or exists(select 1 from code_sessions s where s.thread_id=t.id and s.state in ('streaming','awaiting_approval'))
+       or exists(select 1 from messages trigger where trigger.id=f.after_message_id and trigger.created_at>now()-interval '2 minutes'
+         and not exists(select 1 from runs r where r.trigger_message_id=trigger.id)
+         and not exists(select 1 from messages a where a.thread_id=t.id and a.author_kind='agent' and a.reply_to=trigger.id))
+      ) as busy
+      from thread_followups f join threads t on t.id=f.thread_id and t.workspace_id=f.workspace_id join workspaces w on w.id=f.workspace_id
+      where f.workspace_id=${workspace} and coalesce(f.machine_id,w.primary_machine_id,${host}::uuid)=${host} and f.state in ('queued','steer')
+      and not exists(select 1 from thread_followups active where active.thread_id=f.thread_id and active.state='applying')
+      and (f.requested_steer or not exists (
+        select 1 from thread_followups prev where prev.thread_id=f.thread_id and prev.state='delivered' and not prev.handled_in_run
+          and not exists(select 1 from runs r where r.trigger_message_id=prev.id and r.state not in ('running','parked'))
+          and not exists(select 1 from messages m where (m.thread_id=t.id or m.task_id=t.task_id)
+            and m.author_kind='agent' and m.reply_to=prev.id)
+      ))
+      order by f.thread_id,f.requested_steer desc,f.created_at,f.id`);
+  });
+  app.post("/v1/thread-followups/renew", async (c) => {
+    const { workspace, ids } = validated(z25.object({ workspace: z25.string().uuid(), ids: z25.array(z25.string().uuid()).max(100) }), await c.req.json());
+    const host = machine(c.get("machine"), workspace), sql = db();
+    if (ids.length) await sql`update thread_followups set updated_at=now() where workspace_id=${workspace} and machine_id=${host}
+      and state='applying' and id in ${sql(ids)}`;
+    return c.json({ ok: true });
+  });
+  app.post("/v1/thread-followups/claim", async (c) => {
+    const { workspace, id, steer } = validated(workerScope.extend({ steer: z25.boolean() }), await c.req.json()), host = machine(c.get("machine"), workspace), sql = db();
+    const row = await sql.begin(async (tx) => {
+      const [candidate] = await tx`select t.id from threads t join thread_followups f on f.thread_id=t.id where f.id=${id} and t.workspace_id=${workspace} for update of t`;
+      if (!candidate) return null;
+      const [head] = await tx`select id,state from thread_followups where thread_id=${candidate["id"]} and state in ('queued','steer','applying')
+        order by (state='applying') desc,requested_steer desc,created_at,id limit 1`;
+      if (head?.["id"] !== id || head["state"] !== (steer ? "steer" : "queued")) return null;
+      const [claimed] = await tx`update thread_followups set state='applying',machine_id=${host},updated_at=now() where id=${id}
+        and (machine_id=${host} or (machine_id is null and exists(select 1 from workspaces w where w.id=${workspace} and coalesce(w.primary_machine_id,${host}::uuid)=${host})))
+        and state=${steer ? "steer" : "queued"} returning id`;
+      return claimed ?? null;
+    });
+    return c.json({ claimed: !!row });
+  });
+  app.post("/v1/thread-followups/finish", async (c) => {
+    const { workspace, id, result, reason } = validated(workerScope.extend({ result: z25.enum(["publish", "applied", "retry", "failed"]), reason: z25.string().max(400).optional() }), await c.req.json());
+    const host = machine(c.get("machine"), workspace), sql = db();
+    await sql.begin(async (tx) => {
+      const [f] = await tx`select f.*,t.channel_id,t.task_id,t.archived_at from thread_followups f join threads t on t.id=f.thread_id and t.workspace_id=f.workspace_id
+        where f.id=${id} and f.workspace_id=${workspace} and f.machine_id=${host} for update of f`;
+      if (!f || !["applying", "delivered"].includes(f["state"])) throw new BrainError("CONFLICT", "This machine does not own the pending delivery.", 409);
+      if (f["state"] === "delivered") return;
+      if (result === "retry" || result === "failed" || f["archived_at"]) {
+        const state = result === "retry" && !f["archived_at"] ? f["requested_steer"] ? "steer" : "queued" : "failed";
+        await tx`update thread_followups set state=${state},error=${reason ?? null},updated_at=now() where id=${id}`;
+        return;
+      }
+      const [published] = await tx`insert into messages(id,workspace_id,channel_id,task_id,thread_id,author_kind,author_id,body,applied_followup)
+        values(${id},${workspace},${f["channel_id"]},${f["task_id"]},${f["task_id"] && result === "publish" ? null : f["thread_id"]},'human',${f["author_id"]},${f["body"]},${result === "applied"}) on conflict(id) do nothing returning id`;
+      if (!published) {
+        await tx`update thread_followups set state='failed',error='This message ID already exists. Remove the queued item and send a new prompt.',updated_at=now() where id=${id}`;
+        return;
+      }
+      await tx`update thread_followups set state='delivered',handled_in_run=${result === "applied"},updated_at=now() where id=${id}`;
+    });
+    return c.json({ ok: true });
+  });
+}
+
 // src/team-routes.ts
 init_src();
-import { z as z24 } from "zod";
+import { z as z26 } from "zod";
+
+// src/store/team-desk.ts
+init_src();
 
 // src/store/startup-team.ts
 init_src();
@@ -26772,17 +27811,19 @@ async function teamProjectAccess(sql, actor, workspace, project) {
   if (!row?.["context_channel_id"]) throw new BrainError("NOT_FOUND", "This project is not available to you.", 404);
   return row["context_channel_id"];
 }
-async function teamHomes(sql, workspace, project) {
-  const rows2 = await sql`select t.*, s.summary, coalesce(s.revision,0)::int as summary_revision,
+async function teamHomes(sql, workspace, project, historyAgentId) {
+  const rows2 = await sql`select t.*, coalesce(t.home_root_thread_id,t.id) as card_id, s.summary, coalesce(s.revision,0)::int as summary_revision,
     m.body as last_body, m.author_kind as last_author_kind,
+    exists(select 1 from runs r where r.agent_id=t.home_agent_id and r.trigger_message_id=m.id and r.state='failed') as last_reply_failed,
     (select count(*)::int from messages where thread_id = t.id) as msg_count,
     (select count(*)::int from schedules where owner_home_thread_id = t.id) as routine_count,
-    (select count(*)::int from tasks where origin_thread_id = t.id and state not in ('accepted','closed')) as work_count
+    (select count(*)::int from tasks k join threads origin on origin.id=k.origin_thread_id where origin.project_id=t.project_id and origin.home_agent_id=t.home_agent_id and k.state not in ('accepted','closed')) as work_count
     from threads t join project_agents pa on pa.project_id = t.project_id and pa.agent_id = t.home_agent_id
     join agents a on a.id = pa.agent_id and a.retired_at is null
     left join lateral (select summary,revision from team_context_snapshots where thread_id=t.id order by revision desc limit 1) s on true
-    left join lateral (select body,author_kind from messages where thread_id=t.id order by created_at desc,id desc limit 1) m on true
-    where t.workspace_id=${workspace}::uuid and t.project_id=${project}::uuid and t.home_agent_id is not null and t.archived_at is null
+    left join lateral (select id,body,author_kind from messages where thread_id=t.id order by created_at desc,id desc limit 1) m on true
+    where t.workspace_id=${workspace}::uuid and t.project_id=${project}::uuid and t.home_agent_id is not null
+      and ((${historyAgentId ?? null}::uuid is null and t.archived_at is null) or (t.home_agent_id=${historyAgentId ?? null}::uuid and t.archived_at is not null))
     order by t.created_at,t.id`;
   return rows2.map((r) => ({ ...r, brain_override: r["brain_override"] ? JSON.stringify(r["brain_override"]) : null }));
 }
@@ -26804,35 +27845,51 @@ async function ensureTeamHomes(sql, actor, workspace, project, agentId) {
       select pa.workspace_id,pa.project_id,${channel}::uuid,a.id,a.name || ' · Agent thread',coalesce(a.brief,''),${`human:${actor.id}`},'chat','chat',now()
       from project_agents pa join agents a on a.id=pa.agent_id and a.retired_at is null
       where pa.project_id=${project}::uuid and (${agentId ?? null}::uuid is null or a.id=${agentId ?? null}::uuid)
-      on conflict(project_id,home_agent_id) where home_agent_id is not null do update set archived_at=null`;
+      on conflict(project_id,home_agent_id) where home_agent_id is not null and archived_at is null do nothing`;
   });
 }
-async function teamContext(sql, actor, workspace, threadId) {
+async function teamContext(sql, actor, workspace, threadId, mode, commandId) {
   const access = await brainThreadAccess(sql, actor, workspace, threadId);
-  const [thread] = await sql`select home_agent_id from threads where id=${threadId}::uuid`;
-  if (!thread?.["home_agent_id"]) return { home: null, summary: null, revision: 0, messages: [], compactThrough: null };
-  const home = (await teamHomes(sql, workspace, access.project_id)).find((t2) => t2.id === threadId) ?? null;
-  if (!home) throw new BrainError("NOT_FOUND", "This agent is no longer on this project team.", 404);
-  const [snapshot] = await sql`select * from team_context_snapshots where thread_id=${threadId}::uuid order by revision desc limit 1`;
+  const [thread] = await sql`select home_agent_id,kind,archived_at from threads where id=${threadId}::uuid`;
+  if (!thread || thread["kind"] === "coding") return { home: null, summary: null, revision: 0, messages: [], compactThrough: null };
+  if (thread["archived_at"]) throw new BrainError("CONFLICT", "This conversation is in history. Continue in the current agent thread.", 409);
+  const home = thread["home_agent_id"] ? (await teamHomes(sql, workspace, access.project_id)).find((t2) => t2.id === threadId) ?? null : null;
+  if (thread["home_agent_id"] && !home) throw new BrainError("NOT_FOUND", "This agent is no longer on this project team.", 404);
+  const [snapshot] = await sql`select s.*,m.created_at as through_at from team_context_snapshots s join messages m on m.id=s.through_message_id where s.thread_id=${threadId}::uuid order by s.revision desc limit 1`;
+  let requestedThrough = null;
+  if (mode === "manual") {
+    const [request2] = await sql`select m.id,m.body,m.author_kind,m.machine_authored,m.schedule_id,a.name
+      from messages m left join agents a on a.id=${actor.id}::uuid and a.workspace_id=m.workspace_id
+      where m.thread_id=${threadId}::uuid and (${commandId ?? null}::uuid is null or m.id=${commandId ?? null}::uuid)
+      order by m.created_at desc,m.id desc limit 1`;
+    if (request2 && !request2["machine_authored"] && !request2["schedule_id"] && isCompactCommand(request2["body"], request2["author_kind"], request2["name"] ?? "")) requestedThrough = request2["id"];
+    else if (commandId) throw new BrainError("NOT_PERMITTED", "Compaction requires a human /compact message in this thread.", 403);
+  }
   const rows2 = await sql`select id,author_kind,author_id,body,created_at from messages where thread_id=${threadId}::uuid
     and (${snapshot?.["through_message_id"] ?? null}::uuid is null or (created_at,id)>(select created_at,id from messages where id=${snapshot?.["through_message_id"] ?? null}::uuid))
-    order by created_at,id limit 100`;
+    ${requestedThrough ? sql`and (created_at,id)<=(select created_at,id from messages where id=${requestedThrough}::uuid) order by created_at,id` : sql`order by created_at desc,id desc`}
+    limit 100`;
+  if (!requestedThrough) rows2.reverse();
   const messages2 = rows2.map((r) => ({ ...r, created_at: new Date(r["created_at"]).toISOString() }));
-  const shouldCompact = messages2.length > 60 || messages2.reduce((n, m) => n + m.body.length, 0) > 6e4;
+  const last = messages2.at(-1);
+  const boundary = last?.id === requestedThrough ? messages2.at(-2) : last;
   return {
     home,
+    threadId,
+    projectId: access.project_id ?? void 0,
+    compactedThroughAt: snapshot?.["through_at"] ? new Date(snapshot["through_at"]).toISOString() : null,
     summary: snapshot?.["summary"] ?? null,
     revision: snapshot?.["revision"] ?? 0,
     messages: messages2,
-    compactThrough: shouldCompact && messages2.length > 20 ? messages2[messages2.length - 21].id : null
+    compactThrough: requestedThrough ? boundary?.id ?? null : null
   };
 }
 async function publishTeamContext(sql, actor, workspace, threadId, input) {
   return sql.begin(async (tx) => {
     const q = tx;
     await q`select id from threads where id=${threadId}::uuid for update`;
-    const context = await teamContext(q, actor, workspace, threadId);
-    if (actor.kind !== "agent" || actor.id !== context.home?.home_agent_id) throw new BrainError("NOT_PERMITTED", "Only the owning agent can compact its thread.", 403);
+    const context = await teamContext(q, actor, workspace, threadId, input.mode, input.commandId);
+    if (actor.kind !== "agent" || !context.threadId || context.home && actor.id !== context.home.home_agent_id) throw new BrainError("NOT_PERMITTED", "Only the owning agent can compact its thread.", 403);
     if (context.revision !== input.revision || context.compactThrough !== input.through) throw new BrainError("CONFLICT", "The context changed; read it again before compacting.", 409);
     await q`insert into team_context_snapshots(workspace_id,thread_id,revision,through_message_id,summary)
       values(${workspace}::uuid,${threadId}::uuid,${input.revision + 1},${input.through}::uuid,${input.summary})`;
@@ -26840,9 +27897,47 @@ async function publishTeamContext(sql, actor, workspace, threadId, input) {
   });
 }
 
+// src/store/team-thread.ts
+init_src();
+async function freshTeamThread(sql, actor, workspace, project, threadId) {
+  if (actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "Only a person can start a fresh agent thread.", 403);
+  return sql.begin(async (tx) => {
+    const q = tx;
+    await teamProjectAccess(q, actor, workspace, project);
+    const [identity] = await q`select home_agent_id from threads where id=${threadId}::uuid and project_id=${project}::uuid`;
+    if (!identity?.["home_agent_id"]) throw new BrainError("NOT_FOUND", "This agent thread is not available.", 404);
+    await q`select pg_advisory_xact_lock(hashtextextended(${"team-home:" + project + ":" + identity["home_agent_id"]},0))`;
+    await q`select pg_advisory_xact_lock(hashtextextended(${threadId}, 0))`;
+    await q`select id from projects where id=${project}::uuid for update`;
+    const [old] = await q`select t.* from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id
+      join agents a on a.id=pa.agent_id and a.retired_at is null
+      where t.id=${threadId}::uuid and t.project_id=${project}::uuid and t.workspace_id=${workspace}::uuid for update of t`;
+    if (!old) throw new BrainError("NOT_FOUND", "This agent thread is not available.", 404);
+    if (old["archived_at"]) {
+      const [current] = await q`select id from threads where project_id=${project}::uuid and home_agent_id=${old["home_agent_id"]}::uuid and archived_at is null`;
+      if (!current) throw new BrainError("CONFLICT", "Reopen Agent Desk before starting a fresh thread.", 409);
+      return current["id"];
+    }
+    const [run2] = await q`select id from runs where thread_id=${threadId}::uuid and state in ('running','parked') limit 1`;
+    const [last] = await q`select author_kind,body from messages where thread_id=${threadId}::uuid order by created_at desc,id desc limit 1`;
+    const [decision] = await q`select d.id from decisions d join messages m on m.id=d.message_id where m.thread_id=${threadId}::uuid and d.status='open' limit 1`;
+    if (run2 || decision || last?.["author_kind"] === "human" && last["body"] !== ROUTINE_SCHEDULED_MARKER) {
+      throw new BrainError("CONFLICT", "Wait for this agent\u2019s current reply before starting a fresh thread. Coding tasks can continue separately.", 409);
+    }
+    if (!last) return threadId;
+    await q`update threads set archived_at=now() where id=${threadId}::uuid`;
+    const [next] = await q`insert into threads(workspace_id,project_id,channel_id,home_agent_id,home_root_thread_id,title,description,created_by,mode,kind,titled_at,brain_override,home_thinking,origin,machine_id)
+      select workspace_id,project_id,channel_id,home_agent_id,coalesce(home_root_thread_id,id),title,description,created_by,'chat','chat',now(),brain_override,home_thinking,origin,machine_id
+      from threads where id=${threadId}::uuid returning id`;
+    await q`update schedules set owner_home_thread_id=${next["id"]}::uuid where owner_home_thread_id=${threadId}::uuid`;
+    return next["id"];
+  });
+}
+
 // src/team-routes.ts
-var Scope = z24.object({ workspace: z24.string().uuid(), projectId: z24.string().uuid() });
-var ThreadScope = z24.object({ workspace: z24.string().uuid(), threadId: z24.string().uuid() });
+var Scope = z26.object({ workspace: z26.string().uuid(), projectId: z26.string().uuid() });
+var ThreadScope = z26.object({ workspace: z26.string().uuid(), threadId: z26.string().uuid() });
+var ContextScope = ThreadScope.extend({ mode: z26.enum(["auto", "manual"]).optional(), commandId: z26.string().uuid().optional() });
 function teamRoutes(app, store2) {
   const db = () => {
     const sql = sqlOf(store2);
@@ -26856,36 +27951,49 @@ function teamRoutes(app, store2) {
     return c.json({ projectId: p2.data.projectId, channelId, homes: await teamHomes(db(), p2.data.workspace, p2.data.projectId) });
   });
   app.post("/v1/team/open", async (c) => {
-    const p2 = Scope.extend({ agentId: z24.string().uuid().optional() }).safeParse(await c.req.json());
+    const p2 = Scope.extend({ agentId: z26.string().uuid().optional() }).safeParse(await c.req.json());
     if (!p2.success) return c.json({ error: "Supply a valid project and agent." }, 400);
     const { workspace, projectId, agentId } = p2.data;
     await ensureTeamHomes(db(), c.get("actor"), workspace, projectId, agentId);
     return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get("actor"), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
   });
+  app.post("/v1/team/fresh", async (c) => {
+    const p2 = Scope.extend({ threadId: z26.string().uuid() }).safeParse(await c.req.json());
+    if (!p2.success) return c.json({ error: "Supply the current agent thread and project." }, 400);
+    const { workspace, projectId, threadId } = p2.data;
+    await freshTeamThread(db(), c.get("actor"), workspace, projectId, threadId);
+    return c.json({ projectId, channelId: await teamProjectAccess(db(), c.get("actor"), workspace, projectId), homes: await teamHomes(db(), workspace, projectId) });
+  });
+  app.get("/v1/team/threads", async (c) => {
+    const p2 = Scope.extend({ agentId: z26.string().uuid() }).safeParse(c.req.query());
+    if (!p2.success) return c.json({ error: "Supply the agent and project." }, 400);
+    await teamProjectAccess(db(), c.get("actor"), p2.data.workspace, p2.data.projectId);
+    return c.json(await teamHomes(db(), p2.data.workspace, p2.data.projectId, p2.data.agentId));
+  });
   app.get("/v1/team/context", async (c) => {
-    const p2 = ThreadScope.safeParse(c.req.query());
+    const p2 = ContextScope.safeParse(c.req.query());
     if (!p2.success) return c.json({ error: "Supply a valid thread." }, 400);
-    return c.json(await teamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId));
+    return c.json(await teamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId, p2.data.mode, p2.data.commandId));
   });
   app.post("/v1/team/compact", async (c) => {
-    const p2 = ThreadScope.extend({ revision: z24.number().int().nonnegative(), through: z24.string().uuid(), summary: z24.string().min(1).max(16e3) }).safeParse(await c.req.json());
+    const p2 = ContextScope.extend({ revision: z26.number().int().nonnegative(), through: z26.string().uuid(), summary: z26.string().min(1).max(16e3) }).safeParse(await c.req.json());
     if (!p2.success) return c.json({ error: "Supply a valid context snapshot." }, 400);
     return c.json(await publishTeamContext(db(), c.get("actor"), p2.data.workspace, p2.data.threadId, p2.data));
   });
   app.post("/v1/team/model", async (c) => {
-    const p2 = ThreadScope.extend({ model: z24.string(), thinking: z24.string().nullable() }).safeParse(await c.req.json());
+    const p2 = ThreadScope.extend({ model: z26.string(), thinking: z26.string().nullable() }).safeParse(await c.req.json());
     if (!p2.success || !MODEL_ID_SET.has(p2.data.model) || p2.data.thinking && !THINKING_LEVELS.includes(p2.data.thinking)) return c.json({ error: "Choose a supported model and effort." }, 400);
     const actor = c.get("actor");
     if (actor.kind !== "human") throw new BrainError("HUMAN_ONLY", "The model is a human choice.", 403);
     const sql = db();
     await brainThreadAccess(sql, actor, p2.data.workspace, p2.data.threadId);
     const rows2 = await sql`update threads t set brain_override=jsonb_build_object(a.role,${p2.data.model}::text), home_thinking=${p2.data.thinking}
-      from agents a where t.id=${p2.data.threadId}::uuid and a.id=t.home_agent_id returning t.id`;
+      from agents a where t.id=${p2.data.threadId}::uuid and a.id=t.home_agent_id and t.archived_at is null returning t.id`;
     if (!rows2.length) throw new BrainError("NOT_FOUND", "No agent thread found.", 404);
     return c.json({ ok: true });
   });
   app.get("/v1/team/history", async (c) => {
-    const p2 = ThreadScope.extend({ before: z24.string().uuid().optional(), sourceThreadId: z24.string().uuid().optional() }).safeParse(c.req.query());
+    const p2 = ThreadScope.extend({ before: z26.string().uuid().optional(), sourceThreadId: z26.string().uuid().optional() }).safeParse(c.req.query());
     if (!p2.success) return c.json({ error: "Supply a valid thread." }, 400);
     const sql = db();
     const actor = c.get("actor");
@@ -26902,18 +28010,18 @@ function teamRoutes(app, store2) {
     return c.json({ messages: messages2, next: messages2.length === 50 ? messages2[49]["id"] : null });
   });
   app.get("/v1/team/recall", async (c) => {
-    const p2 = ThreadScope.extend({ query: z24.string().trim().min(1).max(1e3) }).safeParse(c.req.query());
+    const p2 = ThreadScope.extend({ query: z26.string().trim().min(1).max(1e3) }).safeParse(c.req.query());
     if (!p2.success) return c.json({ error: "Supply the agent thread and search text." }, 400);
     const sql = db();
-    const scope = await brainThreadAccess(sql, c.get("actor"), p2.data.workspace, p2.data.threadId);
+    const scope3 = await brainThreadAccess(sql, c.get("actor"), p2.data.workspace, p2.data.threadId);
     const hits = await sql`select m.id,m.body,m.created_at from messages m join threads t on t.id=m.thread_id
-      where t.workspace_id=${p2.data.workspace}::uuid and t.project_id=${scope.project_id}::uuid
+      where t.workspace_id=${p2.data.workspace}::uuid and t.project_id=${scope3.project_id}::uuid
         and t.kind <> 'coding' and m.fts @@ websearch_to_tsquery('english',${p2.data.query})
       order by ts_rank(m.fts,websearch_to_tsquery('english',${p2.data.query})) desc,m.created_at desc limit 8`;
     return c.json({ hits });
   });
   app.post("/v1/team/message", async (c) => {
-    const p2 = ThreadScope.extend({ targetThreadId: z24.string().uuid(), id: z24.string().uuid(), body: z24.string().trim().min(1).max(12e3) }).safeParse(await c.req.json());
+    const p2 = ThreadScope.extend({ targetThreadId: z26.string().uuid(), id: z26.string().uuid(), body: z26.string().trim().min(1).max(12e3) }).safeParse(await c.req.json());
     if (!p2.success) return c.json({ error: "Supply an agent thread and a message." }, 400);
     const actor = c.get("actor");
     if (actor.kind !== "agent") throw new BrainError("NOT_PERMITTED", "This is the agent collaboration tool.", 403);
@@ -26923,8 +28031,10 @@ function teamRoutes(app, store2) {
       const q = tx;
       const source = await brainThreadAccess(q, actor, workspace, threadId);
       const target = await brainThreadAccess(q, actor, workspace, targetThreadId);
-      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid for update`;
+      await q`select id from threads where id in (${threadId}::uuid,${targetThreadId}::uuid) order by id for update`;
+      const [own] = await q`select home_agent_id from threads where id=${threadId}::uuid and archived_at is null`;
       const [to] = await q`select t.home_agent_id from threads t join project_agents pa on pa.project_id=t.project_id and pa.agent_id=t.home_agent_id join agents a on a.id=pa.agent_id and a.retired_at is null where t.id=${targetThreadId}::uuid and t.archived_at is null`;
+      if (!to) throw new BrainError("CONFLICT", "This teammate has a fresh thread. Read list_team and use its current thread ID.", 409);
       if (source.project_id !== target.project_id || own?.["home_agent_id"] !== actor.id || !to?.["home_agent_id"] || threadId === targetThreadId) throw new BrainError("NOT_PERMITTED", "Collaborate with another agent in this project.", 403);
       const [existing] = await q`select body,thread_id,team_source_thread_id from messages where id=${id}::uuid`;
       if (existing) {
@@ -26944,6 +28054,91 @@ function teamRoutes(app, store2) {
   });
 }
 
+// src/permission-routes.ts
+init_src();
+import { z as z27 } from "zod";
+var scope2 = z27.object({ workspace: z27.string().uuid(), threadId: z27.string().uuid().optional(), taskId: z27.string().uuid().optional() });
+async function selection(sql, actor, target) {
+  if (target.taskId) {
+    if (target.threadId) throw new BrainError("INVALID_INPUT", "Choose a thread or task.", 400);
+    const [task] = await sql`select w.permission_mode as "workspaceMode",
+      coalesce(th.permission_mode,k.permission_mode) as "threadMode",coalesce(th.legacy_coding_permissions,false) as "legacyControls",
+      (k.permission_run_message_id is not null and k.state in ('planning','plan_review','in_progress')) as scheduled
+      from tasks k join workspaces w on w.id=k.workspace_id left join threads th on th.task_id=k.id
+      where k.id=${target.taskId} and w.id=${target.workspace} and (
+        (${actor.kind}='human' and exists(select 1 from workspace_members m where m.workspace_id=w.id and m.user_id=${actor.id}))
+        or (${actor.kind}='agent' and exists(select 1 from agent_channels ac join agents a on a.id=ac.agent_id
+            where ac.channel_id=k.channel_id and a.id=${actor.id} and a.workspace_id=w.id and a.retired_at is null)))`;
+    if (!task) throw new BrainError("NOT_FOUND", "No accessible task.", 404);
+    return task;
+  }
+  if (target.threadId) await brainThreadAccess(sql, actor, target.workspace, target.threadId);
+  else {
+    const member = actor.kind === "human" && await sql`select 1 from workspace_members
+      where workspace_id=${target.workspace} and user_id=${actor.id}`;
+    if (!member || !member.length) throw new BrainError("NOT_FOUND", "No accessible workspace.", 404);
+  }
+  const [row] = await sql`select w.permission_mode as "workspaceMode", t.permission_mode as "threadMode",
+    coalesce(t.legacy_coding_permissions,false) as "legacyControls",
+    (k.permission_run_message_id is not null and k.state in ('planning','plan_review','in_progress')) as scheduled
+    from workspaces w left join threads t on t.workspace_id=w.id and t.id=${target.threadId ?? null}::uuid
+    left join tasks k on k.id=t.task_id and k.workspace_id=w.id
+    where w.id=${target.workspace}`;
+  if (!row) throw new BrainError("NOT_FOUND", "No accessible workspace.", 404);
+  return row;
+}
+function permissionRoutes(app, store2) {
+  const db = () => {
+    const sql = sqlOf(store2);
+    if (!sql) throw new BrainError("UNAVAILABLE", "Permission storage is unavailable.", 503);
+    return sql;
+  };
+  app.get("/v1/permissions", async (c) => {
+    const parsed = scope2.extend({ runId: z27.string().uuid().optional() }).safeParse(c.req.query());
+    if (!parsed.success) return c.json({ error: "Supply a valid workspace and optional thread." }, 400);
+    const sql = db(), actor = c.get("actor"), target = parsed.data;
+    const machine = c.get("machine");
+    if (machine && machine.workspaceId !== target.workspace) return c.json({ error: "This machine belongs to a different workspace." }, 403);
+    c.header("Cache-Control", "private, no-store");
+    const current = await selection(sql, actor, target);
+    if (target.runId && target.threadId && actor.kind === "agent") {
+      current.scheduled = !!await scheduledWake(sql, target.workspace, target.threadId, target.runId, actor.id, c.get("machine")?.id, c.get("memberId"));
+    }
+    const [hosts] = await sql`select coalesce(bool_and(permission_version>=1),false) as ready
+      from machines where workspace_id=${target.workspace} and last_seen_at > now()-interval '2 minutes'`;
+    return c.json({ ...current, runtimeReady: hosts?.ready === true });
+  });
+  app.post("/v1/permissions", async (c) => {
+    const actor = c.get("actor");
+    if (actor.kind !== "human" || c.get("machine")) return c.json({ error: "A human chooses the permission mode." }, 403);
+    const parsed = scope2.extend({ mode: z27.enum(PERMISSION_MODES).nullable() }).strict().safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success || !parsed.data.threadId && !parsed.data.taskId && !parsed.data.mode) return c.json({ error: "Choose a valid permission mode." }, 400);
+    const target = parsed.data;
+    const result = await db().begin(async (tx) => {
+      const sql = tx;
+      const prior = await selection(sql, actor, target);
+      if (prior.scheduled) throw new BrainError("NOT_PERMITTED", "This scheduled task uses Turbo while it is running.", 403);
+      if (target.threadId) {
+        const rows2 = await sql`update threads set permission_mode=${target.mode},legacy_coding_permissions=false
+          where id=${target.threadId} and workspace_id=${target.workspace} and created_by=${"human:" + actor.id} and archived_at is null returning id`;
+        if (!rows2.length) throw new BrainError("NOT_PERMITTED", "Only the owner of an active thread can change its permission mode.", 403);
+      } else if (target.taskId) {
+        const [row] = await sql`update tasks k set permission_mode=${target.mode} where k.id=${target.taskId} and k.workspace_id=${target.workspace}
+          and not exists(select 1 from threads th where th.task_id=k.id)
+          and ((k.creator_kind='human' and k.creator_id=${actor.id}) or exists(select 1 from workspace_members m where m.workspace_id=k.workspace_id and m.user_id=${actor.id} and m.role in ('owner','admin'))) returning id`;
+        if (!row) throw new BrainError("NOT_PERMITTED", "Use the owning conversation, or ask the task owner to change permissions.", 403);
+      } else {
+        const rows2 = await sql`update workspaces w set permission_mode=${target.mode}
+          where w.id=${target.workspace} and exists (select 1 from workspace_members m
+          where m.workspace_id=w.id and m.user_id=${actor.id} and m.role in ('owner','admin')) returning id`;
+        if (!rows2.length) throw new BrainError("NOT_PERMITTED", "A workspace administrator chooses the default permission mode.", 403);
+      }
+      return selection(sql, actor, target);
+    });
+    return c.json(result);
+  });
+}
+
 // src/api-error.ts
 var apiError = (err, c) => {
   if (err instanceof DomainError || err instanceof BrainError) {
@@ -26957,7 +28152,7 @@ var apiError = (err, c) => {
 };
 
 // src/local-sync.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 
 // ../client-core/src/table.ts
 var column = { text: { type: "text" }, integer: { type: "integer" } };
@@ -26975,6 +28170,7 @@ var channels2 = new Table({ workspace_id: column.text, slug: column.text, topic:
   indexes: { by_project: ["project_id"] }
 });
 var messages = new Table({
+  applied_followup: column.integer,
   workspace_id: column.text,
   channel_id: column.text,
   task_id: column.text,
@@ -26989,6 +28185,7 @@ var messages = new Table({
   // Named `birth_mode`, NOT thread_mode: `channels.thread_mode` is the unrelated docs/20 view
   // lens (threads on/off in a room), and one grep returning both would be a trap.
   birth_mode: column.text,
+  birth_permission_mode: column.text,
   // docs/10 §15: the composer's brain draft, carried on the send that BIRTHS the thread. Local
   // only, like birth_mode — the server keeps it on `threads`, so sync never writes it back.
   birth_brain: column.text,
@@ -27019,6 +28216,7 @@ var messages = new Table({
   }
 });
 var threads = new Table({
+  followup_count: column.integer,
   workspace_id: column.text,
   channel_id: column.text,
   // Additive ownership projection. Channel contracts remain during desktop compatibility.
@@ -27470,7 +28668,7 @@ var TABLE_COLUMNS = Object.fromEntries(
 var LOCAL_SYNC_SCHEMA_VERSION = 1;
 
 // src/local-sync.ts
-var schema = createHash9("sha256").update(JSON.stringify(TABLE_COLUMNS)).digest("hex");
+var schema = createHash11("sha256").update(JSON.stringify(TABLE_COLUMNS)).digest("hex");
 var nextPruneAt = 0;
 var encode4 = (cursor) => Buffer.from(JSON.stringify(cursor)).toString("base64url");
 function decodeLocalCursor(raw) {
@@ -27495,12 +28693,12 @@ async function authorization(sql, actor) {
       select w.workspace_id, w.id, w.created_at::text, m.id as machine_id
       from machines m join workspace_members w on w.workspace_id=m.workspace_id and w.user_id=m.owner_user_id
       where m.token_hash=${actor.tokenHash}`;
-    return { workspaces: members2.map((m) => m.workspace_id), scope: createHash9("sha256").update(JSON.stringify([actor, members2])).digest("hex") };
+    return { workspaces: members2.map((m) => m.workspace_id), scope: createHash11("sha256").update(JSON.stringify([actor, members2])).digest("hex") };
   }
   if (actor.kind !== "human") throw new Error("A replica requires a member or machine identity");
   const members = await sql`
     select workspace_id, id, created_at::text from workspace_members where user_id = ${actor.id} order by workspace_id`;
-  return { workspaces: members.map((m) => m.workspace_id), scope: createHash9("sha256").update(JSON.stringify([actor.id, members])).digest("hex") };
+  return { workspaces: members.map((m) => m.workspace_id), scope: createHash11("sha256").update(JSON.stringify([actor.id, members])).digest("hex") };
 }
 function workspaceExpression(table) {
   if (table === "agent_channels") return "(select workspace_id from agents where id = t.agent_id)";
@@ -27657,11 +28855,11 @@ function webFrameRoute(app) {
 
 // src/starter-video.ts
 init_src();
-import { z as z25 } from "zod";
+import { z as z28 } from "zod";
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z25.object({ workspace: z25.string().uuid(), item: z25.string().uuid(), prompt: z25.string().min(8).max(2e3) });
+var FilmSchema = z28.object({ workspace: z28.string().uuid(), item: z28.string().uuid(), prompt: z28.string().min(8).max(2e3) });
 var FILM_FAILED = "The film failed. Your credits are back. Try again.";
 var FILM_REFUSED = "NeuraMesh Video refused this script. Change the script, then try again. Your credits are back.";
 var FILM_LOST = "The film did not reach this card. Your credits are back. Try again.";
@@ -28021,85 +29219,39 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z26.object({
-  // Client-supplied id keeps optimistic local rows identical to server rows
-  // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z26.string().uuid().optional(),
-  workspace: z26.string().min(1),
-  channel: z26.string().min(1).optional(),
-  project: z26.string().uuid().optional(),
-  // may be empty when the message carries only attachments (no caption)
-  body: z26.string(),
-  taskId: z26.string().min(1).optional(),
-  // the conversation thread this message belongs to (conversation-first shell). A
-  // fresh client-generated id births the thread transactionally with the message.
-  threadId: z26.string().uuid().optional(),
-  // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
-  // A later message carrying it is ignored — the mode is the thread's, and changing it is
-  // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z26.enum(["tasks", "chat"]).optional(),
-  // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
-  // the same birth-time contract as threadMode above, and for the same reason. Moving it
-  // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z26.record(z26.string(), z26.string()).nullable().optional(),
-  // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
-  // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z26.string().uuid().optional(),
-  // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
-  // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
-  // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z26.string().uuid().optional(),
-  // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
-  // births the thread — the same birth-time contract as the three above. Moving the machine
-  // afterwards is thread.set_machine (human-only); the origin never moves.
-  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
-  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
-  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z26.string().uuid().nullable().optional(),
-  threadOrigin: z26.enum(["desktop", "web", "routine"]).optional(),
-  threadKind: z26.enum(["chat", "coding"]).optional(),
-  // the message this reply ANSWERS (agent wake replies) — the server enforces one
-  // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z26.string().uuid().optional(),
-  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
-  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
-  // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z26.literal(true).optional(),
-  needCard: z26.literal(true).optional()
-}).refine((v) => !!v.channel || !!v.project, { message: "A project is required." });
-var ArtifactCreateSchema = z26.object({
-  id: z26.string().uuid(),
-  workspace: z26.string().min(1),
-  channel: z26.string().min(1),
-  taskId: z26.string().min(1).optional(),
-  messageId: z26.string().uuid(),
-  kind: z26.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z26.string().min(1).max(512),
-  mime: z26.string().max(255).optional(),
-  inlineContent: z26.string().max(4e5).optional(),
-  sizeBytes: z26.number().int().nonnegative().optional(),
-  width: z26.number().int().positive().optional(),
-  height: z26.number().int().positive().optional()
+var ArtifactCreateSchema = z29.object({
+  id: z29.string().uuid(),
+  workspace: z29.string().min(1),
+  channel: z29.string().min(1),
+  taskId: z29.string().min(1).optional(),
+  messageId: z29.string().uuid(),
+  kind: z29.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z29.string().min(1).max(512),
+  mime: z29.string().max(255).optional(),
+  inlineContent: z29.string().max(4e5).optional(),
+  sizeBytes: z29.number().int().nonnegative().optional(),
+  width: z29.number().int().positive().optional(),
+  height: z29.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z26.object({
-  id: z26.string().uuid(),
-  workspace: z26.string().min(1),
-  channel: z26.string().min(1),
-  threadId: z26.string().uuid().optional(),
-  taskId: z26.string().optional(),
-  title: z26.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z26.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z26.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z26.number().int().nonnegative().optional(),
-  rev: z26.number().int().min(1).default(1)
+var WhiteboardPutSchema = z29.object({
+  id: z29.string().uuid(),
+  workspace: z29.string().min(1),
+  channel: z29.string().min(1),
+  threadId: z29.string().uuid().optional(),
+  taskId: z29.string().optional(),
+  title: z29.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z29.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z29.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z29.number().int().nonnegative().optional(),
+  rev: z29.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z26.object({
-  rev: z26.number().int().min(1),
-  title: z26.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z26.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z26.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z26.number().int().nonnegative().optional(),
-  archivedAt: z26.string().nullable().optional()
+var WhiteboardPatchSchema = z29.object({
+  rev: z29.number().int().min(1),
+  title: z29.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z29.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z29.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z29.number().int().nonnegative().optional(),
+  archivedAt: z29.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -28203,7 +29355,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/start", async (c) => {
     const nonce = randomBytes8(32).toString("base64url");
     const pollSecret = randomBytes8(32).toString("base64url");
-    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash10("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
+    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash12("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
     return c.json({ nonce, pollSecret, expiresIn: DESKTOP_AUTH_TTL_MS / 1e3 });
   });
   app.post("/auth/desktop/complete", async (c) => {
@@ -28228,7 +29380,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/poll", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!body.nonce || !body.pollSecret) return c.json({ error: "nonce and pollSecret required", code: "INVALID_INPUT" }, 400);
-    const out = await store2.claimDesktopAuth(body.nonce, createHash10("sha256").update(body.pollSecret).digest("hex"));
+    const out = await store2.claimDesktopAuth(body.nonce, createHash12("sha256").update(body.pollSecret).digest("hex"));
     if (out.status === "done") return c.json({ status: "done", ...out.result });
     return c.json({ status: out.status });
   });
@@ -28338,7 +29490,7 @@ function createApp(store2, opts = {}) {
     return c.json({ ok: ok2 }, ok2 ? 200 : 400);
   });
   app.get("/invites/:token", async (c) => {
-    const hash = createHash10("sha256").update(c.req.param("token")).digest("hex");
+    const hash = createHash12("sha256").update(c.req.param("token")).digest("hex");
     const inv = await store2.inviteByToken(hash);
     if (!inv) return c.json({ error: "this invitation has expired or been revoked", code: "NOT_FOUND" }, 404);
     return c.json({ workspace: inv.workspaceName, email: inv.email, role: inv.role });
@@ -28349,6 +29501,8 @@ function createApp(store2, opts = {}) {
       const lane = await resolveTokenLane(store2, bearer, c.req.header("x-nm-actor"));
       if (!("actor" in lane)) return c.json({ error: lane.error, code: lane.code }, lane.status);
       c.set("actor", lane.actor);
+      if (lane.machine) c.set("machine", lane.machine);
+      if (lane.memberId) c.set("memberId", lane.memberId);
       return next();
     }
     if (bearer) {
@@ -28359,6 +29513,7 @@ function createApp(store2, opts = {}) {
         const actor = await resolveBearerActor(store2, id, c.req.header("x-nm-actor"));
         if (!actor) return c.json({ error: "this account cannot act as that agent", code: "FORBIDDEN" }, 403);
         c.set("actor", actor);
+        c.set("memberId", id);
       } catch (e) {
         if (e instanceof DomainError) return c.json({ error: e.message, code: e.code }, e.status);
         console.error("v1 auth error:", e);
@@ -28386,6 +29541,8 @@ function createApp(store2, opts = {}) {
   contentMediaRoute(app, store2);
   brainRoutes(app, store2, opts.brain);
   teamRoutes(app, store2);
+  threadFollowupRoutes(app, store2);
+  permissionRoutes(app, store2);
   localSyncRoutes(app, store2);
   webFrameRoute(app);
   starterVideoRoutes(app, store2, opts.starterVideo);
@@ -28396,7 +29553,7 @@ function createApp(store2, opts = {}) {
       return c.json({ error: "invalid command", issues: parsed.error.issues }, 400);
     }
     try {
-      const outcome = await executeCommand(store2, c.get("actor"), parsed.data);
+      const outcome = await executeCommand(store2, c.get("actor"), parsed.data, c.get("machine"), c.get("memberId"));
       if (opts.push) pushAfterCommand(opts.push, c.get("actor").id, parsed.data, outcome);
       return c.json(outcome);
     } catch (err) {
@@ -28426,6 +29583,8 @@ function createApp(store2, opts = {}) {
     const parsed = MessageInputSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: "invalid message", issues: parsed.error.issues }, 400);
     const actor = c.get("actor");
+    if (parsed.data.permissionMode && (actor.kind !== "human" || c.get("machine") || !await actorInWorkspace(store2, actor, parsed.data.workspace))) return c.json({ error: "Only a workspace member can select thread permissions." }, 403);
+    if (actor.kind === "agent" && parsed.data.body.trim() && isStandDown(parsed.data.body)) return c.json({ ok: true, posted: false });
     const said = actor.kind === "agent" ? routineCardGuard(repairCardFences(parsed.data.body), parsed.data.routineCard === true) : parsed.data.body;
     if (!said.trim() && parsed.data.body.trim()) return c.json({ error: "a routine card comes only from propose_routine", code: "INVALID_INPUT" }, 422);
     const styledBody = actor.kind === "agent" ? await store2.getCommRules(parsed.data.workspace).then((r) => commRulesFrom(r).noEmdash ? scrubEmdash(said) : said).catch(() => said) : said;
@@ -28438,6 +29597,7 @@ function createApp(store2, opts = {}) {
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
       threadMode: parsed.data.threadMode ?? null,
+      permissionMode: actor.kind === "human" && !c.get("machine") ? parsed.data.permissionMode : void 0,
       // A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16; docs/10 §15.6): the thread a
       // schedule opens is born with the orchestrator on the house model, so the run never waits on a
       // Claude, Codex or Gemini login — credits serve it, which is one thing Pro buys. Server-stamped
@@ -28449,6 +29609,8 @@ function createApp(store2, opts = {}) {
       // (apps/desktop host/starterfallback.ts); an explicit override on the opener still rides.
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
+      schedulePermission: parsed.data.schedulePermission,
+      machineAuthored: !!c.get("machine"),
       // a routine's slot is its own origin, whichever daemon posts it
       threadMachineId: parsed.data.threadMachineId ?? null,
       threadOrigin: parsed.data.scheduleId ? "routine" : parsed.data.threadOrigin ?? null,
@@ -28467,12 +29629,13 @@ function createApp(store2, opts = {}) {
       payload: { preview: styledBody.slice(0, 120) }
     });
     const inChatThread = actor.kind === "agent" && msg2.threadId ? await store2.getThreadMode(msg2.workspace, msg2.threadId) === "chat" : false;
-    const cards = actor.kind === "agent" && !inChatThread ? parseQuestions(styledBody) : [];
+    const cards = actor.kind === "agent" ? parseQuestions(styledBody).filter((q) => !inChatThread || q.kind === "permission") : [];
     const decisions2 = cards.map((q) => ({
       id: crypto.randomUUID(),
       question: q.question,
       options: q.options ?? [],
-      allowOther: q.allowOther !== false
+      allowOther: q.allowOther !== false,
+      ...q.kind === "permission" ? { requiresExactAnswer: true } : {}
     }));
     const auth = actor.kind === "agent" && !inChatThread ? parseAuthCard(styledBody) : null;
     if (auth && !auth.switched) decisions2.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
@@ -28729,6 +29892,18 @@ function safeJson2(raw) {
   }
 }
 
+// src/store/message-thread-scope.ts
+async function messageThreadScope(sql, msg2) {
+  if (!msg2.threadId) return void 0;
+  const [thread] = await sql`select t.workspace_id,t.channel_id,t.home_agent_id,t.archived_at,coalesce(t.project_id,c.project_id) as project_id
+    from threads t join channels c on c.id=t.channel_id where t.id=${msg2.threadId}::uuid for update of t`;
+  if (thread && thread["workspace_id"] !== msg2.workspace) throw new DomainError("NOT_FOUND", "Thread not found in this workspace.");
+  if (thread?.["home_agent_id"] && thread["archived_at"] && msg2.author.kind === "human") {
+    throw new DomainError("CONFLICT", "This conversation is in history. Continue in the agent\u2019s current Agent Desk thread.");
+  }
+  return thread;
+}
+
 // src/store/project-marketing.ts
 init_src();
 
@@ -28876,7 +30051,7 @@ function trackDomainEvent(e, facts) {
 }
 
 // src/pgstore.ts
-import { createHash as createHash12, randomBytes as randomBytes9 } from "node:crypto";
+import { createHash as createHash14, randomBytes as randomBytes9 } from "node:crypto";
 import postgres from "postgres";
 
 // src/embedder.ts
@@ -28949,12 +30124,12 @@ async function dueContentItemsSql(sql, nowIso, limit) {
 }
 
 // src/store/content-media.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 async function attachContentMediaSql(pool, itemId, mime, bytes, actor, makeEvent, objects = configuredBrainObjects()) {
-  const [scope] = await pool`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled')`;
-  if (!scope) throw new DomainError("NOT_FOUND", "The content item does not exist or is published.");
-  const workspace = scope["workspace_id"];
-  const id = randomUUID2();
+  const [scope3] = await pool`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled')`;
+  if (!scope3) throw new DomainError("NOT_FOUND", "The content item does not exist or is published.");
+  const workspace = scope3["workspace_id"];
+  const id = randomUUID3();
   const ref = objects ? await objects.put(`v1/workspaces/${workspace}/content/${itemId}/${id}/${brainHash(bytes)}`, bytes, mime) : null;
   await pool.begin(async (tx) => {
     const [item] = await tx`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled') for update`;
@@ -29003,6 +30178,7 @@ async function setThreadKindSql(sql, workspace, threadId, kind) {
 // src/store/thread-title.ts
 async function updateThreadTitleSql(sql, workspace, threadId, patch, opts) {
   await sql.begin(async (tx) => {
+    await tx`select revision from local_sync_state where singleton and enabled for update`;
     const [current] = await tx`select titled_at from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid for update`;
     if (!current) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
     if (patch.title !== void 0 && opts?.agentTitleOnce && current["titled_at"]) {
@@ -29018,10 +30194,10 @@ async function updateThreadTitleSql(sql, workspace, threadId, patch, opts) {
 }
 
 // src/seed/packversion.ts
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash13 } from "node:crypto";
 var field = (s) => `${s.length}:${s}`;
 function bundledPackVersion(entry) {
-  const h = createHash11("sha256");
+  const h = createHash13("sha256");
   h.update(field(entry.pack.description));
   h.update(field(entry.pack.source_url));
   h.update(field(entry.pack.source_ref));
@@ -29380,6 +30556,9 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
     }))
   };
 }
+
+// src/seed/task-skill-seed.ts
+init_src();
 
 // src/seed/skill-seed.ts
 var SKILL_SEED = [
@@ -29842,6 +31021,18 @@ After applying interview-me:
   }
 ];
 
+// src/seed/task-skill-seed.ts
+var DEV_SKILL_SEED = SKILL_SEED.map((pack) => ({ ...pack, skills: pack.skills.map((skill) => skill.name === "git-workflow-and-versioning" ? { ...skill, body: skill.body + "\n\n## NeuraMesh pull requests\n\n" + PULL_REQUEST_SKILL } : skill) }));
+var TASK_SKILL_SEED = [{
+  pack: { name: "neuramesh-work", description: "Context-rich task handoffs and reviewable implementation plans for every agent.", source_url: "https://github.com/alonge-dev/neuramesh", source_ref: "main", version: "4" },
+  skills: [
+    { name: "task-handoff", description: "Create a task with role, context, requirements, done criteria and validation evidence.", body: TASK_HANDOFF_SKILL },
+    { name: "pull-request", description: "Open a reviewable task PR, verify bot authorship and report evidence and checks.", body: PULL_REQUEST_SKILL },
+    { name: "coding-delivery", description: "Validate coding work, capture before and after evidence, self-review and prepare an approved release.", body: CODING_DELIVERY_SKILL },
+    { name: "implementation-plan", description: "Write or revise a repository-informed implementation plan with the shared review standard.", body: IMPLEMENTATION_PLAN_SKILL }
+  ]
+}];
+
 // src/seed/marketing-os-skill-seed.ts
 var MARKETING_OS_SKILL_SEED = [
   {
@@ -30263,6 +31454,7 @@ var PostgresStore = class {
       definitionOfDone: r["definition_of_done"] ?? "",
       shipPlan: r["ship_plan"] ?? null,
       workPlan: r["work_plan"] ?? null,
+      permissionRunMessageId: r["permission_run_message_id"] ?? null,
       originThreadId: r["origin_thread_id"] ?? null,
       parentTaskId: r["parent_task_id"] ?? null,
       version: r["version"],
@@ -30283,11 +31475,12 @@ var PostgresStore = class {
       const [ch] = await sql`select project_id from channels where id = ${chId}`;
       const projectId = ch?.["project_id"] ?? null;
       await sql`insert into tasks (id, workspace_id, channel_id, project_id, number, title, description, state, kind,
-          creator_kind, creator_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
+          creator_kind, creator_id, assignee_kind, assignee_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at, permission_run_message_id)
         values (${task.id}, ${task.workspace}::uuid, ${chId}, ${projectId}, ${task.number}, ${task.title},
-          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid,
+          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid, ${task.assignee?.kind ?? null}::actor_kind, ${task.assignee?.id ?? null}::uuid,
           ${task.repo?.id ?? null}, ${task.repo?.baseRef ?? null}, ${task.repo?.branch ?? null},
-          ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt})`;
+          ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt}, ${task.permissionRunMessageId ?? null}::uuid)`;
+      if (typeof event.payload["codingOwner"] === "string") await createCodingTaskThread(sql, task.id, event.payload["codingOwner"]);
       await this.insertEvent(sql, event, task.id);
     });
     return task;
@@ -30334,6 +31527,7 @@ var PostgresStore = class {
         left join projects p on p.id = t.project_id where t.id = ${id} for update of t`;
       if (!rows2.length) throw new DomainError("NOT_FOUND", `task ${id} not found`);
       const out = await fn(this.rowToTask(rows2[0]));
+      if (out.unchanged) return out;
       const t2 = out.task;
       await sql`update tasks set state = ${t2.state}::task_state, kind = ${t2.kind}::task_kind,
           title = ${t2.title}, description = ${t2.description},
@@ -30407,7 +31601,7 @@ var PostgresStore = class {
         if (kind === "marketing") await this.ensureSetupTask(sql, workspaceId, ch["id"]);
       }
       await sql`update projects set context_channel_id = ${generalId}::uuid where id = ${defaultProjectId}::uuid`;
-      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, SKILL_SEED);
+      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, [...TASK_SKILL_SEED, ...DEV_SKILL_SEED]);
       await this.insertEvent(sql, { ...event, workspace: workspaceId }, null);
       return { workspaceId, channelId: generalId };
     });
@@ -30454,7 +31648,7 @@ var PostgresStore = class {
   async offerTask(taskId3, agentName, repo, checklist, dod, kind, event) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
-      const [t2] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, c.slug as channel_slug
+      const [t2] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, t.assignee_id, t.offered_agent_id, c.slug as channel_slug
         from tasks t join channels c on c.id = t.channel_id where t.id = ${taskId3} for update of t`;
       if (!t2) throw new DomainError("NOT_FOUND", `task ${taskId3} not found`);
       if (t2["state"] !== "todo" && t2["state"] !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", "only todo or plan_review tasks can be offered");
@@ -30463,12 +31657,11 @@ var PostgresStore = class {
         where a.workspace_id = ${t2["workspace_id"]} and a.name = ${agentName} and ac.channel_id = ${t2["channel_id"]}`;
       if (!agent) throw new DomainError("NOT_FOUND", `agent ${agentName} is not registered to #${t2["channel_slug"]}`);
       if (agent["retired_at"]) throw new DomainError("NOT_PERMITTED", `agent ${agentName} is retired \u2014 rehire it or offer to someone else`);
+      requireTaskOwner(t2["assignee_id"] ?? t2["offered_agent_id"], agent["id"]);
       if (repo) {
         const branch = taskBranch(Number(t2["number"]), t2["title"]);
-        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = null, assignee_kind = null, repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId3}`;
-      } else {
-        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = null, assignee_kind = null where id = ${taskId3}`;
-      }
+        await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = ${agent["id"]}, assignee_kind = 'agent', repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId3}`;
+      } else await sql`update tasks set offered_agent_id = ${agent["id"]}, assignee_id = ${agent["id"]}, assignee_kind = 'agent' where id = ${taskId3}`;
       if (checklist?.length) {
         await sql`update tasks set requirements = ${sql.json(checklist)}, requirements_confirmed = true where id = ${taskId3}`;
       }
@@ -30499,7 +31692,7 @@ var PostgresStore = class {
       where wm.workspace_id = ${input.workspace}::uuid and lower(u.email) = ${email}`;
     if (already) throw new DomainError("CONFLICT", "that address is already a member of this workspace");
     const token = randomBytes9(24).toString("base64url");
-    const tokenHash = createHash12("sha256").update(token).digest("hex");
+    const tokenHash = createHash14("sha256").update(token).digest("hex");
     const [ws] = await this.sql`select name from workspaces where id = ${input.workspace}::uuid`;
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
@@ -31139,7 +32332,7 @@ var PostgresStore = class {
     const active = seconds > 0 || activity?.busy === true;
     const [row] = await this.sql`
       update machines m set last_seen_at = now(), last_active_at = case when ${active} then now() else m.last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json(activity?.runtimes ?? [])}::jsonb else m.runtimes end,
-             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, m.daemon_version)
+             permission_version = ${activity?.permissionVersion ?? 0}, daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, m.daemon_version)
        where m.id = ${machineId}
          and (m.owner_user_id::text = ${actorId}
               or (m.kind = 'local' and exists (select 1 from workspace_members wm where wm.workspace_id = m.workspace_id and wm.user_id::text = ${actorId})))
@@ -31470,7 +32663,7 @@ var PostgresStore = class {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
       const chId = await resolveChannelId(sql, workspace, channel);
-      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, kind === "marketing" ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
+      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, [...TASK_SKILL_SEED, ...kind === "marketing" ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : DEV_SKILL_SEED]);
       if (added > 0 || refreshed > 0) await this.insertEvent(sql, { ...event, workspace }, null);
       return { added, refreshed };
     });
@@ -32304,22 +33497,8 @@ var PostgresStore = class {
   async markContentFailed(itemId, error) {
     await this.sql`update content_items set status = 'failed', last_error = ${error.slice(0, 500)} where id = ${itemId}::uuid`;
   }
-  async claimScheduleRun(scheduleId, runCount, nextRunAt, makeEvent) {
-    return this.sql.begin(async (_tx) => {
-      const sql = asSql2(_tx);
-      const [row] = await sql`update schedules
-        set run_count = run_count + 1, next_run_at = ${nextRunAt}, last_run_at = now(),
-            status = case when ${nextRunAt}::timestamptz is null then 'done' else status end
-        where id = ${scheduleId}::uuid and run_count = ${runCount} and status = 'active'
-        returning workspace_id`;
-      if (!row) {
-        const [exists] = await sql`select 1 from schedules where id = ${scheduleId}::uuid`;
-        if (!exists) throw new DomainError("NOT_FOUND", "schedule not found");
-        return { claimed: false };
-      }
-      await this.insertEvent(sql, makeEvent(row["workspace_id"]), null);
-      return { claimed: true };
-    });
+  async claimScheduleRun(scheduleId, runCount, nextRunAt, makeEvent, authority) {
+    return claimSchedule(this.sql, scheduleId, runCount, nextRunAt, makeEvent, (sql, event) => this.insertEvent(sql, event, null), authority);
   }
   // Run now (routine sessions): store/schedule-now.ts
   async runScheduleNow(scheduleId, makeEvent) {
@@ -32574,11 +33753,8 @@ var PostgresStore = class {
       await this.sql.begin(async (_tx) => {
         const sql = asSql2(_tx);
         if (msg2.threadId) await sql`select pg_advisory_xact_lock(hashtextextended(${msg2.threadId}, 0))`;
-        const [existingThread] = msg2.threadId ? await sql`select t.workspace_id, t.channel_id, coalesce(t.project_id, c.project_id) as project_id
-          from threads t join channels c on c.id = t.channel_id
-          where t.id = ${msg2.threadId}::uuid for update of t` : [];
-        if (existingThread && existingThread["workspace_id"] !== msg2.workspace) throw new DomainError("NOT_FOUND", "Thread not found in this workspace.");
-        let address = msg2.channel;
+        const existingThread = await messageThreadScope(sql, msg2);
+        let address = await taskMessageAddress(sql, msg2);
         if (msg2.projectId) {
           const [project] = await sql`select id, context_channel_id from projects where id = ${msg2.projectId}::uuid and workspace_id = ${msg2.workspace}::uuid for share`;
           if (!project) throw new DomainError("NOT_FOUND", "Project not found in this workspace.");
@@ -32591,8 +33767,8 @@ var PostgresStore = class {
           }
         }
         const chId = await resolveChannelId(sql, msg2.workspace, address);
-        const [scope] = await sql`select project_id from channels where id = ${chId}::uuid for share`;
-        if (msg2.projectId && scope?.["project_id"] !== msg2.projectId) throw new DomainError("CONFLICT", "The conversation address belongs to another project.");
+        const [scope3] = await sql`select project_id from channels where id = ${chId}::uuid for share`;
+        if (msg2.projectId && scope3?.["project_id"] !== msg2.projectId) throw new DomainError("CONFLICT", "The conversation address belongs to another project.");
         if (existingThread && existingThread["channel_id"] !== chId) throw new DomainError("CONFLICT", "The message must use its thread address.");
         if (msg2.projectId && msg2.taskId) {
           const [task] = await sql`select channel_id, project_id from tasks where id = ${msg2.taskId}::uuid and workspace_id = ${msg2.workspace}::uuid for share`;
@@ -32600,17 +33776,19 @@ var PostgresStore = class {
           if (task["project_id"] !== msg2.projectId || task["channel_id"] !== chId) throw new DomainError("CONFLICT", "The task belongs to another conversation context.");
         }
         if (!msg2.channel && !msg2.taskId) event = { ...event, target: `channel/${chId}` };
-        msg2 = { ...msg2, channel: chId, projectId: scope["project_id"] };
+        msg2 = await bindCodingTaskMessage(sql, { ...msg2, channel: chId, projectId: scope3["project_id"] });
         if (msg2.threadId) {
           const bornBrain = parseBrainOverride(msg2.brainOverride);
-          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind, project_id)
-            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg2.workspace, msg2.scheduleId ?? null, msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, (select id from schedules where id = ${msg2.scheduleId ?? null}::uuid and workspace_id = ${msg2.workspace}::uuid), ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null}, ${threadKindOf(msg2.threadKind)}, ${msg2.projectId}::uuid)
+          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind, project_id, permission_mode)
+            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg2.workspace, msg2.scheduleId ?? null, msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, (select id from schedules where id = ${msg2.scheduleId ?? null}::uuid and workspace_id = ${msg2.workspace}::uuid), ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null}, ${threadKindOf(msg2.threadKind)}, ${msg2.projectId}::uuid, ${msg2.author.kind === "human" ? msg2.permissionMode ?? null : null})
             on conflict (id) do update set updated_at = now(), title = case when threads.titled_at is null and threads.schedule_id = excluded.schedule_id then excluded.title else threads.title end`;
         }
-        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, schedule_id)
+        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, machine_authored, schedule_id)
           values (${msg2.id}, ${msg2.workspace}::uuid, ${chId}, ${msg2.taskId ?? null}, ${msg2.threadId ?? null},
-            ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${msg2.body}, ${msg2.replyTo ?? null},
+            ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${msg2.body}, ${msg2.replyTo ?? null}, ${!!msg2.machineAuthored},
             (select id from schedules where id = ${msg2.scheduleId ?? null}::uuid and workspace_id = ${msg2.workspace}::uuid))`;
+        await bindSchedulePermission(sql, msg2);
+        delete msg2.schedulePermission;
         if (msg2.threadId) {
           await sql`update threads
                        set root_message_id = coalesce((select m.id from messages m where m.id = ${msg2.rootMessageId ?? null}::uuid and m.workspace_id = ${msg2.workspace}::uuid and m.channel_id = ${chId}::uuid), ${msg2.id}::uuid)
@@ -32620,13 +33798,13 @@ var PostgresStore = class {
           values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target},
             ${chId}, ${msg2.taskId ?? null}, ${sql.json(event.payload)}, ${event.in_reply_to})`;
         for (const d of decisions2 ?? []) {
-          await sql`update decisions set status = 'dismissed', answered_at = now()
-            where workspace_id = ${msg2.workspace}::uuid and channel_id = ${chId}
+          if (!d.requiresExactAnswer) await sql`update decisions set status = 'dismissed', answered_at = now()
+            where not requires_exact_answer and workspace_id = ${msg2.workspace}::uuid and channel_id = ${chId}
               and task_id is not distinct from ${msg2.taskId ?? null} and (${!isGitHubNeedQuestion(d.question)}::boolean or (select m.thread_id from messages m where m.id = decisions.message_id) is not distinct from ${msg2.threadId ?? null}::uuid)
               and question = ${d.question} and status = 'open'`;
-          await sql`insert into decisions (id, workspace_id, channel_id, task_id, message_id, asker_kind, asker_id, question, options, allow_other)
+          await sql`insert into decisions (id, workspace_id, channel_id, task_id, message_id, asker_kind, asker_id, question, options, allow_other, requires_exact_answer)
             values (${d.id}::uuid, ${msg2.workspace}::uuid, ${chId}, ${msg2.taskId ?? null}, ${msg2.id}::uuid,
-              ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${d.question}, ${sql.json(d.options)}, ${d.allowOther})`;
+              ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${d.question}, ${sql.json(d.options)}, ${d.allowOther}, ${d.requiresExactAnswer === true})`;
         }
         if (msg2.author.kind === "human") {
           for (const [question, answer] of readAnswers([msg2.body])) {
@@ -32634,7 +33812,7 @@ var PostgresStore = class {
                 answered_by_kind = ${msg2.author.kind}::actor_kind, answered_by_id = ${msg2.author.id}::uuid, answered_at = now()
               where workspace_id = ${msg2.workspace}::uuid and channel_id = ${chId}
                 and task_id is not distinct from ${msg2.taskId ?? null}
-                and question = ${question} and status = 'open'`;
+                and not requires_exact_answer and question = ${question} and status = 'open'`;
           }
         }
       });
@@ -32673,7 +33851,8 @@ var PostgresStore = class {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
       const [row] = await sql`select workspace_id, task_id, question, options, status
-        from decisions where id = ${id}::uuid for update`;
+        from decisions d where d.id = ${id}::uuid and exists(select 1 from workspace_members m
+          where m.workspace_id=d.workspace_id and m.user_id=${input.by.id}::uuid) for update`;
       if (!row) {
         throw new DomainError("NOT_FOUND", `decision ${id} not found`);
       }

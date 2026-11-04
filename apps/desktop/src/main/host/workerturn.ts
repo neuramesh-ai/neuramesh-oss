@@ -1,3 +1,7 @@
+import { chatPermissionAction } from '../chat-permission-action';
+import { remoteThreadPermissionGate } from '../thread-permission-gate';
+import { apiAuthHeaders } from '../apiauth';
+import { loadEngineeringPolicyRules } from '../relay/engineering-policy';
 // THE WORKER'S TURN INPUTS — everything a worker needs in hand before its runtime starts.
 //
 // Split out of flows.ts, where it sat as ~95 lines between "open the run" and "run the code":
@@ -12,14 +16,14 @@
 // injection lines still land on the run's live step.
 import { awaitDecision } from '../agents';
 import type { ExecTask, HostedAgent, SkillRef } from '../agents';
-import { defaultBaselineRules, mergePolicies } from '@neuramesh/shared';
-import { buildPermissionCardBody, cleanIntent, intentPrompt, permissionQuestion, policyGateOutcome, protectedPathsFromRules, rowsToRules, taskWhere, toolCallToAction, type PolicyRowLite } from '../policygate';
+import { buildPermissionCardBody, permissionQuestion, policyGateOutcome, protectedPathsFromRules, taskWhere } from '../policygate';
 import type { LogFn } from '../agentlog';
 import type { HostCtx } from './ctx';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { PermissionGate, RuntimeAdapter } from '../runtime/adapter';
 
 export function makeWorkerTurn(ctx: HostCtx & {
+  apiUrl: string; ownerActorId: string;
   db: ReplicaDatabase;
   brainNotesFor: (task: ExecTask, cap?: number, perNote?: number) => string;
   channelLessons: (workspaceId: string, channelId: string) => Promise<string>;
@@ -39,7 +43,7 @@ export function makeWorkerTurn(ctx: HostCtx & {
     token: string;
     log: LogFn;
   }) {
-    const { t, ch, agent, actor, mode, adapter, token, log } = a;
+    const { t, ch, agent, actor, log } = a;
   // team Agent Skills the worker may reach for (the enforcement seam). Logging
   // the count makes "did it consider skills?" visible in the activity log —
   // the model is then prompted to scan + load_skill a fitting one first.
@@ -85,47 +89,31 @@ export function makeWorkerTurn(ctx: HostCtx & {
   // …and gate every tool call against the effective permission policy (agent policy
   // engine, Phase 1): map the call, evaluate baseline+overrides read from the replica,
   // and on `ask` post a permission card the human answers (fail-closed to deny).
+  const modeGate = remoteThreadPermissionGate({apiUrl:ctx.apiUrl,workspace:ch.workspace_id,actorId:ctx.ownerActorId,taskId:t.id,
+    headers:()=>apiAuthHeaders(ctx.apiUrl,{kind:'agent',id:agent.id})});
+  const project = await db.get<{project_id:string}>('select project_id from tasks where id=? and workspace_id=?',[t.id,ch.workspace_id]);
+  const rules = await loadEngineeringPolicyRules(db,ch.workspace_id,project?.project_id);
   const permissionGate: PermissionGate = async (toolName, toolInput) => {
-    const action = toolCallToAction(toolName, toolInput);
-    if (!action) return { decision: 'allow' };
-    const rows = await db
-      .getAll<PolicyRowLite>('select id, scope, capability, selector, verdict, rationale, locked from policies where workspace_id = ?', [ch.workspace_id])
-      .catch(() => [] as PolicyRowLite[]);
-    const outcome = policyGateOutcome(action, mergePolicies(defaultBaselineRules(), rowsToRules(rows)));
-    if (outcome.decision === 'allow') return { decision: 'allow' };
-    if (outcome.decision === 'deny') return { decision: 'deny', reason: outcome.reason };
-    // ask → raise a permission card as the agent (the server turns it into a decision row) and await the human.
-    // The card's summary is the AGENT'S OWN words. Preferred source: the in-call description
-    // (Claude runtimes attach one to Bash calls). When the call carries none (Write/Edit/
-    // WebFetch/MCP have no description field), elicit ONE grounded sentence from the same
-    // agent's model — same provider, same creds — before the card posts. Never a canned
-    // label: if elicitation fails or times out, the summary line is simply absent. Echo
-    // mode stays inert (no creds to ask with).
-    let summary = typeof toolInput['description'] === 'string' ? (toolInput['description'] as string).trim().slice(0, 200) : '';
-    if (!summary && mode === 'claude') {
-      const p = intentPrompt(action, agent.name, taskWhere(t.number), t.title);
-      summary = cleanIntent(
-        await Promise.race([
-          adapter.complete(p.system, p.user, token, agent.model, 120),
-          new Promise<string>((r) => setTimeout(() => r(''), 8000)),
-        ]).catch(() => ''),
-      );
-      if (summary) log({ kind: 'tool', phase: 'inject', summary: `intent elicited for the approval card: ${summary.slice(0, 90)}` });
-    }
+    const mapped=chatPermissionAction(toolName,toolInput);
+    if (!mapped) return {decision:'allow'};
+    const action=mapped.actions[0];
+    if (!action) return {decision:'deny',reason:'Unknown tool action.'};
+    const mode=await modeGate.decide(mapped.kind,mapped.actions,rules);
+    const outcome=policyGateOutcome(action,rules);
+    if (mode && mode.verdict!=='review') { outcome.decision=mode.verdict; outcome.reason=mode.reason; }
+    if (outcome.decision!=='ask') return {decision:outcome.decision,reason:outcome.reason};
+    const summary = typeof toolInput.description==='string' ? toolInput.description.slice(0,200) : undefined;
     const res = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: buildPermissionCardBody(action, outcome, agent.name, taskWhere(t.number), summary || undefined) }).catch(() => null);
     if (!res || !res.ok) return { decision: 'deny', reason: 'could not raise the approval request' };
     const messageId = ((await res.json().catch(() => ({}))) as { message?: { id?: string } }).message?.id;
     if (!messageId) return { decision: 'deny', reason: 'approval request had no id' };
-    const answer = await awaitDecision(db, messageId, { taskId: t.id }, permissionQuestion(action, agent.name, taskWhere(t.number)));
+    const answer = await awaitDecision(db, messageId, { taskId: t.id }, permissionQuestion(action, agent.name, taskWhere(t.number)), undefined, true);
     return answer === 'Approve' ? { decision: 'allow' } : { decision: 'deny', reason: answer == null ? 'approval timed out — denied' : 'a human denied this action' };
   };
   // The kernel FS sandbox enforces the same fs.read deny paths the tool-gate does: read the
   // effective policy once at run-start and hand the human-added protected paths to the runtime,
   // so a workspace's custom "agents can never read X" is a real kernel jail, not just a tool block.
-  const sandboxProtectedPaths = await db
-    .getAll<PolicyRowLite>('select id, scope, capability, selector, verdict, rationale, locked from policies where workspace_id = ?', [ch.workspace_id])
-    .then((rows) => protectedPathsFromRules(mergePolicies(defaultBaselineRules(), rowsToRules(rows))))
-    .catch(() => [] as string[]);
+  const sandboxProtectedPaths = protectedPathsFromRules(rules);
   // lessons already learned here — injected so the worker starts warned
   const lessonsNote = await channelLessons(ch.workspace_id, ch.id);
   if (lessonsNote) log({ kind: 'tool', phase: 'inject', summary: `${(lessonsNote.match(/\n- /g) ?? []).length} lesson(s) from past reviews injected` });
@@ -135,7 +123,7 @@ export function makeWorkerTurn(ctx: HostCtx & {
   const recallNote = await taskRecallNote(ch.workspace_id, recallQuery, lessonsNote);
   if (recallNote) log({ kind: 'tool', phase: 'inject', summary: `${(recallNote.match(/\n- /g) ?? []).length} memory hit(s) recalled into the task context` });
   const memoryNote = (lessonsNote + recallNote) + brainNotesFor(t);
-    return { skills, proposeSkill, recordLesson, addBacklogItem, permissionGate, sandboxProtectedPaths, memoryNote };
+    return { skills, proposeSkill, recordLesson, addBacklogItem, permissionGate, sandboxProtectedPaths, memoryNote, permissionRules:rules };
   }
 
   return { buildWorkerTurn };

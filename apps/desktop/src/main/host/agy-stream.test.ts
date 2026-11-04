@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { agyConversationStream } from './agy-stream';
+import { agyConversationStream, agyFailureMessage } from './agy-stream';
 
 test('Gemini conversation streams provider thinking, tool activity and reply across chunk boundaries', () => {
   const updates: Array<[string, string | undefined]> = [];
@@ -77,4 +77,12 @@ test('malformed reasoning-as-text never streams, becomes public progress or a fi
   assert.throws(() => stream.finish(), /incorrectly formatted response/);
   assert.deepEqual(messages, []);
   assert.ok(visible.every(text => text === ''));
+});
+
+test('a startup failure explains how to recover and never exposes CLI help or login URLs', () => {
+  const help = 'flags provided but not defined: -settings\nUsage of agy:\n' + 'plugin help '.repeat(700);
+  assert.match(agyFailureMessage(2, help), /newer Gemini runtime.*Choose another model/);
+  assert.doesNotMatch(agyFailureMessage(2, help), /Usage|plugin/);
+  assert.match(agyFailureMessage(1, 'authentication required'), /Reconnect your Google account/);
+  assert.match(agyFailureMessage(2, 'Usage of agy:'), /Retry/);
 });

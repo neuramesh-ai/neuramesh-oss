@@ -4,37 +4,39 @@
 // Run from apps/desktop: pnpm exec tsx --test src/main/execpolicy.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planWallOutcome, classifyExecError, isLimitNotice, isTurnExhaustion } from './execpolicy';
+import { EXEC_FAIL_BLOCK_AFTER, planWallOutcome, classifyExecError, isLimitNotice, isTurnExhaustion } from './execpolicy';
 
-const base = { reason: 'no work product — nothing changed in the worktree', blockAfter: 2, taskNumber: 1006, agentName: 'patch' };
+const base = { reason: 'no work product — nothing changed in the worktree', blockAfter: EXEC_FAIL_BLOCK_AFTER, taskNumber: 1006, agentName: 'patch' };
 
 test('first wall retries with the next attempt number and says so in the thread', () => {
   const o = planWallOutcome({ ...base, priorWalls: 0 });
   assert.equal(o.action, 'retry');
   assert.equal((o as { attempt: number }).attempt, 2);
   assert.match(o.wallNote, /^Execution hit a wall: /); // the budget counts this prefix
-  assert.match(o.wallNote, /retrying \(attempt 2 of 2\)/);
+  assert.match(o.wallNote, /retrying \(attempt 2 of 6\)/);
 });
 
 test('the budget-hitting wall blocks with the reason and tells the human what to do', () => {
-  const o = planWallOutcome({ ...base, priorWalls: 1 });
+  const o = planWallOutcome({ ...base, priorWalls: 5 });
   assert.equal(o.action, 'block');
   const b = o as { blockReason: string; blockNote: string; wallNote: string };
-  assert.match(b.blockReason, /execution failed 2× — no work product/);
+  assert.match(b.blockReason, /execution failed 6× — no work product/);
   assert.match(b.wallNote, /^Execution hit a wall: /);
-  assert.match(b.blockNote, /Auto-blocked #1006 after 2 failed execution attempts/);
-  assert.match(b.blockNote, /@patch/);
-  assert.match(b.blockNote, /Unblock.*retry|retry.*Unblock/s);
+  assert.match(b.blockNote, /Auto-blocked #1006 after 6 failed execution attempts/);
+  assert.match(b.blockNote, /inspect the task branch/i);
+  assert.match(b.blockNote, /alternative approach/i);
+  assert.match(b.blockNote, /with your guidance/i);
+  assert.match(b.blockNote, /unblock.*retry|retry.*unblock/is);
 });
 
 test('walls beyond the budget (relaunch trails) still block, never retry', () => {
-  for (const priorWalls of [2, 5]) {
+  for (const priorWalls of [6, 9]) {
     assert.equal(planWallOutcome({ ...base, priorWalls }).action, 'block');
   }
 });
 
 test('reasons are truncated so a stack trace never floods the thread or block reason', () => {
-  const o = planWallOutcome({ ...base, priorWalls: 1, reason: 'x'.repeat(500) });
+  const o = planWallOutcome({ ...base, priorWalls: 5, reason: 'x'.repeat(500) });
   const b = o as { blockReason: string; wallNote: string };
   assert.ok(b.blockReason.length <= 200, String(b.blockReason.length));
   assert.ok(b.wallNote.length <= 240, String(b.wallNote.length));
@@ -135,11 +137,11 @@ test('isLimitNotice ignores empty and ordinary replies', () => {
 // --- the retry budget must RESET on unblock (the "click Unblock, instantly blocked again" bug) ---
 
 test('the budget is per-round: the same wall count blocks, but a reset round retries', () => {
-  const p = { reason: 'no work product — nothing changed in the worktree', blockAfter: 2, taskNumber: 1034, agentName: 'patch' };
-  // 1 prior wall THIS round → still has a retry left
+  const p = { reason: 'no work product — nothing changed in the worktree', blockAfter: EXEC_FAIL_BLOCK_AFTER, taskNumber: 1034, agentName: 'patch' };
+  // No prior wall this round → retry remains
   assert.equal(planWallOutcome({ ...p, priorWalls: 0 }).action, 'retry');
-  // 1 prior + this one = 2 → blocks
-  assert.equal(planWallOutcome({ ...p, priorWalls: 1 }).action, 'block');
+  // Five prior + this one = six → blocks
+  assert.equal(planWallOutcome({ ...p, priorWalls: 5 }).action, 'block');
   // after an unblock the caller passes 0 again, so the very next attempt RETRIES rather than
   // re-blocking — which is the whole point: an all-time count made Unblock a no-op
   assert.equal(planWallOutcome({ ...p, priorWalls: 0 }).action, 'retry');
@@ -147,7 +149,7 @@ test('the budget is per-round: the same wall count blocks, but a reset round ret
 
 test('turn exhaustion is named honestly and does NOT blame the credentials', () => {
   const out = planWallOutcome({
-    reason: 'failed [error_max_turns] 568s', priorWalls: 1, blockAfter: 2, taskNumber: 1034, agentName: 'patch',
+    reason: 'failed [error_max_turns] 568s', priorWalls: 5, blockAfter: EXEC_FAIL_BLOCK_AFTER, taskNumber: 1034, agentName: 'patch',
   });
   assert.equal(out.action, 'block');
   assert.ok(out.action === 'block' && /ran out of turns/.test(out.blockNote), out.action === 'block' ? out.blockNote : '');
@@ -158,7 +160,18 @@ test('turn exhaustion is named honestly and does NOT blame the credentials', () 
 
 test('a provider cap gets cap advice, not key advice', () => {
   const out = planWallOutcome({
-    reason: 'reached your weekly limit', priorWalls: 1, blockAfter: 2, taskNumber: 7, agentName: 'patch',
+    reason: 'reached your weekly limit', priorWalls: 5, blockAfter: EXEC_FAIL_BLOCK_AFTER, taskNumber: 7, agentName: 'patch',
   });
   assert.ok(out.action === 'block' && /provider cap/.test(out.blockNote), 'names the cap');
+});
+
+
+test('the production budget retries the first five failed executions and blocks the sixth', () => {
+  assert.equal(EXEC_FAIL_BLOCK_AFTER, 6);
+  for (let priorWalls = 0; priorWalls < 5; priorWalls++) {
+    const outcome = planWallOutcome({ ...base, priorWalls });
+    assert.equal(outcome.action, 'retry');
+    if (outcome.action === 'retry') assert.equal(outcome.attempt, priorWalls + 2);
+  }
+  assert.equal(planWallOutcome({ ...base, priorWalls: 5 }).action, 'block');
 });

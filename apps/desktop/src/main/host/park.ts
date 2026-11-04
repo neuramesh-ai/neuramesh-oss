@@ -69,7 +69,7 @@ async function runDueParks(): Promise<void> {
     const cred = await repoCred.forRepo(slug, rec.subject.channelId ?? '');
     // a read that failed is not "no CI": the park keeps waiting instead of waking on a false none
     const v = cred.ok ? (await ghPrChecks(undefined, slug, row.pr_number, cred.env).catch(() => ({ verdict: 'pending' as const }))).verdict : 'pending';
-    ci[rec.condition.prNumber] = v === 'unknown' ? 'pending' : v;
+    ci[rec.condition.prNumber] = v === 'unknown' ? 'pending' : v === 'author_unverified' ? 'fail' : v;
   }
   for (const { record, why } of parkBook.due({ ci }, Date.now())) {
     parkBook.release(record.turnId);

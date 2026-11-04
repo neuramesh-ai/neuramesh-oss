@@ -5,6 +5,7 @@
 // names). This renders the SAME markdown for both the birth plan and every revision, so the
 // thread's preview card, the full-tab view, and the review overlay all read one document.
 import { executionLegLabel } from './journey';
+import { normalizeTaskMarkdown } from './task-handoff';
 import { trimLineEnds } from './linear';
 
 export interface PlanDocInput {
@@ -34,20 +35,20 @@ export function isPlanDoc(name: string): boolean {
 // response pills sit above an embedded preview of the plan document, one component. The message
 // carries this marker exactly like ‹wb:id› / ‹task:id›; renderers that know it swap the card in,
 // everything else shows the readable line the body leads with.
-const PLAN_REF_RE = /‹plan:v(\d+)›/;
+const PLAN_REF_RE = /‹plan:(?:([0-9a-f-]{36}):)?v(\d+)›/i;
 
 export function planRefMarker(version: number): string {
   return `‹plan:v${version}›`;
 }
 
-export interface PlanRef { version: number; prose: string }
+export interface PlanRef { version: number; prose: string; taskId?: string }
 
 export function parsePlanRef(body: string | null | undefined): PlanRef | null {
   if (!body) return null;
   const m = PLAN_REF_RE.exec(body);
   if (!m) return null;
   const prose = trimLineEnds(body.replace(PLAN_REF_RE, '')).replace(/\n{3,}/g, '\n\n').trim();
-  return { version: Number(m[1]), prose };
+  return { version: Number(m[2]), prose, ...(m[1] ? { taskId: m[1] } : {}) };
 }
 
 /** how a plan version reaches the thread: a unit's birth plan, a revision, or a hands-off run's plan */
@@ -89,6 +90,6 @@ export function renderPlanMarkdown(p: PlanDocInput): string {
   if (p.subtasks.length) {
     lines.push('', '## Subtasks (minted on approval)', ...p.subtasks.map((s) => `- ${s}`));
   }
-  lines.push('', '## Approach', '', p.approach.trim(), '');
+  lines.push('', '## Approach', '', normalizeTaskMarkdown(p.approach).trim(), '');
   return lines.join('\n');
 }

@@ -30,6 +30,15 @@ beforeEach(async () => {
 });
 
 describe('comm rules config', () => {
+  it('drops internal agent placeholders without discarding human text or explanatory agent replies', async () => {
+    for (const body of ['NO_Reply','(no reply)']) {
+      expect(await j(await send(rex,'/v1/messages',{...base(),body}))).toEqual({ok:true,posted:false});
+    }
+    expect(await store.listEvents('channel/dev')).toHaveLength(0);
+    expect((await send(george,'/v1/messages',{...base(),body:'NO_REPLY'})).status).toBe(200);
+    expect((await send(rex,'/v1/messages',{...base(),body:'The token NO_REPLY means silence.'})).status).toBe(200);
+    expect(await store.listEvents('channel/dev')).toHaveLength(2);
+  });
   it('workspace.update stores them; agents may not touch them', async () => {
     const ok = await send(george, '/v1/commands', { type: 'workspace.update', workspace: ws, commRules: { ste100: false, custom: ['Dates are absolute.'] } });
     expect(ok.status).toBe(200);

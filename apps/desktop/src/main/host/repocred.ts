@@ -7,6 +7,7 @@
 // Custody: the token lives in this module's memory and reaches only the daemon's OWN git and gh
 // processes, through their environment. Never the agent's environment, never a file: an agent that
 // runs `git push` itself finds no credential, so code still reaches the base only through the PR.
+import { agentGitIdentity, NEURAMESH_BOT } from '@neuramesh/shared';
 import type { GhEnv } from './gh';
 
 export type RepoCredResult =
@@ -24,7 +25,7 @@ export function appCredEnv(token: string, base: NodeJS.ProcessEnv = process.env,
     [`GIT_CONFIG_KEY_${n}`]: 'http.https://github.com/.extraheader',
     [`GIT_CONFIG_VALUE_${n}`]: `AUTHORIZATION: basic ${basic}`,
     // a cloud machine has no git identity: the App's bot signs the host's commit
-    ...(identity ? { GIT_AUTHOR_NAME: identity.name, GIT_AUTHOR_EMAIL: identity.email, GIT_COMMITTER_NAME: identity.name, GIT_COMMITTER_EMAIL: identity.email } : {}),
+    ...agentGitIdentity(identity?.name === NEURAMESH_BOT.name ? NEURAMESH_BOT : identity ?? undefined),
   };
 }
 

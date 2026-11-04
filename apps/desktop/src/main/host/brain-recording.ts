@@ -11,7 +11,10 @@ export function hostConversationRecorder(options: Omit<BrainSyncOptions, 'thread
     let threadId: string | undefined;
     if (work.subject?.kind === 'thread') threadId = work.subject.id;
     if (work.subject?.kind === 'task') {
-      const rows = await options.db.getAll<{ id: string }>('select th.id from threads th join tasks t on t.id = th.task_id where t.workspace_id = ? and t.number = ? limit 1', [options.workspace, work.subject.number]);
+      const rows = await options.db.getAll<{ id: string; kind: string }>('select th.id, th.kind from threads th join tasks t on t.id = th.task_id where t.workspace_id = ? and t.number = ? limit 1', [options.workspace, work.subject.number]);
+      // Native coding owns the complete runtime journal. A second writer here races
+      // its checkpoints; task/review messages already persist through the database.
+      if (rows[0]?.kind === 'coding') return run();
       threadId = rows[0]?.id;
     }
     if (!threadId) return run();

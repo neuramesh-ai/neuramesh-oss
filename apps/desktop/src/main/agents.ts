@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { workspaceSkills } from './host/workspace-skills';
 import { brainApiBaseUrl } from '@neuramesh/shared';
 // AgentHost slice 1: channel-scoped @mention wake → reply, posted through the
 // control-api as a real agent actor. `runAgentTurn` is the seam where the
@@ -36,6 +38,7 @@ import { publishConversationArtifact } from './harness/brain-sync';
 import { removeTaskWorkspace } from './harness/workspaces';
 import { stagePriorDesignRound } from './staging';
 import { claudeCode } from './runtime/claudecode';
+import { taskPullRequestState } from './host/task-checkout';
 import { makeBerthSweep } from './host/berthsweep';
 import { makeSchedules } from './host/schedules';
 import { makeOrchSweeps } from './host/orchsweeps';
@@ -130,6 +133,7 @@ export interface HostedAgent {
 export type SkillRef = { name: string; description: string; body: string; pack_name?: string | null };
 
 interface HostOpts {
+  engineering?: () => import('./relay/engineering-host').EngineeringMachineHost;
   headless?: boolean;
   db: ReplicaDatabase;
   machineId: string;
@@ -456,9 +460,6 @@ export async function launcherIdeas(channelId: string, mode: 'task' | 'routine')
 // liveness is OBSERVED rather than asserted, and the stall watchdog (stall.ts) reads that
 // same feed to flag a run that genuinely stopped moving. A run ends when the work ends,
 // when a human hits Stop, or when the watchdog escalates it — never on a timer.
-// after this many failed execution attempts, auto-block instead of re-looping
-// on every host restart (the stuck-#1004 lesson, 2026-06-13)
-export const EXEC_FAIL_BLOCK_AFTER = 2;
 
 // The orchestrator's two sweep cadences (see runOrchestratorSweeps): the full pass carries
 // the judgment turns (digests + the periodic self-check) and stays rationed; the watchdog
@@ -497,6 +498,7 @@ export async function awaitDecision(
   where: { taskId: string } | { threadId: string },
   question: string,
   timeoutMs = TURN_BUDGETS.review.wallMs, // docs/harness/05 §3.6
+  exactDecision = false,
 ): Promise<string | null> {
   const taskId = 'taskId' in where ? where.taskId : null;
   const deadline = Date.now() + timeoutMs;
@@ -508,6 +510,9 @@ export async function awaitDecision(
       .catch(() => [] as { status: string; answer: string | null }[]);
     const d = drows[0];
     if (d && d.status !== 'open') return d.status === 'answered' ? d.answer : null;
+    // Permission grants are for exactly one operation. A matching answer from
+    // last week (or a parallel command) can never authorize a fresh request.
+    if (exactDecision) { await new Promise(r => setTimeout(r, 1500)); continue; }
     // 2) reply-line answer (`**question** → Approve`) — how a mobile client answers today
     const mrows = await db
       .getAll<{ body: string }>(
@@ -602,7 +607,7 @@ export async function excludeFromGit(dir: string, patterns: string[]): Promise<v
     if (missing.length) await appendFile(file, `\n${missing.join('\n')}\n`);
   } catch { /* not a git repo / no exclude — best effort */ }
 }
-export const STAGING_EXCLUDES = ['.nm-evidence/', '.nm-attachments/'];
+export const STAGING_EXCLUDES = ['.nm-evidence/', '.nm-attachments/', '.nm-artifacts/'];
 
 
 
@@ -727,7 +732,7 @@ export async function generateBrandImage(cred: ImageCred, reviewSeat: string, br
 const hostsStarted = new Set<string>();
 // The two task shapes the plan/design flows read. Declared at module level so the flows
 // module (host/flows.ts) shares the SAME shape rather than restating it.
-export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null };
+export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null; offered_agent_id?: string | null };
 export type DesignTask = PlanTask & { repo_id: string | null; base_ref: string | null; updated_at: string };
 
 /** a skill pack mid-import — the curator watch and the flow that runs it share the shape */
@@ -738,7 +743,7 @@ export type ImportPack = { id: string; name: string; channel_id: string; source_
 export { collectFiles, runCoding, worktreeRun } from './execution';
 export { RESEARCH_OUTPUT_CONTRACT, loadMessageAttachments, openPlanningWorkspace, stageApprovedDesigns, stageBrandContext, stageConnections, stagePriorDesignRound, stageTaskAttachments } from './staging';
 
-export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless }: HostOpts) {
+export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless, engineering }: HostOpts) {
   const hostKey = `${apiUrl}|${workspace}`;
   if (hostsStarted.has(hostKey)) {
     console.warn(`agent_host already running for ${workspace.slice(0, 8)} — second start ignored (one host per backend and workspace)`);
@@ -1153,7 +1158,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     executeHire, generateDraftImage, generateShareImage, libraryDocs, startDeepWork, subjectFor, whiteboardClosures,
     workspaceListing, workspaceRead,
   });
-  const { chatTurn, defaultResponder, threadModeFor } = makeChatTurn({
+  const { chatTurn, defaultResponder, threadModeFor, permissionsFor } = makeChatTurn({
     apiUrl, ownerActorId,
     post, machineId, guards, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace,
     generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures,
@@ -1331,15 +1336,8 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // AND enabled AND (no pack OR its pack is enabled). Shared by the worker (before
   // it executes) and the orchestrator (so it can steer toward a fitting skill).
   // Disabled = structurally absent from what any agent ever sees. Replica = 0/1.
-  async function discoverSkills(channelId: string, workspaceId: string): Promise<SkillRef[]> {
-    return db.getAll<SkillRef>(
-      `select s.name, s.description, s.body, p.name as pack_name from skills s
-       left join skill_packs p on p.id = s.pack_id
-       where s.status = 'active' and s.enabled = 1 and (s.pack_id is null or p.enabled = 1)
-         and (s.channel_id = ? or (s.channel_id is null and s.workspace_id = ?))
-       order by s.channel_id is null limit 60`,
-      [channelId, workspaceId],
-    );
+  async function discoverSkills(_channelId: string, workspaceId: string): Promise<SkillRef[]> {
+    return workspaceSkills(db, workspaceId);
   }
 
 
@@ -1421,7 +1419,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     // attributed to that member, so their own machine gets first refusal on it. An
     // orchestrator-filed task has no such origin — it is unattributed and any capable machine may
     // take it at once, which is the right default for work nobody typed directly.
-    `select id, number, title, channel_id, kind, offered_agent_id, repo_id, base_ref, branch, requirements, requirements_confirmed,
+    `select id, number, title, channel_id, state, kind, offered_agent_id, repo_id, base_ref, branch, requirements, requirements_confirmed,
             creator_kind, creator_id
        from tasks
      where workspace_id = ? and state in ('todo', 'plan_review') and offered_agent_id is not null
@@ -1432,7 +1430,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     [workspace],
     {
       onResult: (r) => {
-        for (const t of (r.rows?._array ?? []) as OfferedTask[]) {
+        for (const t of (r.rows?._array ?? []) as Array<OfferedTask & {state: string}>) {
           const agent = agents.get(t.offered_agent_id);
           if (!agent || claimed.has(t.id)) continue;
           claimed.add(t.id);
@@ -1446,7 +1444,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
           // exactly this shape, and a ternary hides one of them from it)
           const flow = owning ? () => ownFlow(agent, t) : () => claimFlow(agent, t);
           execQueue.run(
-            { key: t.id, kind: owning ? 'own' : 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
+            { key: t.id, kind: owning ? 'own' : 'work', cause: t.state === 'plan_review' ? 'approval' : 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
             flow,
           );
         }
@@ -1515,14 +1513,19 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   );
 
   // Built before the watch below calls its debounce. It only CONSTRUCTS — nothing arms here.
-  const { runBerthSweep, scheduleBerthSweep } = makeBerthSweep({ db, brain, withRepoLock, killTaskPtys });
+  const keepPrCheckout = async (number:number) => {
+    const status = await taskPullRequestState(db,repoCred,number).catch(() => 'unknown');
+    return status === 'open' || status === 'unknown';
+  };
+  const { runBerthSweep, scheduleBerthSweep } = makeBerthSweep({ db, brain, withRepoLock, killTaskPtys, keepPrCheckout });
   db.watch(
-    `select number, repo_id, branch from tasks where state in ('accepted', 'closed')`,
+    `select number, repo_id, branch, pr_number from tasks where state in ('accepted', 'closed')`,
     [],
     {
       onResult: async (r) => {
-        for (const row of (r.rows?._array ?? []) as Array<{ number: number; repo_id: string | null; branch: string | null }>) {
+        for (const row of (r.rows?._array ?? []) as Array<{ number: number; repo_id: string | null; branch: string | null; pr_number: number | null }>) {
           if (reclaimed.has(row.number)) continue;
+          if (row.pr_number && (!existsSync(cachePath('worktrees', `nm-${row.number}`)) || await keepPrCheckout(row.number))) continue;
           reclaimed.add(row.number);
           killTaskPtys?.(row.number); // close review terminals before the dir vanishes under them
           const remove = () => removeTaskWorkspace({
@@ -1554,7 +1557,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   db.watch(
     `select t.id, t.number, t.channel_id, t.assignee_id, t.pr_number, t.pr_url, r.org_name, r.name as repo_name, r.clone_url, r.local_path
      from tasks t join repos r on r.id = t.repo_id
-     where t.state = 'accepted' and t.pr_number is not null`,
+     where t.state = 'accepted' and t.pr_number is not null and json_type(t.work_plan,'$.codingDelivery') is null`,
     [],
     {
       onResult: async (r) => {
@@ -1656,7 +1659,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
 
   db.watch(
-    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id from tasks where state = 'planning'`,
+    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id, offered_agent_id from tasks where state = 'planning'`,
     [],
     {
       onResult: (r) => {
@@ -1933,7 +1936,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     orchPlanDecision, ownFlow,
     remoteDelegate, resumeFlow,
   } = makeFlows({
-    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
+    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed, engineering,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
     handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,
@@ -2024,7 +2027,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // The orchestrator's turn (host/orchestratorturn.ts) — it assembles the turn and hands it to
   // whichever transport the provider needs. Choosing is not the same job as running.
   const { orchestratorTurn } = makeOrchTurn({
-    db, NO_RUN, buildOrchestratorTools, draftsForAnchor, ensureChatWorkspace, orchSpawnFor,
+    db, NO_RUN, buildOrchestratorTools, draftsForAnchor, ensureChatWorkspace, orchSpawnFor, permissionsFor,
     dispatchOrchestrator,
   });
 

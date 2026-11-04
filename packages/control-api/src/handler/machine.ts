@@ -44,6 +44,7 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const beat = await store.heartbeatMachine(cmd.machineId, actor.id, {
       activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false,
       ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}),
+      ...(cmd.permissionVersion ? { permissionVersion: cmd.permissionVersion } : {}),
       ...(cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}),
     });
     if (!beat) throw new DomainError('NOT_FOUND', 'no machine you may beat has this id');

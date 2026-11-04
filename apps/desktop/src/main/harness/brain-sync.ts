@@ -6,7 +6,7 @@ import type { BrainCommitRequest, BrainCommitResult, BrainConversationEvent, Bra
 import { brainRoot } from './brain';
 import { durableAppend, durableWrite, packEvent, packRuntime, portableBrainValue, readJSON, unpackEvent, unpackRuntime } from './brain-sync-codec';
 export { portableBrainValue } from './brain-sync-codec';
-export { bindConversationCallback, captureConversationRecorder, conversationContext, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
+export { bindConversationCallback, captureConversationRecorder, conversationContext, conversationToolsThrough, setConversationHistoryBoundary, withoutConversationBrain, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
 
 export interface BrainSyncOptions {
   workspace: string;
@@ -116,7 +116,7 @@ export class ConversationBrain {
     const dir = join(this.path, 'uploads');
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const request = { workspace: this.options.workspace, threadId: this.options.threadId, id, name: body['name'], mime: data?.[1] ?? body['mime'] ?? 'text/plain', contentBase64: bytes.toString('base64'), sha256,
-      ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
+      ...(body['capture'] ? { capture: body['capture'] } : {}), ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
     durableWrite(join(dir, `${digest(id)}.json`), JSON.stringify({ actor, request }));
     this.schedule();
     await this.flushArtifacts();

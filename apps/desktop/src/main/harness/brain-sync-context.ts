@@ -1,9 +1,20 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ConversationBrain } from './brain-sync';
 
-const context = new AsyncLocalStorage<{ brain: ConversationBrain; turnId?: string }>();
+const context = new AsyncLocalStorage<{ brain: ConversationBrain; turnId?: string; historyAfter?: string }>();
 export const bindConversationCallback = AsyncLocalStorage.bind;
 export const withConversationBrain = <T>(brain: ConversationBrain, run: () => Promise<T>, turnId?: string): Promise<T> => context.run({ brain, turnId }, run);
+/** Summarization is a derived operation, not a new assistant turn or tool permission. */
+export const withoutConversationBrain = <T>(run: () => Promise<T>): Promise<T> => context.exit(run);
+export function setConversationHistoryBoundary(timestamp: string | null | undefined): void {
+  const current = context.getStore(); if (current) current.historyAfter = timestamp ?? undefined;
+}
+export function conversationToolsThrough(timestamp: string): string {
+  const current = context.getStore();
+  const events = (current?.brain.events() ?? []).filter(event => ['tool.call', 'tool.result'].includes(event.type)
+    && event.timestamp <= timestamp && (!current?.historyAfter || event.timestamp > current.historyAfter));
+  return events.map(event => { const value = JSON.stringify({ id: event.id, type: event.type, payload: event.payload }); return value.length > 12000 ? `${value.slice(0, 12000)} [receipt ${event.id} excerpt; complete output retained in the journal]` : value; }).join('\n');
+}
 const attributed = (payload: unknown, turnId?: string): unknown => turnId && payload && typeof payload === 'object' && !Array.isArray(payload) ? { ...payload, turnId } : payload;
 export const recordConversationEvent = (type: string, payload: unknown, id?: string): void => captureConversationRecorder()(type, payload, id);
 export const excludeConversationSecret = (secret: string | undefined): void => context.getStore()?.brain.excludeSecret(secret);
@@ -26,6 +37,7 @@ export function conversationContext(currentPrompt = ''): string {
   if (!events.length) return '';
   const seen = new Set<string>();
   const portable = events.filter((event) => {
+    if (context.getStore()?.historyAfter && event.timestamp <= context.getStore()!.historyAfter!) return false;
     if (!['user.message', 'assistant.message', 'tool.call', 'tool.result'].includes(event.type)) return false;
     const text = (event.payload as { text?: unknown } | null)?.text;
     if (typeof text !== 'string') return true;

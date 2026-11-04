@@ -247,7 +247,7 @@ export class ControlApiClient {
   // birth-time contract the desktop's uploader honours (./crud-upload.ts).
   postMessage(input: {
     workspace: string; channel: string; project?: string; body: string; taskId?: string; id?: string;
-    threadId?: string; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
+    threadId?: string; permissionMode?: import('@neuramesh/shared').PermissionMode; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
     threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine';
     // 0144: `coding` when the repo chip was set — birth-only, like the rest
     threadKind?: 'chat' | 'coding';

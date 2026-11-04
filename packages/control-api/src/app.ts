@@ -1,6 +1,7 @@
+import {MessageInputSchema} from './message-input';
 import { publicationImage } from './publication-image';
 import { createHash, randomBytes } from 'node:crypto';
-import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, repairCardFences, RETRO_RANGES, routineCardGuard, routineDecisionQuestion, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';   import { needDecision } from './need-cards';
+import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, isStandDown, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, repairCardFences, RETRO_RANGES, routineCardGuard, routineDecisionQuestion, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';   import { needDecision } from './need-cards';
 import { Hono } from 'hono';
 import { cronRoutes } from './cron-routes';
 import { announceClaimRoute, announceRoutes } from './announce';
@@ -19,7 +20,7 @@ import { seal, verifyMediaSig } from './connector-crypto';
 import { clerkCreateUser, clerkFindUserByEmail, clerkPrimaryEmail, clerkVerifyPassword, createClerkSession, mintApiToken, mintPowerSyncToken, verifyClerkToken } from './clerk';
 import { unsubscribePage, verifyUnsubscribeToken } from './mail';
 import { fireWakeBump, lifecycleRoutes } from './fleet-lifecycle';
-import { applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
+import { actorInWorkspace, applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
 import { trialReminder, trialRoutes } from './trial';
 import { applyPlanPatch } from './plan-flip';
 import { actorMayReadCredentials } from './credentials-authz';
@@ -31,7 +32,9 @@ import { exportRoutes } from './export';
 import { importRoutes } from './import';
 import { contentMediaRoute, publicContentMediaRoute } from './content-media-route';
 import { brainRoutes } from './brain-routes';
+import { threadFollowupRoutes } from './thread-followups';
 import { teamRoutes } from './team-routes';
+import { permissionRoutes } from './permission-routes';
 import { apiError } from './api-error';
 import { taskDetailRoute } from './store/artifact-content';
 import { localSyncRoutes } from './local-sync';
@@ -40,50 +43,6 @@ import { filmsCronRoute, starterVideoRoutes } from './starter-video';
 import { executeCommand } from './handler';
 import { pushAfterCommand, type PushService } from './push';
 import type { Store } from './store';
-
-const MessageInputSchema = z.object({
-  // Client-supplied id keeps optimistic local rows identical to server rows
-  // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z.string().uuid().optional(),
-  workspace: z.string().min(1),
-  channel: z.string().min(1).optional(),
-  project: z.string().uuid().optional(),
-  // may be empty when the message carries only attachments (no caption)
-  body: z.string(),
-  taskId: z.string().min(1).optional(),
-  // the conversation thread this message belongs to (conversation-first shell). A
-  // fresh client-generated id births the thread transactionally with the message.
-  threadId: z.string().uuid().optional(),
-  // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
-  // A later message carrying it is ignored — the mode is the thread's, and changing it is
-  // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z.enum(['tasks', 'chat']).optional(),
-  // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
-  // the same birth-time contract as threadMode above, and for the same reason. Moving it
-  // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z.record(z.string(), z.string()).nullable().optional(),
-  // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
-  // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z.string().uuid().optional(),
-  // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
-  // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
-  // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z.string().uuid().optional(),
-  // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
-  // births the thread — the same birth-time contract as the three above. Moving the machine
-  // afterwards is thread.set_machine (human-only); the origin never moves.
-  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
-  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
-  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z.string().uuid().nullable().optional(), threadOrigin: z.enum(['desktop', 'web', 'routine']).optional(), threadKind: z.enum(['chat', 'coding']).optional(),
-  // the message this reply ANSWERS (agent wake replies) — the server enforces one
-  // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z.string().uuid().optional(),
-  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
-  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
-  // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z.literal(true).optional(), needCard: z.literal(true).optional(),
-}).refine(v => !!v.channel || !!v.project, { message: 'A project is required.' });
 
 // Chat attachment forwarded by the desktop's PowerSync uploadData. The full bytes stay on the
 // host; only metadata + a small thumbnail (inlineContent) are persisted here and synced.
@@ -128,7 +87,7 @@ const WhiteboardPatchSchema = z.object({
   archivedAt: z.string().nullable().optional(),
 });
 
-type Env = { Variables: { actor: Actor } };
+type Env = { Variables: { actor: Actor; memberId?:string; machine?: { id:string; workspaceId:string; kind:string } } };
 
 /** The origins the marketing site is served from (plus local dev for e2e). EVERY route the
  *  BROWSER calls has to be mounted with these CORS headers — a browser-called route without
@@ -508,6 +467,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       const lane = await resolveTokenLane(store, bearer, c.req.header('x-nm-actor'));
       if (!('actor' in lane)) return c.json({ error: lane.error, code: lane.code }, lane.status);
       c.set('actor', lane.actor);
+      if (lane.machine) c.set('machine', lane.machine);
+      if (lane.memberId) c.set('memberId',lane.memberId);
       return next();
     }
     if (bearer) {
@@ -520,6 +481,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
         const actor = await resolveBearerActor(store, id, c.req.header('x-nm-actor'));
         if (!actor) return c.json({ error: 'this account cannot act as that agent', code: 'FORBIDDEN' }, 403);
         c.set('actor', actor);
+        c.set('memberId',id);
       } catch (e) {
         // 401 IS A VERDICT ON THE TOKEN, NEVER ON OUR LUCK. Both branches used to answer 401, so a
         // JWKS blip or a database hiccup told every client its credential was dead: the desktop
@@ -555,6 +517,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
   brainRoutes(app, store, opts.brain);
   teamRoutes(app, store);
+  threadFollowupRoutes(app, store);
+  permissionRoutes(app, store);
   localSyncRoutes(app, store);
   webFrameRoute(app); // GET /v1/web/frame: may the web client frame this page? (web-frame.ts)
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
@@ -566,7 +530,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return c.json({ error: 'invalid command', issues: parsed.error.issues }, 400);
     }
     try {
-      const outcome = await executeCommand(store, c.get('actor'), parsed.data);
+      const outcome = await executeCommand(store, c.get('actor'), parsed.data, c.get('machine'),c.get('memberId'));
       // fire-and-forget push when a command lands a task on a human gate, or a Code approval waits (push.ts)
       if (opts.push) pushAfterCommand(opts.push, c.get('actor').id, parsed.data, outcome);
       return c.json(outcome);
@@ -613,6 +577,10 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const parsed = MessageInputSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid message', issues: parsed.error.issues }, 400);
     const actor = c.get('actor');
+    if (parsed.data.permissionMode && (actor.kind !== 'human' || c.get('machine') || !(await actorInWorkspace(store, actor, parsed.data.workspace)))) return c.json({error:'Only a workspace member can select thread permissions.'},403);
+    // Older machines may still submit their internal silence marker as a reply.
+    // Acknowledge it without creating a message, activity event or another wake.
+    if (actor.kind === 'agent' && parsed.data.body.trim() && isStandDown(parsed.data.body)) return c.json({ ok:true, posted:false });
     // the workspace voice, ENFORCED at the one boundary every agent message crosses
     // (docs/design/agent-comm-rules-2026-08 slice 3): with noEmdash on, agent-authored
     // prose is scrubbed fence-aware — quoted code stays untouched by construction.
@@ -633,6 +601,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
       threadMode: parsed.data.threadMode ?? null,
+      permissionMode: actor.kind === 'human' && !c.get('machine') ? parsed.data.permissionMode : undefined,
       // A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16; docs/10 §15.6): the thread a
       // schedule opens is born with the orchestrator on the house model, so the run never waits on a
       // Claude, Codex or Gemini login — credits serve it, which is one thing Pro buys. Server-stamped
@@ -644,6 +613,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       // (apps/desktop host/starterfallback.ts); an explicit override on the opener still rides.
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
+      schedulePermission: parsed.data.schedulePermission, machineAuthored: !!c.get('machine'),
       // a routine's slot is its own origin, whichever daemon posts it
       threadMachineId: parsed.data.threadMachineId ?? null, threadOrigin: parsed.data.scheduleId ? 'routine' : parsed.data.threadOrigin ?? null, threadKind: parsed.data.threadKind ?? null,
       author: { kind: actor.kind, id: actor.id },
@@ -671,12 +641,12 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const inChatThread = actor.kind === 'agent' && msg.threadId
       ? (await store.getThreadMode(msg.workspace, msg.threadId)) === 'chat'
       : false;
-    const cards = actor.kind === 'agent' && !inChatThread ? parseQuestions(styledBody) : [];
+    const cards = actor.kind === 'agent' ? parseQuestions(styledBody).filter(q => !inChatThread || q.kind === 'permission') : [];
     const decisions = cards.map((q) => ({
       id: crypto.randomUUID(),
       question: q.question,
       options: q.options ?? [],
-      allowOther: q.allowOther !== false,
+      allowOther: q.allowOther !== false, ...(q.kind === 'permission' ? {requiresExactAnswer: true} : {}),
     }));
     // An AUTH card is a needs-you item too (George, 2026-09-17: "the message '@rex cannot run…' is
     // easily missed"). The agent cannot run here and waits on the person, so it mints a decision

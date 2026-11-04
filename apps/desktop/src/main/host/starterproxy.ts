@@ -10,7 +10,7 @@ import { apiAuthHeaders } from '../apiauth';
 import { NO_CREDITS_ERROR } from '../computenotice';
 
 /** `thoughts`: ask for the model's thought summaries, for a live bubble's Thoughts block (host/starterthoughts.ts) */
-export interface StarterCall { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any; thoughts?: boolean }
+export interface StarterCall { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any; purpose?: 'action-review'; thoughts?: boolean; signal?: AbortSignal }
 
 const OUT_OF_CREDITS = `${NO_CREDITS_ERROR}: add credits in Credits, or connect your own brain in Settings`;
 
@@ -18,6 +18,7 @@ const OUT_OF_CREDITS = `${NO_CREDITS_ERROR}: add credits in Credits, or connect 
 const proxyBody = (a: StarterCall): string => JSON.stringify({
   workspace: a.workspace,
   contents: a.contents,
+  ...(a.purpose ? { purpose: a.purpose } : {}),
   system: a.config?.systemInstruction,
   tools: a.config?.tools,
   ...(a.thoughts ? { thoughts: true } : {}),
@@ -30,6 +31,7 @@ const proxyBody = (a: StarterCall): string => JSON.stringify({
 export async function starterGenerate(a: StarterCall): Promise<any> {
   const res = await fetch(`${a.apiUrl}/v1/starter/generate`, {
     method: 'POST',
+    signal: a.signal,
     headers: await apiAuthHeaders(a.apiUrl, { kind: 'human', id: a.actorId }),
     body: proxyBody(a),
   });
@@ -50,6 +52,7 @@ export async function starterStream(a: StarterCall & { onText: (delta: string) =
   if (Date.now() < streamMissingUntil) return starterGenerate(a);
   const res = await fetch(`${a.apiUrl}/v1/starter/stream`, {
     method: 'POST',
+    signal: a.signal,
     // identity: a compressing hop would hold the small lines back until it had a block to squeeze
     headers: { ...(await apiAuthHeaders(a.apiUrl, { kind: 'human', id: a.actorId })), accept: 'application/x-ndjson', 'accept-encoding': 'identity' },
     body: proxyBody(a),

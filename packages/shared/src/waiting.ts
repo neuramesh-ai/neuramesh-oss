@@ -1,3 +1,4 @@
+import { parseQuestions } from './cards';
 // WHAT A THREAD SAYS BETWEEN YOUR MESSAGE AND THE ANSWER — the words, and how long they may
 // stand. Shared because the desktop, the browser and the phone all say them, and one wait must
 // never get three stories (the MACHINE_WAIT_LINE ruling in compute.ts, applied again).
@@ -58,3 +59,29 @@ export const WAIT_RETRY = 'Send it again';
 
 /** how often a waiting surface re-reads the clock. Minute granularity needs no more. */
 export const WAIT_TICK_MS = 15_000;
+
+/** Earlier hosts stored the tail of agy's help screen in the failed run. Translate
+ * those saved failures too, so an existing unanswered message can be retried. */
+export function replyFailureText(summary: string | null): string {
+  if (/^agy orchestrator exited 2:/i.test(summary ?? '')) {
+    return 'Gemini could not start this reply. Retry, or choose another model in the composer and retry.';
+  }
+  if (/^(?:orchestration|the chat turn|thread orchestration) timed out/i.test(summary ?? '')) return 'The reply timed out. Retry to continue from this conversation.';
+  return summary || 'The answer did not start.';
+}
+
+/** An answered permission card is part of the pending turn, not its final reply. */
+export function replyRowsAfterPermission<T extends { id: string; author_kind: string; body: string }>(
+  rows: T[], decisions: readonly { message_id: string; question: string; status: string }[],
+): T[] {
+  let end = rows.length;
+  while (end) {
+    const row = rows[end - 1]!;
+    if (row.author_kind !== 'agent' || !row.body.includes('nmq')) break;
+    const questions = parseQuestions(row.body);
+    if (!questions.length || !questions.every(q => q.kind === 'permission' &&
+        decisions.some(d => d.message_id === row.id && d.question === q.question && d.status === 'answered'))) break;
+    end--;
+  }
+  return end === rows.length ? rows : rows.slice(0, end);
+}

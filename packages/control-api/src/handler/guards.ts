@@ -101,3 +101,11 @@ export function slugify(name: string): string {
 export function taskTarget(task: Task): string {
   return `task:${task.number}`;
 }
+
+/** A workspace machine can post for its owner. It cannot sign its own tool or release approval. */
+export function requireHumanAuthority(actor: Actor, cmd: {type: string}): void {
+  if (['decision.answer', 'decision.dismiss', 'task.approve_ship_plan', 'content.approve', 'policy.set', 'policy.delete'].includes(cmd.type)
+      || (cmd.type === 'task.accept' && actor.kind === 'human')) {
+    throw new DomainError('HUMAN_ONLY', 'This approval needs a signed-in person.');
+  }
+}

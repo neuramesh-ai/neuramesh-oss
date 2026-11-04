@@ -1,3 +1,5 @@
+import { recoverRecordedEngineeringPlan, recoverEngineeringPlanProgress } from '@neuramesh/shared';
+import type { EngineeringConversation } from './engineering-conversation';
 import type { CoreSessionEvent } from '@cline/sdk';
 import type { EngineeringRuntimeEvent } from '@neuramesh/shared';
 
@@ -26,4 +28,9 @@ export function forwardEngineeringUsage(event: CoreSessionEvent, emit: (event: E
   if (event.type !== 'agent_event' || event.payload.event.type !== 'usage') return;
   emit({ type: 'usage', inputTokens: event.payload.event.totalInputTokens, outputTokens: event.payload.event.totalOutputTokens,
     ...(typeof event.payload.event.totalCost === 'number' ? { cost: event.payload.event.totalCost } : {}) });
+}
+
+export function currentCodingPlan(messages: unknown, conversation?: EngineeringConversation) {
+  if (!conversation) return recoverEngineeringPlanProgress(messages);
+  return recoverRecordedEngineeringPlan({ events:[...conversation.brain.events()], runtimeMessages:Array.isArray(messages) ? messages : [], metadata:conversation.brain.metadata() });
 }

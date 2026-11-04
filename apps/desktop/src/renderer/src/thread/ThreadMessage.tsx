@@ -1,3 +1,4 @@
+import { TaskApprovalCard } from './TaskApprovalCard';
 // ONE MESSAGE — its attachments, the whiteboard snapshot card, a dropped document, and the
 // answer-then-post path a decision reply takes.
 //
@@ -160,7 +161,7 @@ export function UnitCard({ id, onOpen }: { id: string; onOpen?: (taskId: string)
   // ghosted (todo) instead of claiming a staffing gap this surface cannot verify
   const legs = plan
     ? journeyFor(
-        { state: row.state, kind: row.kind, blockedFrom: null, hasDesignRound: false, hasPlanDoc: true, repoBacked: !!row.repo_id, shipGate: false, assigneeName: row.assignee_id, workPlanLegs: plan.legs },
+        { state: row.state, kind: row.kind, blockedFrom: null, hasDesignRound: false, hasPlanDoc: true, repoBacked: !!row.repo_id, shipGate: false, assigneeName: null, workPlanLegs: plan.legs },
         { designer: '·', architect: '·', developer: '·', reviewer: '·', shipper: '·' },
       )
     : [];
@@ -275,12 +276,12 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
   const brief = drop || wb || unit || article || report ? null : parseBriefRef(m.body);
   // the plan-review card (2026-08-19): ‹plan:vN› + a task-thread context = the gate as a
   // thread-native card; without planCtx (a conversation) the readable line renders as prose
-  const plan = drop || wb || unit || article || report || brief || !planCtx ? null : parsePlanRef(m.body);
+  const plan = drop || wb || unit || article || report || brief ? null : parsePlanRef(m.body);
   // every door exists exactly when the parent passed one (the cards read presence), and calls the latest
   const openTask = onOpenTask ? doors.onOpenTask : undefined;
   const openDoc = onOpenDoc ? doors.onOpenDoc : undefined;
   // every marker shares one anatomy: surrounding prose stays prose, the marker becomes its card
-  const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={doors.onOpenPlanCtx} onArmRevise={doors.onArmRevise} handsOff={planCtx.handsOff} /> }
+  const marker = plan?.taskId ? { prose: plan.prose, card: <TaskApprovalCard taskId={plan.taskId} version={plan.version} onOpenTask={openTask} /> } : plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={doors.onOpenPlanCtx} onArmRevise={doors.onArmRevise} handsOff={planCtx.handsOff} /> }
     : wb ? { prose: wb.prose, card: <WbCard id={wb.id} onOpen={onOpenWhiteboard ? doors.onOpenWhiteboard : undefined} /> }
     : unit ? { prose: unit.prose, card: <UnitCard id={unit.id} onOpen={openTask} /> }
     : article ? { prose: article.prose, card: <ArticleCard id={article.id} onOpen={onOpenArticle ? doors.onOpenArticle : undefined} /> }
