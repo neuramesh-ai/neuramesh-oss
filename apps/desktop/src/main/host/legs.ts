@@ -100,7 +100,7 @@ export function makeLegs(ctx: {
             seated, task, dir, cred.token ?? '', null, false, undefined, narrate(run, log ?? (() => {})),
             undefined, undefined, undefined, undefined, undefined, undefined,
             // a caller-authored turn: the child works ONE piece and reports back to its parent
-            { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger task for ${parent.name}. Do exactly this piece, then report what you produced and how you validated it. You cannot submit, accept or file board work — your parent owns this workflow and reports for you.${brainBriefing({ kind: 'task', number: task.number }, dir)}` },
+            { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger task for ${parent.name}. Do exactly this piece, then report what you produced and how you validated it. You cannot submit, accept or file board work — your parent owns this workflow and reports for you.${await brainBriefing({ kind: 'task', number: task.number }, dir)}` },
             undefined, undefined, undefined, undefined,
             // the leg's REAL kind on the bus (TOOL_KINDS can finally grant a leg something), and
             // the X read closed over this room — host/searchx.ts, the one implementation
@@ -178,12 +178,12 @@ export function makeLegs(ctx: {
    * needs, and inlining five notes into every sibling's prompt is how a fan-out's context cost turns
    * quadratic.
    */
-  function brainBriefing(subject: SubjectRef | null, dir: string): string {
+  async function brainBriefing(subject: SubjectRef | null, dir: string): Promise<string> {
     const lines = [`Your working directory is ${dir} — it is SHARED with everyone else working this subject, and it persists between turns.`];
     if (!subject) return `\n\n${lines[0]} Write what you produce there.`;
     try {
       const b = brain.open(subject);
-      const files = workspaceListing(subject, 20);
+      const files = await workspaceListing(subject, 20);
       const notes = b.notes();
       const results = b.messages().filter((m) => m.kind === 'result');
       if (files.length) lines.push(`Already in it: ${files.map((f) => f.name).join(', ')}. Read what is relevant before you start, and EDIT an existing file rather than writing a near-duplicate beside it.`);

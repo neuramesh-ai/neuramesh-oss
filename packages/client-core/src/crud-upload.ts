@@ -81,6 +81,7 @@ export async function uploadCrudEntry(ident: UploadIdentity, op: CrudEntry): Pro
       rootMessageId: d['root_message_id'] ?? undefined,
       // …and the composer's Tasks toggle (docs/34), applied at birth and ignored after
       threadMode: d['birth_mode'] ?? undefined,
+      permissionMode: d['birth_permission_mode'] ?? undefined,
       // …and the brain the composer was showing when this conversation was born
       brainOverride: d['birth_brain'] ? JSON.parse(d['birth_brain'] as string) : undefined,
       // …and where the session runs and which client bore it (0134), the same birth-only contract

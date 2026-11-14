@@ -186,3 +186,7 @@ export const IconPhone = ({ s }: { s?: number }) => <Svg s={s}><rect x="6" y="2.
 
 /** Compact thread context; distinct from chat and the split-pane toggle. */
 export const IconOverview = ({ s }: { s?: number }) => <Svg s={s}><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /><path d="M9 6h11M9 12h11M9 18h7" /></Svg>;
+
+export const IconTeam = ({ s }: { s?: number }) => <Svg s={s}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19.5c.7-3.4 2.8-5.2 5.5-5.2s4.8 1.8 5.5 5.2" /><circle cx="17" cy="9.5" r="2.6" /><path d="M15.6 14.6c2.5.1 4.2 1.8 4.9 4.9" /></Svg>;
+export const IconSliders = ({ s }: { s?: number }) => <Svg s={s}><path d="M4 7h9" /><path d="M19 7h1" /><circle cx="16" cy="7" r="2.2" /><path d="M4 17h1" /><path d="M11 17h9" /><circle cx="8" cy="17" r="2.2" /></Svg>;
+export const IconMoreH = ({ s }: { s?: number }) => <svg width={s ?? 15} height={s ?? 15} viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>;

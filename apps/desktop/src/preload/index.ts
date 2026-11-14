@@ -1,3 +1,4 @@
+import { financeBridge } from './finance';
 import { contextBridge, ipcRenderer } from 'electron';
 import { openLocalEngineeringChannel } from './engineering-local-channel';
 
@@ -44,6 +45,8 @@ contextBridge.exposeInMainWorld('nm', {
   electron: process.versions.electron,
   channels: (): Promise<ChannelRow[]> => ipcRenderer.invoke('nm:channels'),
   policies: () => ipcRenderer.invoke('nm:policies'),
+  getPermissions: (threadId?: string,taskId?:string) => ipcRenderer.invoke('nm:permission-selection', {threadId,taskId}),
+  setPermissions: (mode: string | null, threadId?: string,taskId?:string) => ipcRenderer.invoke('nm:permission-save', { mode, threadId,taskId }),
   policySet: (input: unknown) => ipcRenderer.invoke('nm:policy-set', input),
   policyDelete: (id: string) => ipcRenderer.invoke('nm:policy-delete', { id }),
   sandboxGet: () => ipcRenderer.invoke('nm:sandbox-get'),
@@ -232,6 +235,7 @@ contextBridge.exposeInMainWorld('nm', {
     ipcRenderer.invoke('nm:create-task', { channelId, title, ...(opts ?? {}) }),
   channelMeta: (channelId: string) => ipcRenderer.invoke('nm:channel-meta', { channelId }),
   workspaceMeta: () => ipcRenderer.invoke('nm:workspace-meta'),
+  ...financeBridge,
   workspaceSettings: (): Promise<{ autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null }> => ipcRenderer.invoke('nm:workspace-settings'),
   workspaceUpdate: (input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: 'starter' | 'xpress' | 'premium' | null }) => ipcRenderer.invoke('nm:workspace-update', input),
   workspaceCreate: (input: { name: string; slug: string }): Promise<{ workspaceId: string }> => ipcRenderer.invoke('nm:workspace-create', input),
@@ -700,7 +704,7 @@ contextBridge.exposeInMainWorld('nm', {
     };
   },
   // live token stream from local agents (host broadcasts to all windows; no subId)
-  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string; imageGeneration?: import('@neuramesh/shared').ImageGenerationProgress | null }) => void): (() => void) => {
+  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string; progress?: string[]; imageGeneration?: import('@neuramesh/shared').ImageGenerationProgress | null }) => void): (() => void) => {
     const listener = (_e: unknown, p: { key: string; agent: string; text: string; done: boolean }) => cb(p);
     ipcRenderer.on('nm:agent-stream', listener);
     return () => ipcRenderer.removeListener('nm:agent-stream', listener);

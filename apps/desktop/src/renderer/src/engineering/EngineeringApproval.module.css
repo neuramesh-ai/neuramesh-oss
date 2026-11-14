@@ -5,7 +5,8 @@
 .kind { font: 10px var(--fmono); color: var(--muted); }
 .path { flex: 1; min-width: 0; font: 11px var(--fmono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.commands { min-width: 0; max-height: min(38vh, 360px); overflow: auto; }
+/* Approval previews sit on the current panel palette, including syntax highlighting. */
+.commands { --code: var(--panel2); --codeink: var(--text); min-width: 0; max-height: min(38vh, 360px); overflow: auto; }
 .commands:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .commandFrame { margin: 0 11px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--code); overflow: hidden; }
 .commandLabel { padding: 7px 13px; border-bottom: 1px solid var(--border); color: color-mix(in srgb, var(--codeink) 80%, var(--muted)); font: 10px var(--fmono); }

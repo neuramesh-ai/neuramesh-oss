@@ -35,10 +35,11 @@ export function makeMemory(ctx: HostCtx & {
 }) {
 const { apiUrl, db, ownerActorId, post } = ctx;
 
-// Lessons the channel already learned from review corrections (kind='lesson'
+// Lessons the PROJECT already learned from review corrections (kind='lesson'
 // facts), formatted for a worker/reviewer prompt. Facts are server-side only
-// (never synced), so this reads /v1/memory; '' when none or offline — the loop
-// must never depend on memory being reachable.
+// (never synced), so this reads /v1/memory, which turns the channel into its
+// project (D15); '' when none or offline — the loop must never depend on memory
+// being reachable.
 async function channelLessons(workspaceId: string, channelId: string): Promise<string> {
   try {
     const r = await fetch(`${apiUrl}/v1/memory?workspace=${workspaceId}&channel=${encodeURIComponent(channelId)}`, {
@@ -59,14 +60,15 @@ async function channelLessons(workspaceId: string, channelId: string): Promise<s
 // promise in docs/03 §6. One hybrid /v1/recall (FTS + vector when the embedder
 // is on) so the worker starts warm instead of spending an in-loop tool turn
 // asking; '' on failure or no hits — the loop never depends on memory being
-// reachable. Workspace-wide on purpose: decisions land in other rooms.
-async function taskRecallNote(workspaceId: string, query: string, lessonsNote: string): Promise<string> {
+// reachable. Project-wide (D15): decisions land in the project's other threads, and a
+// channel id names the project. Without one (an old caller) it reads the workspace.
+async function taskRecallNote(workspaceId: string, query: string, lessonsNote: string, channelId?: string): Promise<string> {
   if (query.length < 8) return '';
   try {
     const r = await fetch(`${apiUrl}/v1/recall`, {
       method: 'POST',
       headers: await apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }),
-      body: JSON.stringify({ workspace: workspaceId, query, k: 8 }),
+      body: JSON.stringify({ workspace: workspaceId, ...(channelId ? { channel: channelId } : {}), query, k: 8 }),
     });
     if (!r.ok) return '';
     const j = (await r.json()) as { hits?: Array<{ kind: string; body: string; channel: string }> };

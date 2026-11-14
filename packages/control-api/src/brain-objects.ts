@@ -96,12 +96,17 @@ export class GcsBrainObjects implements BrainObjectStore {
 }
 
 let configured: { key: string; store: BrainObjectStore } | undefined;
+/** Real local object persistence for the loopback UI harness, independently of Local product mode. */
+export function fileBrainAllowed(env: NodeJS.ProcessEnv): boolean {
+  return env['NM_LOCAL'] === '1' || (env['NODE_ENV'] !== 'production'
+    && env['NM_ALLOW_ACTOR_HEADER'] === '1' && ['127.0.0.1', '::1', 'localhost'].includes(env['HOST'] ?? ''));
+}
 export function configuredBrainObjects(): BrainObjectStore | null {
   const bucket = process.env['NM_BRAIN_GCS_BUCKET'];
   const root = process.env['NM_BRAIN_STORAGE_DIR'];
   const key = JSON.stringify([bucket, root, process.env['NM_LOCAL'], process.env['NM_BRAIN_GCS_AUTH'], process.env['NM_BRAIN_GCS_GCLOUD_CONFIGURATION'], process.env['HOST'], process.env['NODE_ENV'], process.env['NM_ALLOW_ACTOR_HEADER']]);
   if (configured?.key === key) return configured.store;
-  const local = root && process.env['NM_LOCAL'] === '1' ? new FileBrainObjects(root) : null;
+  const local = root && fileBrainAllowed(process.env) ? new FileBrainObjects(root) : null;
   const gcs = bucket ? new GcsBrainObjects(bucket) : null;
   // Enabling GCS changes the writer. References recorded before that switch must remain readable.
   const store = gcs && local ? {

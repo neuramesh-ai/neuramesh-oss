@@ -1,3 +1,5 @@
+import {agentDataIdentity} from './agent-data-context';
+import type { WakeContext } from "./wake-context";
 // THE WAKE PATH — a message arrives, and some agent answers it.
 //
 // Six functions split out of startAgentHost, and the largest single unit in it: the gate that
@@ -18,73 +20,48 @@ import { routineOwned, starterFallback, unavailableOf } from './starterfallback'
 import { SKILL_MARKER, echoTurn, emitStream, loadMessageAttachments, parseSkillMarker, resolveToken, runtimeFor } from '../agents';
 import { isLimitNotice } from '../execpolicy';
 import { isNoCreditsError, noCreditsNotice } from '../computenotice';
+import { endFailedTurn } from './wakefail';
 import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harness/assemble';
 import { type RunHandle } from './runs';
-import type { AgentAttachment, DeltaFn } from '../runtime/adapter';
+
 import { foLabel } from './staffing';
+import { withPermissionDeadline } from './permission-deadline';
 import { withTimeout } from './turnkit';
 import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
 import { TURN_BUDGETS, genVideoItemId, isChatThread, isRoutineScheduledMarker, modelFreeItemId, parseKindMarker, parseModeMarker, cardsAsWords } from '@neuramesh/shared';
 import { makeFilm } from './videogen';
 import { streamFixture } from './streamfixture';
-import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
-import type { HostedAgent, SkillRef, ThreadTask } from '../agents';
-import type { LogFn } from '../agentlog';
+
+import type { HostedAgent, ThreadTask } from '../agents';
+
 import { runWindow } from './runwindow';
 import type { SubjectRef } from '../harness/brain';
-import type { makeRuns } from './runs';
-import type { makeBlock } from './block';
-import type { makeChatTurn } from './chatturn';
-import type { makeStaffing } from './staffing';
-import type { makeEcho } from './echo';
-import type { makeContent } from './content';
+
+
+
+
+
+
 
 /** open a wake's live stream (presence: the ghost mounts before the first token) and return its emitter.
  *  After its first `done` the emitter drops deltas: withTimeout only rejects, so a turn the wall gave up on
  *  keeps writing, and each late delta would open a new bubble that no `done` ever ends */
-export const openStream = (emit: (text: string, done: boolean, thinking?: string) => void): typeof emit => { let ended = false; emit('', false); return (text, done, thinking) => { if (done || !ended) emit(text, done, thinking); ended ||= done; }; };
+export const openStream = (emit: (text: string, done: boolean, thinking?: string, progress?: readonly string[]) => void): typeof emit => { if(agentDataIdentity.getStore()?.privateDestination==='marketing')return ()=>{};let ended = false; emit('', false); return (text, done, thinking, progress) => { if (done || !ended) emit(text, done, thinking, progress); ended ||= done; }; };
 
 /** the orchestrator's turn — a host closure, so its shape is named here once */
-type OrchestratorTurn = (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: DeltaFn) => Promise<string>;
+
 
 // FORTY-THREE dependencies. That number is the finding, not an accident of the split: the wake
 // path touches nearly everything the host does, and until now that was true but invisible.
 // Every type here is INFERRED from the maker that produces it — never restated.
-export function makeWake(ctx: {
-  db: ReplicaDatabase;
-  agents: Map<string, HostedAgent>;
-  NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
-  alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
-  apiUrl: string;
-  arun: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null) => { log: LogFn; runId: string };
-  blockFor: ReturnType<typeof makeBlock>['blockFor'];
-  brainNotes: (subject: SubjectRef, cap?: number, perNote?: number, since?: number) => string;
-  brainResults: (subject: SubjectRef, cap?: number, per?: number, since?: number) => string;
-  chatTurn: ReturnType<typeof makeChatTurn>['chatTurn'];
-  discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
-  drawOnAsk: ReturnType<typeof makeContent>['drawOnAsk'];
-  echoOrchestrate: ReturnType<typeof makeEcho>['echoOrchestrate'];
-  echoPlanReview: ReturnType<typeof makeEcho>['echoPlanReview'];
-  echoThreadOrchestrate: ReturnType<typeof makeEcho>['echoThreadOrchestrate'];
-  handleExhaustion: ReturnType<typeof makeStaffing>['handleExhaustion'];
-  openWakeRun: (agent: HostedAgent, where: { workspace: string; channelId: string; threadId?: string | null; taskId?: string | null }, prompt: string, triggerMessageId?: string | null) => Promise<RunHandle>;
-  orchestratorTurn: OrchestratorTurn;
-  ownerActorId: string;
-  post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
-  rearmWake: (messageId: string) => boolean;
-  reviseContentDrafts: ReturnType<typeof makeContent>['reviseContentDrafts'];
-  seatFor: ReturnType<typeof makeStaffing>['seatFor'];
-  setStatus: (agent: HostedAgent, status: 'online' | 'thinking' | 'working') => void;
-  threadModeFor: ReturnType<typeof makeChatTurn>['threadModeFor'];
-  threadTranscript: ReturnType<typeof makeContent>['threadTranscript'];
-  wakeEnded: (chId: string) => void;
-  wakeStarted: (chId: string) => void;
-}) {
+export function makeWake(ctx: WakeContext) {
   const { db } = ctx;
   // the film lane (videogen.ts): the card's ‹gen-video:› marker, served like the draw marker
   const { filmDraft } = makeFilm({ db, apiUrl: ctx.apiUrl, ownerActorId: ctx.ownerActorId, post: ctx.post, agents: ctx.agents });
   const { NO_RUN, alog, apiUrl, arun, blockFor, brainNotes, brainResults, chatTurn, discoverSkills, drawOnAsk, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, handleExhaustion, openWakeRun, orchestratorTurn, ownerActorId, post, rearmWake, reviseContentDrafts, seatFor, setStatus, threadModeFor, threadTranscript, wakeEnded, wakeStarted } = ctx;
+  // a failed turn ends out loud (host/wakefail.ts), through the same lease and the same API the wake uses
+  const failDeps = { db, openWakeRun, post, log: (line: string) => console.warn(`agent_host ${line}`) };
   // the NeuraMesh brain refused the turn for credits: say so in the thread (computenotice.ts), never
   // silence. replyTo keeps it to one notice per trigger: the server holds one reply per (agent, trigger).
   // A conversation can move rooms mid-turn (file_conversation), so its thread names the room, as in wake().
@@ -109,9 +86,13 @@ export function makeWake(ctx: {
     // land shows this agent working from the first moment — the only reliable attribution
     // for a non-assignee wake (rex answering in someone else's thread), since agent status
     // is global. The `finally` below closes it on every exit path.
-    const emitTask = openStream((text, done, thinking) => emitStream(`${t.channel_id}:${t.id}`, agent.name, text, done, thinking));
+    const emitTask = openStream((text, done, thinking, progress) => emitStream(`${t.channel_id}:${t.id}`, agent.name, text, done, thinking, progress));
     // the run is the ghost's synced twin (docs/29) — declared out here so every exit settles it
     let wakeRun: RunHandle = NO_RUN;
+    // how a failure ends (host/wakefail.ts): past the lease this wake speaks for the message, and a reply
+    // the sweep re-answers keeps the message's one reply slot
+    let held = false;
+    let rearmed = false;
     try {
       const ch = await db.get<{ id: string; slug: string; workspace_id: string }>(
         'select id, slug, workspace_id from channels where id = ?',
@@ -120,6 +101,7 @@ export function makeWake(ctx: {
       wakeRun = await openWakeRun(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, m.body, m.id);
       // another member's machine holds the lease — it is answering, so we generate nothing (0114)
       if (wakeRun.lost) return;
+      held = true;
       let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
       // a draw or a film is a BUTTON, not a turn (2026-09-27): it runs no model, so it asks nothing
       // of the seat's login, and whoever woke answers it (a task draft's ask from a tab or the phone
@@ -147,7 +129,7 @@ export function makeWake(ctx: {
           const att = await loadMessageAttachments(db, m.id);
           reply = await withTimeout(
             orchestratorTurn(agent, ch, (await threadTranscript(agent, t)) + att.manifest, token, t, tlog, skills, att.list, null, NO_RUN,
-              (t2, th) => emitTask(t2, false, th)),
+              (t2, th, pg) => emitTask(t2, false, th, pg)),
             TURN_BUDGETS.triage.wallMs,
             'thread orchestration timed out after 4m',
           );
@@ -209,13 +191,15 @@ export function makeWake(ctx: {
         return;
       }
       if (sent.outcome !== 'ok') {
-        if (sent.outcome === 'gave_up') rearmWake(m.id); // the sweep re-answers once the server is back
+        if (sent.outcome === 'gave_up') rearmed = rearmWake(m.id); // the sweep re-answers once the server is back
         throw new Error(`thread reply post failed ${sent.httpStatus ?? '(network)'} after ${sent.tries} tries`);
       }
       console.log(`agent_thread_wake agent=${agent.name} task=${t.number} mode=${mode} replied=ok${sent.tries > 1 ? ` tries=${sent.tries}` : ''}`);
     } catch (err) {
       console.error(`agent_thread_wake agent=${agent.name} task=${t.number} failed:`, err);
       if (isNoCreditsError(err)) await noCreditsReply(agent, t.channel_id, { taskId: t.id, replyTo: m.id });
+      // any other failure ends out loud too, once, from the machine that holds the message
+      else await endFailedTurn(failDeps, { agent, m, at: { channelId: t.channel_id, taskId: t.id }, err, run: wakeRun, held, rearmed });
       await wakeRun.settle('failed', err instanceof Error ? err.message.slice(0, 200) : 'the turn failed');
     } finally {
       emitTask('', true); // clear the live bubble on every exit (wake() already does)
@@ -235,13 +219,17 @@ export function makeWake(ctx: {
     log({ kind: 'wake', phase: 'channel', summary: `woke on: ${m.body.replace(/\s+/g, ' ').slice(0, 120)}` });
     // the live bubble paints wherever the reply will land: the channel feed, and — when
     // the trigger rode a conversation thread — that thread's sheet too
-    const emitChat = openStream((text, done, thinking) => {
-      emitStream(`${m.channel_id}:`, agent.name, text, done, thinking);
-      if (m.thread_id) emitStream(`${m.channel_id}:${m.thread_id}`, agent.name, text, done, thinking);
+    const emitChat = openStream((text, done, thinking, progress) => {
+      emitStream(`${m.channel_id}:`, agent.name, text, done, thinking, progress);
+      if (m.thread_id) emitStream(`${m.channel_id}:${m.thread_id}`, agent.name, text, done, thinking, progress);
     });
     // the run is the ghost's synced twin (docs/29): same story, durable and cross-machine.
     // Declared out here so every exit path below can settle it.
     let wakeRun: RunHandle = NO_RUN;
+    // how a failure ends (host/wakefail.ts): past the lease this wake speaks for the message, and a reply
+    // the sweep re-answers keeps the message's one reply slot
+    let held = false;
+    let rearmed = false;
     try {
       const ch = await db.get<{ id: string; slug: string; workspace_id: string }>(
         'select id, slug, workspace_id from channels where id = ?',
@@ -250,6 +238,7 @@ export function makeWake(ctx: {
       wakeRun = await openWakeRun(agent, { workspace: ch.workspace_id, channelId: ch.id, threadId: m.thread_id ?? null }, m.body, m.id);
       // another member's machine holds the lease — it is answering, so we generate nothing (0114)
       if (wakeRun.lost) { emitChat('', true); return; }
+      held = true;
       let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
       // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's conversation
       // re-seats it and says why; a human's gets the reason and the card, as a reply to their
@@ -304,6 +293,9 @@ export function makeWake(ctx: {
           [m.thread_id, win.cut],
         );
         const att = await loadMessageAttachments(db, m.id);
+        // the project's memory block rides every chat turn too (D15): a conversation or an Agent Desk
+        // home thread knows what the rest of the project decided, not only its own thread
+        const chatBlock = await blockFor(m.channel_id);
         // a chat carries MORE history than a board wake (24 turns): the conversation IS the
         // context, and a chat that forgets what it said four messages ago is not a chat.
         // ── Assembled to budget (docs/harness/05 §3.7) ───────────────────────────────────────
@@ -313,6 +305,7 @@ export function makeWake(ctx: {
         // "fits" actually means. Before this, three flows each picked their own row cap (8 / 14 / 24)
         // and none of them knew the cost.
         const ctx = assemble([
+          { source: 'facts', text: chatBlock ? `[project memory block]\n${chatBlock}` : '' },
           transcriptBlock(
             recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body) && !isRoutineScheduledMarker(r.body)).map((r) => ({ ...r, body: cardsAsWords(r.body.replace(SKILL_MARKER, '').trim()) })),
             { selfId: agent.id },
@@ -321,11 +314,9 @@ export function makeWake(ctx: {
         ], contextBudget('chat'));
         clog({ kind: 'turn', phase: 'inject', summary: assemblyLine(ctx) }); // context spend is measured, not asserted
         const transcript = ctx.text;
-        reply = await withTimeout(
-          chatTurn({ agent, ch, threadId: m.thread_id!, transcript, token, log: clog, onDelta: (t2, th) => emitChat(t2, false, th), attachments: att.list, run: wakeRun }),
-          TURN_BUDGETS.chat.wallMs, // docs/harness/05 §3.6 — a chat may research + write + run code
-          'the chat turn timed out after 12m',
-        );
+        const request = { body: m.body, author_kind: (await db.get<{ author_kind: string }>('select author_kind from messages where id=?', [m.id]))?.author_kind ?? '' };
+        reply = await chatTurn({ agent, ch, threadId: m.thread_id!, transcript, request, replyTo: m.id,
+          token, log: clog, attachments: att.list, run: wakeRun, onDelta: (text, thinking, progress) => emitChat(text, false, thinking, progress) });
       } else if (agent.role === 'orchestrator') {
         // the orchestrator considers team skills too (to scope/route work). Logged
         // for both echo + claude so "skills considered" is visible in the activity
@@ -359,7 +350,7 @@ export function makeWake(ctx: {
           // look does not — which is how a fan-out got re-commissioned for ground already covered.
           const oSubject: SubjectRef | null = m.thread_id ? { kind: 'thread', id: m.thread_id } : null;
           const octx = assemble([
-            { source: 'facts', text: block ? `[channel summary block]\n${block}` : '' },
+            { source: 'facts', text: block ? `[project memory block]\n${block}` : '' },
             { source: 'notes', text: oSubject ? brainNotes(oSubject, undefined, undefined, win.since) : '' },
             { source: 'results', text: oSubject ? brainResults(oSubject, undefined, undefined, win.since) : '' },
             transcriptBlock(
@@ -371,7 +362,7 @@ export function makeWake(ctx: {
           ], contextBudget('triage'));
           olog({ kind: 'turn', phase: 'inject', summary: assemblyLine(octx) });
           const transcript = octx.text;
-          reply = await withTimeout(orchestratorTurn(agent, ch, transcript, token, undefined, olog, skills, att.list, m.thread_id ?? null, wakeRun, (t, th) => emitChat(t, false, th)), TURN_BUDGETS.triage.wallMs, 'orchestration timed out');
+          reply = await withPermissionDeadline(wait => orchestratorTurn(agent, ch, transcript, token, undefined, olog, skills, att.list, m.thread_id ?? null, wakeRun, (t, th, pg) => emitChat(t, false, th, pg), wait), TURN_BUDGETS.triage.wallMs, 'orchestration timed out');
         } else {
           reply = await echoOrchestrate(agent, m.body, ch);
         }
@@ -388,7 +379,7 @@ export function makeWake(ctx: {
             );
         const block = await blockFor(m.channel_id);
         const transcript =
-          (block ? `[channel summary block]\n${block}\n\n` : '') +
+          (block ? `[project memory block]\n${block}\n\n` : '') +
           recent
             .reverse()
             .map((r) => `${r.author_kind === 'agent' ? 'agent' : 'human'}: ${r.body}`)
@@ -443,8 +434,10 @@ export function makeWake(ctx: {
         return;
       }
       if (sent.outcome !== 'ok') {
-        if (sent.outcome === 'gave_up' && rearmWake(m.id))
+        if (sent.outcome === 'gave_up' && rearmWake(m.id)) {
+          rearmed = true;
           log({ kind: 'wake', phase: 'retry', summary: 'reply undelivered — re-armed for the dead-letter sweep once the server is reachable', level: 'warn' });
+        }
         throw new Error(`reply post failed ${sent.httpStatus ?? '(network)'} after ${sent.tries} tries`);
       }
       console.log(`agent_wake agent=${agent.name} mode=${mode} cred=${cred.source} replied=ok${sent.tries > 1 ? ` tries=${sent.tries}` : ''}`);
@@ -453,6 +446,8 @@ export function makeWake(ctx: {
       console.error(`agent_wake agent=${agent.name} failed:`, err);
       log({ kind: 'wake', phase: 'error', summary: `wake failed: ${err instanceof Error ? err.message.slice(0, 200) : 'unknown'}`, level: 'error' });
       if (isNoCreditsError(err)) await noCreditsReply(agent, m.channel_id, { replyTo: m.id, ...(m.thread_id ? { threadId: m.thread_id } : {}) });
+      // any other failure ends out loud too, once, from the machine that holds the message
+      else await endFailedTurn(failDeps, { agent, m, at: { channelId: m.channel_id, threadId: m.thread_id ?? null }, err, run: wakeRun, held, rearmed });
       await wakeRun.settle('failed', err instanceof Error ? err.message.slice(0, 200) : 'the turn failed');
     } finally {
       wakeEnded(m.channel_id);

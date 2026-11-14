@@ -190,6 +190,11 @@ export const NM_VERBS: Record<string, { verb: string; cat?: ToolCat }> = {
   web_click: { verb: 'clicks an item on the page', cat: 'search' },
   web_type: { verb: 'types text on the page', cat: 'search' },
   web_screenshot: { verb: 'takes a screenshot of the page', cat: 'search' },
+  // Message boards (harness.ts NM_TOOLS)
+  message_board_list: { verb: 'checks the message boards', cat: 'check' },
+  message_board_catch_up: { verb: 'reads a message board', cat: 'check' },
+  message_board_send: { verb: 'posts to a message board' },
+  message_board_take_handoff: { verb: 'takes a handoff' },
 };
 
 // the Claude Code tools a summary names bare (host/turnkit.ts toolSummary). null = plumbing worth no words

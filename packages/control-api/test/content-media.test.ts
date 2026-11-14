@@ -173,6 +173,18 @@ describe('publicApiBase', () => {
     expect(publicApiBase('https://api.neuramesh.app/internal/publish-due')).toBe('https://api.neuramesh.app');
     expect(publicApiBase('http://localhost:8787/internal/publish-due')).toBe('http://localhost:8787'); // dev keeps its stack
   });
+  it('the configured public https origin is the base when TLS ends before the API (Cloud Run gives an http request url)', () => {
+    const saved = process.env['NM_API_URL'];
+    try {
+      process.env['NM_API_URL'] = 'https://api.neuramesh.app/';
+      expect(publicApiBase('http://nm-cr-api-123.us-east4.run.app/internal/publish-due')).toBe('https://api.neuramesh.app');
+      // an http setting is a dev stack: the request origin stays the base
+      process.env['NM_API_URL'] = 'http://localhost:8787';
+      expect(publicApiBase('http://localhost:8787/internal/publish-due')).toBe('http://localhost:8787');
+    } finally {
+      if (saved === undefined) delete process.env['NM_API_URL']; else process.env['NM_API_URL'] = saved;
+    }
+  });
 });
 
 describe('xPoster media', () => {

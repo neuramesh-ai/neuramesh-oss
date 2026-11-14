@@ -5,7 +5,11 @@
 // Run: pnpm exec tsx --test src/main/host/reporead.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeRepoReader, readSignalsViaConnector, renderChanges, renderTree } from './reporead';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { isNotOnGitHub, makeRepoReader, readSignalsViaConnector, renderChanges, renderTree } from './reporead';
 
 const REPO = { id: 'r1', org_name: 'acme', name: 'site', clone_url: 'https://github.com/acme/site.git', local_path: null, provider: 'github' };
 const CHANGES = {
@@ -82,4 +86,51 @@ test('renderers: empty sets say so, a cut tree says to name a deeper path', () =
   assert.match(quiet, /Releases \(newest first\): none published/);
   assert.match(quiet, /Tags \(no releases published\):\n- v1 · 2026-08-01/);
   assert.match(renderTree({ slug: 'a/b', ref: 'HEAD', path: 'src', entries: [], truncated: true }), /src @ HEAD · 0 entries \(cut: name a deeper path\)/);
+});
+
+// r7 evals ede25023: a coding session on a plain git repository (the e2e repo door's file:///nm/work URL)
+// read "GitHub is not connected" back from the repo tools and told the person to connect GitHub
+const GIT_REPO = { id: 'r9', org_name: 'e2e', name: 'ledger', clone_url: 'file:///nm/work/e2e/ledger.git', local_path: null, provider: 'git' };
+const BUNDLE_REPO = { id: 'r8', org_name: 'acme', name: 'upload', clone_url: 'nm-bundle:k1', local_path: null, provider: 'bundle' };
+
+function directReader(repo: unknown, o: { connected?: boolean; checkout?: (repoId: string | undefined) => string | null } = {}) {
+  const calls: string[] = [];
+  let needs = 0;
+  const db = { getAll: async <T,>(sql: string) => (/from connectors/.test(sql) ? [{ n: o.connected ? 1 : 0 }] : /from repos/.test(sql) ? [repo] : []) as T[] };
+  const apiGet = async (path: string) => { calls.push(path); return { status: 409, ok: false, json: async () => ({ code: 'NOT_CONNECTED', error: 'x' }), text: async () => '' }; };
+  const reader = makeRepoReader({ apiGet, actor: { kind: 'agent', id: 'rex' }, db, channelId: 'ch', capable: async () => false, onNeed: async () => { needs += 1; return true; }, ...(o.checkout ? { checkout: o.checkout } : {}) });
+  return { reader, calls, needs: () => needs };
+}
+
+test('a git or bundle repository is never answered with the GitHub hint, and no GitHub card goes up', async () => {
+  for (const repo of [GIT_REPO, BUNDLE_REPO]) {
+    for (const connected of [false, true]) {
+      const h = directReader(repo, { connected });
+      const out = await h.reader.file({ path: 'README.md' });
+      assert.doesNotMatch(out, /GitHub is not connected|Connections › GitHub|Connect GitHub card/, `${repo.provider} connected=${connected}`);
+      assert.match(out, /is not a GitHub repository/);
+      assert.equal(h.needs(), 0, 'connecting GitHub would not fix it, so no card');
+      assert.deepEqual(h.calls, [], 'no connector read for a repository GitHub does not hold');
+    }
+  }
+  assert.equal(isNotOnGitHub(GIT_REPO), true);
+  assert.equal(isNotOnGitHub(BUNDLE_REPO), true);
+  assert.equal(isNotOnGitHub(REPO), false);
+  assert.equal(isNotOnGitHub({ clone_url: '', provider: 'local' }), false);
+});
+
+test('a session that holds a checkout reads it, whatever the repository host', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'nm-reporead-checkout-'));
+  try {
+    execFileSync('git', ['init', '-q', dir]);
+    writeFileSync(join(dir, 'README.md'), '# Ledger\n');
+    execFileSync('git', ['-C', dir, 'add', 'README.md']);
+    for (const repo of [GIT_REPO, BUNDLE_REPO, REPO]) {
+      const h = directReader(repo, { checkout: (repoId) => (!repoId || repoId === repo.id ? dir : null) });
+      assert.match(await h.reader.file({ path: 'README.md' }), /README\.md\n\n# Ledger/);
+      assert.match(await h.reader.tree({}), /README\.md/);
+      assert.equal(h.needs(), 0);
+      assert.deepEqual(h.calls, []);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

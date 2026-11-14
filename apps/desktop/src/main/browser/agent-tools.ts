@@ -7,7 +7,7 @@
 // every answer says plainly what happened, a refused address and a site that blocked the visit
 // included, because a model told nothing fills the gap with a guess.
 import type { LogFn } from '../agentlog';
-import { checkUrl } from './address-guard';
+import { checkUrl, isPreviewUrl } from './address-guard';
 import { browserService } from './registry';
 import type { BrowserPage } from './page';
 import type { BrowserService } from './service';
@@ -110,7 +110,8 @@ export function webToolsFor(ctx: WebToolCtx, svc: BrowserService | null = browse
     async open({ url }) {
       say(`web_open ${url.slice(0, 80)}`);
       const v = checkUrl(/^[a-z][a-z0-9+.-]*:/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`);
-      const r = v.ok ? await svc.allowed(v.url.hostname) : v;
+      // a box preview (address-guard.ts isPreviewUrl) never asks the proxy: Chromium reaches it in the box
+      const r = v.ok ? (isPreviewUrl(v.url) ? v : await svc.allowed(v.url.hostname)) : v;
       if (!v.ok || !r.ok) { const reason = !v.ok ? v.reason : !r.ok ? r.reason : ''; say(`web_open refused: ${reason}`, true); return refusedText(reason); }
       return svc.withAgentPage(agentName, async (page) => {
         const nav = await page.navigate(v.url.href, LOAD_MS);

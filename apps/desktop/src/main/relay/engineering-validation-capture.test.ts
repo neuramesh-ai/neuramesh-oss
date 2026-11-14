@@ -1,0 +1,42 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { type CaptureReceipt, defaultBaselineRules } from '@neuramesh/shared';
+import { chromiumBin } from '../browser/chromium';
+import { validationCaptureTool } from './engineering-validation-capture';
+import { codingValidationFiles, prValidationSection } from '../host/coding-validation-files';
+import type { EngineeringConversation } from './engineering-conversation';
+
+test('a real site produces paired, distinct screenshots, with verified bytes on the task and links pinned to the PR commit', { skip: !chromiumBin() }, async t => {
+  const cwd=await mkdtemp(join(tmpdir(),'nm-capture-test-'));
+  t.after(()=>rm(cwd,{force:true,recursive:true}));
+  await mkdir(join(cwd,'public'));
+  const index = join(cwd,'public','index.html');
+  await writeFile(index,'<!doctype html><title>Checkout</title><h1>Checkout</h1><button>Order</button>');
+  const git=(...args:string[])=>execFileSync('git',args,{cwd,stdio:'pipe'});
+  git('init');git('add','.');git('-c','user.name=QA','-c','user.email=qa@localhost','commit','-m','baseline');
+  const paths:string[]=[];
+  const receipts: CaptureReceipt[]=[];
+  const conversation = {publishArtifact:async(name:string,capture:{sha256:string;target:string})=>{paths.push(name);receipts.push({name,...capture,source:'managed-browser',capturedAt:new Date().toISOString()});return {id:name};}} as EngineeringConversation;
+  const tool=validationCaptureTool(cwd,defaultBaselineRules(),conversation);
+  const view={root:'public',route:'/',view:'checkout',previewOrigin:'',width:720,height:550};
+  await tool.execute({...view,phase:'before'});
+  await tool.execute({...view,phase:'before'}); // the first capture itself does not dirty the application baseline
+  await assert.rejects(codingValidationFiles(cwd,true,undefined,async()=>receipts),/Missing after/);
+  await writeFile(index,'<!doctype html><title>Checkout</title><h1>Review your order</h1><button onclick="this.nextElementSibling.hidden=false" style="background:navy;color:white">Confirm purchase</button><p id=receipt hidden>Confirmed</p>');
+  await assert.rejects(tool.execute({...view,phase:'after',interaction:{click:'button',expectVisible:'#missing'}}),/expected state/);
+  await tool.execute({...view,phase:'after',interaction:{click:'button',expectVisible:'#receipt'}});
+  const shots=await codingValidationFiles(cwd,true,undefined,async()=>receipts);
+  assert.deepEqual(shots.map(s=>s.name),[...new Set(paths)]);assert.notEqual(shots[0]!.content,shots[1]!.content);
+  for (const shot of shots) assert.ok((await readFile(join(cwd,'.nm-artifacts',shot.name))).length>100);
+  await assert.rejects(codingValidationFiles(cwd,true,Date.now()+1000),/earlier revision/);
+  await assert.rejects(codingValidationFiles(cwd,true,undefined,async()=>[]),/Unverified screenshot/);
+  await writeFile(join(cwd,'.nm-artifacts',paths.at(-1)!),await readFile(join(cwd,'.nm-artifacts',paths[0]!)));
+  await assert.rejects(codingValidationFiles(cwd,true,undefined,async()=>receipts),/Unverified screenshot/);
+  const md=prValidationSection('fixture/website','abc123',paths);
+  assert.match(md,/blob\/abc123\/\.nm-artifacts\/validation\/before\/checkout/);
+  assert.match(md,/blob\/abc123\/\.nm-artifacts\/validation\/after\/checkout/);
+});

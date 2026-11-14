@@ -21,7 +21,7 @@
 // Credits gate all three: out of credits, the door says so and offers nothing it cannot deliver.
 //
 // Configured once at boot (agents.ts, beside the worker lane) so the flows keep their signatures.
-import { AUTH_LABEL, STARTER_MODEL, authCardBlock, parseAuthCard, parseBrainOverride, runtimeForModel, type AgentRole, type BrainOverride, type NmAuth } from '@neuramesh/shared';
+import { AUTH_LABEL, STARTER_MODEL, authCardBlock, authNoticeCopy, parseAuthCard, parseBrainOverride, runtimeForModel, type AgentRole, type BrainOverride, type NmAuth } from '@neuramesh/shared';
 import type { LogFn } from '../agentlog';
 import type { HostedAgent } from '../agents';
 import { apiAuthHeaders } from '../apiauth';
@@ -62,13 +62,13 @@ export type AutoOwner = 'routine' | 'conversation';
 
 /** the sentence the thread reads — the reason first, then what happens now */
 export function fallbackText(agent: { name: string; runtime: string }, u: Unavailable, outcome: FallbackOutcome, owner: AutoOwner = 'routine'): string {
-  const label = labelOf(u, agent.runtime);
   const why = whyUnavailable(u, agent.runtime);
   if (outcome === 'house') return `@${agent.name} cannot run on the NeuraMesh brain now. ${why}`;
-  const head = `@${agent.name} cannot run on ${label} here. ${why}`;
-  if (outcome === 'auto') return `${head} This ${owner} continues on the NeuraMesh brain, on credits. Reset the brain in this conversation to go back.`;
-  if (outcome === 'nocredits') return `${head} The NeuraMesh brain cannot take it either: this workspace is out of credits. Sign in to ${label} again on this machine, or add credits.`;
-  return `${head} Sign in to ${label} again on this machine, or run this conversation on the NeuraMesh brain, on credits.`;
+  const copy = authNoticeCopy({ provider: u.kind === 'capped' ? providerFor(agent.runtime) : u.provider,
+    reason: u.kind === 'login' && u.reason === 'expired' ? 'expired' : 'unavailable',
+    why, work: { kind: owner }, starter: outcome !== 'nocredits', ...(outcome === 'auto' ? { switched: true } : {}) },
+  onCloudMachine() ? 'the cloud machine' : 'this machine');
+  return `@${agent.name}: ${copy.title}. ${copy.reason} ${copy.action}`;
 }
 
 /** an automatic switch said in a thread: the switched card (its role), or the capped path's line that the
@@ -78,27 +78,29 @@ export function autoSwitchOf(body: string): { role?: string; agent?: string } | 
   const card = parseAuthCard(body);
   if (card) return card.switched && (card.scope?.role || card.agent) ? (card.scope?.role ? { role: card.scope.role } : { agent: card.agent! }) : null;
   const line = /^@(\S+) cannot run on .+ This (?:routine|conversation) continues on the NeuraMesh brain, on credits\./.exec(body);
-  return line ? { agent: line[1]! } : null;
+  const current = /^@(\S+): (?:Routine|Reply) continuing on NeuraMesh brain\./.exec(body);
+  return line || current ? { agent: (line ?? current)![1]! } : null;
 }
 /** the card's payload — what the renderer's card and the docked notice read (packages/shared cards.ts) */
-function cardOf(agent: HostedAgent, u: Unavailable, scope: { threadId: string } | null, starter: boolean, taskNumber?: number): NmAuth {
+function cardOf(agent: HostedAgent, u: Unavailable, scope: { threadId: string } | null, starter: boolean, taskNumber?: number, work?: NmAuth['work']): NmAuth {
   return {
     provider: u.kind === 'capped' ? providerFor(agent.runtime) : u.provider,
     reason: u.kind === 'login' && u.reason === 'expired' ? 'expired' : 'unavailable',
     agent: agent.name, ...(taskNumber ? { taskNumber } : {}),
     why: whyUnavailable(u, agent.runtime), starter, ...(scope ? { scope: { ...scope, role: agent.role } } : {}),
+    ...(work ? { work } : {}),
   };
 }
 
 /** the card a human conversation gets: the reason, then the buttons (cards/AuthCard.tsx) */
-export function offerCard(agent: HostedAgent, u: Unavailable, scope: { threadId: string } | null, starter: boolean, taskNumber?: number): string {
-  return `${fallbackText(agent, u, starter ? 'offer' : 'nocredits')}\n\n${authCardBlock(cardOf(agent, u, scope, starter, taskNumber))}`;
+export function offerCard(agent: HostedAgent, u: Unavailable, scope: { threadId: string } | null, starter: boolean, taskNumber?: number, work?: NmAuth['work']): string {
+  return `${fallbackText(agent, u, starter ? 'offer' : 'nocredits', work?.kind === 'routine' ? 'routine' : 'conversation')}\n\n${authCardBlock(cardOf(agent, u, scope, starter, taskNumber, work))}`;
 }
 
 /** the record a routine's conversation gets: the same card, marked as a switch that already happened
  *  (2026-09-17, George: "easily missed") — the docked notice reads it, the server mints no decision from it */
 export function switchedCard(agent: HostedAgent, u: Unavailable, scope: { threadId: string }, taskNumber?: number, owner: AutoOwner = 'routine'): string {
-  return `${fallbackText(agent, u, 'auto', owner)}\n\n${authCardBlock({ ...cardOf(agent, u, scope, true, taskNumber), switched: true })}`;
+  return `${fallbackText(agent, u, 'auto', owner)}\n\n${authCardBlock({ ...cardOf(agent, u, scope, true, taskNumber, { kind: owner }), switched: true })}`;
 }
 
 /** a cloud machine (runner or member): machined sets NM_MACHINE_KIND on the image, a laptop leaves it unset */
@@ -181,7 +183,7 @@ export async function starterFallback(
   if (memo && Date.now() - memo.at < MOVED_MEMO_MS && !(where.replyTo && memo.trigger && memo.trigger !== where.replyTo)) return reseatOnStarter(agent);
   const credits = await creditsOk(apiUrl, where.workspace, ownerActorId);
   const offer = async () => {
-    await say(offerCard(agent, u, thread ? { threadId: thread.id } : null, credits, where.taskNumber));
+    await say(offerCard(agent, u, thread ? { threadId: thread.id } : null, credits, where.taskNumber, { kind: thread?.routine ? 'routine' : where.taskId ? 'task' : 'conversation' }));
     log?.({ kind: 'wake', phase: 'stood_down', summary: `${whyUnavailable(u, agent.runtime)} ${credits ? 'offered the NeuraMesh brain' : 'out of credits'}`, level: 'warn' });
     return null;
   };
@@ -221,8 +223,11 @@ export async function conversationOrigin(where: { threadId?: string | null; task
   if (!ctx) return null;
   const thread = await owningThread(ctx.db, where).catch(() => null);
   if (!thread) return null;
-  const root = await ctx.db.get<{ author_kind: string; author_id: string | null }>(
-    'select m.author_kind, m.author_id from threads th join messages m on m.id = th.root_message_id where th.id = ?', [thread.id],
+  const root = await ctx.db.get<{ created_by?: string; author_kind: string; author_id: string | null }>(
+    'select th.created_by, m.author_kind, m.author_id from threads th left join messages m on m.id = th.root_message_id where th.id = ?', [thread.id],
   ).catch(() => null);
+  // A coding handoff starts with an agent-authored brief. Its authenticated human owner
+  // remains on the thread; the brief's author must not erase placement/fallback ownership.
+  if (root?.created_by?.startsWith('human:')) return root.created_by.slice(6) || null;
   return root?.author_kind === 'human' && root.author_id ? root.author_id : null;
 }

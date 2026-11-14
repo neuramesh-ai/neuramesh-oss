@@ -1,5 +1,7 @@
 # 37 — The NeuraMesh Harness: one execution contract for every agent turn
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **What this doc is.** A design + implementation plan for making NeuraMesh's agent execution layer
 > **first class**: one coordinated harness instead of ~30 independently-wired reactive paths. It is a
 > **one-way-door decision** ([docs/05 §7](05-engineering-philosophy.md)) — it changes the security

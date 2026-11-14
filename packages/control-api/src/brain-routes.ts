@@ -17,6 +17,7 @@ const CommitSchema = z.object({
   runtimeMessages: z.array(z.unknown()).optional(), metadata: z.record(z.unknown()).optional(), artifactIds: z.array(z.string().uuid()).max(256).optional(),
 }).strict();
 const ArtifactSchema = z.object({
+  capture: z.object({source:z.enum(['managed-browser','independent-observer']),target:z.string().min(1).max(2000),reviewedRevision:z.string().regex(/^[a-f0-9]{40}$/).optional()}).strict().optional(),
   workspace: z.string().uuid(), threadId: z.string().uuid(), id: z.string().uuid(),
   name: z.string().min(1).max(512), mime: z.string().max(255).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
   contentBase64: z.string(), sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), messageId: z.string().uuid().optional(),

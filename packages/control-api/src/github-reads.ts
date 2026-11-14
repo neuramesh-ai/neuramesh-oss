@@ -15,7 +15,7 @@ export interface RepoFile { path: string; ref: string | null; size: number; sha:
 export interface TreeEntry { path: string; type: 'blob' | 'tree'; size: number | null }
 export interface RepoTree { ref: string; path: string; entries: TreeEntry[]; truncated: boolean }
 export interface RepoCommit { sha: string; message: string; date: string | null; author: string | null; url: string }
-export interface InstallationFacts { account: string; selection: 'all' | 'selected' }
+export interface InstallationFacts { account: string; selection: 'all' | 'selected'; /** when GitHub says it was installed (the door's freshness test, announce-grant.ts) */ createdAt?: string | null }
 
 /** a path as GitHub wants it: no leading slash, no `..`, no trailing slash */
 export function cleanPath(p: string | null | undefined): string {
@@ -110,6 +110,6 @@ export async function readRepoCommits(slug: string, since: string, branch: strin
 export async function installationFacts(installationId: number, opts: AppOpts = {}): Promise<InstallationFacts> {
   const r = await githubGet(`/app/installations/${installationId}`, { ...opts, token: appJwt(opts.env, opts.now) });
   if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for installation ${installationId}`, r.status);
-  const b = r.json as { account?: { login?: string; slug?: string } | null; repository_selection?: string };
-  return { account: b.account?.login ?? b.account?.slug ?? '', selection: b.repository_selection === 'all' ? 'all' : 'selected' };
+  const b = r.json as { account?: { login?: string; slug?: string } | null; repository_selection?: string; created_at?: string | null };
+  return { account: b.account?.login ?? b.account?.slug ?? '', selection: b.repository_selection === 'all' ? 'all' : 'selected', createdAt: b.created_at ?? null };
 }

@@ -5,6 +5,7 @@
   "license": "Elastic-2.0",
   "type": "module",
   "exports": {
+    "./always-on": "./src/always-on.ts",
     ".": "./src/index.ts",
     "./command-union": "./src/command-union.ts"
   },

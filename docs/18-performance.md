@@ -1,5 +1,7 @@
 # 18 — Performance: budgets, measurements, and the memory hot path
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 Budgets are doctrine ([05 §speed](05-engineering-philosophy.md)); this doc is where they meet
 measured reality. First full review 2026-07-07 (Apple Silicon dev machine, Docker pg16,
 pgvector 0.8.2; prod probes against api.neuramesh.app). Update the tables when a change

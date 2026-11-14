@@ -73,13 +73,32 @@ export function refusedHost(host: string): string | null {
   return BLOCKED_NAMES.some((re) => re.test(h)) ? `${h} is a private or local name` : null;
 }
 
+/** the lowest port a preview may use: below it are system services, never a dev server */
+export const PREVIEW_MIN_PORT = 1024;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+let loopbackPreview = false;
+
+/** ON ONLY WHEN CHROMIUM RUNS IN THE AGENT BOX (cloudrun/box-browser.ts). Then 127.0.0.1 is the box,
+ *  whose dev servers an agent or a person started, and a preview of one is the point. In the
+ *  supervisor, loopback is machined's own helpers, so the default stays refused */
+export function setLoopbackPreview(on: boolean): void { loopbackPreview = on; }
+
+/** a dev-server preview: loopback by name or address, an explicit port at or above PREVIEW_MIN_PORT,
+ *  and only while the browser runs in the box. Chromium connects to it directly, never through the
+ *  egress proxy, whose loopback is the supervisor's */
+export function isPreviewUrl(url: URL): boolean {
+  if (!loopbackPreview || (url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) return false;
+  return LOOPBACK_HOSTS.has(url.hostname.toLowerCase()) && Number(url.port) >= PREVIEW_MIN_PORT;
+}
+
 /** the check every navigation and every agent call runs first: a web scheme, no user name or
- *  password in the address, and a host that is not refused on its face */
+ *  password in the address, and a host that is not refused on its face (or a box preview) */
 export function checkUrl(raw: string): { ok: true; url: URL } | { ok: false; reason: string } {
   let url: URL;
   try { url = new URL(raw); } catch { return { ok: false, reason: 'that is not a web address' }; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return { ok: false, reason: `${url.protocol.replace(/:$/, '')} addresses are refused, only http and https open` };
   if (url.username || url.password) return { ok: false, reason: 'an address with a user name or a password in it is refused' };
+  if (isPreviewUrl(url)) return { ok: true, url };
   const why = refusedHost(url.hostname);
   return why ? { ok: false, reason: why } : { ok: true, url };
 }

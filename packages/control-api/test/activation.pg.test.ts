@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 import { PostgresStore } from '../src/pgstore';
+import { createApp } from '../src/app';
 import { executeCommand } from '../src/handler';
 import { applyPlanPatch } from '../src/plan-flip';
 import { rowsToDesired, type CloudMachineRow } from '../src/fleet';
@@ -49,6 +50,27 @@ describe.skipIf(!DB)('activation on the real database', () => {
     await expect(executeCommand(store!, { kind: 'human', id: owner!.user_id }, {
       type: 'thread.unsettle', workspace: ws, threadId: randomUUID(),
     })).rejects.toMatchObject({ code: 'ACTIVATION_REQUIRED' });
+  });
+  it('requires an entitled canary workspace to create its artifact-reader task without allocating credits', async () => {
+    const ws = await workspace();
+    // The production canary seeds a stopped claim, unlike the signup helper's dormant claim.
+    await sql!`update machines set lifecycle = 'stopped', desired_replicas = 0 where workspace_id = ${ws}::uuid`;
+    const [owner] = await sql!`select user_id from workspace_members where workspace_id = ${ws}::uuid and role = 'owner'`;
+    const [channel] = await sql!`select id from channels where workspace_id = ${ws}::uuid limit 1`;
+    const actor = { kind: 'human' as const, id: owner!.user_id };
+    const command = { type: 'task.create' as const, workspace: ws, channel: channel!.id, title: 'Brain artifact reader canary', kind: 'bug' as const };
+    const request = () => createApp(store!).request('/v1/commands', { method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(actor) }, body: JSON.stringify(command) });
+    const denied = await request();
+    expect(denied.status).toBe(402);
+    expect(await denied.json()).toMatchObject({ code: 'ACTIVATION_REQUIRED' });
+    // Match the isolated infrastructure fixture, without a Stripe event or a credit grant.
+    await sql!`update workspaces set plan = 'cloud' where id = ${ws}::uuid`;
+    const result = await request();
+    expect(result.status, await result.clone().text()).toBe(200);
+    expect(await result.json()).toMatchObject({ task: { title: command.title, workspace: ws } });
+    expect((await creditBalance(sql!, ws)).remainingMicros).toBe(0);
+    expect(await sql!`select id from machines where workspace_id = ${ws}::uuid and desired_replicas > 0`).toHaveLength(0);
   });
   it.each([50, 500])('preserves an existing %i-credit signup balance', async (credits) => {
     const ws = await workspace();

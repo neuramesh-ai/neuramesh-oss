@@ -1,3 +1,6 @@
+export { machineUsageToday, resetDailyUsage } from './fleet-lifecycle-usage';
+import { resetDailyUsage } from './fleet-lifecycle-usage';
+import { cronAuthorized } from './cron-auth';
 // the fleet's wake/idle-stop lifecycle + starter metering (docs/design/cloud-first-2026-08:
 // wake = scale to 1, idle-stop = scale to 0). rows stay the only truth — this module only
 // moves desired_replicas/last_wake_at; the nm-fleet operator reads the result through
@@ -17,8 +20,15 @@ import { CLOUD_SEAT_MONTHLY_CREDITS, type Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
 import type postgres from 'postgres';
 import { creditBalance, grantCredits, sqlOf, workspacesDueRefill } from './credits';
+import { cloudRunOn } from './fleet-cloudrun';
+import { clearBreakerOnHumanWake } from './fleet-cloudrun-breaker';
+import { depcachePass, snapshotRetentionPass, type DepcacheResult, type RetentionResult } from './fleet-cloudrun-retention';
+import { configuredSnapshotStorage, type SnapshotStorage } from './gcs-sign';
+import { cloudRunSweep, type CloudRunSweepResult } from './fleet-cloudrun-sweep';
+import { alwaysOnRoutes } from './machine-always-on';
+import { idleRule, prewakeRoutes } from './fleet-prewake';
 import { machineReach, mayUse, wakeMachine } from './member-machines';
-import { routineWakeRoutes } from './routines-wake';
+import { routineWakeRoutes, type RunnerBump } from './routines-wake';
 import type { Store } from './store';
 
 /** minutes each sweep pass adds to every running workspace's meter. the vercel cron MUST run
@@ -42,7 +52,8 @@ export function sweepIntervalMin(): number {
  *  hole, closed here.
  *
  *  `idle_stop_min IS NULL` still means NEVER auto-stop, on any plan. That is the escape hatch
- *  a dedicated always-on machine will use, and it outranks this. */
+ *  the Always on add-on sets (machine-always-on.ts), and it outranks this. It never outranks the
+ *  credit cap or the crash-loop breaker. */
 export function idleStopMin(): number {
   const n = Number(process.env['NM_IDLE_STOP_MIN'] ?? 2880);
   return Number.isFinite(n) && n > 0 ? n : 2880;
@@ -52,26 +63,24 @@ export function idleStopMin(): number {
 // if stopped; so does the machine of the member who wrote the message — never every machine in
 // the workspace, which with N members would be N pods per message on N subscriptions. The credit
 // pool is the only gate. last_wake_at moves either way: a refused wake is still activity.
+// A machine whose crash-loop breaker tripped (fleet-cloudrun-breaker.ts) wakes only for a PERSON's
+// message, and that message clears the stamp for one more boot. An agent's or a routine's message
+// (originUserId null) leaves it asleep: it would only boot into the same failure.
 export async function bumpMachineWake(sql: postgres.Sql, workspaceId: string, originUserId: string | null = null): Promise<void> {
+  // fragments are built fresh at each use: one fragment object interpolated twice is not supported
+  const funded = () => sql`greatest(coalesce(c.granted_micros, 0) - coalesce(c.spent_micros, 0), 0)
+                + greatest(coalesce(c.purchased_micros, 0) - coalesce(c.purchased_spent_micros, 0), 0) > 0`;
+  const human = originUserId !== null;
+  // the wake this message makes: a stopped machine, credits, and no open breaker unless a person asks
+  const wakes = () => sql`m.desired_replicas = 0 and ${funded()} and (m.boot_loop_at is null or ${human}::boolean)`;
   await sql`
     update machines m
        set last_wake_at = now(),
-           desired_replicas = case
-             when m.desired_replicas = 0
-              and greatest(coalesce(c.granted_micros, 0) - coalesce(c.spent_micros, 0), 0)
-                + greatest(coalesce(c.purchased_micros, 0) - coalesce(c.purchased_spent_micros, 0), 0) > 0
-             then 1
-             else m.desired_replicas
-           end,
+           desired_replicas = case when ${wakes()} then 1 else m.desired_replicas end,
            -- the START, stamped on the same transition and nowhere else. last_wake_at above
            -- moves on every message, so it can never answer "how long has this been up".
-           started_at = case
-             when m.desired_replicas = 0
-              and greatest(coalesce(c.granted_micros, 0) - coalesce(c.spent_micros, 0), 0)
-                + greatest(coalesce(c.purchased_micros, 0) - coalesce(c.purchased_spent_micros, 0), 0) > 0
-             then now()
-             else m.started_at
-           end
+           started_at = case when ${wakes()} then now() else m.started_at end,
+           ${clearBreakerOnHumanWake(sql, () => sql`${human}::boolean and ${funded()}`)}
       from workspaces w
       left join workspace_credits c on c.workspace_id = w.id
      where w.id = m.workspace_id
@@ -81,6 +90,11 @@ export async function bumpMachineWake(sql: postgres.Sql, workspaceId: string, or
        and (m.kind = 'runner' or m.owner_user_id = ${originUserId}::uuid)`;
 }
 
+/** what a due routine does to its workspace: the runner alone, credit-gated (routines-wake.ts). The
+ *  cron route and the sandbox's e2e door (e2e-routes.ts) both take this one, so the door proves the
+ *  cron's wake and not a copy of it. */
+export const routineRunnerBump: RunnerBump = (sql, ws) => bumpMachineWake(sql, ws, null);
+
 export interface MachineSweepResult {
   /** workspaces whose telemetry accrued this pass (they had a running cloud machine) */
   metered: number;
@@ -88,9 +102,16 @@ export interface MachineSweepResult {
   capStopped: string[];
   /** machines stopped after 48h with no work and no messages (NULL = never auto-stop) */
   idleStopped: string[];
+  /** Cloud Run machines: their stops drain first (fleet-cloudrun-sweep.ts, FLEET_CLOUDRUN=1 only) */
+  cloudrun?: CloudRunSweepResult;
+  /** Cloud Run machines: superseded snapshots deleted (fleet-cloudrun-retention.ts), when storage is set */
+  snapshots?: RetentionResult | { error: string };
+  /** the dependency cache's idle objects deleted (fleet-cloudrun-retention.ts depcachePass) */
+  depcache?: DepcacheResult | { error: string };
 }
 
-export async function machineSweep(sql: postgres.Sql, intervalMin: number): Promise<MachineSweepResult> {
+/** `retention`: the snapshot storage seam (tests); undefined reads NM_SNAPSHOT_GCS_BUCKET, null skips it */
+export async function machineSweep(sql: postgres.Sql, intervalMin: number, retention?: SnapshotStorage | null): Promise<MachineSweepResult> {
   const metered = await sql<{ workspace_id: string }[]>`
     insert into machine_usage (workspace_id, day, minutes)
     select distinct m.workspace_id, (now() at time zone 'utc')::date, ${intervalMin}::int
@@ -102,40 +123,50 @@ export async function machineSweep(sql: postgres.Sql, intervalMin: number): Prom
   // PARK AT ZERO — the only stop a funded workspace never meets. The 10-minute recency guard
   // on last_active_at is the run-drain grace: work in flight finishes, nothing is killed. The
   // free daily minute cap this replaces is gone: minutes keep accruing above as telemetry, but
-  // the credit balance is the budget now.
+  // the credit balance is the budget now. A Cloud Run machine is skipped while its lane is on: its
+  // work lives in RAM, so it drains first (cloudRunSweep below, rule M12)
+  const drainFirst = cloudRunOn();
   const capStopped = await sql<{ id: string }[]>`
     update machines m
        set desired_replicas = 0, started_at = null
       from workspace_credits c
      where c.workspace_id = m.workspace_id
-       and m.kind <> 'local' and m.desired_replicas = 1
+       and m.kind <> 'local' and m.desired_replicas = 1 and (m.substrate <> 'cloudrun' or ${!drainFirst})
        and greatest(c.granted_micros - c.spent_micros, 0)
          + greatest(c.purchased_micros - c.purchased_spent_micros, 0) <= 0
        and (m.last_active_at is null or m.last_active_at < now() - interval '10 minutes')
      returning m.id`;
-  // ONE window, both plans; work OR messages defend the machine
+  // ONE window, both plans; work OR messages defend the machine. A speculative start (typing woke it,
+  // fleet-prewake.ts) that no message followed stops on its own short timeout
   const idleMin = idleStopMin();
   const idleStopped = await sql<{ id: string }[]>`
     update machines m
        set desired_replicas = 0, started_at = null
-     where m.kind <> 'local' and m.desired_replicas = 1
-       and m.idle_stop_min is not null
-       and greatest(coalesce(m.last_wake_at, to_timestamp(0)), coalesce(m.last_active_at, to_timestamp(0)))
-             < now() - make_interval(mins => ${idleMin}::int)
+     where m.kind <> 'local' and m.desired_replicas = 1 and (m.substrate <> 'cloudrun' or ${!drainFirst})
+       and m.idle_stop_min is not null and ${idleRule(sql, idleMin)}
      returning m.id`;
-  return { metered: metered.length, capStopped: capStopped.map((r) => r.id), idleStopped: idleStopped.map((r) => r.id) };
-}
-
-export async function machineUsageToday(sql: postgres.Sql, workspaceId: string): Promise<{ day: string; minutes: number }> {
-  const [row] = await sql<{ day: string; minutes: number }[]>`
-    select to_char((now() at time zone 'utc')::date, 'YYYY-MM-DD') as day,
-           coalesce((select u.minutes from machine_usage u
-              where u.workspace_id = ${workspaceId}::uuid and u.day = (now() at time zone 'utc')::date), 0) as minutes`;
-  return { day: row!.day, minutes: Number(row!.minutes) };
+  // a Cloud Run machine keeps its work in RAM: its two stops above became drains (rule M12)
+  const cloudrun = drainFirst ? await cloudRunSweep(sql, idleMin) : null;
+  // ...and the snapshots their drains left behind, bounded (R17). A storage error never fails the sweep
+  const snapshots = drainFirst
+    ? await snapshotRetentionPass(sql, retention === undefined ? configuredSnapshotStorage() : retention)
+        .catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }))
+    : null;
+  const depcache = drainFirst
+    ? await depcachePass(retention === undefined ? configuredSnapshotStorage() : retention)
+        .catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }))
+    : null;
+  return {
+    metered: metered.length, capStopped: capStopped.map((r) => r.id), idleStopped: idleStopped.map((r) => r.id),
+    ...(cloudrun ? { cloudrun } : {}),
+    ...(snapshots ? { snapshots } : {}),
+    ...(depcache ? { depcache } : {}),
+  };
 }
 
 /** the message path's wake, fire-and-forget: never awaited, never throws — a fleet hiccup
  *  must not slow or fail message delivery. no-op on stores that don't serve fleet. */
+
 export function fireWakeBump(store: Store, workspaceId: string, originUserId: string | null = null): void {
   if (!store.bumpMachineWake) return;
   void store.bumpMachineWake(workspaceId, originUserId).catch((e) => console.error('machine wake bump failed:', e));
@@ -146,17 +177,18 @@ export function fireWakeBump(store: Store, workspaceId: string, originUserId: st
  *  sync publication. The UI needs it anyway — without it "offline" cannot be told apart from
  *  "asleep on purpose" — so it rides this read rather than a schema change and a re-snapshot. */
 export async function machineIntent(sql: postgres.Sql, workspaceId: string): Promise<Array<{
-  id: string; name: string; desiredReplicas: number; lastSeenAt: string | null;
+  id: string; name: string; desiredReplicas: number; lastSeenAt: string | null; interactiveReady: boolean | null;
   lastWakeAt: string | null; lifecycle: string | null; idleStopMin: number | null;
   /** which kind, and whose — a surface groups the runner apart from members' machines on these */
   kind: string; ownerUserId: string | null;
   /** when it started (null = stopped) and when it last did real work — both written by the
    *  fleet for a while, neither ever surfaced, so no screen could say how long it had been up */
   startedAt: string | null; lastActiveAt: string | null;
-}>> {
+  /** the stop and the breaker, so a surface can say "going to sleep" or "paused" (shared machineState) */
+  drainState: string | null; drainReason: string | null; bootLoopAt: string | null; parkedAt: string | null; }>> {
   const rows = await sql<Array<Record<string, unknown>>>`
     select m.id, m.name, m.desired_replicas, m.last_seen_at, m.last_wake_at, m.lifecycle,
-           m.started_at, m.last_active_at, m.kind, m.owner_user_id,
+           m.started_at, m.last_active_at, m.kind, m.owner_user_id, m.drain_state, m.drain_reason, m.boot_loop_at, m.parked_at, m.interactive_ready,
            -- the EFFECTIVE window — one number for every plan since credits (2026-08-31),
            -- so a surface never re-derives the rule. NULL still means never auto-stop.
            case when m.idle_stop_min is null then null
@@ -168,16 +200,17 @@ export async function machineIntent(sql: postgres.Sql, workspaceId: string): Pro
      -- the runner FIRST: every client shipped before member machines takes machines[0] as "the"
      -- machine, and member-… sorts before runner — so this order is a compatibility contract
      order by (m.kind = 'runner') desc, m.name`;
+  const iso = (v: unknown): string | null => (v ? new Date(v as string).toISOString() : null);
   return rows.map((r) => ({
     id: String(r['id']), name: String(r['name']),
     desiredReplicas: Number(r['desired_replicas'] ?? 0),
-    lastSeenAt: r['last_seen_at'] ? new Date(r['last_seen_at'] as string).toISOString() : null,
-    lastWakeAt: r['last_wake_at'] ? new Date(r['last_wake_at'] as string).toISOString() : null,
+    lastSeenAt: iso(r['last_seen_at']), lastWakeAt: iso(r['last_wake_at']),
+    interactiveReady: typeof r['interactive_ready'] === 'boolean' ? r['interactive_ready'] : null,
     lifecycle: (r['lifecycle'] as string | null) ?? null,
     idleStopMin: r['idle_stop_min'] === null || r['idle_stop_min'] === undefined ? null : Number(r['idle_stop_min']),
-    startedAt: r['started_at'] ? new Date(r['started_at'] as string).toISOString() : null,
-    lastActiveAt: r['last_active_at'] ? new Date(r['last_active_at'] as string).toISOString() : null,
+    startedAt: iso(r['started_at']), lastActiveAt: iso(r['last_active_at']),
     kind: String(r['kind'] ?? 'runner'), ownerUserId: (r['owner_user_id'] as string | null) ?? null,
+    drainState: (r['drain_state'] as string | null) ?? null, drainReason: (r['drain_reason'] as string | null) ?? null, bootLoopAt: iso(r['boot_loop_at']), parkedAt: iso(r['parked_at']),
   }));
 }
 
@@ -194,14 +227,17 @@ export async function wakeMachines(sql: postgres.Sql, workspaceId: string): Prom
   // of credits" (the response shape is kept so every existing caller's refusal path holds).
   const bal = await creditBalance(sql, workspaceId);
   if (bal.remainingMicros <= 0) return { woken: 0, capped: true };
+  // only people call this (Wake now, the admin reset), so it also clears a tripped crash-loop
+  // breaker for one more boot (fleet-cloudrun-breaker.ts)
   const woken = await sql<{ id: string }[]>`
-    update machines set desired_replicas = 1, last_wake_at = now(),
+    update machines m set desired_replicas = 1, last_wake_at = now(),
            -- only a machine that was STOPPED is starting; re-waking a running one must not
            -- reset its clock and make a healthy machine look freshly booted
-           started_at = case when desired_replicas = 0 then now() else started_at end
-     where workspace_id = ${workspaceId}::uuid and kind <> 'local'
-       and (lifecycle is null or lifecycle <> 'destroyed')
-     returning id`;
+           started_at = case when m.desired_replicas = 0 then now() else m.started_at end,
+           ${clearBreakerOnHumanWake(sql, () => sql`true`)}
+     where m.workspace_id = ${workspaceId}::uuid and m.kind <> 'local'
+       and (m.lifecycle is null or m.lifecycle <> 'destroyed')
+     returning m.id`;
   return { woken: woken.length, capped: false };
 }
 
@@ -217,30 +253,23 @@ export async function wakeMachines(sql: postgres.Sql, workspaceId: string): Prom
  * no row for today has nothing to reset (the reads coalesce a missing row to 0), and saying "0
  * reset" is more useful to an operator than pretending something happened.
  */
-export async function resetDailyUsage(sql: postgres.Sql, target: { workspace?: string; all?: boolean }): Promise<string[]> {
-  const rows = target.all
-    ? await sql<{ workspace_id: string }[]>`
-        update machine_usage set minutes = 0
-         where day = (now() at time zone 'utc')::date and minutes > 0
-        returning workspace_id`
-    : await sql<{ workspace_id: string }[]>`
-        update machine_usage set minutes = 0
-         where day = (now() at time zone 'utc')::date and minutes > 0
-           and workspace_id = ${target.workspace!}::uuid
-        returning workspace_id`;
-  return rows.map((r) => r.workspace_id);
-}
-
 export function lifecycleRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store): void {
-  routineWakeRoutes(app, store, (sql, ws) => bumpMachineWake(sql, ws, null)); // a routine wakes its runner (routines-wake.ts)
+  routineWakeRoutes(app, store, routineRunnerBump); // a routine wakes its runner (routines-wake.ts)
+  alwaysOnRoutes(app, store); // a person keeps one machine awake (machine-always-on.ts)
+  prewakeRoutes(app, store); // typing wakes the machine early, speculatively (fleet-prewake.ts)
   // the sweep pass: vercel cron GETs this with `authorization: Bearer $CRON_SECRET` every
   // NM_MACHINE_SWEEP_MIN minutes (cron-routes.ts idiom). meter, then enforce.
   app.get('/internal/machine-sweep', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     if (!store.machineSweep) return c.json({ error: 'fleet not served by this store' }, 501);
     const out = await store.machineSweep(sweepIntervalMin());
-    console.log(`machine-sweep: metered=${out.metered} capStopped=[${out.capStopped.join(',')}] idleStopped=[${out.idleStopped.join(',')}]`);
+    const snaps = out.snapshots && 'deleted' in out.snapshots ? ` snapshots=machines:${out.snapshots.machines},deleted:${out.snapshots.deleted}${out.snapshots.errors.length ? `,errors:${out.snapshots.errors.length}` : ''}` : out.snapshots ? ` snapshots=error:${out.snapshots.error.slice(0, 120)}` : '';
+    const dep = out.depcache && 'deleted' in out.depcache ? ` depcache=listed:${out.depcache.listed},deleted:${out.depcache.deleted}${out.depcache.errors.length ? `,errors:${out.depcache.errors.length}` : ''}` : out.depcache ? ` depcache=error:${out.depcache.error.slice(0, 120)}` : '';
+    // the Cloud Run half too: a cap or idle drain, a missed deadline and a rewake are fleet moves
+    // that hand out or take back compute, and the response body is not logged anywhere
+    const cr = out.cloudrun;
+    const crLine = cr ? ` cloudrun capDrains=[${cr.capDrains.join(',')}] idleDrains=[${cr.idleDrains.join(',')}] lost=[${cr.lost.join(',')}] rolled=[${cr.rolled.join(',')}] rewoken=[${cr.rewoken.join(',')}] speculative=[${(cr.speculative ?? []).join(',')}]` : '';
+    console.log(`machine-sweep: metered=${out.metered} capStopped=[${out.capStopped.join(',')}] idleStopped=[${out.idleStopped.join(',')}]${snaps}${dep}${crLine}`);
     return c.json(out);
   });
 
@@ -250,8 +279,7 @@ export function lifecycleRoutes<E extends Env & { Variables: { actor: Actor } }>
   // adding to it. idempotent by period_start — a cron that fires twice in a month is a no-op
   // the second time, which matters because vercel crons are at-least-once.
   app.get('/internal/credit-refill', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     const sql = sqlOf(store);
     if (!sql) return c.json({ error: 'credits not served by this store' }, 501);
     const due = await workspacesDueRefill(sql);
@@ -360,7 +388,7 @@ export function lifecycleRoutes<E extends Env & { Variables: { actor: Actor } }>
       const reach = await machineReach(sql, machineId);
       if (!reach || reach.workspaceId !== workspace) return c.json({ error: 'no such machine here', code: 'NOT_FOUND' }, 404);
       if (!mayUse(reach, actor.id)) return c.json({ error: 'this machine is not lent to you', code: 'NOT_PERMITTED' }, 403);
-      const one = await wakeMachine(sql, machineId);
+      const one = await wakeMachine(sql, machineId, { human: true });
       if (one.capped) return c.json({ ok: false, capped: true, error: 'this workspace is out of credits — top up to wake its machine', code: 'NO_CREDITS' }, 409);
       return c.json({ ok: true, woken: one.woken ? 1 : 0 });
     }

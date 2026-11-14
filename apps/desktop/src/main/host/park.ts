@@ -9,6 +9,7 @@
 // it. The thunk defers the lookup to call time, which is when it actually happens.
 import { planPark, resumeNote, type ParkBook, type WakeCondition } from '../harness/park';
 import { ghPrChecks, repoSlugFor } from './gh';
+import { parks } from '../cloudrun/parks';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostQueue } from '../harness/hostqueue';
 import type { HostedAgent, ExecTask } from '../agents';
@@ -71,7 +72,16 @@ async function runDueParks(): Promise<void> {
     const v = cred.ok ? (await ghPrChecks(undefined, slug, row.pr_number, cred.env).catch(() => ({ verdict: 'pending' as const }))).verdict : 'pending';
     ci[rec.condition.prNumber] = v === 'unknown' ? 'pending' : v;
   }
-  for (const { record, why } of parkBook.due({ ci }, Date.now())) {
+  // an approval parked on Cloud Run (cloudrun/parks.ts) waits on its card: answered once the card's
+  // decision row leaves `open` (a click, or a reply line the server matched). The resumed turn then
+  // re-issues the call and the gate applies the answer from the durable park.
+  const answered: Record<string, boolean> = {};
+  for (const rec of parked) {
+    if (rec.condition.on !== 'answer') continue;
+    const d = await db.get<{ status: string }>('select status from decisions where message_id = ? limit 1', [rec.condition.questionId]).catch(() => null);
+    answered[rec.condition.questionId] = (!!d && d.status !== 'open') || !!parks()?.answered(rec.condition.questionId);
+  }
+  for (const { record, why } of parkBook.due({ ci, answered }, Date.now())) {
     parkBook.release(record.turnId);
     const t = await db.get<ExecTask & { assignee_id: string }>(
       `select id, number, title, channel_id, kind, assignee_id, repo_id, base_ref, branch, requirements from tasks where id = ?`,

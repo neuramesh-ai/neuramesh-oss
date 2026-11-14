@@ -1,3 +1,4 @@
+import { hydrationPending } from '../harness/hydration';
 // THE BERTH SWEEP — the one owner of `cache/` (docs/40).
 //
 // Split out of agents.ts, where it sat inside startAgentHost as ~105 lines. Policy is pure
@@ -81,7 +82,7 @@ export function makeBerthSweep(ctx: {
       });
     }
 
-    const actions = decideSweep(berthEntries, donorEntries, cloneEntries, caps);
+    const actions = hydrationPending(brain.root) ? [] : decideSweep(berthEntries, donorEntries, cloneEntries, caps);
     let reclaimedBytes = 0;
     for (const a of actions) {
       if (a.kind === 'remove-berth' || a.kind === 'evict-berth') {

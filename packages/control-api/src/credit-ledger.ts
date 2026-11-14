@@ -28,6 +28,8 @@ export interface UsageToday {
   day: string;
   minutes: number;
   activeSeconds: number;
+  /** awake seconds Always on billed on top of activeSeconds (0176) */
+  alwaysOnSeconds: number;
   modelCalls: number;
   modelMicros: number;
   machineMicros: number;
@@ -168,37 +170,43 @@ export async function chargeMachineActivity(
   micros: number,
   activeSeconds: number,
 ): Promise<void> {
-  await sql.begin(async (tx) => {
-    const [bal] = await tx<{ granted_micros: string; spent_micros: string; purchased_micros: string; purchased_spent_micros: string }[]>`
-      select granted_micros, spent_micros, purchased_micros, purchased_spent_micros
-        from workspace_credits where workspace_id = ${workspaceId}::uuid for update`;
-    const grantLeft = Math.max(0, Number(bal?.granted_micros ?? 0) - Number(bal?.spent_micros ?? 0));
-    const purchasedLeft = Math.max(0, Number(bal?.purchased_micros ?? 0) - Number(bal?.purchased_spent_micros ?? 0));
-    const fromGrant = Math.min(micros, grantLeft);
-    const fromPurchased = Math.min(micros - fromGrant, purchasedLeft);
-    if (bal && (fromGrant > 0 || fromPurchased > 0)) {
-      await tx`update workspace_credits
-                  set spent_micros = spent_micros + ${fromGrant},
-                      purchased_spent_micros = purchased_spent_micros + ${fromPurchased},
-                      updated_at = now()
-                where workspace_id = ${workspaceId}::uuid`;
-    }
-    await tx`insert into machine_usage (workspace_id, day, minutes, active_seconds, machine_micros)
-             values (${workspaceId}::uuid, (now() at time zone 'utc')::date, 0, ${activeSeconds}, ${fromGrant + fromPurchased})
-             on conflict (workspace_id, day) do update
-               set active_seconds = machine_usage.active_seconds + ${activeSeconds},
-                   machine_micros = machine_usage.machine_micros + ${fromGrant + fromPurchased}`;
-  });
+  await sql.begin(async (tx) => { await chargeMachineIn(tx as unknown as postgres.Sql, workspaceId, micros, activeSeconds); });
+}
+
+/** the same charge inside a transaction the caller holds (machine-beat.ts meters and charges in one).
+ *  `alwaysOnSeconds`: awake seconds billed on top of the active ones (an Always on machine, 0176) */
+export async function chargeMachineIn(tx: postgres.Sql, workspaceId: string, micros: number, activeSeconds: number, alwaysOnSeconds = 0): Promise<void> {
+  const [bal] = await tx<{ granted_micros: string; spent_micros: string; purchased_micros: string; purchased_spent_micros: string }[]>`
+    select granted_micros, spent_micros, purchased_micros, purchased_spent_micros
+      from workspace_credits where workspace_id = ${workspaceId}::uuid for update`;
+  const grantLeft = Math.max(0, Number(bal?.granted_micros ?? 0) - Number(bal?.spent_micros ?? 0));
+  const purchasedLeft = Math.max(0, Number(bal?.purchased_micros ?? 0) - Number(bal?.purchased_spent_micros ?? 0));
+  const fromGrant = Math.min(micros, grantLeft);
+  const fromPurchased = Math.min(micros - fromGrant, purchasedLeft);
+  if (bal && (fromGrant > 0 || fromPurchased > 0)) {
+    await tx`update workspace_credits
+                set spent_micros = spent_micros + ${fromGrant},
+                    purchased_spent_micros = purchased_spent_micros + ${fromPurchased},
+                    updated_at = now()
+              where workspace_id = ${workspaceId}::uuid`;
+  }
+  await tx`insert into machine_usage (workspace_id, day, minutes, active_seconds, always_on_seconds, machine_micros)
+           values (${workspaceId}::uuid, (now() at time zone 'utc')::date, 0, ${activeSeconds}, ${alwaysOnSeconds}, ${fromGrant + fromPurchased})
+           on conflict (workspace_id, day) do update
+             set active_seconds = machine_usage.active_seconds + ${activeSeconds},
+                 always_on_seconds = machine_usage.always_on_seconds + ${alwaysOnSeconds},
+                 machine_micros = machine_usage.machine_micros + ${fromGrant + fromPurchased}`;
 }
 
 export async function usageToday(sql: postgres.Sql, workspaceId: string): Promise<UsageToday> {
-  const [row] = await sql<{ minutes: number; active_seconds: number; model_calls: number; model_micros: string; machine_micros: string; video_clips: number; video_micros: string }[]>`
-    select minutes, active_seconds, model_calls, model_micros, machine_micros, video_clips, video_micros from machine_usage
+  const [row] = await sql<{ minutes: number; active_seconds: number; always_on_seconds: number; model_calls: number; model_micros: string; machine_micros: string; video_clips: number; video_micros: string }[]>`
+    select minutes, active_seconds, always_on_seconds, model_calls, model_micros, machine_micros, video_clips, video_micros from machine_usage
      where workspace_id = ${workspaceId}::uuid and day = (now() at time zone 'utc')::date`;
   return {
     day: new Date().toISOString().slice(0, 10),
     minutes: Number(row?.minutes ?? 0),
     activeSeconds: Number(row?.active_seconds ?? 0),
+    alwaysOnSeconds: Number(row?.always_on_seconds ?? 0),
     modelCalls: Number(row?.model_calls ?? 0),
     modelMicros: Number(row?.model_micros ?? 0),
     machineMicros: Number(row?.machine_micros ?? 0),

@@ -19,6 +19,7 @@
  *  claim work it would only fail — so capability has to be visible ACROSS machines, not just
  *  probed locally. */
 import { STARTER_MODEL } from './rates';
+import { MACHINE_ONLINE_MS } from './machine-state';
 
 export interface MachineCapability {
   machineId: string;
@@ -129,8 +130,6 @@ export type ClaimVerdict =
   | { act: 'wait'; why: 'origin-may-serve' | 'designated-may-serve' | 'cloud-may-serve'; retryInMs: number };
 
 export const DEFAULT_GRACE_MS = 8_000;
-/** a machine is a live candidate only while its heartbeat is fresh (machine.heartbeat is 30s) */
-export const MACHINE_ONLINE_MS = 90_000;
 
 export function machineOnline(m: MachineCapability, now: number): boolean {
   return !!m.lastSeenAt && now - new Date(m.lastSeenAt).getTime() < MACHINE_ONLINE_MS;
@@ -411,189 +410,6 @@ export function applyShare(
   return [...set];
 }
 
-// ── THE MACHINE'S STATE, DERIVED ONCE (cloud-cap round, 2026-08-29) ──────────────────────────
-//
-// A machine has TWO independent axes and the UI rendered only one of them:
-//
-//   intent   — `desired_replicas` (0|1): should it be running. Moved by the message path's wake
-//              bump, and by the sweep's cap-stop / idle-stop.
-//   liveness — `last_seen_at`: is its daemon actually heartbeating right now.
-//
-// Everything read liveness alone, so the single word "offline" covered five different
-// situations: asleep on purpose, waking right now, refused because the free day is spent,
-// crashed, and never provisioned. A person looking at a machine that is deliberately asleep and
-// a person looking at one that died see the same word — and the second one is the only one worth
-// interrupting anybody about.
-//
-// So the state is derived HERE, once, and every surface renders the result: the compute pill, the
-// Compute row, the thread's gate card, the attention bar. A surface that derives its own version
-// is how two of them come to disagree.
-export type MachineStatus = 'online' | 'waking' | 'asleep' | 'no_credits' | 'capped' | 'unreachable' | 'stopped';
-
-/** How long a machine may be scaled-up-but-silent before that stops being "waking" and becomes a
- *  fault worth naming. A cold pod pulls an image and boots a daemon, which is tens of seconds on
- *  a good day; three minutes is generous enough that a slow start never cries wolf, and short
- *  enough that a genuinely dead machine does not sit there claiming to be on its way. */
-export const MACHINE_WAKE_GRACE_MS = 180_000;
-
-export interface MachineIntent {
-  /** the fleet's intent — 1 = should be up. NOT synced to the replica; it rides /v1/machines/usage */
-  desiredReplicas?: number | null;
-  lastSeenAt?: string | null;
-  /** when intent last moved to 1 — the clock `waking` is measured against */
-  lastWakeAt?: string | null;
-  /** 'destroyed' takes precedence over everything: there is no machine to have a state */
-  lifecycle?: string | null;
-}
-
-/** today's meter for the workspace this machine belongs to. `capMinutes` null = uncapped (Cloud). */
-export interface MachineCap {
-  minutes: number;
-  capMinutes: number | null;
-  /** the workspace cannot pay for compute. THE ONLY THING THAT STOPS A WAKE now (bumpMachineWake
-   *  raises desired_replicas only on a positive balance), so a surface that does not know this
-   *  will describe a machine as "asleep — a message wakes it" when no message ever will. */
-  outOfCredits?: boolean;
-}
-
-export interface MachineStateOut {
-  status: MachineStatus;
-  /** one sentence, already written for a person — surfaces render it, they do not compose it */
-  reason: string;
-}
-
-/** the cap is spent when there IS one and the meter has reached it */
-export function capSpent(cap: MachineCap | null | undefined): boolean {
-  return !!cap && cap.capMinutes !== null && cap.minutes >= cap.capMinutes;
-}
-
-/**
- * ORDER MATTERS, and each rule earns its place:
- *
- *   1. destroyed  — there is no machine; nothing else can be true of it.
- *   2. ONLINE BEATS INTENT. A heartbeat inside the window means it is up, whatever the fleet
- *      currently intends. Reading intent first would show "asleep" on a machine that is answering
- *      right now, in the gap between a cap-stop landing and the pod actually going away.
- *   3. intent=1, still inside the grace  → waking (the state that did not exist before).
- *   4. intent=1, past the grace          → unreachable. It should be up and it is not: a fault,
- *      not a nap, and the only status here that means "something is wrong".
- *   5. intent=0 and the day is spent     → capped, which is WHY it is not coming back on its own.
- *   6. intent=0 otherwise                → asleep, the ordinary resting state.
- */
-/** THE FRESHER HEARTBEAT WINS.
- *
- *  This store is polled every 60s. The replica's `machines.last_seen_at` is watched, so it is live.
- *  A machine that answered 20 seconds ago therefore reads "seen now" from the replica while THIS
- *  snapshot still holds the heartbeat from before it woke — and machineState, given only the stale
- *  half, called it unreachable. George's card said "seen now · The machine does not answer" at the
- *  same time, which is not a state any machine was ever in.
- *
- *  machineState's own rule 2 is "online beats intent". It can only obey that with the newest
- *  evidence the screen holds, so the screen hands it both and this picks. Same derivation, better
- *  input: nothing here forms a second opinion. */
-export function newestSeen(a: string | null | undefined, b: string | null | undefined): string | null {
-  const ta = a ? Date.parse(a) : Number.NaN;
-  const tb = b ? Date.parse(b) : Number.NaN;
-  if (Number.isNaN(ta)) return Number.isNaN(tb) ? null : (b ?? null);
-  if (Number.isNaN(tb)) return a ?? null;
-  return ta >= tb ? (a ?? null) : (b ?? null);
-}
-
-export function machineState(m: MachineIntent, cap: MachineCap | null, now: number): MachineStateOut {
-  if (m.lifecycle === 'destroyed') return { status: 'stopped', reason: 'This machine is destroyed.' };
-  if (machineOnline({ lastSeenAt: m.lastSeenAt } as MachineCapability, now)) {
-    return { status: 'online', reason: 'Awake and ready for your agents.' };
-  }
-  const wants = (m.desiredReplicas ?? 0) >= 1;
-  if (wants) {
-    const since = m.lastWakeAt ? now - new Date(m.lastWakeAt).getTime() : Number.POSITIVE_INFINITY;
-    return since < MACHINE_WAKE_GRACE_MS
-      ? { status: 'waking', reason: 'It starts now. Your agents continue their work automatically.' }
-      : { status: 'unreachable', reason: 'The machine does not answer. Start it again.' };
-  }
-  // A WAKE THAT CANNOT HAPPEN MUST NOT LOOK LIKE ONE THAT HAS NOT HAPPENED YET. At a zero
-  // balance the server leaves desired_replicas at 0 and says nothing, so every surface fell
-  // through to 'asleep' and its "a message wakes it" — which is false, and the thread ghost
-  // went further and claimed the machine was already starting. Checked BEFORE the asleep
-  // fallback and AFTER the running states: a machine that is up stays up until the sweep
-  // parks it, and describing a live machine as out of credits would be its own lie.
-  if (cap?.outOfCredits) {
-    return {
-      status: 'no_credits',
-      reason: 'No credits, so this machine cannot start. Add credits and the next message starts it.',
-    };
-  }
-  if (capSpent(cap)) {
-    return {
-      status: 'capped',
-      reason: "Today's free machine hours are spent. It starts again after the reset, or now on the Team plan.",
-    };
-  }
-  return { status: 'asleep', reason: 'Asleep until someone needs it. A message starts it.' };
-}
-
-/**
- * WHAT A PERSON WAITING ON AN ANSWER IS TOLD ABOUT THE MACHINE.
- *
- * The desktop has said this since the cloud-cap round, in `waitghost-rule.ts`. The phone said
- * nothing, so a 146-second cold start after a send was dead air (George, 2026-09-06: "it takes a
- * while after i send a message for the agent thinking state to appear; if machine is off, it should
- * say that and stream in the status of the machine until it starts similar to how the web handles
- * this"). One machine must not get two stories, so the words live here and both clients read them.
- *
- * `online` and `capped` are deliberately absent. `online` hands over to the real agent indicator,
- * because two of them are worse than none, and `capped` has its own card that says far more.
- */
-export const MACHINE_WAIT_LINE: Partial<Record<MachineStatus, string>> = {
-  // THESE ARE BUSY-STATE LABELS, and CLAUDE.md #11 names that exception itself: a waiting state
-  // reads as "Please wait…" or "Thinking…", present participle and ellipsis, because the shape is
-  // what says "still going". A full stop closes the sentence and the reader takes it as the end of
-  // the story — George read "The cloud machine starts now." beside a thread that then sat there
-  // and called it wrong (2026-09-07). Progress is punctuated as progress.
-  waking: 'Starting the cloud machine…',
-  asleep: 'Waking the cloud machine…',
-  // it should be up and it is not. Still a wait, so still an ellipsis.
-  unreachable: 'Waiting for the cloud machine to answer…',
-  // NOT progress, and the one here that ends in a full stop for that reason. A workspace at a zero
-  // balance never raises desired_replicas, so the machine is not on its way and never will be until
-  // somebody adds credits. MACHINE_WAIT_STALLED drops the orb to match.
-  no_credits: 'No credits, so the cloud machine cannot start.',
-};
-
-/** the lines above that are NOT going anywhere: no spinner, and no promise of an answer on its way */
-export const MACHINE_WAIT_STALLED: Partial<Record<MachineStatus, true>> = { no_credits: true };
-
-/** the line and whether it moves, or null when the machine's state is nobody's business here */
-export function machineWaitLine(status: MachineStatus | undefined | null): { line: string; stalled: boolean } | null {
-  const line = status ? MACHINE_WAIT_LINE[status] : undefined;
-  return line ? { line, stalled: !!(status && MACHINE_WAIT_STALLED[status]) } : null;
-}
-
-/** ms until the meter resets: the next UTC midnight after `now`. The cap is a per-UTC-day counter
- *  (machine_usage.day), so this is the one clock every "resets in…" label may read. */
-export function msUntilCapReset(now: number): number {
-  const d = new Date(now);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1) - now;
-}
-
-/**
- * WHEN THE FREE DAY ROLLS OVER, in the reader's own clock.
- *
- * The cap counts against `machine_usage.day`, which is a UTC date, so the reset really is UTC
- * midnight. Saying that out loud was a mistake: at 3:33pm local (UTC-7) the card read "resets at
- * midnight UTC" beside "resets in 1h 27m", and the only way to see that both were true was to do
- * timezone arithmetic in your head. George read it and reasonably concluded the timer was broken.
- *
- * The countdown was always right. What was wrong was naming the boundary in a clock the reader is
- * not living in. So the label is LOCAL: "5:00 PM" agrees with "in 1h 27m" without any arithmetic,
- * and the UTC boundary stays an implementation detail of the meter rather than something a person
- * has to translate.
- *
- * `tomorrow` is not decoration: east of UTC the roll-over lands on the reader's next calendar day,
- * and a bare "1:00 AM" would look like it had already passed.
- */
-export function capResetLabel(now: number): string {
-  const at = new Date(now + msUntilCapReset(now));
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return at.toDateString() === new Date(now).toDateString() ? time : `tomorrow at ${time}`;
-}
+// THE MACHINE'S STATE (machineState, the labels, the wait lines, the cap clock) lives in
+// machine-state.ts, split out for the size cap. It is re-exported here, so every import stays.
+export * from './machine-state';

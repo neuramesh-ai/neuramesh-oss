@@ -78,6 +78,9 @@ export async function insertCodeSession(sql: postgres.Sql, input: { id: string; 
 export async function patchCodeSession(sql: postgres.Sql, id: string, patch: CodeSessionPatch, ended: boolean, event?: NMEvent): Promise<void> {
   const cols = columnsOf(patch);
   await sql.begin(async (tx) => {
+    // Replicated writes take the sync revision before touching rows. Acquire it in
+    // that same order before explicitly locking the thread shared with permission saves.
+    await tx`select revision from local_sync_state where singleton and enabled for update`;
     // A reconnecting host's prompt-derived fallback must not replace a deliberate title.
     // All paths take the thread lock before the Code row, including settlement updates below.
     // This matches the human/generated rename transaction and prevents a reverse-order deadlock.

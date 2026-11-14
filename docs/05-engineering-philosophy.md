@@ -30,7 +30,7 @@ Work is not done because someone — human or agent — *says* it's done. Work i
 Invariants live in the server, the schema, and the type system — never in prompt etiquette. Slock got this right with task claiming ("enforced by the system, not AI manners") and we generalize it: illegal state transitions are *rejected*, double-claims are *impossible*, self-review is *blocked*, artifact-less submission *does not compile*. If a rule matters, an agent must be physically unable to break it. Prompts are for judgment; code is for law.
 
 ### 1.4 Your compute, cloud truth
-*(Amended 2026-08-30 — until then this read "local compute"; [docs/09 §14](09-system-architecture.md#14-amended-2026-08-30--the-cloud-plane) records the change.)*
+*(Amended 2026-08-30 — until then this read "local compute"; [docs/09 §5](09-system-architecture.md#5-machines-sleep-and-restore) records the change.)*
 
 The user's code, keys, and machines are theirs — and a machine is theirs whether it is a laptop or a **cloud machine NeuraMesh provisions for that member**: a gVisor sandbox with its own volume, their vendor logins on that volume and nowhere else, outbound-only, no platform SSH, no platform snapshots of the volume. Daemons connect outbound-only; inference is BYOK/BYOS; nothing leaves a machine unless explicitly attached. The platform holds no repo tokens and no model keys, with one narrow, named exception: the metered starter brain, whose key stays server-side behind a proxy so it can be capped and never reaches a machine. Meanwhile the team's *state* — channels, board, events, memory — is always consistent in the cloud and replicated locally for offline. We never blur this line in either direction: no code in our cloud, no team state trapped on one machine.
 

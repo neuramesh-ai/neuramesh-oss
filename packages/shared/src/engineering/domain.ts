@@ -1,4 +1,7 @@
+import { effectivePermission, OPEN_ENGINEERING_POLICY, RECOMMENDED_ENGINEERING_PERMISSIONS } from './permissions';
+export { effectivePermission, OPEN_ENGINEERING_POLICY, PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, REVIEW_ENGINEERING_PERMISSIONS } from './permissions';
 import { SAMPLE_CHANGES, WORK_PLAN } from './demo-plan';
+import { isScratchRepoId } from './scratch';
 import type { EngineeringPlanProgress } from './plan-progress';
 import type { ThinkingLevel } from '../agent-models';
 import type { EngineeringAgent } from './selection';
@@ -50,7 +53,8 @@ export interface EngineeringToolReceipt {
 }
 export interface EngineeringMessage { agent?: EngineeringAgent; id: string; role: 'user' | 'assistant' | 'tool' | 'reasoning'; body: string; createdAt: string; tool?: EngineeringToolReceipt; kind?: 'work_plan' | 'change_review'; planReport?: EngineeringPlanReport; review?: EngineeringChangeReview; tone?: 'plain' | 'plan' | 'success' | 'warning'; streaming?: boolean; collapsed?: boolean; redacted?: boolean; attachments?: EngineeringAttachment[] }
 
-export interface EngineeringActiveActivity { phase: 'thinking' | 'tool' | 'composing' | 'restoring'; toolName?: string; startedAt: string }
+/** `installing`: a Cloud Run machine installs the worktree's dependencies before the session opens */
+export interface EngineeringActiveActivity { phase: 'thinking' | 'tool' | 'composing' | 'restoring' | 'installing'; toolName?: string; startedAt: string }
 
 export interface EngineeringChange {
   path: string;
@@ -125,37 +129,8 @@ export interface EngineeringSession {
   createdAt: string; updatedAt: string;
 }
 
-export const PERMISSION_LABELS: Record<PermissionCategory, { label: string; detail: string }> = {
-  read: { label: 'Read files', detail: 'Inspect files and search the repository' },
-  edit: { label: 'Edit files', detail: 'Create, modify, rename, or delete files' },
-  command: { label: 'Execute commands', detail: 'Run shell commands and test suites' },
-  web: { label: 'Fetch web content', detail: 'Open URLs and search the web' },
-  mcp: { label: 'Use MCP servers', detail: 'Call tools exposed by connected MCP servers' },
-};
-
-/** Recommended session posture: reads flow; every side effect is reviewed. */
-export const RECOMMENDED_ENGINEERING_PERMISSIONS: EngineeringPermissions = {
-  read: true, edit: false, command: false, web: false, mcp: false,
-};
-
-export const OPEN_ENGINEERING_POLICY: EngineeringPolicy = {
-  read: true, edit: true, command: true, web: true, mcp: true,
-};
-
 const stamp = () => new Date().toISOString();
 const uid = (prefix: string) => `${prefix}-${globalThis.crypto.randomUUID()}`;
-
-export function effectivePermission(
-  mode: EngineeringMode,
-  category: PermissionCategory,
-  session: EngineeringPermissions,
-  policy: EngineeringPolicy,
-): PermissionDecision {
-  if (!policy[category]) return 'blocked';
-  // Plan is structurally read-only, even if a stale client claims edit/command auto-approval.
-  if (mode === 'plan' && (category === 'edit' || category === 'command')) return 'blocked';
-  return session[category] ? 'auto' : 'ask';
-}
 
 const msg = (role: EngineeringMessage['role'], body: string, tone: EngineeringMessage['tone'] = 'plain'): EngineeringMessage => ({
   id: uid('msg'), role, body, tone, createdAt: stamp(),
@@ -165,16 +140,19 @@ const initialCheckpoint = (): EngineeringCheckpoint => ({
   id: uid('cp'), label: 'Session start', createdAt: stamp(), messageCount: 1, changes: [], workPlan: null,
 });
 
-export function createEngineeringSession(repo: EngineeringRepo, title = 'New Code task', project: EngineeringProject | null = null, machineId: string | null = null): EngineeringSession {
+export function createEngineeringSession(repo: EngineeringRepo, title = 'New Code task', project: EngineeringProject | null = null, machineId: string | null = null, permissions: EngineeringPermissions = RECOMMENDED_ENGINEERING_PERMISSIONS): EngineeringSession {
   const now = stamp();
-  const hello = msg('assistant', `Ready in **${repo.name}**. I’ll begin in Plan mode and ask before any side effect.`, 'plain');
+  // a scratch workspace (round 9) has no repository to inspect: its greeting says what it is
+  const hello = msg('assistant', isScratchRepoId(repo.id)
+    ? `Ready in **${repo.name}**: a local workspace on the machine, with no repository. In Act, your session permissions and machine policy control what runs.`
+    : `Ready in **${repo.name}**. In Plan, I can inspect the repository. In Act, your session permissions and machine policy control what runs.`, 'plain');
   const checkpoint = initialCheckpoint();
   checkpoint.messageCount = 1;
   return {
     // a BARE uuid (the mobile-cloud round, S5): the session id is the thread id, and the thread id is
     // the synced code_sessions row's id (0135, a uuid pk) — a prefixed id could never become a row
     id: globalThis.crypto.randomUUID(), title, repo, project, mode: 'plan',
-    permissions: { ...RECOMMENDED_ENGINEERING_PERMISSIONS },
+    permissions: { ...permissions },
     policy: { ...OPEN_ENGINEERING_POLICY }, state: 'idle', activeActivity: null, pendingModeHandoff: null, messages: [hello], pendingApproval: null,
     proposedChanges: [], changes: [], checkpoints: [checkpoint], workPlan: null, modelOverride: null, brainPack: null, machineId,
     createdAt: now, updatedAt: now,

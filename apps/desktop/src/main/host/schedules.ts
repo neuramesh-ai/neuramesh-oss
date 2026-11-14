@@ -165,9 +165,8 @@ export function makeSchedules(ctx: {
           continue;
         }
       }
-      const actor = { kind: 'agent', id: runner?.id ?? 'schedule', role: runner?.role ?? 'marketer' };
-      const claimRes = await post('/v1/commands', runner ? actor : { kind: 'human', id: ownerActorId }, { type: 'schedule.claim_run', schedule: s.id, runCount: s.run_count, nextRunAt: next }).catch(() => null);
-      const claim = claimRes?.ok ? ((await claimRes.json().catch(() => null)) as { claimed?: boolean } | null) : null;
+      const claimRes = await post('/v1/commands', { kind: 'human', id: ownerActorId }, { type: 'schedule.claim_run', schedule: s.id, runCount: s.run_count, nextRunAt: next }).catch(() => null);
+      const claim = claimRes?.ok ? ((await claimRes.json().catch(() => null)) as { claimed?: boolean; schedulePermission?: string } | null) : null;
       if (!claim?.claimed) continue; // another machine won, or the row moved — never double-fire
       // general-channel routines (the universal launcher): outside marketing HQs the
       // slot fires the PROMPT into the room as the owner's scheduled message — the
@@ -175,7 +174,7 @@ export function makeSchedules(ctx: {
       // drafting turn below (content items, calendar chips, publish gate).
       {
         if (isRelease && releasePre?.ok) {
-          const out = await releaseWatch.fire(s, payload.release!, releasePre);
+          const out = await releaseWatch.fire(s, payload.release!, releasePre, claim.schedulePermission);
           console.log(`schedule_run id=${s.id} release watch ${out.outcome}${out.error ? `: ${out.error}` : ''}`);
           await writeResult(out.error);
           continue;
@@ -190,7 +189,7 @@ export function makeSchedules(ctx: {
           // after the schedule (store/session-title.ts), and the first line stays PLAIN text (2026-09-12).
           try {
             const at = await session(s);
-            const r = await post('/v1/messages', { kind: 'human', id: ownerActorId }, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, body: `Routine · ${s.title}\n\n${routinePrompt}` });
+            const r = await post('/v1/messages', { kind: 'human', id: ownerActorId }, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, schedulePermission: claim.schedulePermission, body: `Routine · ${s.title}\n\n${routinePrompt}` });
             if (!r.ok) throw new Error(`the server refused the routine's message (${r.status})`);
             console.log(`schedule_run id=${s.id} routine fired into the room`);
             await writeResult(null);
@@ -232,7 +231,7 @@ export function makeSchedules(ctx: {
         // also the calendar's atom: its chip sits on the slot and waits for a human approve, which keeps the
         // slot. host/draftrun.ts. the session stays in the schedule's room: the run posts as its agent
         const { threadId } = await session(s, true);
-        await postDraftRun(post, runner, { schedule: s, threadId, reply, slotAt: slotIso, slotLabel });
+        await postDraftRun(post, runner, { schedule: s, threadId, reply, slotAt: slotIso, slotLabel, schedulePermission:claim.schedulePermission });
         log({ kind: 'wake', phase: 'replied', summary: `scheduled draft posted — ${s.title}` });
         console.log(`schedule_run id=${s.id} agent=${runner.name} posted=ok`);
         await writeResult(null);

@@ -3,7 +3,9 @@
 // rather than restating the rule.
 import { formatAddress, trimEndChars, type Actor, type ActorRef, type Task } from '@neuramesh/shared';
 import { clerkPrimaryEmail } from '../clerk';
+import { emailSelfAsserted } from '../email-proof';
 import { DomainError } from '../errors';
+import { BUNDLE_URL_PREFIX, bundleKeyOf, repoBundlesOn } from '../repo-bundles';
 import type { Store } from '../store';
 
 export function actorAddress(actor: Actor): string {
@@ -23,6 +25,9 @@ export function actorAddress(actor: Actor): string {
 export async function verifiedEmailFor(store: Store, userId: string): Promise<string | null> {
   const identity = await store.userIdentity(userId);
   if (!identity) return null;
+  // an in-app sign-up's address is self-asserted until its emailed proof (email-proof.ts, R10 NM-010):
+  // Clerk calls a Backend-API address verified, so its answer cannot be the proof for these accounts
+  if (await emailSelfAsserted(store, userId)) return null;
   if (identity.clerkUserId) {
     const primary = await clerkPrimaryEmail(identity.clerkUserId);
     // A configured Clerk that says "not verified" is a REFUSAL, not a reason to fall back to the
@@ -30,6 +35,13 @@ export async function verifiedEmailFor(store: Store, userId: string): Promise<st
     if (primary) return primary.verified ? primary.email : null;
   }
   return identity.email;
+}
+
+/** why verifiedEmailFor answered nothing, in words the person can act on */
+export async function unverifiedEmailReason(store: Store, userId: string): Promise<string> {
+  return (await emailSelfAsserted(store, userId))
+    ? 'Confirm your email first. Open the link in the mail that we sent to your address. To get a new mail, sign in again.'
+    : 'we could not confirm your verified email address';
 }
 
 export function sameActor(ref: ActorRef | null, actor: Actor): boolean {
@@ -80,7 +92,15 @@ export async function requireConfirmCard(store: Store, workspace: string, needle
 // executing machine's own git creds authenticate at push time (no tokens stored).
 // Accepts a full URL, a scheme-less github.com/<org>/<repo>, or an <org>/<repo>
 // shorthand — so the orchestrator can attach a repo the human named loosely.
-export function parseRepoUrl(raw: string): { provider: string; orgName: string; name: string; cloneUrl: string } {
+export function parseRepoUrl(raw: string, env: NodeJS.ProcessEnv = process.env): { provider: string; orgName: string; name: string; cloneUrl: string } {
+  // A REPOSITORY BUNDLE (repo-bundles.ts): an uploaded `git bundle`, behind NM_REPO_BUNDLES=1. It
+  // has no host and no org, so it is its own provider and org, and nothing reads it as GitHub.
+  if (raw.trim().startsWith(BUNDLE_URL_PREFIX)) {
+    if (!repoBundlesOn(env)) throw new DomainError('INVALID_INPUT', 'repository bundles are off on this server: paste a public GitHub repo URL');
+    const key = bundleKeyOf(raw.trim());
+    if (!key) throw new DomainError('INVALID_INPUT', 'a bundle URL is nm-bundle:<key>, with the key the upload route returned');
+    return { provider: 'bundle', orgName: 'bundle', name: key, cloneUrl: `${BUNDLE_URL_PREFIX}${key}` };
+  }
   const s = trimEndChars(raw.trim().replace(/\.git$/, ''), '/');
   const gh = /^(?:https?:\/\/)?github\.com\/([\w.-]+)\/([\w.-]+)$/.exec(s);
   if (gh) return { provider: 'github', orgName: gh[1]!, name: gh[2]!, cloneUrl: `https://github.com/${gh[1]}/${gh[2]}.git` };
@@ -100,4 +120,23 @@ export function slugify(name: string): string {
 
 export function taskTarget(task: Task): string {
   return `task:${task.number}`;
+}
+
+/** A workspace machine can post for its owner. It cannot sign its own tool or release approval.
+ *
+ *  NOR CAN IT ADMINISTER THE ACCOUNT (R10 lane A, NM-086, 2026-11-09). With no actor header the
+ *  machine lane acts AS ITS OWNER, so anything that held the nmm_ token (agents run arbitrary
+ *  commands on that machine) passed every `actor.kind === 'human'` check: invite an outside address
+ *  (a persistent takeover), delete the workspace or the account, swap provider keys. Those are a
+ *  person's acts at a screen; no daemon sends them (apps/desktop/src/main/host never does: they ride
+ *  the signed-in desktop's own bearer from sync/ipc), so the machine lane is refused them outright. */
+export const MACHINE_REFUSED = new Set<string>(['decision.answer', 'decision.dismiss', 'task.approve_ship_plan', 'content.approve', 'policy.set', 'policy.delete',
+  'workspace.invite', 'workspace.revoke_invite', 'workspace.remove_member', 'workspace.delete', 'workspace.leave', 'account.delete',
+  'credential.set', 'modelpack.save', 'modelpack.delete', 'connector.disconnect', 'project.delete', 'channel.delete',
+  'member.share_compute', 'member.set_compute', 'agent.retire', 'skillpack.remove']);
+export function requireHumanAuthority(actor: Actor, cmd: {type: string}): void {
+  if (MACHINE_REFUSED.has(cmd.type)
+      || (cmd.type === 'task.accept' && actor.kind === 'human')) {
+    throw new DomainError('HUMAN_ONLY', 'This approval needs a signed-in person.');
+  }
 }

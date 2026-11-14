@@ -10,6 +10,7 @@ import type postgres from 'postgres';
 import { creditBalance } from './credit-ledger';
 import { sqlOf } from './credits';
 import { createCloudMachine } from './fleet';
+import { clearBreakerOnHumanWake } from './fleet-cloudrun-breaker';
 import { mintMachineToken } from './machine-auth';
 import type { Store } from './store';
 
@@ -65,17 +66,24 @@ export async function provisionMemberMachine(sql: postgres.Sql, workspaceId: str
 /**
  * Tombstone the member's machine(s) here. The desired feed drops destroyed rows, so the operator
  * removes the StatefulSet, the token Secret and the PVC — the logins die with the membership,
- * by construction (architecture.md §2). The name is freed too: `(workspace_id, name)` is unique,
+ * by construction (architecture.md §2). On Cloud Run the login vault row goes too. The name is freed too: `(workspace_id, name)` is unique,
  * and a member who re-joins mints `member-<id>` again.
  */
 export async function destroyMemberMachine(sql: postgres.Sql, workspaceId: string, userId: string): Promise<string[]> {
+  // the login vault (0160) goes in the same statement: a tombstone keeps its id, so the cascade
+  // never fires, and a login must not outlive the membership it was made under
   const rows = await sql<{ id: string }[]>`
-    update machines
-       set lifecycle = 'destroyed', desired_replicas = 0, started_at = null, token_hash = null,
-           name = name || '-gone-' || left(id::text, 8)
-     where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
-       and ${LIVE(sql)}
-     returning id`;
+    with gone as (
+      update machines
+         set lifecycle = 'destroyed', desired_replicas = 0, started_at = null, token_hash = null,
+             name = name || '-gone-' || left(id::text, 8)
+       where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
+         and ${LIVE(sql)}
+       returning id
+    ), vault as (
+      delete from machine_vault where machine_id in (select id from gone)
+    )
+    select id from gone`;
   return rows.map((r) => r.id);
 }
 
@@ -113,18 +121,23 @@ export const mayUse = (m: MachineReach, userId: string): boolean =>
 export const mayAttach = (m: Pick<MachineReach, 'kind' | 'ownerUserId'>, userId: string): boolean =>
   m.kind === 'runner' || m.ownerUserId === userId;
 
-/** wake ONE machine, credits permitting — the by-id half of fleet-lifecycle's workspace wake */
-export async function wakeMachine(sql: postgres.Sql, machineId: string): Promise<{ woken: boolean; capped: boolean }> {
+/** wake ONE machine, credits permitting — the by-id half of fleet-lifecycle's workspace wake.
+ *  `human`: a person asked (Wake now, a park they answered). Only that wakes a machine whose
+ *  crash-loop breaker tripped, and it clears the stamp for one more boot (fleet-cloudrun-breaker.ts) */
+export async function wakeMachine(sql: postgres.Sql, machineId: string, opts: { human?: boolean } = {}): Promise<{ woken: boolean; capped: boolean }> {
   const reach = await machineReach(sql, machineId);
   if (!reach) return { woken: false, capped: false };
   if ((await creditBalance(sql, reach.workspaceId)).remainingMicros <= 0) return { woken: false, capped: true };
+  const human = opts.human === true;
   const rows = await sql<{ id: string }[]>`
-    update machines
+    update machines m
        set desired_replicas = 1, last_wake_at = now(),
            -- only a STOPPED machine is starting; re-waking a running one must not reset its clock
-           started_at = case when desired_replicas = 0 then now() else started_at end
-     where id = ${machineId}::uuid and kind <> 'local' and ${LIVE(sql)}
-     returning id`;
+           started_at = case when m.desired_replicas = 0 then now() else m.started_at end,
+           ${clearBreakerOnHumanWake(sql, () => sql`${human}::boolean`)}
+     where m.id = ${machineId}::uuid and m.kind <> 'local' and (m.lifecycle is null or m.lifecycle <> 'destroyed')
+       and (m.boot_loop_at is null or ${human}::boolean)
+     returning m.id`;
   return { woken: rows.length > 0, capped: false };
 }
 

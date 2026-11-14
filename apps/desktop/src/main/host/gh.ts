@@ -64,6 +64,13 @@ export function repoSlug(cloneUrl: string): string {
   return m ? `${m[1]}/${m[2]}` : '';
 }
 
+// The key of a repository BUNDLE row's clone URL (`nm-bundle:<key>`, control-api repo-bundles.ts),
+// or null for any other URL. git cannot fetch that URL: a cloud machine fetches the bundle file
+// through its sign route and clones from the file (relay/engineering-workspace.ts).
+export function bundleKeyOf(cloneUrl: string | null | undefined): string | null {
+  return /^nm-bundle:([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(cloneUrl ?? '')?.[1] ?? null;
+}
+
 // A repo attached from a local checkout (provider=local) can carry an EMPTY clone_url even though the
 // checkout itself is a git repo with a real remote. Resolve that remote (its `origin`) so the worker
 // runs the normal clone → branch → push → PR flow against it — "auto-detect the local git repo and
@@ -88,8 +95,25 @@ export async function repoSlugFor(row: { clone_url?: string | null; local_path?:
 export async function ghPrCreate(cwd: string, slug: string, base: string, head: string, title: string, body: string, env?: GhEnv): Promise<{ url: string; number: number } | null> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr create ${slug} ${head}`); return { url: `https://github.com/${slug}/pull/7`, number: 7 }; }
   // reuse an existing PR for the branch (re-submits land on the same PR)
-  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number'], cwd, env);
-  if (view.ok) { try { const j = JSON.parse(view.stdout) as { url?: string; number?: number }; if (j.url && j.number) return { url: j.url, number: j.number }; } catch { /* create below */ } }
+  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number,body'], cwd, env);
+  if (view.ok) {
+    const current = JSON.parse(view.stdout) as { url: string; number: number; body: string };
+    if (current.url && current.number) {
+      const marker = '<!-- nm-validation:start -->';
+      const start = body.indexOf(marker);
+      if (start >= 0) {
+        const section = body.slice(start);
+        const original = current.body ?? '';
+        const previous = /<!-- nm-validation:start -->[\s\S]*?<!-- nm-validation:end -->/;
+        const updated = previous.test(original) ? original.replace(previous, () => section) : original.trimEnd() + '\n\n' + section;
+        if (updated !== original) {
+          const edit = await ghRaw(['api', `repos/${slug}/pulls/${current.number}`, '-X', 'PATCH', '-f', `body=${updated}`],cwd,env);
+          if (!edit.ok) throw new Error('The PR exists but its implementation evidence could not be updated.');
+        }
+      }
+      return { url: current.url, number: current.number };
+    }
+  }
   const create = await ghRaw(['pr', 'create', '-R', slug, '--base', base, '--head', head, '--title', title, '--body', body], cwd, env);
   if (!create.ok) return null;
   const url = create.stdout.split('\n').map((l) => l.trim()).find((l) => /\/pull\/\d+/.test(l)) ?? create.stdout.trim();

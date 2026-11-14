@@ -31,6 +31,7 @@ const mocks: Record<string, unknown> = {
   electron: { app: { on: () => {} }, BrowserWindow: { getAllWindows: () => [] }, Notification: {} },
   '@neuramesh/client-core/sqlite-replica': { SQLiteReplica: Replica },
   '../apiauth': {}, '../auth': {}, '../auth-clerk': {},
+  '../finance/worker': { startFinanceWorker: () => () => {} },
   '../agents': { startAgentHost: () => {} }, '../notify': { startNotifications: () => {} },
   '../sync': fakeSync,
   './sqlite-driver': { sqliteDriver: () => ({}), upgradeReplica: async () => {} },

@@ -36,10 +36,14 @@ export type DomainErrorCode =
   | 'AUTH_FAILED'
   | 'SESSION_EXPIRED'
   | 'AUTH_UNAVAILABLE'
+  | 'AUTH_DELETE_FAILED'
   | 'CONFLICT'
   // whiteboard.update carried a baseRev the board has moved past (docs/38) — the caller
   // re-reads the board and reapplies; LWW with no silent clobber.
   | 'WHITEBOARD_STALE'
+  // a Cloud Run machine wrote with an epoch older than its row's (fleet-cloudrun.ts): a resize
+  // overlaps the old instance with the new one, and only the newest may write
+  | 'STALE_EPOCH'
   | 'DUPLICATE_TASK'
   | 'PLAN_LIMIT'
   | 'MACHINE_LIMIT'
@@ -104,9 +108,13 @@ const STATUS: Record<DomainErrorCode, number> = {
   // 503 — auth infrastructure (Clerk / network / config) failed transiently. Clients must
   // retry and keep the user signed in; a Clerk outage may never force a re-login.
   AUTH_UNAVAILABLE: 503,
+  // 502 — Clerk did not delete the sign-in identity: the account row stays, and a second try can finish
+  AUTH_DELETE_FAILED: 502,
   CONFLICT: 409,
   // 409 — same family as CONFLICT: the state is already past what you built on
   WHITEBOARD_STALE: 409,
+  // 409 — same family: the machine is past the epoch the caller holds
+  STALE_EPOCH: 409,
   // 409 — an agent tried to create a task an open same-title sibling already covers
   // (the double-triage class). The message names the existing task so the caller's
   // turn can act on it instead of retrying the create.

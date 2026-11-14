@@ -97,18 +97,70 @@ describe.skipIf(!url)('Agent Desk persistent homes', () => {
     const [row] = await sql!`select schedule_id,home_agent_id from threads where id=${home.id}::uuid`;
     expect(row).toMatchObject({ schedule_id:null,home_agent_id:agentA });
   });
-  it('compacts with a validated cursor and retains the complete journal and prior snapshots', async () => {
+  it('reads the newest page without compacting and bounds a manual request to the messages it covers', async () => {
     const state = await (await request(`/v1/team?workspace=${workspace}&projectId=${projectId}`)).json() as TeamDeskState;
-    const home = state.homes.find(h => h.home_agent_id===agentA)!;
-    for (let i=0;i<65;i++) await sql!`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body) values(${workspace}::uuid,${home.channel_id}::uuid,${home.id}::uuid,'human',${user}::uuid,${`Constraint ${i}: preserve task and artifact references.`})`;
-    const context = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${home.id}`)).json() as TeamContext;
-    expect(context.compactThrough).toBeTruthy();
-    const data = { workspace, threadId:home.id, revision:context.revision, through:context.compactThrough, summary:'Preserve all constraints and open work. Sources remain in the journal.' };
-    expect((await request('/v1/team/compact', data)).status).toBe(403);
-    expect((await request('/v1/team/compact', data, {kind:'agent',id:agentA})).status).toBe(200);
-    expect((await request('/v1/team/compact', data, {kind:'agent',id:agentA})).status).toBe(409);
-    const after = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${home.id}`)).json() as TeamContext;
-    expect(after.messages).toHaveLength(20); expect(after.revision).toBe(1);
-    expect(await sql!`select id from messages where thread_id=${home.id}::uuid`).toHaveLength(68);
+    const home = state.homes.find(h => h.home_agent_id === agentA)!;
+    const actor = { kind: 'agent', id: agentA };
+    const path = `/v1/team/context?workspace=${workspace}&threadId=${home.id}`;
+    const insert = async (body: string, kind = 'human', machine = false) => {
+      const [row] = await sql!`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body,machine_authored)
+        values(${workspace},${home.channel_id},${home.id},${kind},${kind === 'human' ? user : agentA},${body},${machine}) returning id`;
+      return String(row!['id']);
+    };
+    await sql!`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body)
+      select ${workspace}::uuid,${home.channel_id}::uuid,${home.id}::uuid,'human',${user}::uuid,repeat('context ',110) from generate_series(1,115)`;
+    const latest = await insert('Where are we on the task?');
+    const normal = await (await request(path)).json() as TeamContext;
+    expect(normal.messages).toHaveLength(100); expect(normal.messages.at(-1)?.id).toBe(latest);
+    expect(normal.compactThrough).toBeNull();
+    // An older host used manual mode whenever tool history exceeded its pressure threshold.
+    expect((await (await request(path + '&mode=manual', undefined, actor)).json() as TeamContext).compactThrough).toBeNull();
+    const save = { workspace, threadId: home.id, revision: 0, through: latest, summary: 'Keep task and artifact references.' };
+    expect((await request('/v1/team/compact', save, actor)).status).toBe(409);
+    for (const invalid of [latest, await insert('/compact','agent'), await insert('/compact','human',true), await insert('@Iris /compact')]) {
+      expect((await request(path + '&mode=manual&commandId=' + invalid, undefined, actor)).status).toBe(403);
+    }
+    const commandId = await insert('@Rex /compact');
+    const later = await insert('Keep this new work separate.');
+    const manual = path + '&mode=manual&commandId=' + commandId;
+    let current = await (await request(manual, undefined, actor)).json() as TeamContext;
+    expect(current.compactThrough).toBeTruthy();
+    let batches = 0;
+    while (current.compactThrough) {
+      const body = { ...save, mode: 'manual', commandId, revision: current.revision, through: current.compactThrough };
+      expect((await request('/v1/team/compact', body, actor)).status).toBe(200);
+      expect((await request('/v1/team/compact', body, actor)).status).toBe(409);
+      current = await (await request(manual, undefined, actor)).json() as TeamContext;
+      expect(++batches).toBeLessThan(3);
+    }
+    expect(batches).toBe(2);
+    const after = await (await request(path)).json() as TeamContext;
+    expect(after.messages.map(m => m.id)).toEqual([commandId, later]);
+    expect(after.revision).toBe(2); expect(after.summary).toBe(save.summary);
+    expect(await sql!`select id from messages where thread_id=${home.id}::uuid and id=${latest}::uuid`).toHaveLength(1);
+    await sql!`insert into runs(workspace_id,channel_id,thread_id,agent_id,kind,title,state,trigger_message_id)
+      values(${workspace},${home.channel_id},${home.id},${agentA},'wake','Reply','failed',${later})`;
+    const homeFailed = async () => (await (await request(`/v1/team?workspace=${workspace}&projectId=${projectId}`)).json() as TeamDeskState).homes.find(h => h.id === home.id)?.last_reply_failed;
+    expect(await homeFailed()).toBe(true);
+    await insert('Try the status check again.');
+    expect(await homeFailed()).toBe(false);
+  });
+  it('manually compacts a short ordinary chat without deleting history or crossing workspace access', async () => {
+    const [channel] = await sql!`select context_channel_id from projects where id=${projectId}::uuid`;
+    const [thread] = await sql!`insert into threads(workspace_id,project_id,channel_id,created_by,title,kind,mode)
+      values(${workspace}::uuid,${projectId}::uuid,${channel!['context_channel_id']}::uuid,${`human:${user}`},'Short chat','chat','chat') returning id`;
+    const id = String(thread!['id']);
+    for (const body of ['Keep budget below $500.', 'Understood. Deliverable: brief.md.', '/compact']) await sql!`insert into messages(workspace_id,channel_id,thread_id,author_kind,author_id,body)
+      values(${workspace}::uuid,${channel!['context_channel_id']}::uuid,${id}::uuid,'human',${user}::uuid,${body})`;
+    const auto = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}`)).json() as TeamContext;
+    expect(auto.compactThrough).toBeNull();
+    const manual = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}&mode=manual`)).json() as TeamContext;
+    expect(manual.home).toBeNull(); expect(manual.threadId).toBe(id); expect(manual.compactThrough).toBe(manual.messages[1]!.id);
+    const body = { workspace, threadId: id, mode: 'manual', revision: manual.revision, through: manual.compactThrough, summary: 'Budget $500; deliver brief.md.' };
+    expect((await request('/v1/team/compact', body, { kind: 'agent', id: randomUUID() })).status).toBe(404);
+    expect((await request('/v1/team/compact', body, { kind: 'agent', id: agentA })).status).toBe(200);
+    const next = await (await request(`/v1/team/context?workspace=${workspace}&threadId=${id}&mode=manual`)).json() as TeamContext;
+    expect(next.messages.map(m => m.body)).toEqual(['/compact']); expect(next.compactThrough).toBeNull(); expect(next.compactedThroughAt).toBeTruthy();
+    expect(await sql!`select id from messages where thread_id=${id}::uuid`).toHaveLength(3);
   });
 });

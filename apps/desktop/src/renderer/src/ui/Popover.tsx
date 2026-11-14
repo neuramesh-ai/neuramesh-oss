@@ -8,6 +8,8 @@
 // Three families collapse into this one: `.histovl-wrap`/`.histovl-scrim`, `.rosterscrim`, and
 // `Modal`'s `.overlay` (which keeps the veil, and gains `anchored` for the menus among its users).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {createPortal} from 'react-dom';
+import {escapeCloses} from '../shell/dismiss';
 
 export function Popover({ label, anchor, width, align = 'start', onClose, children, className }: {
   /** the dialog's accessible name */
@@ -19,7 +21,7 @@ export function Popover({ label, anchor, width, align = 'start', onClose, childr
   /** `start` opens rightward/downward of the anchor (a left-rail trigger); `end` opens leftward */
   align?: 'start' | 'end';
   onClose: () => void;
-  children: React.ReactNode;
+  children: React.ReactNode | ((dismiss:()=>void)=>React.ReactNode);
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -34,14 +36,13 @@ export function Popover({ label, anchor, width, align = 'start', onClose, childr
   // a dismissal ANIMATES back into the anchor; a programmatic close (a row you picked, a submit)
   // unmounts at once — the surface has already done its job and the eye is following the result
   const dismiss = () => (origin ? setClosing(true) : onClose());
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); dismiss(); } };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+  const keys=useRef(dismiss);keys.current=dismiss;
+  useEffect(()=>escapeCloses(document,()=>keys.current()),[]);
+  useEffect(()=>{if(!closing)return;const id=setTimeout(onClose,240);return()=>clearTimeout(id);},[closing,onClose]);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || !origin) return;
+    const place=()=>{
     const M = 12; // the frame's own margin — a popover never touches an edge
     const w = Math.min(width, window.innerWidth - M * 2);
     // WIDTH FIRST, then measure — and measure with `offsetHeight`, NOT `getBoundingClientRect()`.
@@ -63,8 +64,12 @@ export function Popover({ label, anchor, width, align = 'start', onClose, childr
     el.style.top = `${Math.round(top)}px`;
     // viewport-space anchor → box-space transform-origin, so the growth starts AT the control
     el.style.transformOrigin = `${Math.round(origin.x - left)}px ${Math.round(origin.y - top)}px`;
+    };
+    place();
+    const observer=new ResizeObserver(place);observer.observe(el);window.addEventListener('resize',place);
+    return()=>{observer.disconnect();window.removeEventListener('resize',place);};
   }, [origin, width, align]);
-  return (
+  const surface=(
     <div className={`popwrap${closing ? ' closing' : ''}`} role="dialog" aria-label={label}>
       {/* click-catching, and NOTHING else: no tint, no blur. What you were looking at stays
           exactly as legible as it was — which is the whole point of the change. */}
@@ -74,8 +79,9 @@ export function Popover({ label, anchor, width, align = 'start', onClose, childr
         className={`popsurf${origin ? ' anchored' : ' centred'}${closing ? ' closing' : ''}${className ? ` ${className}` : ''}`}
         onAnimationEnd={closing ? (e) => { if (e.target === box.current) onClose(); } : undefined}
       >
-        {children}
+        {typeof children==='function'?children(dismiss):children}
       </div>
     </div>
   );
+  return typeof document==='undefined'?surface:createPortal(surface,document.body);
 }

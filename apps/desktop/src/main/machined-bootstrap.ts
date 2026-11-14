@@ -7,7 +7,7 @@
 //
 // Dependency-free on purpose (fetch and a sleep are injected), so the test runs without the
 // daemon's native modules.
-import type { BootstrapEnv, BootstrapIdentity } from './machined-config';
+import { adoptIdentity, bootstrapEnvOf, readConfig, type BootstrapEnv, type BootstrapIdentity, type MachinedConfig } from './machined-config';
 
 export interface BootstrapDeps {
   fetch: typeof fetch;
@@ -58,4 +58,17 @@ export async function bootstrapIdentity(env: BootstrapEnv, deps: BootstrapDeps):
     if (polls >= maxPolls) throw new Error(`bootstrap: not bound after ${polls} polls`);
     await deps.sleep(interval);
   }
+}
+
+/** a stamped machine reads its env; a warm spare redeems its binding first (round §5.2) */
+export async function resolveMachinedConfig(): Promise<MachinedConfig> {
+  const spare = bootstrapEnvOf(process.env);
+  if (!spare) return readConfig(process.env);
+  console.log(`[machined] unbound boot: pod=${spare.pod} asking ${spare.apiUrl} for an identity`);
+  const identity = await bootstrapIdentity(spare, {
+    fetch,
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    log: (line) => console.log(`[machined] ${line}`),
+  });
+  return adoptIdentity(process.env, identity);
 }

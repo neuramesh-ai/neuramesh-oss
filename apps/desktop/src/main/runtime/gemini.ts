@@ -16,6 +16,7 @@ import { openBusBridge, ensureAgyBus, userDataDir, beatsAdapter } from '../harne
 import { computeFsJail } from '../sandbox/fsjail';
 import { buildSeatbeltProfile, cleanupTempProfile, sandboxExecArgv, sandboxExecAvailable, writeTempProfile } from '../sandbox/seatbelt';
 import { ensureCli } from './cli';
+import { boxRelayEnv, boxRuntimesActive } from '../cloudrun/runtime-state';
 import { isStarterSeat, starterComplete, starterRunQuery } from './starter';
 
 // Run `agy --print` non-interactively. Auth = the machine's Google login (system keyring;
@@ -51,7 +52,7 @@ async function agySeatbelt(bin: string, argv: string[], dir: string | undefined,
   }
 }
 
-async function agyExec(args: { dir?: string; prompt: string; ac?: AbortController; log?: LogFn; onDelta?: (t: string) => void; protectedPaths?: string[]; busEnv?: Record<string, string> }): Promise<string> {
+async function agyExec(args: { dir?: string; prompt: string; ac?: AbortController; log?: LogFn; onDelta?: (t: string) => void; protectedPaths?: string[]; busEnv?: Record<string, string>; keyEnv?: Record<string, string> }): Promise<string> {
   const bin = await ensureCli('gemini', args.log);
   const argv = ['--print', args.prompt];
   const sbx = await agySeatbelt(bin, argv, args.dir, args.protectedPaths, args.log);
@@ -67,8 +68,9 @@ async function agyExec(args: { dir?: string; prompt: string; ac?: AbortControlle
     // agy passes down to the stdio shim it spawns. Layered ON TOP of the L0 allowlist rather than
     // through it: these are per-turn, non-secret-bearing coordinates for a 127.0.0.1 endpoint, not
     // inherited environment, so they must not be added to AGENT_ENV_ALLOW (which would let a stray
-    // NM_ORCH_* in the daemon's own env leak into every agent).
-    const child = spawn(sbx ? sbx.cmd : bin, sbx ? sbx.args : argv, { cwd: args.dir, env: { ...agentBaseEnv(), ...(args.busEnv ?? {}) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    // NM_ORCH_* in the daemon's own env leak into every agent). boxRelayEnv: on a Cloud Run machine `bin`
+    // is the relay wrapper and agy runs in the agent box (cloudrun/runtime-relay.ts); empty elsewhere.
+    const child = spawn(sbx ? sbx.cmd : bin, sbx ? sbx.args : argv, { cwd: args.dir, env: { ...agentBaseEnv(), ...(args.busEnv ?? {}), ...(args.keyEnv ?? {}), ...boxRelayEnv() }, stdio: ['ignore', 'pipe', 'pipe'] });
     if (args.ac) args.ac.signal.addEventListener('abort', () => child.kill('SIGTERM'));
     let out = '';
     let errTail = '';
@@ -83,6 +85,12 @@ async function agyExec(args: { dir?: string; prompt: string; ac?: AbortControlle
       reject(new Error(`agy exited ${code}: ${errTail.replace(/\s+/g, ' ').slice(-200) || 'is agy signed in? run `agy` once to sign in with your Google account'}`));
     });
   });
+}
+
+/** The BYOK key for an agy worker: only in the Cloud Run agent box (cloudrun/README.md), where agy has
+ *  no Google login unless one was made there. Everywhere else agy keeps its own OAuth, as before. */
+export function agyKeyEnv(token: string | null | undefined): Record<string, string> {
+  return token && boxRuntimesActive() ? { GEMINI_API_KEY: token } : {};
 }
 
 // Gemini is natively multimodal: build `contents` with inlineData image parts when images are
@@ -140,7 +148,11 @@ export const geminiAdapter: RuntimeAdapter = {
   async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: PermissionGate, protectedPaths?: string[], opts?: TurnOpts) {
     // the Starter lane: the same bus, direct, on the proxy — no agy, no login (runtime/starter.ts)
     if (isStarterSeat(agent.model, token)) return starterRunQuery(agent, t, dir, channelBlock, repoBacked, ac, log, skills, proposeSkill, reworkNotes, attachmentsNote, recordLesson, lessonsNote, promptOverride, addBacklogItem, beats, _permissionGate, opts);
-    void token; // workers authenticate through agy's own Google login, not a GEMINI_API_KEY
+    if (_permissionGate && opts?.permissionRules) return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,_permissionGate,opts,{provider:'gemini',token});
+    // workers authenticate through agy's own Google login, not a GEMINI_API_KEY — except in the
+    // Cloud Run agent box, which has no Google login of its own on a fresh machine: there a stored
+    // BYOK key rides to agy as GEMINI_API_KEY (the relay moves it into secretEnv, never argv).
+    const keyEnv = agyKeyEnv(token);
     // ── The tool bus (docs/harness/03) ─────────────────────────────────────────────────────────
     // agy used to receive these six tool closures and discard every one of them. Now they arrive as
     // real MCP tools through the loopback bridge, so a Gemini-seated worker declares beats, records
@@ -148,7 +160,7 @@ export const geminiAdapter: RuntimeAdapter = {
     const ud = userDataDir();
     ensureAgyBus(ud); // idempotent MERGE into agy's own mcp_config; inert outside a turn
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}), ...(opts?.messageBoards ? { messageBoards: opts.messageBoards } : {}) } },
       ud,
       log,
     );
@@ -156,7 +168,7 @@ export const geminiAdapter: RuntimeAdapter = {
     // started — never as the primary path (docs/harness §1.3: a mechanism, not model etiquette).
     const onDelta = beats && !promptOverride && !bus.count ? beatMarkerSink(beats.advance) : undefined;
     try {
-      const out = await agyExec({ dir, prompt: promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac, log, onDelta, protectedPaths, busEnv: bus.env });
+      const out = await agyExec({ dir, prompt: promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac, log, onDelta, protectedPaths, busEnv: bus.env, keyEnv });
       return onDelta ? stripBeatMarkers(out) : out;
     } finally {
       bus.cleanup();

@@ -1,7 +1,15 @@
+import { PgDestinationStore } from './store/destinations';
+import { clerkDeleteUser } from './clerk-delete';
+import type { Actor } from '@neuramesh/shared';
+import { PgFinanceStore } from './store/finance';
+import { bindSchedulePermission, claimSchedule } from './store/permission-run';
+import { messageThreadScope } from './store/message-thread-scope';
+import { bindCodingTaskMessage, createCodingTaskThread, taskMessageAddress } from './store/coding-task-thread';
+import { requireTaskOwner } from './store/task-owner';
 import { startProjectMarketing } from './store/project-marketing';
 import { seedStartupTeamSql } from './store/startup-team';
-import { memoryViewSql } from './store/project-memory';
-import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, isGitHubNeedQuestion, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
+import { memoryViewSql, recallProjectsSql, recallSql, writeProjectSql, type RecallScope } from './store/project-memory';
+import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, isGitHubNeedQuestion, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, type WorkspaceMode, workspaceModeOf } from '@neuramesh/shared';
 import { taskFacts, trackDomainEvent, type EventFacts } from './analytics';
 import { createHash, randomBytes } from 'node:crypto';
 import postgres from 'postgres';
@@ -23,16 +31,17 @@ import { seedBundledPacksSql } from './store/skillpack-seed';   import { addMark
 import { PgAnnounceStore } from './store/announce';
 import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';   import { PgGitHubProofStore } from './store/github-proofs';
 import { computeRetro } from './retro';
-import { SKILL_SEED } from './seed/skill-seed';
+import { SKILL_SEED } from './seed/skill-seed'; import { TASK_SKILL_SEED } from './seed/task-skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
 import { MARKETING_OS_SKILL_SEED } from './seed/marketing-os-skill-seed';
 import type { LifecycleRow } from './lifecycle';
 import { computeFleetDesired, createCloudMachine, machineByTokenHash, rotateMachineToken, type CloudMachineCreate, type FleetDesired, type MachineIdentityRow } from './fleet';
 import { machineWorkspace, type MachineAttachRow } from './relay';
 import { bumpMachineWake, machineSweep, machineUsageToday, type MachineSweepResult } from './fleet-lifecycle';
-import { chargeMachineActivity } from './credit-ledger';
+import { beatMachine, type BeatActivity } from './machine-beat';
 import { localMode } from './localmode';
 import { schemaVersionSql, seedLocalUserSql, userIdForLocalTokenHashSql, type LocalUserSeed } from './store/local-identity';
+import { agentHome, scopeWorkspaces, type ScopeRef } from './store/scope-rows';
 import type { ArtifactRow, AttachmentInput, DecisionRow, DecisionSeed, DesktopAuthResult, MutationResult, NMMessage, PolicyInput, PolicyRow, RunInput, ScheduleInput, Store, VideoMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardMeta, WhiteboardRow, WhiteboardUpdate } from './store';
 
 type Row = Record<string, any>;
@@ -66,6 +75,10 @@ async function resolveChannelId(
 }
 
 export class PostgresStore implements Store {
+  private destinationStore: PgDestinationStore | undefined;
+  get destinations(): PgDestinationStore { return this.destinationStore ??= new PgDestinationStore(this.sql); }
+  private financeStore: PgFinanceStore | undefined;
+  get finance(): PgFinanceStore { return this.financeStore ??= new PgFinanceStore(this.sql); }
   /** the pool, readable by modules that own their own SQL (credits.ts) rather than
    *  becoming five more delegates on a file already at its size cap */
   readonly sql: postgres.Sql;
@@ -73,7 +86,7 @@ export class PostgresStore implements Store {
   get announcements(): PgAnnounceStore { return (this.ann ??= new PgAnnounceStore(this.sql)); }
   private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }   private replyStore: PgReplyStore | undefined;   get replies(): PgReplyStore { return (this.replyStore ??= new PgReplyStore(this.sql)); }   private modelStore: PgAgentModelStore | undefined;   get agentModels(): PgAgentModelStore { return (this.modelStore ??= new PgAgentModelStore(this.sql)); }   private proofStore: PgGitHubProofStore | undefined;   get githubProofs(): PgGitHubProofStore { return (this.proofStore ??= new PgGitHubProofStore(this.sql)); }
 
-  constructor(url: string) {
+  constructor(url: string, socketPath?: string) {
     // prepare:false keeps Supavisor pooler compatibility.
     //
     // SERVERLESS POOL HYGIENE. On Vercel this store is a per-instance singleton, and a warm
@@ -85,6 +98,7 @@ export class PostgresStore implements Store {
     // daemon process keeps its warm pool unchanged.
     const serverless = !!process.env['VERCEL'];
     this.sql = postgres(url, {
+      ...(socketPath ? { path: socketPath } : {}),
       max: serverless ? 3 : 5,
       idle_timeout: serverless ? 20 : 0,
       connect_timeout: 15,
@@ -112,6 +126,9 @@ export class PostgresStore implements Store {
   async machineByTokenHash(hash: string): Promise<MachineIdentityRow | null> { return machineByTokenHash(this.sql, hash); }
 
   async rotateMachineToken(machineId: string, tokenHash: string): Promise<{ id: string } | null> { return rotateMachineToken(this.sql, machineId, tokenHash); }
+  // the command scope guard's row owners and an agent's home + role (store/scope-rows.ts, R10 NM-002/NM-106)
+  async scopeWorkspaces(refs: ScopeRef[]): Promise<Array<string | null>> { return scopeWorkspaces(this.sql, refs); }
+  async agentHome(agentId: string): Promise<{ workspace: string; role: string | null } | null> { return agentHome(this.sql, agentId); }
 
   // the local stack's one human (0138) — store/local-identity.ts
   async seedLocalUser(input: LocalUserSeed): Promise<{ id: string }> { return seedLocalUserSql(this.sql, input); }
@@ -161,6 +178,7 @@ export class PostgresStore implements Store {
       definitionOfDone: r['definition_of_done'] ?? '',
       shipPlan: r['ship_plan'] ?? null,
       workPlan: r['work_plan'] ?? null,
+      permissionRunMessageId: r['permission_run_message_id'] ?? null,
       originThreadId: r['origin_thread_id'] ?? null,
       parentTaskId: r['parent_task_id'] ?? null,
       version: r['version'],
@@ -199,11 +217,12 @@ export class PostgresStore implements Store {
       // whole object while this column list silently dropped the stamp, so on postgres every
       // "born approved" unit was actually born GATED and parked at plan_review forever.
       await sql`insert into tasks (id, workspace_id, channel_id, project_id, number, title, description, state, kind,
-          creator_kind, creator_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at)
+          creator_kind, creator_id, assignee_kind, assignee_id, repo_id, base_ref, branch, offered_agent_id, requirements, requirements_confirmed, definition_of_done, parent_task_id, work_plan, origin_thread_id, plan_approved_at, permission_run_message_id)
         values (${task.id}, ${task.workspace}::uuid, ${chId}, ${projectId}, ${task.number}, ${task.title},
-          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid,
+          ${task.description}, ${task.state}::task_state, ${task.kind}::task_kind, ${task.creator.kind}::actor_kind, ${task.creator.id}::uuid, ${task.assignee?.kind ?? null}::actor_kind, ${task.assignee?.id ?? null}::uuid,
           ${task.repo?.id ?? null}, ${task.repo?.baseRef ?? null}, ${task.repo?.branch ?? null},
-          ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements as never) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan as never) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt})`;
+          ${task.offeredAgentId}::uuid, ${task.requirements ? sql.json(task.requirements as never) : null}, ${task.requirementsConfirmed}, ${task.definitionOfDone}, ${task.parentTaskId}::uuid, ${task.workPlan ? sql.json(task.workPlan as never) : null}, ${task.originThreadId}::uuid, ${task.planApprovedAt}, ${task.permissionRunMessageId ?? null}::uuid)`;
+      if (typeof event.payload['codingOwner'] === 'string') await createCodingTaskThread(sql,task.id,event.payload['codingOwner']);
       await this.insertEvent(sql, event, task.id);
     });
     return task;
@@ -260,6 +279,7 @@ export class PostgresStore implements Store {
         left join projects p on p.id = t.project_id where t.id = ${id} for update of t`;
       if (!rows.length) throw new DomainError('NOT_FOUND', `task ${id} not found`);
       const out = await fn(this.rowToTask(rows[0]!));
+      if (out.unchanged) return out;
       const t = out.task;
       // version/updated_at are owned by the DB trigger; the state guard
       // trigger re-validates the transition pairs as defense-in-depth.
@@ -355,7 +375,7 @@ export class PostgresStore implements Store {
       }
       await sql`update projects set context_channel_id = ${generalId}::uuid where id = ${defaultProjectId}::uuid`;
       // #build (né #dev) ships with the bundled default skill packs (gstack + addyosmani)
-      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, SKILL_SEED);
+      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, [...TASK_SKILL_SEED, ...SKILL_SEED]);
       await this.insertEvent(sql, { ...event, workspace: workspaceId }, null);
       return { workspaceId, channelId: generalId };
     }) as Promise<{ workspaceId: string; channelId: string }>;
@@ -396,7 +416,9 @@ export class PostgresStore implements Store {
     // an unreachable state — you were a member of someone else's workspace with no way out, so
     // your own account could never be deleted.
     if (Number(n!['c']) > 0) throw new DomainError('CONFLICT', 'leave or delete your workspaces first');
-    // drop the identity mapping (Clerk-backed users have no auth.users row)
+    // the sign-in identity first, then the mapping (clerk-delete.ts): a Clerk failure throws before the row goes
+    const [u] = await this.sql`select clerk_user_id from nm_users where id = ${userId}::uuid`;
+    await clerkDeleteUser(u?.['clerk_user_id'] as string | null | undefined);
     await this.sql`delete from nm_users where id = ${userId}::uuid`;
     const url = process.env['SUPABASE_URL'];
     const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];
@@ -424,7 +446,7 @@ export class PostgresStore implements Store {
   ): Promise<{ offeredAgentId: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
-      const [t] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, c.slug as channel_slug
+      const [t] = await sql`select t.id, t.state, t.number, t.title, t.workspace_id, t.channel_id, t.assignee_id, t.offered_agent_id, c.slug as channel_slug
         from tasks t join channels c on c.id = t.channel_id where t.id = ${taskId} for update of t`;
       if (!t) throw new DomainError('NOT_FOUND', `task ${taskId} not found`);
       // todo (trivial path) or plan_review (the approved, planned task) may be
@@ -437,19 +459,13 @@ export class PostgresStore implements Store {
       if (!agent) throw new DomainError('NOT_FOUND', `agent ${agentName} is not registered to #${t['channel_slug']}`);
       // a retired agent keeps its channel rows (rehire restores remit) but can't take work
       if (agent['retired_at']) throw new DomainError('NOT_PERMITTED', `agent ${agentName} is retired — rehire it or offer to someone else`);
-      // Hand the task off: a planned task is still assigned to the ARCHITECT (request_plan set the
-      // assignee so the board shows who's planning it). Offering it to a developer must release that
-      // assignment — otherwise the claim is denied (claiming requires the task be unassigned or the
-      // claimer's own), so the offered dev can never pick up a planned task. Clear it on every offer
-      // (a no-op for the trivial todo path, where it's already null).
+      requireTaskOwner(t['assignee_id'] ?? t['offered_agent_id'], agent['id']);
       if (repo) {
         // intake resolved to repo-backed work — bind it now, branch derived
         // the same way task.create does
         const branch = taskBranch(Number(t['number']), t['title'] as string);
-        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = null, assignee_kind = null, repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId}`;
-      } else {
-        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = null, assignee_kind = null where id = ${taskId}`;
-      }
+        await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = ${agent['id']}, assignee_kind = 'agent', repo_id = ${repo.id}::uuid, base_ref = ${repo.baseRef}, branch = ${branch} where id = ${taskId}`;
+      } else await sql`update tasks set offered_agent_id = ${agent['id']}, assignee_id = ${agent['id']}, assignee_kind = 'agent' where id = ${taskId}`;
       if (checklist?.length) {
         // the orchestrator resolved requirements in the thread — recorded
         // here so the offered worker executes them instead of inventing its own
@@ -818,13 +834,16 @@ export class PostgresStore implements Store {
   // stable internal uuid, creating the mapping on first sign-in. New Clerk
   // identities get a fresh nm_users row (we deliberately do NOT auto-merge by
   // email onto the backfilled dev/legacy rows — that would clobber their sub).
-  async resolveClerkUser(clerkId: string, email: string | null): Promise<{ id: string; created: boolean }> {
+  // `selfAsserted`: nobody proved the address (an in-app sign-up, or a Clerk identity whose address the
+  // Backend API verified). the flag is part of the INSERT: as a second statement it could fail and
+  // leave a trusted row, and a row made again after account.delete started trusted (email-proof.ts).
+  async resolveClerkUser(clerkId: string, email: string | null, selfAsserted = false): Promise<{ id: string; created: boolean }> {
     const [existing] = await this.sql`select id from nm_users where clerk_user_id = ${clerkId}`;
     if (existing) return { id: existing['id'] as string, created: false };
     // onboarding_at starts the activation clock the lifecycle sequence measures against; it is
     // set ONLY here, so a user who predates the email system keeps a NULL and can never be
     // handed a "day 1" nudge months after the fact (see lifecycleCandidates).
-    const [row] = await this.sql`insert into nm_users (clerk_user_id, email, onboarding_at) values (${clerkId}, ${email}, now())
+    const [row] = await this.sql`insert into nm_users (clerk_user_id, email, onboarding_at, email_self_asserted) values (${clerkId}, ${email}, now(), ${selfAsserted})
       on conflict (clerk_user_id) do update set email = coalesce(excluded.email, nm_users.email)
       returning id`;
     return { id: row!['id'] as string, created: true };
@@ -920,8 +939,11 @@ export class PostgresStore implements Store {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const chId = await resolveChannelId(sql, input.workspace, input.channel);
-      // kind-scoped reconcile: lessons supersede lessons, facts supersede facts
-      const valid = await sql`select id, content from facts where channel_id = ${chId} and kind = ${kind} and valid_until is null`;
+      // D15: the reconcile reads the PROJECT's facts (the channel only names the project), kind-scoped:
+      // lessons supersede lessons, facts supersede facts
+      const project = await writeProjectSql(sql, chId);
+      const valid = await sql`select f.id, f.content from facts f join channels c on c.id = f.channel_id
+        where coalesce(f.project_id, c.project_id) = ${project}::uuid and f.kind = ${kind} and f.valid_until is null`;
 
       const exact = valid.find((f) => f['content'] === input.content);
       if (exact) return { decision: 'noop' as const, factId: exact['id'] as string };
@@ -936,7 +958,7 @@ export class PostgresStore implements Store {
         })?.['id'] as string) ?? null;
       if (!nearId && vecs?.[0]) {
         const [hit] = await sql`select id, embedding <=> ${JSON.stringify(vecs[0])}::vector as d
-          from facts where channel_id = ${chId} and kind = ${kind} and valid_until is null and embedding is not null
+          from facts where project_id = ${project}::uuid and kind = ${kind} and valid_until is null and embedding is not null
           order by d asc limit 1`;
         // < 0.1 = near-paraphrase for bge-small. Calibrated 2026-07-07, the embedder's first
         // live run: two DISTINCT same-topic lessons sat at cosine distance 0.246 and the old
@@ -945,8 +967,8 @@ export class PostgresStore implements Store {
         if (hit && Number(hit['d']) < 0.1) nearId = hit['id'] as string;
       }
 
-      const [inserted] = await sql`insert into facts (workspace_id, channel_id, content, embedding, basis_count, kind, task_id)
-        values (${input.workspace}::uuid, ${chId}, ${input.content},
+      const [inserted] = await sql`insert into facts (workspace_id, channel_id, project_id, content, embedding, basis_count, kind, task_id)
+        values (${input.workspace}::uuid, ${chId}, ${project}::uuid, ${input.content},
           ${vecs?.[0] ? JSON.stringify(vecs[0]) : null}::vector, ${input.basisCount}, ${kind}, ${input.taskId ?? null}) returning id`;
       const factId = inserted!['id'] as string;
       if (nearId) {
@@ -988,11 +1010,19 @@ export class PostgresStore implements Store {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const chId = await resolveChannelId(sql, input.workspace, input.channel);
-      const [row] = await sql`insert into memory_blocks (workspace_id, channel_id, kind, content, basis_count, updated_at)
-        values (${input.workspace}::uuid, ${chId}, ${input.kind}, ${input.content}, ${input.basisCount}, now())
-        on conflict (channel_id, kind) where project_id is null
-        do update set content = excluded.content, basis_count = excluded.basis_count, updated_at = now()
-        returning id`;
+      // D15: a project_summary is keyed by the channel's project (one per project). A channel_summary
+      // stays keyed by its channel: the legacy row an old machine still writes
+      const [row] = input.kind === 'project_summary'
+        ? await sql`insert into memory_blocks (workspace_id, channel_id, project_id, kind, content, basis_count, updated_at)
+            values (${input.workspace}::uuid, ${chId}, ${await writeProjectSql(sql, chId)}::uuid, 'project_summary', ${input.content}, ${input.basisCount}, now())
+            on conflict (project_id, kind) where project_id is not null
+            do update set content = excluded.content, basis_count = excluded.basis_count, updated_at = now()
+            returning id`
+        : await sql`insert into memory_blocks (workspace_id, channel_id, kind, content, basis_count, updated_at)
+            values (${input.workspace}::uuid, ${chId}, ${input.kind}, ${input.content}, ${input.basisCount}, now())
+            on conflict (channel_id, kind) where project_id is null
+            do update set content = excluded.content, basis_count = excluded.basis_count, updated_at = now()
+            returning id`;
       await this.insertEvent(sql, event, null);
       return { id: row!['id'] as string };
     }) as Promise<{ id: string }>;
@@ -1219,25 +1249,8 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string; inserted: boolean }>;
   }
 
-  async heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<boolean> {
-    const seconds = activity?.activeSeconds ?? 0;
-    const active = seconds > 0 || activity?.busy === true;
-    // runtimes and the build ride the beat for cloud machines (they never register): written only
-    // when sent, so an older machine's beat leaves the recorded build standing.
-    // WHO MAY BEAT is in the WHERE, so a beat that fails it moves and charges nothing: a cloud
-    // machine's owner only, and for a local one any human member of its workspace (two members'
-    // laptops can share a default name, and so one row, and a local beat is never billed).
-    const [row] = await this.sql<{ workspace_id: string; kind: string }[]>`
-      update machines m set last_seen_at = now(), last_active_at = case when ${active} then now() else m.last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json((activity?.runtimes ?? []) as never)}::jsonb else m.runtimes end,
-             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, m.daemon_version)
-       where m.id = ${machineId}
-         and (m.owner_user_id::text = ${actorId}
-              or (m.kind = 'local' and exists (select 1 from workspace_members wm where wm.workspace_id = m.workspace_id and wm.user_id::text = ${actorId})))
-       returning m.workspace_id, m.kind`;
-    // LOCAL machines beat too, and their time is the user's own hardware — never billed.
-    if (row && row.kind !== 'local' && seconds > 0) await chargeMachineActivity(this.sql, row.workspace_id, priceActiveSeconds(seconds), seconds);
-    return !!row;
-  }
+  // the beat and its meter, Always on billed as active (machine-beat.ts, 0176)
+  async heartbeatMachine(machineId: string, actorId: string, activity?: BeatActivity): Promise<boolean> { return beatMachine(this.sql, machineId, actorId, activity); }
 
   async registerAgent(
     input: { workspace: string; machineId: string; name: string; role: string; model: string; runtime: string; emoji?: string; description?: string; brief?: string; channels: string[] },
@@ -1643,7 +1656,7 @@ export class PostgresStore implements Store {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const chId = await resolveChannelId(sql, workspace, channel);
-      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
+      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, [...TASK_SKILL_SEED, ...(kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED)]);
       if (added > 0 || refreshed > 0) await this.insertEvent(sql, { ...event, workspace }, null);
       return { added, refreshed };
     }) as Promise<{ added: number; refreshed: number }>;
@@ -2643,24 +2656,8 @@ export class PostgresStore implements Store {
     await this.sql`update content_items set status = 'failed', last_error = ${error.slice(0, 500)} where id = ${itemId}::uuid`;
   }
 
-  async claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ claimed: boolean }> {
-    return this.sql.begin(async (_tx) => {
-      const sql = asSql(_tx);
-      // the CAS: run_count is the claim token (counter, not timestamp — the ship-stage
-      // lesson), so two daemons racing the same due row get exactly one winner.
-      const [row] = await sql`update schedules
-        set run_count = run_count + 1, next_run_at = ${nextRunAt}, last_run_at = now(),
-            status = case when ${nextRunAt}::timestamptz is null then 'done' else status end
-        where id = ${scheduleId}::uuid and run_count = ${runCount} and status = 'active'
-        returning workspace_id`;
-      if (!row) {
-        const [exists] = await sql`select 1 from schedules where id = ${scheduleId}::uuid`;
-        if (!exists) throw new DomainError('NOT_FOUND', 'schedule not found');
-        return { claimed: false };
-      }
-      await this.insertEvent(sql, makeEvent(row['workspace_id'] as string), null);
-      return { claimed: true };
-    }) as Promise<{ claimed: boolean }>;
+  async claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent, authority?: { actor: import('@neuramesh/shared').Actor; machineWorkspace?: string }): Promise<{ claimed: boolean; schedulePermission?: string }> {
+    return claimSchedule(this.sql,scheduleId,runCount,nextRunAt,makeEvent,(sql,event)=>this.insertEvent(sql,event,null),authority);
   }
 
   // Run now (routine sessions): store/schedule-now.ts
@@ -2713,7 +2710,10 @@ export class PostgresStore implements Store {
       if (input.scope === 'workspace') {
         await sql`delete from provider_credentials where workspace_id = ${input.workspace}::uuid and provider = ${input.provider} and scope = 'workspace'`;
       } else {
-        await sql`delete from provider_credentials where agent_id = ${input.agentId}::uuid and provider = ${input.provider} and scope = 'agent'`;
+        // the agent must be THIS workspace's (R10 NM-004: a foreign agentId swapped another tenant's key)
+        const [own] = await sql`select 1 from agents where id = ${input.agentId}::uuid and workspace_id = ${input.workspace}::uuid`;
+        if (!own) throw new DomainError('NOT_FOUND', `agent ${input.agentId} not found`);
+        await sql`delete from provider_credentials where agent_id = ${input.agentId}::uuid and workspace_id = ${input.workspace}::uuid and provider = ${input.provider} and scope = 'agent'`;
       }
       await sql`insert into provider_credentials (workspace_id, scope, agent_id, provider, token, auth_mode, set_by)
         values (${input.workspace}::uuid, ${input.scope}, ${input.agentId}::uuid, ${input.provider}, ${input.token}, ${input.authMode}, ${input.setBy}::uuid)`;
@@ -2725,7 +2725,7 @@ export class PostgresStore implements Store {
     const [wsRow] = await this.sql`select auto_failover from workspaces where id = ${workspace}::uuid`;
     const autoFailover = !!(wsRow?.['auto_failover']);
     if (agentId) {
-      const [a] = await this.sql`select token, auth_mode from provider_credentials where agent_id = ${agentId}::uuid and provider = ${provider} and scope = 'agent'`;
+      const [a] = await this.sql`select token, auth_mode from provider_credentials where agent_id = ${agentId}::uuid and workspace_id = ${workspace}::uuid and provider = ${provider} and scope = 'agent'`;
       if (a) return { token: (a['token'] as string | null) ?? null, authMode: a['auth_mode'] as 'apikey' | 'subscription', source: 'agent', autoFailover };
     }
     const [w] = await this.sql`select token, auth_mode from provider_credentials where workspace_id = ${workspace}::uuid and provider = ${provider} and scope = 'workspace'`;
@@ -2914,7 +2914,7 @@ export class PostgresStore implements Store {
   /** rule D9 (0134): a conversation's designated machine — store/thread-machine.ts */
   async setThreadMachine(workspace: string, threadId: string, machineId: string | null): Promise<void> { await setThreadMachineSql(this.sql, workspace, threadId, machineId); }
   /** 0144, coding threads: a conversation's kind — store/thread-machine.ts */
-  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void> { await setThreadKindSql(this.sql, workspace, threadId, kind); }
+  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind, mode?: WorkspaceMode | null): Promise<void> { await setThreadKindSql(this.sql, workspace, threadId, kind, mode); }
 
   async setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void> {
     const [row] = await this.sql<Array<{ id: string }>>`update threads
@@ -2954,11 +2954,8 @@ export class PostgresStore implements Store {
         // must agree with the existing thread. Resolve inside this transaction before writing.
         // Serialize births too, where no row exists for SELECT FOR UPDATE to lock yet.
         if (msg.threadId) await sql`select pg_advisory_xact_lock(hashtextextended(${msg.threadId}, 0))`;
-        const [existingThread] = msg.threadId ? await sql`select t.workspace_id, t.channel_id, coalesce(t.project_id, c.project_id) as project_id
-          from threads t join channels c on c.id = t.channel_id
-          where t.id = ${msg.threadId}::uuid for update of t` : [];
-        if (existingThread && existingThread['workspace_id'] !== msg.workspace) throw new DomainError('NOT_FOUND', 'Thread not found in this workspace.');
-        let address = msg.channel;
+        const existingThread = await messageThreadScope(sql, msg);
+        let address = await taskMessageAddress(sql, msg);
         if (msg.projectId) {
           const [project] = await sql`select id, context_channel_id from projects where id = ${msg.projectId}::uuid and workspace_id = ${msg.workspace}::uuid for share`;
           if (!project) throw new DomainError('NOT_FOUND', 'Project not found in this workspace.');
@@ -2980,7 +2977,7 @@ export class PostgresStore implements Store {
           if (task['project_id'] !== msg.projectId || task['channel_id'] !== chId) throw new DomainError('CONFLICT', 'The task belongs to another conversation context.');
         }
         if (!msg.channel && !msg.taskId) event = { ...event, target: `channel/${chId}` };
-        msg = { ...msg, channel: chId, projectId: scope!['project_id'] as string };
+        msg = await bindCodingTaskMessage(sql, { ...msg, channel: chId, projectId: scope!['project_id'] as string });
         // conversation threads: the first message carrying an unknown thread id births
         // the thread (title = heuristic over the body) in this same transaction; every
         // later message just touches updated_at so history sorts by freshness.
@@ -3000,15 +2997,17 @@ export class PostgresStore implements Store {
           // a schedule's session wears the schedule's title, and a later run of it renames the session
           // while nobody named it (titled_at): the conflict branch below, store/session-title.ts
           // 0134: a designation naming a machine outside THIS workspace is dropped rather than mis-routing at claim time
-          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind, project_id)
-            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg.workspace, msg.scheduleId ?? null, msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, (select id from schedules where id = ${msg.scheduleId ?? null}::uuid and workspace_id = ${msg.workspace}::uuid), ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null}, ${threadKindOf(msg.threadKind)}, ${msg.projectId!}::uuid)
+          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind, project_id, permission_mode, workspace_mode)
+            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg.workspace, msg.scheduleId ?? null, msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, (select id from schedules where id = ${msg.scheduleId ?? null}::uuid and workspace_id = ${msg.workspace}::uuid), ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null}, ${threadKindOf(msg.threadKind)}, ${msg.projectId!}::uuid, ${msg.author.kind === 'human' ? msg.permissionMode ?? null : null}, ${threadKindOf(msg.threadKind) === 'coding' ? workspaceModeOf(msg.threadWorkspace) : null})
             on conflict (id) do update set updated_at = now(), title = case when threads.titled_at is null and threads.schedule_id = excluded.schedule_id then excluded.title else threads.title end`;
         }
         // 0145: a run's opener keeps its schedule, and only one of this workspace (else null, never a refusal)
-        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, schedule_id)
+        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, machine_authored, schedule_id)
           values (${msg.id}, ${msg.workspace}::uuid, ${chId}, ${msg.taskId ?? null}, ${msg.threadId ?? null},
-            ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${msg.body}, ${msg.replyTo ?? null},
+            ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${msg.body}, ${msg.replyTo ?? null}, ${!!msg.machineAuthored},
             (select id from schedules where id = ${msg.scheduleId ?? null}::uuid and workspace_id = ${msg.workspace}::uuid))`;
+        await bindSchedulePermission(sql, msg);
+        delete msg.schedulePermission;
         // A thread's opening message IS its root (docs/31) unless the client named a different
         // one (the reply flow, where the root is an older message that stays in the feed). Rootless
         // threads are the bug shape: the feed shows a thread's root and hides its replies, so a
@@ -3038,13 +3037,13 @@ export class PostgresStore implements Store {
         // re-emitted cards (plan re-review rounds) never pile up as stale needs-you entries.
         // A GitHub card's question names only its ask, so it supersedes only in its own conversation.
         for (const d of decisions ?? []) {
-          await sql`update decisions set status = 'dismissed', answered_at = now()
-            where workspace_id = ${msg.workspace}::uuid and channel_id = ${chId}
+          if (!d.requiresExactAnswer) await sql`update decisions set status = 'dismissed', answered_at = now()
+            where not requires_exact_answer and workspace_id = ${msg.workspace}::uuid and channel_id = ${chId}
               and task_id is not distinct from ${msg.taskId ?? null} and (${!isGitHubNeedQuestion(d.question)}::boolean or (select m.thread_id from messages m where m.id = decisions.message_id) is not distinct from ${msg.threadId ?? null}::uuid)
               and question = ${d.question} and status = 'open'`;
-          await sql`insert into decisions (id, workspace_id, channel_id, task_id, message_id, asker_kind, asker_id, question, options, allow_other)
+          await sql`insert into decisions (id, workspace_id, channel_id, task_id, message_id, asker_kind, asker_id, question, options, allow_other, requires_exact_answer)
             values (${d.id}::uuid, ${msg.workspace}::uuid, ${chId}, ${msg.taskId ?? null}, ${msg.id}::uuid,
-              ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${d.question}, ${sql.json(d.options as never)}, ${d.allowOther})`;
+              ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${d.question}, ${sql.json(d.options as never)}, ${d.allowOther}, ${d.requiresExactAnswer === true})`;
         }
         // Authoritative auto-resolve: a human reply carrying `**question** → answer` lines flips
         // the matching OPEN card to answered — so Mission Control / the Home needs-you list (which
@@ -3058,7 +3057,7 @@ export class PostgresStore implements Store {
                 answered_by_kind = ${msg.author.kind}::actor_kind, answered_by_id = ${msg.author.id}::uuid, answered_at = now()
               where workspace_id = ${msg.workspace}::uuid and channel_id = ${chId}
                 and task_id is not distinct from ${msg.taskId ?? null}
-                and question = ${question} and status = 'open'`;
+                and not requires_exact_answer and question = ${question} and status = 'open'`;
           }
         }
       });
@@ -3121,7 +3120,8 @@ export class PostgresStore implements Store {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const [row] = await sql`select workspace_id, task_id, question, options, status
-        from decisions where id = ${id}::uuid for update`;
+        from decisions d where d.id = ${id}::uuid and exists(select 1 from workspace_members m
+          where m.workspace_id=d.workspace_id and m.user_id=${input.by.id}::uuid) for update`;
       if (!row) {
         throw new DomainError('NOT_FOUND', `decision ${id} not found`);
       }
@@ -3204,7 +3204,7 @@ export class PostgresStore implements Store {
   async deletePolicy(policyId: string, event: NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
-      const [row] = await sql`delete from policies where id = ${policyId}::uuid returning workspace_id`;
+      const [row] = await sql`delete from policies where id = ${policyId}::uuid and workspace_id = ${event.workspace}::uuid returning workspace_id`;
       if (!row) throw new DomainError('NOT_FOUND', `policy ${policyId} not found`);
       await this.insertEvent(sql, { ...event, workspace: row['workspace_id'] as string }, null);
       return { id: policyId };
@@ -3273,7 +3273,7 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  async channelMemory(workspace: string, channel: string) {
+  async channelMemory(workspace: string, channel: string, actor?: Actor, marketing?:boolean) {
     const project = channel.startsWith('project:') ? channel.slice(8) : null;
     const chId = project ? null : await resolveChannelId(this.sql, workspace, channel);
     if (project) {
@@ -3281,66 +3281,11 @@ export class PostgresStore implements Store {
         throw new DomainError('NOT_FOUND', 'Project not found in this workspace.');
       }
     }
-    return memoryViewSql(this.sql, workspace, chId, project);
+    return memoryViewSql(this.sql, workspace, chId, project, actor, marketing);
   }
 
-  // Hybrid recall: FTS + vector legs in parallel, fused with reciprocal-rank
-  // (1/(60+rank)). Without the embedder the vector leg is empty and FTS wins.
-  async recall(
-    workspace: string,
-    channel: string | null,
-    query: string,
-    k: number,
-  ): Promise<Array<{ id: string; kind: 'fact' | 'message'; body: string; channel: string; createdAt: string; score: number }>> {
-    // TODO(channel-id): every caller today passes either null or a channel slug (the /v1/recall
-    // endpoint, the agents.ts recall tool, the sync e2e all omit it or send a slug) — never an id.
-    // Once desktop callers pass a channel id here, switch this filter to `${alias}.channel_id = ${channel}`.
-    const chFilter = (alias: string) => (channel ? this.sql`and ${this.sql(alias)}.slug = ${channel}` : this.sql``);
-    const qvecs = await embed([query]);
-    const [fts, vec, factFts, factVec] = await Promise.all([
-      this.sql`select m.id, m.body, c.slug as channel, m.created_at
-        from messages m join channels c on c.id = m.channel_id
-        where m.workspace_id = ${workspace}::uuid
-          and m.fts @@ websearch_to_tsquery('english', ${query}) ${chFilter('c')}
-        order by ts_rank(m.fts, websearch_to_tsquery('english', ${query})) desc limit 20`,
-      qvecs?.[0]
-        ? this.sql`select m.id, m.body, c.slug as channel, m.created_at
-            from messages m join channels c on c.id = m.channel_id
-            where m.workspace_id = ${workspace}::uuid and m.embedding is not null ${chFilter('c')}
-            order by m.embedding <=> ${JSON.stringify(qvecs[0])}::vector limit 20`
-        : Promise.resolve([] as Row[]),
-      this.sql`select f.id, f.content as body, c.slug as channel, f.created_at
-        from facts f join channels c on c.id = f.channel_id
-        where f.workspace_id = ${workspace}::uuid and f.valid_until is null
-          and f.fts @@ websearch_to_tsquery('english', ${query}) ${chFilter('c')}
-        order by ts_rank(f.fts, websearch_to_tsquery('english', ${query})) desc limit 10`,
-      qvecs?.[0]
-        ? this.sql`select f.id, f.content as body, c.slug as channel, f.created_at
-            from facts f join channels c on c.id = f.channel_id
-            where f.workspace_id = ${workspace}::uuid and f.valid_until is null and f.embedding is not null ${chFilter('c')}
-            order by f.embedding <=> ${JSON.stringify(qvecs[0])}::vector limit 10`
-        : Promise.resolve([] as Row[]),
-    ]);
-    const factIds = new Set([...factFts, ...factVec].map((r) => r['id']));
-    const scores = new Map<string, { row: Row; score: number }>();
-    for (const [leg, rows] of [['fts', fts], ['vec', vec], ['ffts', factFts], ['fvec', factVec]] as const) {
-      void leg;
-      rows.forEach((row, rank) => {
-        const prev = scores.get(row['id']);
-        const score = (prev?.score ?? 0) + 1 / (60 + rank);
-        scores.set(row['id'], { row, score });
-      });
-    }
-    return [...scores.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, k)
-      .map(({ row, score }) => ({
-        id: row['id'],
-        kind: factIds.has(row['id']) ? ('fact' as const) : ('message' as const),
-        body: row['body'],
-        channel: row['channel'],
-        createdAt: new Date(row['created_at']).toISOString(),
-        score: Number(score.toFixed(5)),
-      }));
+  // Hybrid recall, scoped to projects (store/project-memory.ts: recallProjectsSql decides which, recallSql reads)
+  async recall(workspace: string, channel: string | null, query: string, k: number, scope?: RecallScope) {
+    return recallSql(this.sql, workspace, channel, query, k, await recallProjectsSql(this.sql, workspace, channel, scope ?? {}), scope?.actor,scope?.marketing);
   }
 }

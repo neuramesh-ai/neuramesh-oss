@@ -1,34 +1,14 @@
-import {
-
-  BEAT_PHASE_ROLES,
-
-  createEvent,
-  DESIGN_PROVIDER_QUESTION,
-  designProviderFromDecision,
-  formatAddress,
-
-
-
-
-
-
-
-
-  type Actor,
-
-  type NMEvent,
-  type Task,
-
-
-
-} from '@neuramesh/shared';
+import { assertMarketingCommand } from './marketing-access';
+import { BEAT_PHASE_ROLES, createEvent, DESIGN_PROVIDER_QUESTION, designProviderFromDecision, formatAddress, type Actor, type NMEvent, type Task } from '@neuramesh/shared';
 import type { Command } from './commands';
 import { DomainError } from './errors';
+import { settleParksForDecision } from './machine-parks';
 import { requireCommandActivation } from './activation';
 
 import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
-import { actorAddress, verifiedEmailFor, taskTarget } from './handler/guards';
+import { requireHumanAuthority, actorAddress, verifiedEmailFor, unverifiedEmailReason, taskTarget, sameActor } from './handler/guards';
+import { assertSubmittedVisualEvidence, requireReleasePreparation, requestCodingChecklist, wantsCodingRelease } from './handler/coding-handoff';
 import { SUBTASK_GATED, setDefinitionOfDone, checkShipItem, addShipItem, updateDetails, selectDesignProvider, confirmRequirements, approvePlan, transition, nextPlanVersion } from './handler/fsm';
 import { planRevisionFollowup, routineAcceptFollowup, routineDesignFollowup, routinePlanFollowup } from './handler/planfollowup';
 import { channelCommands } from './handler/channel';
@@ -58,6 +38,7 @@ import { threadCommands } from './handler/thread';
 import { whiteboardCommands } from './handler/whiteboard';
 import { codeSessionCommands } from './handler/codesession';
 import { createTask } from './handler/createtask';
+import { assertCommandScope } from './handler/scope'; import { fireWakeWait } from './fleet-wake-wait';
 // the plan-name helpers are part of handler.ts's public surface (analytics.test.ts reads them)
 export { nextPlanVersion, implementationPlanName } from './handler/fsm';
 
@@ -86,7 +67,13 @@ export async function executeCommand(
   store: Store,
   actor: Actor,
   cmd: Command,
+  machine?: { id:string; workspaceId:string }, memberId?:string,
 ): Promise<CommandOutcome | { machineId: string }> {
+  // every actor writes only into the one workspace the command's rows live in (handler/scope.ts)
+  await assertCommandScope(store, actor, cmd, { machine, memberId });
+  await assertMarketingCommand(store, actor, cmd);
+  if (memberId && actor.kind === 'agent') await assertMarketingCommand(store, {kind:'human',id:memberId}, cmd);
+  if (machine) requireHumanAuthority(actor, cmd);
   await requireCommandActivation(store, cmd);
   // Domain branches (handler/<domain>.ts). Delegated in one place, before the FSM tail:
   // command types are unique, so matching here is identical to matching where they were.
@@ -104,7 +91,7 @@ export async function executeCommand(
   { const r = await repoCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await projectCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await threadCommands(store, actor, cmd); if (r !== undefined) return r; }
-  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
+  { const r = await scheduleCommands(store, actor, cmd, machine?.workspaceId); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await contentCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await connectorCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await marketingCommands(store, actor, cmd); if (r !== undefined) return r; }
@@ -114,7 +101,7 @@ export async function executeCommand(
   { const r = await messageCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await workspaceCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await channelCommands(store, actor, cmd); if (r !== undefined) return r; }
-  if (cmd.type === 'task.create') return createTask(store, actor, cmd);
+  if (cmd.type === 'task.create') return createTask(store, actor, cmd, machine?.id,memberId);
 
   if (cmd.type === 'task.offer') {
     const mayOffer = actor.kind === 'human' || actor.role === 'orchestrator';
@@ -154,7 +141,8 @@ export async function executeCommand(
     const task = await store.getTask(cmd.taskId);
     if (!task) throw new DomainError('NOT_FOUND', `task ${cmd.taskId} not found`);
     const owners = BEAT_PHASE_ROLES[task.state] ?? [];
-    if (!actor.role || !owners.includes(actor.role)) {
+    const ownsPhase = sameActor(task.assignee, actor) || (!task.assignee && task.offeredAgentId === actor.id);
+    if (!actor.role || (!owners.includes(actor.role) && !ownsPhase)) {
       throw new DomainError('NOT_PERMITTED', `only the ${owners.join('/') || 'assigned agent'} may set beats while a task is ${task.state}`);
     }
     if (cmd.type === 'beats.declare') {
@@ -180,9 +168,7 @@ export async function executeCommand(
         taskId: cmd.runTaskId ?? null,
         parentRunId: cmd.parentRunId ?? null,
         agentId: actor.id,
-        kind: cmd.kind,
-        title: cmd.title,
-        total: cmd.total,
+        kind: cmd.kind, title: cmd.title, total: cmd.total,
         step: cmd.step ?? null,
         seat: cmd.seat ?? null,
         triggerMessageId: cmd.triggerMessageId ?? null,
@@ -191,6 +177,8 @@ export async function executeCommand(
       // `won: false` is the wake lease saying another member's machine is already answering.
       // 200, not an error — a losing host stands down silently, exactly as the losing daemon
       // does on 0060's reply index. It is the normal shape of shared compute, not a failure.
+      // A won run for a person's message logs the wait they saw (fleet-wake-wait.ts, decision D13)
+      if (won && cmd.triggerMessageId && cmd.machineId) fireWakeWait(store, id);
       return { ok: true, runId: id, won } as never;
     }
     const run = await store.getRun(cmd.runId);
@@ -241,6 +229,8 @@ export async function executeCommand(
           }
         : undefined,
     );
+    // a parked turn waiting on this card resolves with it, and its sleeping machine wakes (machine-parks.ts)
+    await settleParksForDecision(store, cmd.decisionId, cmd.type === 'decision.answer' ? cmd.answer : null, actor);
     return { ok: true, id: result.id } as never;
   }
 
@@ -258,7 +248,7 @@ export async function executeCommand(
   if (cmd.type === 'workspace.accept_invite' || cmd.type === 'workspace.decline_invite') {
     if (actor.kind !== 'human') throw new DomainError('NOT_PERMITTED', 'only the invited person answers an invitation');
     const email = await verifiedEmailFor(store, actor.id);
-    if (!email) throw new DomainError('NOT_PERMITTED', 'we could not confirm your verified email address');
+    if (!email) throw new DomainError('NOT_PERMITTED', await unverifiedEmailReason(store, actor.id));
     if (cmd.type === 'workspace.decline_invite') {
       const ok = await store.declineInvite(cmd.invite, email);
       if (!ok) throw new DomainError('NOT_FOUND', 'that invitation is no longer open');
@@ -348,16 +338,9 @@ export async function executeCommand(
   // Ship gate arming check (docs/23): claiming ship prep is legal only for a
   // repo-backed task with an open PR, in a project whose release gate is on.
   // Both are enforced here — the daemon's own filter is convenience, not law.
-  if (cmd.type === 'task.claim_ship') {
-    const t = await store.getTask(cmd.taskId);
-    if (!t) throw new DomainError('NOT_FOUND', `task ${cmd.taskId} not found`);
-    if (!t.prNumber) {
-      throw new DomainError('INVALID_INPUT', 'the ship gate covers repo-backed tasks with an open pull request — a human accept ships this one directly');
-    }
-    if (!(await store.shipGate(cmd.taskId))) {
-      throw new DomainError('NOT_PERMITTED', 'the release gate is off for this project — a human accept merges it directly');
-    }
-  }
+  if (cmd.type === 'task.submit') await assertSubmittedVisualEvidence(store, cmd.taskId, cmd.artifacts);
+  if (cmd.type === 'task.approve') await assertSubmittedVisualEvidence(store, cmd.taskId);
+  if (cmd.type === 'task.claim_ship') await requireReleasePreparation(store, actor, cmd.taskId);
 
   // Subtask gate (docs/24): a parent may not pass submit/accept/ship with open
   // companion work — the count is fetched here, verified structurally inside
@@ -383,7 +366,10 @@ export async function executeCommand(
     throw new DomainError('HUMAN_ONLY', 'accept needs the human\'s word: nobody typed in this thread since the review verdict, and a card click is no word');
   }
 
+  const releaseWord = word && await wantsCodingRelease(store,cmd.taskId,word.id);
   let outcome = await store.mutate(cmd.taskId, async (task) => {
+    if (releaseWord && task.state === 'done' && task.workPlan?.codingDelivery) return transition(task,actor,{type:'task.claim_ship',taskId:task.id},0,0,true);
+    if (cmd.type === 'task.request_release_checklist') return requestCodingChecklist(task, actor);
     if (cmd.type === 'task.confirm_requirements') return confirmRequirements(task, actor, cmd.checklist);
     if (cmd.type === 'task.approve_plan') return approvePlan(task, actor);
     if (cmd.type === 'task.set_definition_of_done') return setDefinitionOfDone(task, actor, cmd.dod);

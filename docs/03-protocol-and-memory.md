@@ -1,5 +1,7 @@
 # 03 — Protocol, Orchestration, Memory, Security
 
+> **Deployment note (November 2026).** The command/FSM/memory contracts remain applicable. Any Supabase/PowerSync hosting references below are historical implementation details; current production uses Cloud SQL and the authenticated API SQLite replica. See [09](09-system-architecture.md).
+
 The contracts that make the loop enforceable. A2A 1.0 facts verified against the spec 2026-06-10 (v1.0.0, Linux Foundation, Apache-2.0).
 
 ## 1. Addressing & event envelope

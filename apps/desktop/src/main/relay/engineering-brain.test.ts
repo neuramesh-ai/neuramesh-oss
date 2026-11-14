@@ -35,6 +35,25 @@ test('Engineering rejects a project that is not connected to the selected reposi
   await assert.rejects(resolveEngineeringBrain(db, opts, { repoId: 'repo-1', projectId: 'foreign-project' }), /not connected to this repository/);
 });
 
+// round 9 (r9-002 live, the hq flow): a scratch session has no repository, so no project_repos row. With the
+// thread's project set (as hq opens it) the check reads the project alone, in this workspace
+test('a scratch workspace passes the project check with its project, and a foreign project is still refused', async () => {
+  const calls: Array<{ sql: string; parameters?: unknown[] }> = [];
+  const db = { getAll: async <T>(sql: string, parameters?: unknown[]) => {
+    calls.push({ sql, parameters });
+    if (sql.includes('from agents')) return [{ id: 'patch-1', model: 'claude-sonnet-4-6', model_source: 'pack' } as T];
+    if (sql.includes('project_repos')) return [] as T[];
+    return (parameters?.[1] === 'project-1' ? [{ model_pack: null }] : []) as T[];
+  } };
+  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'scratch', projectId: 'project-1' }), { modelId: STARTER_MODEL, agentId: 'patch-1' });
+  const projectRead = calls.find((call) => call.sql.includes('from projects'));
+  assert.equal(projectRead?.sql.includes('project_repos'), false);
+  assert.deepEqual(projectRead?.parameters, ['workspace-1', 'project-1']);
+  await assert.rejects(resolveEngineeringBrain(db, opts, { repoId: 'scratch', projectId: 'foreign-project' }), /not connected/);
+  // a repository session keeps the pair check: the same project with a real repository id and no link is refused
+  await assert.rejects(resolveEngineeringBrain(db, opts, { repoId: 'repo-1', projectId: 'project-1' }), /not connected to this repository/);
+});
+
 test('a manual developer pin no longer sets the Code model either', async () => {
   const db = { getAll: async <T>(sql: string) => [(sql.includes('from agents')
     ? { id: 'patch-1', model: 'claude-opus-4-8', model_source: 'manual' }

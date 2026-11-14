@@ -44,6 +44,7 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const beat = await store.heartbeatMachine(cmd.machineId, actor.id, {
       activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false,
       ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}),
+      ...(cmd.permissionVersion ? { permissionVersion: cmd.permissionVersion } : {}),
       ...(cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}),
     });
     if (!beat) throw new DomainError('NOT_FOUND', 'no machine you may beat has this id');
@@ -90,7 +91,8 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const allowed = actor.kind === 'human' ? mayUse(reach, actor.id)
       : reach.kind === 'runner' || reach.shares.includes('*') || (origin !== null && mayUse(reach, origin));
     if (!allowed) throw new DomainError('NOT_PERMITTED', 'this machine is not lent to you');
-    const out = await wakeMachine(sql, cmd.machineId);
+    // a person's wake clears a tripped crash-loop breaker; an agent's does not (fleet-cloudrun-breaker.ts)
+    const out = await wakeMachine(sql, cmd.machineId, { human: actor.kind === 'human' });
     if (out.capped) throw new DomainError('PLAN_LIMIT', 'this workspace is out of credits — top up to wake its machine');
     return { ok: true, woken: out.woken } as never;
   }

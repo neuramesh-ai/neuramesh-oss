@@ -1,11 +1,13 @@
 import { createPublicKey, verify } from 'node:crypto';
+import { boardsOrigin } from './boards-guard';
 import { DomainError } from './errors';
+import { canaryClerkAllowed, isMigrationCanary } from './migration-canary';
 
 // api.clerk.com sits behind Cloudflare, which 1010-blocks unfamiliar User-Agents
 // (observed: python-urllib gets a 403 "error code: 1010"). Node's fetch UA passes
 // today, but a runtime/CF shift would break auth with a confusing 401 — pin a
 // browser-like UA on the Backend-API calls so it can't silently regress.
-const CLERK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+export const CLERK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
 // Clerk auth bridge: verify a Clerk session JWT (RS256) against Clerk's published
 // JWKS, then resolve the user. We do NOT make PowerSync trust Clerk directly —
@@ -28,11 +30,17 @@ export function clerkDomain(): string {
 
 type Jwk = { kid: string; kty: string; n: string; e: string; alg?: string };
 let jwksCache: { keys: Jwk[]; at: number } | null = null;
+/** the forced refetch on an unknown kid (R10 NM-096): one in flight, at most once per JWKS_MISS_REFETCH_MS */
+let missFetch: Promise<Jwk[]> | null = null;
+let lastMissFetchAt = 0;
+export const JWKS_MISS_REFETCH_MS = 30_000;
+/** tests only: forget the cached keys and the refetch clock */
+export function resetClerkJwksForTests(): void { jwksCache = null; missFetch = null; lastMissFetchAt = 0; }
 
 // exported for the merged sync JWKS (fleet.ts): PowerSync validates against ONE key
 // source, so /v1/sync-jwks serves clerk's keys + the machine issuer's in one document.
-export async function clerkJwks(): Promise<Jwk[]> {
-  if (jwksCache && Date.now() - jwksCache.at < 600_000) return jwksCache.keys;
+export async function clerkJwks(force = false): Promise<Jwk[]> {
+  if (!force && jwksCache && Date.now() - jwksCache.at < 600_000) return jwksCache.keys;
   const domain = clerkDomain();
   if (!domain) throw new DomainError('AUTH_FAILED', 'CLERK_PUBLISHABLE_KEY is not set or malformed');
   // A JWKS WE CANNOT FETCH SAYS NOTHING ABOUT THE TOKEN (George, 2026-09-06: "generate image …
@@ -49,7 +57,10 @@ export async function clerkJwks(): Promise<Jwk[]> {
     const res = await fetch(`https://${domain}/.well-known/jwks.json`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new DomainError('AUTH_UNAVAILABLE', `clerk jwks fetch failed (${res.status})`);
     keys = ((await res.json()) as { keys?: Jwk[] }).keys ?? [];
+    // an EMPTY key set is not an answer to cache (R10 NM-096): it would 401 every token for ten minutes
+    if (!keys.length) throw new DomainError('AUTH_UNAVAILABLE', 'clerk jwks answered no keys');
   } catch (e) {
+    if (force) throw e instanceof DomainError ? e : new DomainError('AUTH_UNAVAILABLE', `clerk jwks unreachable: ${e instanceof Error ? e.message : 'fetch failed'}`);
     if (jwksCache) return jwksCache.keys;
     if (e instanceof DomainError) throw e;
     throw new DomainError('AUTH_UNAVAILABLE', `clerk jwks unreachable: ${e instanceof Error ? e.message : 'fetch failed'}`);
@@ -58,13 +69,34 @@ export async function clerkJwks(): Promise<Jwk[]> {
   return keys;
 }
 
+/** THE KEY FOR A KID, REFETCHED ONCE WHEN IT IS NEW (R10 lane A, NM-096). The cache served for ten
+ *  minutes with no refetch on a miss, so after a Clerk key rotation every token signed with the new
+ *  key got a hard 401 (the desktop signs out on one) until the cache aged out. A miss now forces one
+ *  single-flight refetch (rate-limited); AUTH_FAILED only once a fresh set still lacks the kid, and
+ *  AUTH_UNAVAILABLE (a 503 clients retry) when the refetch itself failed. */
+async function jwkFor(kid: string | undefined): Promise<Jwk> {
+  const hit = (await clerkJwks()).find((k) => k.kid === kid);
+  if (hit) return hit;
+  if (!missFetch && Date.now() - lastMissFetchAt >= JWKS_MISS_REFETCH_MS) {
+    lastMissFetchAt = Date.now();
+    missFetch = clerkJwks(true).finally(() => { missFetch = null; });
+  }
+  const fresh = missFetch ? await missFetch : (jwksCache?.keys ?? []);
+  const jwk = fresh.find((k) => k.kid === kid);
+  if (!jwk) throw new DomainError('AUTH_FAILED', 'token signed by an unknown key');
+  return jwk;
+}
+
+/** comma list in an env var → its entries, trimmed; empty = no pin */
+const listEnv = (name: string): string[] => (process.env[name] ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+
 // Verify the Clerk JWT and return its claims (throws AUTH_FAILED on any failure).
 export async function verifyClerkToken(token: string): Promise<{ sub: string; [k: string]: unknown }> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new DomainError('AUTH_FAILED', 'malformed token');
   const [h, p, s] = parts as [string, string, string];
   let header: { alg?: string; kid?: string };
-  let payload: { sub?: string; exp?: number; nbf?: number; iss?: string };
+  let payload: { sub?: string; exp?: number; nbf?: number; iss?: string; aud?: string | string[]; azp?: string };
   try {
     header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
     payload = JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));
@@ -72,16 +104,29 @@ export async function verifyClerkToken(token: string): Promise<{ sub: string; [k
     throw new DomainError('AUTH_FAILED', 'unparseable token');
   }
   if (header.alg !== 'RS256') throw new DomainError('AUTH_FAILED', `unexpected token alg ${header.alg ?? '?'}`);
-  const jwk = (await clerkJwks()).find((k) => k.kid === header.kid);
-  if (!jwk) throw new DomainError('AUTH_FAILED', 'token signed by an unknown key');
+  const jwk = await jwkFor(header.kid);
   const pub = createPublicKey({ key: jwk as never, format: 'jwk' });
   const ok = verify('RSA-SHA256', Buffer.from(`${h}.${p}`), pub, Buffer.from(s, 'base64url'));
   if (!ok) throw new DomainError('AUTH_FAILED', 'bad token signature');
   const now = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp === 'number' && payload.exp < now - 5) throw new DomainError('AUTH_FAILED', 'token expired');
+  // exp and iss are REQUIRED (R10 NM-171): every Clerk token carries both, and a signed token that
+  // names neither never expires and could come from any issuer sharing the key set
+  if (typeof payload.exp !== 'number') throw new DomainError('AUTH_FAILED', 'token has no expiry');
+  if (payload.exp < now - 5) throw new DomainError('AUTH_FAILED', 'token expired');
   if (typeof payload.nbf === 'number' && payload.nbf > now + 5) throw new DomainError('AUTH_FAILED', 'token not yet valid');
-  if (payload.iss && payload.iss !== `https://${clerkDomain()}`) throw new DomainError('AUTH_FAILED', `unexpected issuer ${payload.iss}`);
+  if (payload.iss !== `https://${clerkDomain()}`) throw new DomainError('AUTH_FAILED', `unexpected issuer ${payload.iss ?? '(none)'}`);
+  // the audience and the authorized party, pinned when the deploy names them (NM-171): a template
+  // token minted for another service (PowerSync's carries its aud) must not replay as a /v1 credential
+  const auds = listEnv('CLERK_ALLOWED_AUDIENCES');
+  const aud = payload.aud === undefined ? [] : Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (auds.length && aud.length && !aud.some((a) => auds.includes(a))) throw new DomainError('AUTH_FAILED', 'token minted for another audience');
+  const parties = listEnv('CLERK_AUTHORIZED_PARTIES');
+  if (parties.length && payload.azp && !parties.includes(payload.azp)) throw new DomainError('AUTH_FAILED', `unexpected authorized party ${payload.azp}`);
+  // the second wall for sign-in (message-boards plan §7.5): Message boards is its own origin on the
+  // same Clerk instance, so a session token that origin got is refused here whatever the pin above says
+  if (payload.azp && payload.azp === boardsOrigin()) throw new DomainError('AUTH_FAILED', 'a Message boards session does not work on the NeuraMesh API');
   if (!payload.sub) throw new DomainError('AUTH_FAILED', 'token has no subject');
+  if (!canaryClerkAllowed(payload.sub)) throw new DomainError('AUTH_UNAVAILABLE', 'This deployment is not open to customer traffic yet');
   return payload as { sub: string; [k: string]: unknown };
 }
 
@@ -111,7 +156,11 @@ async function clerkSessionDead(key: string, sessionId: string): Promise<boolean
 }
 
 /** Ordinary Clerk session JWT: no template or sync-service audience dependency. */
-export function mintApiToken(sessionId: string): Promise<string> { return mintSessionToken(sessionId, false); }
+export async function mintApiToken(sessionId: string): Promise<string> {
+  const token = await mintSessionToken(sessionId, false);
+  if (isMigrationCanary()) await verifyClerkToken(token);
+  return token;
+}
 /** Compatibility for installed clients, removed after their rollout gate. */
 export function mintPowerSyncToken(sessionId: string): Promise<string> { return mintSessionToken(sessionId, true); }
 async function mintSessionToken(sessionId: string, legacy: boolean): Promise<string> {
@@ -164,7 +213,9 @@ export async function clerkUserEmail(clerkUserId: string): Promise<string | null
 // claimed by matching a verified email (docs/27 §1d) — matching an unverified one would let
 // anyone join a workspace by signing up with somebody else's address, so this is a security
 // boundary, not a nicety. Fails closed: an unreadable verification status is `false`.
-export async function clerkPrimaryEmail(clerkUserId: string): Promise<{ email: string; verified: boolean; firstName: string | null } | null> {
+// `byAdmin`: Clerk marks an address that the Backend API created as verified with the strategy `admin`.
+// nobody proved that address, so a row made for such an identity starts self-asserted (email-proof.ts).
+export async function clerkPrimaryEmail(clerkUserId: string): Promise<{ email: string; verified: boolean; firstName: string | null; byAdmin: boolean } | null> {
   const key = process.env['CLERK_SECRET_KEY'];
   if (!key) return null;
   try {
@@ -177,7 +228,7 @@ export async function clerkPrimaryEmail(clerkUserId: string): Promise<{ email: s
     const primary = u.email_addresses?.find((e) => e.id === u.primary_email_address_id) ?? u.email_addresses?.[0];
     if (!primary?.email_address) return null;
     // first_name names the workspace a first sign-in creates (first-workspace.ts); null when unset
-    return { email: primary.email_address, verified: primary.verification?.status === 'verified', firstName: u.first_name?.trim() || null };
+    return { email: primary.email_address, verified: primary.verification?.status === 'verified', firstName: u.first_name?.trim() || null, byAdmin: primary.verification?.strategy === 'admin' };
   } catch {
     return null;
   }
@@ -186,7 +237,7 @@ export async function clerkPrimaryEmail(clerkUserId: string): Promise<{ email: s
 type ClerkUser = {
   id: string;
   first_name?: string | null;
-  email_addresses?: Array<{ id: string; email_address: string; verification?: { status?: string } | null }>;
+  email_addresses?: Array<{ id: string; email_address: string; verification?: { status?: string; strategy?: string } | null }>;
   primary_email_address_id?: string;
 };
 

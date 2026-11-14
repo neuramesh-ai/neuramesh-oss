@@ -1,12 +1,13 @@
 # 11 — Releases & Deploy
 
-How NeuraMesh ships. Three surfaces, each on its own lane:
+How NeuraMesh ships after the November 2026 Cloud Run cutover. Each surface has its own lane:
 
 | Surface | Cadence | Trigger | Lands at |
 |---|---|---|---|
-| **Backend** — control-api + schema | continuous | merge to `main` | `api.neuramesh.app` (Vercel) |
+| **Backend/HQ/relay** | controlled release | GitHub release build → qualified digests → CI Pulumi promotion | Cloud Run behind the production edge |
 | **Desktop app** | discrete, versioned | push a `vX.Y.Z` tag | a **draft** you publish in `alonge-dev/neuramesh-desktop-releases` |
-| **Cloud machines** (the daemon in the machine image) | discrete | push a `fleet-vN` tag (§2a) | every workspace's cloud machine, after a boot test on the cluster |
+| **Cloud machines** | controlled release | qualified machine digest + safe fleet promotion (§2a) | member Cloud Run Worker Pools |
+| **iOS** | versioned native / compatible OTA | EAS build/submit or approved update | TestFlight/App Store; verify installed upgrade |
 
 Background: [docs/09 — system architecture](09-system-architecture.md) · [control-api README](../packages/control-api/README.md) · workflows in [`.github/workflows/`](../.github/workflows/).
 
@@ -27,25 +28,37 @@ makes it enforceable per change.
 
 **A desktop release is cut as needed, never per feature** ([docs/45 §4](45-feature-placement.md#4-when-the-desktop-ships), 2026-09-19): a Free feature, a fix installed apps need, the compatibility window above, or a parity catch-up the [desktop parity ledger](desktop-parity-ledger.md) makes worth it. Pro work lands on the web and the phone first, and the version-bump PR closes the ledger rows the release carries.
 
-**The schema and control-api code a desktop build depends on must be live in prod *before* you publish that build.** A desktop app that calls a column or endpoint that isn't there yet is a broken release. Order every coupled rollout: land the backend PR (migrations + bundle) → verify prod → *then* tag/publish the desktop app. This is the v0.5.0 lesson — see §5.
+**The schema and control-api code a desktop build depends on must be live in prod *before* you publish that build.** A desktop app that calls a column or endpoint that isn't there yet is a broken release. Order every coupled rollout: land the backend PR → explicitly apply migrations and promote the Cloud Run release → verify prod → *then* tag/publish the desktop app. This is the v0.5.0 lesson — see §5.
 
 ---
 
 ## 1 · Backend release (control-api + schema)
 
-There is no version or tag — **merging to `main` is the release.** Vercel is wired to the repo: a preview Function per PR, production on merge.
+Merging main records approved source; it does **not** deploy Cloud Run. All infrastructure writes,
+builds and deployments go through the [GitHub production pipeline](../infra/cloudrun/ci/README.md).
+`cloudrun-release.yml` packages tracked source, uploads it through Pulumi and builds immutable
+images. `cloudrun-infra.yml` applies reviewed owning-stack configuration using the saved plan
+from that run, including explicit guarded migration jobs and image/secret-version promotion.
+There is no local apply/build fallback. State remains in the existing GCS backend; Cloud Run
+stacks use KMS. PR checks receive no production credentials.
+The old Vercel projects are paused/disconnected, and the six GKE deploy/image workflows stay
+disabled. WalGit CI remains deferred. Marketing and native/public-image release lanes stay active.
 
 **Since the source release the public repository is a publish of this one** ([cutover.md](design/oss-release-2026-09/cutover.md)). This private `main` stays the source of truth. Every push to it runs [`publish-public.yml`](../.github/workflows/publish-public.yml), which scrubs the tree (`scripts/public-snapshot.sh`: the site, the bench suite, the audits) and commits it on top of `neuramesh-ai/neuramesh-oss` `main` on the rolling branch `publish`, as a pull request a human merges. A pull request in the public repository is ported here by a maintainer and reaches the public repository with the next publish. `scripts/pr-land.sh` takes `NM_PR_REPO` for landing in either repository. The flow with its diagrams, for the public reader: [docs/43](43-public-repository.md).
 
-On the production deploy ([`vercel.json`](../packages/control-api/vercel.json) `buildCommand`):
+Record source commit/archive hash, image digests, schema set, secret-version changes and
+rollout/rollback evidence. A successful build or source merge does not prove production changed.
+Verify the actual ready revisions and a Clerk-authenticated replica/history/write round trip,
+as well as public HTTPS:
 
-1. **Migrations auto-apply** — [`scripts/migrate.mjs`](../packages/control-api/scripts/migrate.mjs) runs every un-applied `supabase/migrations/*.sql` before the new Function serves (idempotent, production-gated). Add a migration file in your PR and it ships itself. See the control-api README → *Migrations on deploy*.
-2. **The bundle is already current** — `packages/control-api/index.js` (the esbuild bundle Vercel deploys verbatim) is auto-regenerated and committed onto any PR that touches `src/` or `@neuramesh/shared` ([`control-api-bundle.yml`](../.github/workflows/control-api-bundle.yml)). You never hand-build it.
-
-**Verify a deploy:**
 ```bash
-curl -s https://api.neuramesh.app/.well-known/a2a/agent-card.json | head
+curl --fail --silent https://api.neuramesh.app/.well-known/a2a/agent-card.json
 ```
+
+The committed API `index.js` and its bundle guard remain compatibility artifacts; Cloud Run
+runs the container's Node server entry. `supabase/migrations` still names the SQL directory,
+not the production database provider. Migrations require an explicit reviewed job and cannot
+be assumed to run automatically on every merge.
 
 ### SQLite replica deployment
 
@@ -55,19 +68,12 @@ service, JWT audience, publication or rule deployment is required. New read-mode
 in `packages/client-core/src/schema.ts`; the server uses that allowlist and forces a fresh snapshot
 when its hash changes. A new table also needs the change-capture trigger and a workspace scope.
 
-The production brain/replica API has its own deployment. A green Vercel control-API deploy
-does not update it. For changes to replica fields or brain routes, wait for CI on the intended
-revision, then run `gh workflow run infra.yml --ref <tested-ref> -f deploy_brain=true`.
-Wait for its production HTTPS and storage canary before rolling the fleet. Verify the fields
-through a freshly loaded authenticated client as well as the machine's image revision.
-Agent Desk requires `home_agent_id` and collaboration metadata to reach that replica; an old
-projection can show the correct card while routing its message to the wrong agent.
-
-During the retirement rollout, the frozen legacy sync-rule file remains a compatibility contract
-for installed clients only. The local stack and CI no longer deploy it. Follow the
-[retirement plan](design/powersync-retirement-2026-10/plan.md) for client releases, the supported
-version gate, credential cleanup and hosted-service shutdown. Do not advance the desktop floor
-before publishing its replacement.
+Brain and replica routes are part of the promoted Cloud Run API image. A green bundle check
+or an old `infra.yml` run cannot update them. Verify new fields in a freshly authenticated
+client, not only in the database. PowerSync is cancelled and the original Supabase project is
+paused. The [retirement plan](design/powersync-retirement-2026-10/plan.md) remains historical
+validation evidence. Keep supported installed clients compatible; do not raise their floor
+before a replacement is published and its upgrade path verified.
 
 ---
 
@@ -84,7 +90,7 @@ before publishing its replacement.
    git tag v0.6.0 && git push origin v0.6.0
    ```
    (or run **Release Desktop** via `workflow_dispatch` with a tag/SHA.)
-3. **The desktop tag does not roll the fleet** (since 2026-09-26). From 2026-09-19 it did, so a daemon fix waited for a desktop release. The cloud machines now roll on their own tag (§2a).
+3. **The desktop tag does not roll the fleet** (since 2026-09-26). From 2026-09-19 it did, so a daemon fix waited for a desktop release. Cloud Run machines now use a separately qualified digest promotion (§2a).
 4. **[`release.yml`](../.github/workflows/release.yml) builds both Mac architectures on one `macos-15` runner.** The release install includes optional native dependencies for both arm64 and x64. The job signs, notarizes and staples each app, then uploads a **draft** to the public releases repo. The macOS 14 image retires on November 2, 2026 and has reduced capacity during its deprecation period ([runner notice](https://github.com/actions/runner-images/issues/13518)).
    - **Bake guard:** the build *fails* unless `CLERK_PUBLISHABLE_KEY` are set (repo `vars`) — a release can never ship pointing at localhost or keyless. `NM_API` defaults to `https://api.neuramesh.app`.
    - **Native CLI and SQLite guard:** both packaged apps must pass `--smoke-cli`, including a native database write, reopen and read-only check. The runner tests the Intel app through Rosetta. A pass on arm64 does not prove the Intel payload works. Keep the draft unpublished if either check fails.
@@ -94,36 +100,29 @@ before publishing its replacement.
 
 ## 2a · Cloud machine release (the fleet)
 
-The cloud machines run the daemon from the machine image (`infra/images/machine/Dockerfile`). They roll on a **fleet tag** that George cuts, never on a desktop tag (George, 2026-09-26). A daemon fix reaches the machines when it is ready, not at the next desktop release.
+The daemon ships in `infra/images/machine/Dockerfile`. Build and qualify its immutable digest
+from the intended source archive, then preview the fleet/runtime change through Pulumi.
+`fleet-vN`, `fleet-roll.yml`, `fleet:pin` and GKE rollout instructions are retired production paths.
 
-**What a fleet tag does** ([`fleet-roll.yml`](../.github/workflows/fleet-roll.yml)):
+Before promotion, boot the exact image on an isolated machine, verify native SQLite and shipped
+agent contracts, core restore and requested-subject hydration, relay/terminal readiness, a real
+provider reply and safe snapshot/drain/wake. Do not infer startup from a successful image build.
+For coding-runtime changes run all three real local coding eval cases and required native iOS
+parity checks; retain failed attempts and inspect screenshots.
 
-1. It builds and pushes the machine image for the tagged commit (`machine-image.yml`, called). The image carries the commit's sha as `NM_IMAGE_SHA`.
-2. It boots the new image once as a Job on the production cluster, on the gVisor nodes and the runtime class that the machines use. The Job imports `machined`, initializes/writes/reopens the real native SQLite replica, loads the shipped agent contract of every role, and reaches the relay's `/healthz`. Any other result stops the roll, and the fleet stays on its pin. The Job deletes itself.
-3. It pins `infra/k8s/cluster/overlays/gke/fleet-deployment.yaml` to the full sha and commits the pin to `main` as the bot. Only a commit on `main` rolls.
-4. It dispatches `fleet-deploy.yml`, which applies the operator, pre-pulls the image and lets the operator roll every workspace machine.
+An awake Worker Pool must drain and save recoverable state before an image/template change.
+A stopped pool can take its next image before wake. Preserve the 15-minute idle default, both
+relay shards at minimum zero and the rollback image. Never roll all machines by scaling down
+unsaved RAM. See [the driver contract](../packages/fleet/CLOUDRUN.md).
 
-**Cut a fleet tag, dry run first.** The dry run builds the image and boots it on the cluster. It pins nothing and deploys nothing:
+### 2b · iOS release
 
-```bash
-gh workflow run fleet-roll.yml --ref main -f dry_run=true
-```
-
-When the dry run is green, tag the commit and push the tag. `N` is the next number after the newest fleet tag (`git tag -l 'fleet-v*' --sort=-v:refname | head -1`):
-
-```bash
-git tag fleet-vN <sha> && git push origin fleet-vN
-```
-
-A dispatch with `-f dry_run=false` rolls the tip of `main` the same way. A tag runs the workflow file of the commit it names, so a fleet tag rolls only a commit that carries this lane.
-
-**What a machine runs.** A cloud machine sends its image sha on every heartbeat, and the API stores it in `machines.daemon_version`. The pin says what the fleet must run. The row says what each machine runs. An image from before this lane sends no sha, and its row keeps what it held.
-
-**The hand pin.** `pnpm fleet:pin <sha>` still writes the pin, and `fleet-deploy.yml` applies it when the pin merges. It skips the boot test, so keep it for a rollback to a build that ran before. `pnpm fleet:pin --check` names the newest image build that the fleet does not run.
-
-**Which commits build an image.** A push to `main` builds one when it changes an input of the image. The push paths of `machine-image.yml` and `IMAGE_PATHS` in `scripts/pin-machine-image.mjs` name the inputs. `scripts/pin-machine-image.test.mjs` holds both lists to the `COPY` lines of the Dockerfile and to the files that the daemon imports, on every pull request.
-
----
+Use [the mobile release guide](../apps/mobile/README.md) and its App Store checklist. A native
+change requires an EAS build and submission; an OTA cannot replace an incompatible binary.
+Deploy its API first, install the TestFlight build **over the existing installation**, and verify
+sign-in, retained history, artifacts and a real reply. Capture native evidence in both themes.
+Do not uninstall to obtain a clean pass. Record the tested build number and whether distribution
+is TestFlight or public App Store; availability on one does not prove availability on the other.
 
 ## 3 · Before any release — review the model lineup
 
@@ -139,10 +138,10 @@ Automation enforces what it can (migrations on deploy, bundle regen), but a huma
 
 **Triggers that demand a note** (non-exhaustive):
 - **Replica rollout** — deploy the API before clients; record upgrade, offline-queue and membership-revocation checks. During retirement, include the installed-client and service-shutdown gates.
-- **Vercel env / secrets** — a new or changed variable (e.g. `MIGRATE_DATABASE_URL`, a new Stripe/Clerk key).
-- **Migrations** — anything beyond "auto-applies on deploy": a manual backfill, a data migration, a destructive change.
+- **Cloud Run env / secrets** — a new or changed variable (e.g. `MIGRATE_DATABASE_URL`, a new Stripe/Clerk key).
+- **Migrations** — the reviewed migration job, schema ordering, backfills and any destructive change.
 - **Desktop** — publishing the draft, or a required backend-before-desktop ordering.
-- **Cloud machines.** A daemon change reaches the machines at the next fleet tag (§2a). Say if it needs one soon.
+- **Cloud machines.** A daemon change requires a qualified digest promotion and safe drain (§2a). Say whether the current hosted release already carries it.
 - **External one-offs** — a Clerk/Stripe dashboard setting, a DNS change, a one-time script.
 
 **Copy this block into the PR description:**
@@ -150,8 +149,8 @@ Automation enforces what it can (migrations on deploy, bundle regen), but a huma
 ## Deploy notes
 <!-- Manual steps the operator must take on/after merge. Write "none" if fully automated. -->
 - [ ] Replica: <API/schema deployment / client migration / retirement gate / none>
-- [ ] Vercel env/secrets: <add VAR=… / none>
-- [ ] Migration: <auto-applies on deploy / manual backfill needed / none>
+- [ ] Cloud Run env/secrets: <Pulumi secret-version/runtime change / none>
+- [ ] Migration: <reviewed migration job / manual backfill / none>
 - [ ] Desktop: <publish vX.Y.Z draft after backend is live / n/a>
 - [ ] Other: <Clerk/Stripe/DNS/one-off script / none>
 ```
@@ -163,7 +162,7 @@ The same block is the repo's [PR template](../.github/pull_request_template.md),
 ## 5 · Why this exists (the v0.5.0 lesson)
 
 v0.5.0 (model packs) merged with two silent manual requirements no one had surfaced: an **unapplied migration** (`0047`) and a **stale committed `index.js`** — so the feature was "merged" but dead in prod. The fixes:
-- **migrations now auto-apply on deploy** and **the bundle auto-regenerates on PRs** (§1) — these classes of step are no longer manual at all;
+- **the historical Vercel lane gained automatic migrations and a PR bundle guard**; the current Cloud Run lane instead requires an explicit, recorded migration and digest promotion (§1);
 - **everything that's still manual must be written into the PR** (§4) — so the operator always knows the exact steps.
 
 ---
@@ -173,7 +172,7 @@ v0.5.0 (model packs) merged with two silent manual requirements no one had surfa
 A coupled feature (backend + desktop):
 
 - [ ] Model lineup reviewed (§3); packs/routing updated if needed
-- [ ] Backend PR merged → Vercel prod deploy green → migration applied (verify with the curl in §1)
+- [ ] Backend PR merged → reviewed migration applied → Cloud Run digests promoted → authenticated production smoke passes (§1)
 - [ ] Replica: API feed deployed before clients; restored data and queued writes verified
 - [ ] Prod smoke: public route returns the new code
 - [ ] Ledger rows closed, header updated ([desktop-parity-ledger.md](desktop-parity-ledger.md))
@@ -188,6 +187,6 @@ A coupled feature (backend + desktop):
 
 ## 7 · Rollback
 
-- **Backend** — Vercel → **redeploy the previous production deployment** (instant, no rebuild). Migrations are **forward-only**: undo a bad one with a *new* forward migration, never by hand-editing prod.
+- **Backend** — preview and promote the previous compatible image digest through Pulumi. Migrations are forward-only unless a separately rehearsed recovery is required. After new Cloud SQL writes, DNS back to the paused source is not a data rollback; fence writers and plan reverse migration before reopening it.
 - **Desktop** — ship a fixed `vX.Y.Z+1` (the updater pulls the newest). To stop the bleed fast, delete the bad release's assets so it's no longer "latest"; installed apps already on it need the follow-up version.
-- **Cloud machines.** Pin the last good sha by hand (`pnpm fleet:pin <sha>`) and merge the pin. `fleet-deploy.yml` applies it. An awake machine restarts on the older image, and a machine that sleeps takes it at its next wake.
+- **Cloud machines.** Promote the last qualified digest through the Cloud Run fleet configuration. Drain awake machines safely first; a stopped machine takes the compatible template on wake. Retain snapshots and inspect restore compatibility before rolling backward.

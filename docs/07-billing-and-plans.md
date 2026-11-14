@@ -80,13 +80,13 @@ pnpm --filter @neuramesh/control-api dev    # control-api on :8787
 # copy the printed whsec_… into STRIPE_WEBHOOK_SECRET, restart the control-api
 ```
 
-### Production (Vercel control-api at api.neuramesh.app)
+### Production (Cloud Run control API at api.neuramesh.app)
 
 Create a webhook endpoint → `https://api.neuramesh.app/webhooks/stripe` with the six events above
 (`checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
 `customer.subscription.deleted`, `invoice.payment_failed`, `customer.subscription.trial_will_end`).
 Put its `whsec_…` and `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` / `STRIPE_PUBLISHABLE_KEY` /
-`NM_BILLING_RETURN_URL` in Vercel env. The card trial's wallets also need hq's domain in Stripe
+`NM_BILLING_RETURN_URL` in Pulumi-managed Secret Manager/runtime configuration. The card trial's wallets also need hq's domain in Stripe
 (Settings › Payment methods › Payment method domains: `hq.neuramesh.app`).
 Webhooks go ONLY to the hosted control-api (never the desktop's embedded API).
 
@@ -108,7 +108,7 @@ ledger: `packages/control-api/src/credit-ledger.ts` · dashboard: the **Credits*
 |---|---|
 | Brain (starter model via `POST /v1/starter/generate`, or `/v1/starter/stream` for a reply that types itself out, one price for both: docs/10 §15.9) | vendor-reported tokens × list price (`MODEL_RATES`), and the thinking tokens at the output rate, as Google bills them (2026-10-04). An unknown model costs 0, never a guess. |
 | Machine, **active** | **1 credit / 10 worked minutes** (`MACHINE_MICROS_PER_ACTIVE_MINUTE`); the daemon samples work every 5 s and reports `activeSeconds` on each heartbeat |
-| Machine, standby | free — bounded by the **48 h idle stop** (`NM_IDLE_STOP_MIN`, default 2880; `idle_stop_min IS NULL` = never) |
+| Machine, standby | free on a normal machine, bounded by the **idle stop** (`NM_IDLE_STOP_MIN`: code default 2880, Cloud Run 15 by decision D2. `idle_stop_min IS NULL` = never. The **Always on** switch sets it. An Always on machine pays the active rate for every awake second, see below) |
 | Storage | included per plan (10 GB free / 50 GB cloud, `planDiskGb`); `STORAGE_MICROS_PER_GB_HOUR` is `null` — **not metered yet** |
 
 **Two pools** (migration 0130, `workspace_credits`): a **grant** pool that resets each period (1,500 ×
@@ -123,6 +123,33 @@ is reported as `outOfCredits` on `/v1/machines/usage`, and the client shows `no_
 spinner); the `*/5` `machine-sweep` cron parks a machine at zero balance after a 10-minute
 run-drain grace; `chargeMachineActivity` never refuses (the work already happened — pools clamp,
 telemetry stays true). `GET /v1/usage` returns the three lines + balance + rate version.
+
+**Always on** (decision D2, `packages/control-api/src/machine-always-on.ts`). A person can keep one
+cloud machine awake past the idle window. The switch is in the compute panel, under each cloud
+machine (`apps/hq/src/compute/AlwaysOnRow.tsx`).
+
+- `POST /v1/machines/always-on` with `{ workspace, machineId, on }`. Human only.
+- The owner of a member machine can switch their own machine. A workspace owner or admin can switch
+  the runner. Other people get 403. A local machine gets 409 `LOCAL_MACHINE`.
+- On sets `idle_stop_min` to NULL. Off writes the column default back. The idle sweeps then use
+  `NM_IDLE_STOP_MIN` again. `GET /v1/machines/usage` reports the effective window per machine
+  (`idleStopMin`, NULL when Always on).
+- A repeat is a no-op. Each real change writes one `machine.always_on_set` event.
+- Always on does not wake the machine. It does not stop the credit cap: at a zero balance the sweep
+  parks the machine as usual. It does not stop the crash-loop breaker.
+- **Billed as active** (George, 2026-11-06). While Always on is on and the machine is up, every awake
+  second costs the active price (`priceActiveSeconds`), also when the machine does no work. That is
+  about 6 credits an hour. A normal machine still pays only for its active seconds.
+- The heartbeat charges it (`packages/control-api/src/machine-beat.ts`). Each beat of an Always on
+  machine with `desired_replicas = 1` charges the wall time since the last beat
+  (`machines.billed_through`, migration 0176). The window starts no earlier than `started_at` and is
+  at most 60 s. The active seconds of the beat are inside the same window, so the beat charges
+  max(active, window), not the sum. A machine that is down sends no beat, so it pays nothing.
+- The charge never refuses. The pools clamp at zero, and the cap sweep then parks the machine.
+- `machine_usage.always_on_seconds` holds the extra awake seconds. `active_seconds` stays the
+  "worked" figure. `machine_micros` holds the money for both. `GET /v1/usage` reports
+  `machine.alwaysOnSecondsToday`, and the Credits screen shows it beside the worked hours.
+
 
 **Packs.** One-time Stripe Checkout on **any plan**, free included: `$5 / 500 · $10 / 1,000 ·
 $25 / 2,500` pre-filled, and any whole amount between `MIN_PACK_CREDITS` (500) and

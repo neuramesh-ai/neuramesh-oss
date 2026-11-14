@@ -1,3 +1,6 @@
+import { replyRowsAfterPermission } from '@neuramesh/shared';
+import { PermissionRequest } from '../composer/PermissionRequest';
+import { PermissionPicker } from '../composer/PermissionPicker';
 import type { ConvoThreadProps } from './ConvoThreadProps';
 import { overviewSourceFiles, overviewOutputFiles } from './overview-model';
 import { ThreadOverviewBody, useThreadOverview } from './ThreadOverview';
@@ -137,7 +140,8 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   const trees = useMemo(() => runTrees(runRows, { threadId }).filter(isWatchableRun), [runRows, threadId]);
   // who is live here: the working ghost, the wait ghost that precedes it, and the run cards that
   // outrank both. One derivation, because the typist chip below has to agree with all three.
-  const { ghostAgent, waitGhost, carded, typists } = useConvoPresence({ rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming });
+  const replyRows = useMemo(() => replyRowsAfterPermission(rows, decisions), [rows, decisions]);
+  const { ghostAgent, waitGhost, carded, typists } = useConvoPresence({ rows: replyRows, agents, machines, channelId, threadId, runRows, trees, stream, streaming });
   // The drafted posts, in the transcript where they were handed over. Originals land as ONE strip
   // at the first draft's time; a revision rides its own strip after the reply that asked for it,
   // so scrolling back replays the review round rather than showing only the final copy.
@@ -259,12 +263,13 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
           /* Retry = say it again, which is what a person does anyway. It re-fires the daemon's
              live message watch AND re-bumps the machine, so it uses the proven path rather than
              a second one nobody exercises. The duplicate in the transcript is the truth. */
-          <WaitGhost found={waitGhost} onRetry={async () => { await nm?.send(channelId, rows[rows.length - 1]?.body ?? '', { threadId }); }} />
+          <WaitGhost key={replyRows.at(-1)?.id} found={waitGhost} needsAttachments={convoAttByMsg.has(replyRows.at(-1)?.id ?? '')} onRetry={async () => { await nm?.send(channelId, replyRows.at(-1)!.body ?? '', { threadId }); }} />
         )}
         {streaming && <StreamBubble live={streaming} role={agents.find((a) => a.name === streaming.agent)?.role} taskRef={taskRef} onOpenTask={onOpenTask} />}
       </div>
       </ThreadOverviewBody>
       <div className="tcompose">
+        <PermissionRequest rows={rows} decisions={decisions} />
         <RunDock trees={trees} agents={agents} onOpen={onActivity} scrollRef={listRef} />
         {(() => {
           // who's on it: the agents working in THIS thread (convo-presence), streamer first. It
@@ -347,6 +352,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
             {/* the same chip the task composer carries — the override it edits belongs to THIS
                 thread, and `threads.brain_override` is already synced onto the row we hold */}
+            <PermissionPicker key={threadId} threadId={threadId} />
             <BrainChip
               onConnect={onBrainConnect ?? (() => {})}
               project={brainProject ?? null}

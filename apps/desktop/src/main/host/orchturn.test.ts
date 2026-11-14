@@ -220,3 +220,37 @@ describe('zodShapeToGemini — the schema the house model is handed', () => {
     assert.deepEqual(out.properties.rows.items, { type: 'OBJECT', properties: { a: { type: 'STRING' } }, required: ['a'] });
   });
 });
+
+describe('live narration on the API lane (round 9)', () => {
+  /** a scripted /v1/starter/stream: each round answers NDJSON words, then the raw REST body */
+  function stubStream(rounds: Array<{ words: string; body: unknown }>) {
+    const real = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      urls.push(String(url));
+      const next = rounds.shift();
+      if (!next) return new Response('{}', { status: 500 });
+      const lines = [JSON.stringify({ t: 'text', text: next.words }), JSON.stringify({ t: 'done', response: next.body })].join('\n') + '\n';
+      return new Response(lines, { status: 200, headers: { 'content-type': 'application/x-ndjson' } });
+    }) as unknown as typeof globalThis.fetch;
+    return { urls, restore: () => { globalThis.fetch = real; } };
+  }
+
+  test('a round that writes words and then calls a tool keeps its words as a progress line', async () => {
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: {}, run: async () => 'two tasks' };
+    const plan = 'I will check the board first.';
+    const f = stubStream([
+      { words: plan, body: { candidates: [{ content: { role: 'model', parts: [{ text: plan }, { functionCall: { name: 'list_tasks', args: {} } }] } }] } },
+      { words: 'You have two tasks.', body: restText('You have two tasks.') },
+    ]);
+    undo = f.restore;
+    const updates: Array<{ text: string; progress: readonly string[] }> = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, traceKey: 'thread-1',
+      onDelta: (text, _thinking, progress) => updates.push({ text, progress: progress ?? [] }) });
+    assert.equal(out, 'You have two tasks.', 'the posted reply is the answer only');
+    assert.ok(f.urls.every((u) => u.endsWith('/v1/starter/stream')));
+    const atTool = updates.find((u) => u.progress.length === 1 && u.text === '');
+    assert.ok(atTool, 'when the tool starts, the plan moves to the progress lines and the bubble types fresh');
+    assert.deepEqual(updates.at(-1), { text: 'You have two tasks.', progress: [plan] });
+  });
+});

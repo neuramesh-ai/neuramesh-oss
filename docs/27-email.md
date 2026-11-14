@@ -1,5 +1,7 @@
 # 27 — Email (invites, lifecycle, broadcasts)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status 2026-07-23 — phases 1, 2 and 4 are BUILT and verified against real delivery.**
 > Migrations `0091_email` + `0092_workspace_invites`; `mail.ts` (Resend), `onauth.ts`,
 > `lifecycle.ts`; templates in `packages/shared/src/email/`; `pnpm mail:preview`.

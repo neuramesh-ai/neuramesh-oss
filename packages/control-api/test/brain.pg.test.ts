@@ -312,19 +312,27 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
   });
 
   it('stores original draft images through the large-body ingress with workspace and channel authorization', async () => {
-    const { id } = await thread();
-    const item = await json(await request(owner, '/v1/commands', { type: 'content.create', channel, thread: id, platform: 'x', body: 'Full quality draft' }));
+    const { id: publicThread } = await thread();
+    const [privateChannel]=await sql!`insert into channels(workspace_id,project_id,slug,kind) select workspace_id,project_id,${'media-'+randomUUID()},'marketing' from channels where id=${channel}::uuid returning id`;
+    const id=randomUUID(),mediaChannel=String(privateChannel!.id);
+    await sql!`insert into threads(id,workspace_id,channel_id,title,created_by) values(${id},${workspace},${mediaChannel},'Private media',${owner.id})`;
+    const item = await json(await request(owner, '/v1/commands', { type: 'content.create', channel:mediaChannel, thread: id, platform: 'x', body: 'Full quality draft' }));
     const bytes = Buffer.concat([Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'), Buffer.alloc(9_000_000, 23)]);
     const body = { type: 'content.attach_media', item: item.itemId, dataUrl: `data:image/gif;base64,${bytes.toString('base64')}` };
     expect((await request(stranger, '/v1/brain/content-media', body)).status).toBe(403);
-    const [registered] = await sql!`insert into agents (workspace_id, name, role, model) values (${workspace}::uuid, 'original-image-agent', 'orchestrator', 'gpt-5.6-sol') returning id`;
+    const [host]=await sql!`insert into machines(workspace_id,owner_user_id,name) values(${workspace},${owner.id},${'media-fixture-'+randomUUID()}) returning id`;
+    const [registered] = await sql!`insert into agents (workspace_id,machine_id,name,role,model) values (${workspace}::uuid,${host!.id},'original-image-agent','orchestrator','gpt-5.6-sol') returning id`;
     const agent: Actor = { kind: 'agent', id: registered!['id'], role: 'orchestrator' };
     expect((await request(agent, '/v1/brain/content-media', body)).status).toBe(403);
-    await sql!`insert into agent_channels (agent_id, channel_id) values (${agent.id}::uuid, ${channel}::uuid)`;
+    await sql!`insert into agent_channels (agent_id, channel_id) values (${agent.id}::uuid, ${mediaChannel}::uuid)`;
+    expect((await request(agent,'/v1/brain/content-media',body)).status).toBe(403);
+    await sql!`insert into workspace_destination_members(workspace_id,destination,principal_kind,principal_id,added_by) values(${workspace},'marketing','agent',${agent.id},${owner.id})`;
+    const upload=(context:string)=>app.request('/v1/brain/content-media',{method:'POST',headers:{'content-type':'application/json','x-nm-actor':JSON.stringify(agent),'x-nm-agent-context':JSON.stringify({workspace,subject:{kind:'thread',id:context}})},body:JSON.stringify(body)});
+    expect((await upload(publicThread)).status).toBe(403);
     vi.stubEnv('NM_LOCAL', '1'); vi.stubEnv('NM_BRAIN_STORAGE_DIR', root); vi.stubEnv('NM_BRAIN_GCS_BUCKET', '');
     vi.stubEnv('NM_BRAIN_CLOUD_ONLY_WORKSPACES', workspace);
     try {
-      const result = await request(agent, '/v1/brain/content-media', body);
+      const result = await upload(id);
       expect(result.status).toBe(200);
       const { mediaId } = await json(result);
       const [row] = await sql!`select bytes, object_ref, size_bytes from content_media where id = ${mediaId}::uuid`;

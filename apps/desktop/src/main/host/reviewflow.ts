@@ -6,10 +6,11 @@ import { projectPolicy, resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 import { shouldHoldReview } from '../runtime/honesty';
-import { type ShipPlan, type ClaimVerdict } from '@neuramesh/shared';
+import { hasPairedValidationImages, CODING_DELIVERY_SKILL, recordedCodingDelivery, type ShipPlan, type ClaimVerdict } from '@neuramesh/shared';
 
 import { reviewerBeatTitles } from '../beats';
 
+import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 import { reviewBlock } from './plan';
 
 import { type SubjectRef } from '../harness/brain';
@@ -109,7 +110,7 @@ const {
 
 async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; title: string; channel_id: string }) {
   agent = await seatFor(agent, t.channel_id, { taskId: t.id }); // per-project + per-thread brains (docs/10)
-  const actor = { kind: 'agent', id: agent.id, role: 'reviewer' };
+  const actor = { kind: 'agent', id: agent.id, role: agent.role };
   const beats = beatCursor(actor, t.id); // inert until declare(); gates and the catch fail() it
   // Beats gate on the echo mode (not `live`, which is resolved late) — the structural/CI
   // gates run before the reviewer's credential is even resolved. Echo stays beatless so
@@ -118,10 +119,11 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
   try {
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     const { log: rlog } = arun(agent, t, ch.slug);
-    const full = await db.get<{ requirements: string | null; definition_of_done: string | null; description: string | null; repo_id: string | null; submitted_sha: string | null; pr_url: string | null; pr_number: number | null; repo_clone: string | null }>(
-      `select t.requirements, t.definition_of_done, t.description, t.repo_id, t.submitted_sha, t.pr_url, t.pr_number, r.clone_url as repo_clone
+    const full = await db.get<{ work_plan: string | null; requirements: string | null; definition_of_done: string | null; description: string | null; repo_id: string | null; submitted_sha: string | null; pr_url: string | null; pr_number: number | null; repo_clone: string | null }>(
+      `select t.work_plan, t.requirements, t.definition_of_done, t.description, t.repo_id, t.submitted_sha, t.pr_url, t.pr_number, r.clone_url as repo_clone
        from tasks t left join repos r on r.id = t.repo_id where t.id = ?`, [t.id],
     );
+    const owned = recordedCodingDelivery(full?.work_plan);
     let checklist: string[] = [];
     try { checklist = JSON.parse(full?.requirements ?? '[]') as string[]; } catch { /* none */ }
     // the authoritative acceptance contract the reviewer gates on: the Definition
@@ -215,20 +217,20 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     // screenshots but none are attached, that item is provably unmet — don't let the semantic judge
     // rubber-stamp it on the worker's say-so. Bounce once so the worker can add them; if it's already
     // been bounced and still hasn't (it may be unable to capture a running app), block it for a human.
-    if (process.env['NM_AGENT_MODE'] !== 'echo' && /\bscreenshots?\b/i.test(dod)) {
+    if (owned?.visualEvidence || (process.env['NM_AGENT_MODE'] !== 'echo' && /\bscreenshots?\b/i.test(dod))) {
       const shots = await db.getAll<{ name: string; kind: string }>(`select name, kind from artifacts where task_id = ?`, [t.id]);
-      const hasShot = shots.some((a) => a.kind === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(a.name));
+      const hasShot = owned?.visualEvidence ? hasPairedValidationImages(shots) : shots.some((a) => a.kind === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(a.name));
       if (!hasShot) {
         const [bc] = await db.getAll<{ n: number }>(`select count(*) as n from messages where task_id = ? and author_kind = 'agent' and body like 'Auto-review of #%changes requested%screenshot%'`, [t.id]);
         if (Number(bc?.n ?? 0) >= 1) {
-          const reason = 'the Definition of Done requires screenshots, but none were attached after a prior review request — needs human attention (the worker may be unable to capture a running app; attach them or relax the DoD).';
+          const reason = 'required screenshot evidence is still incomplete after a prior review request — needs human attention (the worker may be unable to capture a running app; attach them or relax the DoD).';
           await beats.fail(); // review can't complete — mark the DoD beat blocked before task.block transitions it
           await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
           await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: `Auto-review of #${t.number}: ⛔ blocked — ${reason}` }).catch(() => {});
           rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `blocked #${t.number}: DoD screenshots still missing`, level: 'warn' });
           return;
         }
-        await requestChanges('the Definition of Done requires screenshots (e.g. of the delivered pages), but none are attached to the task — capture and attach them, then re-submit.', 'DoD requires screenshots; none attached');
+        await requestChanges(owned?.visualEvidence ? 'Capture and attach the missing before and after screenshots of each required view, then resubmit.' : 'The Definition of Done requires screenshots of the delivered work. Capture and attach them, then resubmit.', 'DoD requires screenshots; none attached');
         return;
       }
     }
@@ -284,19 +286,29 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
         ? `\n\n${reviewBlock('verdict.design_note', { names: designArts.map((a) => a.name).join(', ') })}`
         : '';
       try {
+        const diff = owned ? await db.get<ArtifactContentRow>("select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id=? and kind='diff' order by created_at desc limit 1",[t.id]) : null;
+        const reviewEvidence = owned ? (await readArtifactText(db,diff)).slice(0,24000) : '';
+        if (owned && !reviewEvidence.trim()) throw new Error('The submitted diff is unavailable.');
         const raw = await runtimeFor(agent.runtime).complete(
-          reviewBlock('verdict.system'),
+          reviewBlock('verdict.system') + (owned ? '\n\n' + CODING_DELIVERY_SKILL : ''),
           reviewBlock('verdict.user', {
             criteria, designNote, ciNote, lessonsNote,
             repoBinding: full?.repo_id ? `bound; pushed ${full.submitted_sha?.slice(0, 10) ?? 'NO'}` : 'none (repo-less scratch run)',
             artifacts: arts.map((a) => `- [${a.kind}] ${a.name}`).join('\n') || '(none)',
-            summary: summary.slice(0, 2000),
+            summary: summary.slice(0, 2000) + (owned ? `\nSubmitted diff and checks for self-review:\n${reviewEvidence}` : ''),
           }),
           token, agent.model, 400,
         );
         const j = JSON.parse((raw.match(/\{[\s\S]*\}/)?.[0]) ?? '{}') as { verdict?: string; reason?: string };
+        if (owned && !['approve','changes'].includes(j.verdict ?? '')) throw new Error('The review returned no usable verdict.');
         if (j.verdict === 'changes') { await requestChanges(j.reason?.trim() || 'a Definition-of-Done item is not satisfied by the delivered artifacts', 'definition of done unmet'); return; }
       } catch (err) {
+        if (owned) {
+          await beats.fail();
+          await post('/v1/messages',actor,{workspace:ch.workspace_id,channel:ch.id,taskId:t.id,body:`Review is incomplete. ${err instanceof Error ? err.message : 'The evidence could not be verified.'}`});
+          reviewed.delete(t.id);
+          return;
+        }
         console.error(`agent_review_judge #${t.number} failed (approving on structural pass):`, err);
         // fail-open to approve — the structural repo gate already passed
       } finally {
@@ -307,11 +319,11 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     // APPROVE — structural gate passed (+ semantic review passed in live)
     await beats.next(); // the Definition-of-Done review passed — settle the last beat before task.approve
     const approve = await post('/v1/commands', actor, { type: 'task.approve', taskId: t.id });
-    if (approve.status >= 400 && approve.status < 500) return; // another reviewer won
+    if (approve.status === 409) return; // another reviewer won
     if (!approve.ok) throw new Error(`approve ${approve.status}: ${await approve.text()}`);
     await post('/v1/messages', actor, {
       workspace: ch.workspace_id, channel: ch.id, taskId: t.id,
-      body: approvalLine({ number: t.number, dod: !!dod, prNumber, prUrl: full?.pr_url, pushedSha: repoRequired && pushed ? full?.submitted_sha : null, ci: ciVerdict }),
+      body: owned ? `I reviewed #${t.number} against the requirements and its submitted diff. ${owned.prepareRelease ? 'I will prepare the release checklist for your approval.' : 'Implementation review is complete. You can request a release checklist when ready.'}` : approvalLine({ number: t.number, dod: !!dod, prNumber, prUrl: full?.pr_url, pushedSha: repoRequired && pushed ? full?.submitted_sha : null, ci: ciVerdict }),
     });
     console.log(`agent_review agent=${agent.name} task=${t.number} approved`);
     rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `auto-review of #${t.number}: approved` });
@@ -329,17 +341,17 @@ const reviseToken = (planJson: string | null): string => {
   try { const p = JSON.parse(planJson) as ShipPlan; return `${p.round}:${p.revisions ?? 0}`; } catch { return ''; }
 };
 db.watch(
-  `select id, number, title, channel_id, pr_number, ship_plan from tasks where state = 'done' and pr_number is not null`,
+  `select id, number, title, channel_id, pr_number, ship_plan, case when json_type(work_plan,'$.codingDelivery') is not null then assignee_id end as coding_owner from tasks where state = 'done' and pr_number is not null and (json_type(work_plan,'$.codingDelivery') is null or json_extract(work_plan,'$.codingDelivery.prepareRelease')=1)`,
   [],
   {
     onResult: async (r) => {
       for (const t of (r.rows?._array ?? []) as ShipTask[]) {
         const token = reviseToken(t.ship_plan);
         if (shipPrepped.get(t.id) === token) continue;
-        const shipper = [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(t.channel_id));
+        const shipper = t.coding_owner ? agents.get(t.coding_owner) : [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(t.channel_id));
         if (!shipper) continue;
         shipPrepped.set(t.id, token);
-        execQueue.run({ key: `ship:${t.id}`, kind: 'ship', cause: 'board', agentId: shipper.id, subject: { kind: 'task', number: t.number } }, () => shipperFlow(shipper, t, { resume: false }));
+        execQueue.run({ key: `ship:${t.id}`, kind: 'ship', cause: t.coding_owner ? 'approval' : 'board', agentId: shipper.id, subject: { kind: 'task', number: t.number } }, () => shipperFlow(shipper, t, { resume: false }));
       }
     },
     onError: () => {},
@@ -350,17 +362,17 @@ db.watch(
 // a fresh redraft request): the claim already happened, so the flow re-enters
 // past it.
 db.watch(
-  `select id, number, title, channel_id, pr_number, ship_plan from tasks where state = 'shipping'`,
+  `select id, number, title, channel_id, pr_number, ship_plan, case when json_type(work_plan,'$.codingDelivery') is not null then assignee_id end as coding_owner from tasks where state = 'shipping'`,
   [],
   {
     onResult: (r) => {
       for (const t of (r.rows?._array ?? []) as ShipTask[]) {
         const token = reviseToken(t.ship_plan);
         if (shipPrepped.get(t.id) === token) continue;
-        const shipper = [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(t.channel_id));
+        const shipper = t.coding_owner ? agents.get(t.coding_owner) : [...agents.values()].find((a) => a.role === 'shipper' && a.channels.has(t.channel_id));
         if (!shipper) continue;
         shipPrepped.set(t.id, token);
-        execQueue.run({ key: `ship:${t.id}:resume`, kind: 'ship', cause: 'board', agentId: shipper.id, subject: { kind: 'task', number: t.number } }, () => shipperFlow(shipper, t, { resume: true }));
+        execQueue.run({ key: `ship:${t.id}:resume`, kind: 'ship', cause: t.coding_owner ? 'approval' : 'board', agentId: shipper.id, subject: { kind: 'task', number: t.number } }, () => shipperFlow(shipper, t, { resume: true }));
       }
     },
     onError: () => {},

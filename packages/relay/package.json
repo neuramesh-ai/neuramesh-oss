@@ -6,6 +6,10 @@
   "type": "module",
   "main": "src/lib.ts",
   "types": "src/lib.ts",
+  "exports": {
+    ".": "./src/lib.ts",
+    "./shard": "./src/shard.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

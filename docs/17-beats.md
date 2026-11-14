@@ -1,5 +1,7 @@
 # 17 — Beats: per-phase, agent-declared progress the human can watch (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-05) on `claude/beats-spec` — pending PR + release. Adds **beats**: the ordered,
 > high-level steps an agent declares for the phase it just picked up, checked off live, synced to the
 > cloud, and rendered as an animated tracker pinned above the task thread's composer. One set per phase

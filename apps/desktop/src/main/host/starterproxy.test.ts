@@ -180,11 +180,14 @@ describe('a watched house turn types as it is written', () => {
     ]);
     undo = f.restore;
     const seen: string[] = [];
-    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t) => seen.push(t) });
+    const lines: Array<readonly string[] | undefined> = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, _th, pg) => { seen.push(t); lines.push(pg); } });
     assert.equal(out, 'You have two tasks.');
     assert.deepEqual(ran, [{ state: 'todo' }]);
-    // the third update is the tool step's own (starterthoughts.ts): this round's words stay, the step rides beside them
-    assert.deepEqual(seen, ['Checking', 'Checking the board.', 'Checking the board.', 'You have', 'You have two tasks.']);
+    // the third update is the tool step's own (starterthoughts.ts). Round 9: this round's words move to the
+    // progress lines there, so the next round types afresh and the plan stays on screen above it
+    assert.deepEqual(seen, ['Checking', 'Checking the board.', '', 'You have', 'You have two tasks.']);
+    assert.deepEqual(lines.slice(2), [['Checking the board.'], ['Checking the board.'], ['Checking the board.']]);
     const second = f.calls[1]!.body;
     assert.deepEqual(second.contents[1], round1.candidates[0]!.content, 'the model turn goes back exactly as it came');
     assert.deepEqual(second.contents[2].parts[0].functionResponse, { id: 'call_1', name: 'list_tasks', response: { result: 'two tasks' } });
@@ -264,19 +267,22 @@ describe('a watched house turn shows its thoughts (starterthoughts.ts)', () => {
       { lines: [{ t: 'thought', text: 'Found two.' }, ...words('You have', ' two tasks.'), { t: 'done', response: body([{ text: 'Found two.', thought: true }, { text: 'You have two tasks.' }]) }] },
     ]);
     undo = f.restore;
-    const fed: Array<[string, string | undefined]> = [];
-    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, th) => { fed.push([t, th]); } });
+    const fed: Array<[string, string | undefined, readonly string[] | undefined]> = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, th, pg) => { fed.push([t, th, pg]); } });
     assert.equal(out, 'You have two tasks.');
-    // every bubble folds the block at the first word and opens it again on an update with no words (StreamBubble: thinking={!words && !done})
-    assert.equal(fed.findIndex(([t]) => t === ''), -1, `an update dropped the words: ${JSON.stringify(fed)}`);
+    // every bubble folds the block at the first word and opens it again on an update with nothing to read
+    // (StreamBubble: thinking={!spoken && !done}). Round 9: the words of a round that called a tool stay on
+    // screen as a progress line, so no update after the first word may lose both
+    assert.equal(fed.findIndex(([t, , pg]) => t === '' && !pg?.length), -1, `an update dropped the words: ${JSON.stringify(fed)}`);
     const steps = '› checks the board · todo\n\n› checks the board · done';
+    const plan = ['Checking the board.'];
     assert.deepEqual(fed, [
-      ['Checking the board.', undefined],
-      ['Checking the board.', '› checks the board · todo'],
-      ['Checking the board.', steps],
-      ['Checking the board.', `${steps}\n\nFound two.`],
-      ['You have', `${steps}\n\nFound two.`],
-      ['You have two tasks.', `${steps}\n\nFound two.`],
+      ['Checking the board.', undefined, []],
+      ['', '› checks the board · todo', plan],
+      ['', steps, plan],
+      ['', `${steps}\n\nFound two.`, plan],
+      ['You have', `${steps}\n\nFound two.`, plan],
+      ['You have two tasks.', `${steps}\n\nFound two.`, plan],
     ]);
   });
 

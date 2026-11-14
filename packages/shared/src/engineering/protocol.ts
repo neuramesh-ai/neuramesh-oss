@@ -65,6 +65,8 @@ export interface EngineeringAttachmentRef {
 }
 
 export type EngineeringRuntimeEvent =
+  /** Authenticated attachment to a task already executing on this host. Public UI state only. */
+  | { type: 'task_state'; session: import('./domain').EngineeringSession }
   /** Client transport lifecycle, never an agent reply or a recorded host event. */
   | { type: 'disconnected'; message: string }
   | { type: 'file_preview'; requestId: string; path: string; content?: string; error?: string }
@@ -74,6 +76,7 @@ export type EngineeringRuntimeEvent =
   | { type: 'model_changed'; provider: string; model: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
   /** @deprecated Accepted so an older machine can finish an already-open browser session. */
   | { type: 'brain_changed'; provider: string; model: string; brainPack: string | null }
+  | { type: 'followup_received'; id: string; text: string; attachments: EngineeringAttachmentRef[] }
   | { type: 'session_started'; sessionId: string }
   | { type: 'attachment_ack'; id: string; index: number }
   | { type: 'agent_event'; event: Record<string, unknown> }
@@ -166,7 +169,9 @@ export function isEngineeringCommand(value: unknown): value is EngineeringComman
 
 const NATIVE_TOOL_CATEGORY: Record<string, EngineeringPermissionCategory> = {
   show_artifact: 'read',
+  capture_task_view: 'edit',
   list_library: 'read',
+  load_skill: 'read',
   read_library_doc: 'read',
   list_repos: 'read',
   list_repo_files: 'read',
@@ -178,6 +183,10 @@ const NATIVE_TOOL_CATEGORY: Record<string, EngineeringPermissionCategory> = {
   update_whiteboard: 'edit',
   draft_article: 'edit',
   share_images: 'edit',
+  message_board_list: 'read',
+  message_board_catch_up: 'read',
+  message_board_send: 'edit',
+  message_board_take_handoff: 'edit',
   read_files: 'read',
   search_codebase: 'read',
   run_commands: 'command',

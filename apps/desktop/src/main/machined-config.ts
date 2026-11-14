@@ -89,6 +89,64 @@ export function readConfig(env: Record<string, string | undefined>): MachinedCon
   };
 }
 
+/** where this daemon runs. Unset is every machine before Cloud Run (a laptop, a GKE pod) and keeps
+ *  their behaviour. A value this build does not know must stop the boot, not fall back. */
+export type Substrate = 'default' | 'cloudrun';
+
+export function substrateOf(env: Record<string, string | undefined>): Substrate {
+  const v = env['NM_SUBSTRATE']?.trim() ?? '';
+  if (!v) return 'default';
+  if (v === 'cloudrun') return 'cloudrun';
+  throw new Error(`machined: NM_SUBSTRATE=${v} is not a substrate this build knows`);
+}
+
+/** the Cloud Run machine's layout (cloudrun/README.md). Only the work dir survives a restart (it is
+ *  snapshotted on drain and bind-mounted into the agent box), so the brain must live inside it. */
+export interface CloudRunConfig {
+  /** Convert legacy full snapshots on the next drain. Manifest readers are always enabled. */
+  lazySnapshots?: boolean;
+  /** Recovery switch: fully hydrate manifest-backed work before admitting interactive work. */
+  lazyRestoreEager?: boolean;
+  /** the snapshot root: `tar -C root -cf - work` */
+  root: string;
+  /** the work dir's name under root */
+  work: string;
+  workDir: string;
+  brainDir: string;
+  /** host side of the box's secret mount: 0400 files, deleted once read */
+  secretsDir: string;
+  /** memory percent of the container limit at which the guard drains the machine */
+  guardPct: number;
+  /** how long a controller drain waits for running turns before it stops them. Capped at 120 s so
+   *  grace plus snapshot stays under the 180 s a stop drain gets. */
+  graceMs: number;
+  zstdLevel: number;
+}
+
+export function cloudRunConfigOf(env: Record<string, string | undefined>): CloudRunConfig {
+  const root = (env['NM_CLOUDRUN_ROOT'] ?? '/nm').replace(/\/+$/, '') || '/';
+  const work = env['NM_CLOUDRUN_WORK'] ?? 'work';
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(work)) throw new Error(`machined: NM_CLOUDRUN_WORK=${work} must be one directory name`);
+  const workDir = `${root === '/' ? '' : root}/${work}`;
+  const brainDir = env['NM_BRAIN'] ?? `${workDir}/brain`;
+  if (brainDir !== workDir && !brainDir.startsWith(`${workDir}/`)) throw new Error(`machined: NM_BRAIN=${brainDir} is outside ${workDir}, so a Cloud Run restart would lose it`);
+  const num = (name: string, fallback: number, min: number, max: number): number => {
+    const raw = env[name];
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < min || n > max) throw new Error(`machined: ${name}=${raw} must be a number from ${min} to ${max}`);
+    return n;
+  };
+  const secretsDir = env['NM_CLOUDRUN_SECRETS'] ?? `${root === '/' ? '' : root}/secrets`;
+  if (secretsDir === workDir || secretsDir.startsWith(`${workDir}/`)) throw new Error(`machined: NM_CLOUDRUN_SECRETS=${secretsDir} is inside ${workDir}, so a snapshot could carry a key`);
+  return {
+    root, work, workDir, brainDir, secretsDir, lazySnapshots: env['NM_LAZY_SNAPSHOTS'] === '1', lazyRestoreEager: env['NM_LAZY_RESTORE_EAGER'] === '1',
+    guardPct: num('NM_OOM_GUARD_PCT', 90, 50, 99),
+    graceMs: num('NM_DRAIN_GRACE_MS', 60_000, 0, 120_000),
+    zstdLevel: num('NM_SNAPSHOT_ZSTD_LEVEL', 3, 1, 19),
+  };
+}
+
 /** the commit this machine's image was built from (the Dockerfile bakes NM_IMAGE_SHA from
  *  machine-image.yml), or null on a local build. Only a full commit sha counts: the API stores it
  *  as the machine's daemon_version, and a value it refused would cost the whole beat, not a field. */
@@ -101,7 +159,7 @@ export function imageShaOf(env: Record<string, string | undefined>): string | nu
  *  names its commit; an older image sends none, and the API keeps whatever the row holds. */
 export function heartbeatBody(machineId: string, beat: { activeSeconds: number; busy: boolean; runtimes?: string[]; imageSha: string | null }) {
   return {
-    type: 'machine.heartbeat' as const,
+    type: 'machine.heartbeat' as const, permissionVersion: 1,
     machineId,
     activeSeconds: beat.activeSeconds,
     busy: beat.busy,

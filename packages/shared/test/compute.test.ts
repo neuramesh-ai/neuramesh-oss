@@ -628,7 +628,7 @@ describe('the house brain is servable by any awake machine', () => {
 // These pin the ORDER of the rules, because the order is the design: a machine that is
 // heartbeating must never read "asleep", and one scaled up but silent must stop claiming to be on
 // its way once that stops being plausible. Each was a distinct situation "offline" used to cover.
-import { MACHINE_WAKE_GRACE_MS, capResetLabel, capSpent, machineState, msUntilCapReset } from '../src/compute';
+import { MACHINE_STATUS_LABEL, MACHINE_WAKE_GRACE_MS, capResetLabel, capSpent, machineLit, machineSeenFact, machineState, machineWaitLine, msUntilCapReset } from '../src/compute';
 
 describe('machineState — the two axes, resolved once', () => {
   const NOW = Date.parse('2026-08-29T12:00:00Z');
@@ -637,10 +637,25 @@ describe('machineState — the two axes, resolved once', () => {
   const ROOM = { minutes: 12, capMinutes: 60 };
   const CLOUD = { minutes: 900, capMinutes: null };
 
-  it('a heartbeat beats intent — a machine answering right now is never "asleep"', () => {
-    // the gap between a cap-stop landing and the pod going away: intent is already 0, but it IS up
-    const s = machineState({ desiredReplicas: 0, lastSeenAt: ago(5_000) }, CAPPED, NOW);
-    expect(s.status).toBe('online');
+  it('explicit startup readiness defeats a recent heartbeat until relay registration', () => {
+    const m = { desiredReplicas: 1, lastSeenAt: ago(1000), startedAt: ago(20_000), interactiveReady: false };
+    expect(machineState(m, CLOUD, NOW).status).toBe('waking');
+    expect(machineState({ ...m, interactiveReady: true }, CLOUD, NOW).status).toBe('online');
+    expect(machineState({ ...m, interactiveReady: null }, CLOUD, NOW).status).toBe('online');
+    expect(machineState({ ...m, desiredReplicas: 0 }, CLOUD, NOW).status).toBe('asleep');
+    expect(machineState({ ...m, startedAt: ago(MACHINE_WAKE_GRACE_MS + 1) }, CLOUD, NOW).status).toBe('unreachable');
+  });
+
+  // THE LIVE BUG (build 25f8d8dd, 2026-11-06): a parked runner (desired 0) was seen seconds ago
+  // because it had just drained, and the Compute panel said "Online. Awake and ready". Intent wins
+  it('intent beats a heartbeat: desired 0 with a beat seconds ago is ASLEEP, never awake', () => {
+    const s = machineState({ desiredReplicas: 0, lastSeenAt: ago(5_000) }, ROOM, NOW);
+    expect(s.status).toBe('asleep');
+    expect(s.reason).not.toMatch(/awake and ready/i);
+    expect(s.reason).toMatch(/no credits/i);
+    expect(machineLit(s.status)).toBe(false);
+    // the same machine with the day spent reads capped, not online
+    expect(machineState({ desiredReplicas: 0, lastSeenAt: ago(5_000) }, CAPPED, NOW).status).toBe('capped');
   });
 
   // THE WAKE THAT CANNOT HAPPEN. bumpMachineWake raises desired_replicas only on a positive
@@ -653,7 +668,7 @@ describe('machineState — the two axes, resolved once', () => {
     expect(s.reason).toMatch(/credits/i);
     // the guard is that the ASLEEP copy never leaks in here, matched on its opening rather than
     // on one clause of it, so a rewrite of the sentence cannot quietly disarm this test
-    expect(s.reason).not.toMatch(/asleep until someone needs it/i);
+    expect(s.reason).not.toMatch(/^asleep/i);
   });
 
   it('a RUNNING machine is never described as out of credits — the sweep parks it, not the reader', () => {
@@ -697,6 +712,54 @@ describe('machineState — the two axes, resolved once', () => {
 
   it('a wake with no last_wake_at is unreachable, not waking — an unknown clock is not a young one', () => {
     expect(machineState({ desiredReplicas: 1, lastSeenAt: null, lastWakeAt: null }, ROOM, NOW).status).toBe('unreachable');
+  });
+
+  it('THE STATE TABLE: every row, from the intent first and the heartbeat second', () => {
+    const started = ago(60_000);
+    const rows: Array<[string, Parameters<typeof machineState>[0], Parameters<typeof machineState>[1], string]> = [
+      ['parked, beat 5 s ago', { desiredReplicas: 0, lastSeenAt: ago(5_000), parkedAt: ago(4_000) }, ROOM, 'asleep'],
+      ['parked long ago', { desiredReplicas: 0, lastSeenAt: ago(3_600_000) }, ROOM, 'asleep'],
+      ['parked, breaker open', { desiredReplicas: 0, lastSeenAt: ago(5_000), bootLoopAt: ago(10_000) }, ROOM, 'held'],
+      ['parked, no credits (beats the breaker)', { desiredReplicas: 0, bootLoopAt: ago(10_000) }, { minutes: 0, capMinutes: null, outOfCredits: true }, 'no_credits'],
+      ['woken, no beat since the start, in the grace', { desiredReplicas: 1, startedAt: ago(20_000), lastSeenAt: ago(600_000) }, ROOM, 'waking'],
+      ['woken, an OLD beat 30 s before the start', { desiredReplicas: 1, startedAt: ago(10_000), lastSeenAt: ago(40_000) }, ROOM, 'waking'],
+      ['prewoken: started, last_wake_at old', { desiredReplicas: 1, startedAt: ago(5_000), lastWakeAt: ago(3_600_000), lastSeenAt: null }, ROOM, 'waking'],
+      ['up: a fresh beat since the start', { desiredReplicas: 1, startedAt: started, lastSeenAt: ago(10_000) }, ROOM, 'online'],
+      ['up, an older server with no start', { desiredReplicas: 1, lastSeenAt: ago(10_000) }, ROOM, 'online'],
+      ['woken, never answered, past the grace', { desiredReplicas: 1, startedAt: ago(MACHINE_WAKE_GRACE_MS + 5_000), lastSeenAt: null }, ROOM, 'unreachable'],
+      ['up, then silent', { desiredReplicas: 1, startedAt: ago(3_600_000), lastSeenAt: ago(300_000) }, ROOM, 'unreachable'],
+      ['idle stop draining', { desiredReplicas: 1, startedAt: started, lastSeenAt: ago(2_000), drainState: 'draining', drainReason: 'idle' }, ROOM, 'sleeping'],
+      ['cap stop draining', { desiredReplicas: 1, startedAt: started, lastSeenAt: ago(2_000), drainState: 'draining', drainReason: 'cap' }, ROOM, 'sleeping'],
+      ['grow drain requested', { desiredReplicas: 1, startedAt: started, lastSeenAt: ago(2_000), drainState: 'requested', drainReason: 'grow' }, ROOM, 'waking'],
+      ['resizing', { desiredReplicas: 1, startedAt: started, lastSeenAt: ago(2_000), drainState: 'resizing', drainReason: 'grow' }, ROOM, 'waking'],
+      ['unknown intent, fresh beat (a laptop)', { lastSeenAt: ago(5_000) }, null, 'online'],
+      ['unknown intent, no beat', { lastSeenAt: null }, null, 'asleep'],
+      ['destroyed', { lifecycle: 'destroyed', desiredReplicas: 1, lastSeenAt: ago(1_000) }, ROOM, 'stopped'],
+    ];
+    for (const [name, m, cap, want] of rows) expect(`${name}: ${machineState(m, cap, NOW).status}`).toBe(`${name}: ${want}`);
+  });
+
+  it('the words are honest about the bill: asleep costs nothing, awake uses credits', () => {
+    expect(machineState({ desiredReplicas: 0, lastSeenAt: null }, ROOM, NOW).reason).toMatch(/uses no credits/);
+    expect(machineState({ desiredReplicas: 1, lastSeenAt: ago(5_000) }, ROOM, NOW).reason).toMatch(/uses credits while it is awake/);
+    expect(machineState({ desiredReplicas: 1, drainState: 'draining', drainReason: 'idle' }, ROOM, NOW).reason).toMatch(/then it uses no credits/i);
+    for (const label of Object.values(MACHINE_STATUS_LABEL)) expect(label).not.toMatch(/[;\u2014]/);
+    expect(MACHINE_STATUS_LABEL.asleep).toBe('Asleep');
+    expect(MACHINE_STATUS_LABEL.online).toBe('Awake');
+  });
+
+  it('the "when" fact: a stopped machine says when it went to sleep, never "seen just now"', () => {
+    const ago2 = (iso: string) => (iso === ago(4_000) ? 'just now' : 'earlier');
+    expect(machineSeenFact('asleep', { lastSeenAt: ago(5_000), parkedAt: ago(4_000) }, ago2)).toBe('went to sleep just now');
+    expect(machineSeenFact('held', { lastSeenAt: ago(4_000) }, ago2)).toBe('went to sleep just now');
+    expect(machineSeenFact('online', { lastSeenAt: ago(4_000) }, ago2)).toBe('seen just now');
+    expect(machineSeenFact('stopped', { lastSeenAt: ago(4_000) }, ago2)).toBeNull();
+    expect(machineSeenFact('asleep', { lastSeenAt: null }, ago2)).toBeNull();
+  });
+
+  it('the new states have a wait line: a message wakes a machine that is going to sleep or paused', () => {
+    expect(machineWaitLine('sleeping')).toEqual({ line: 'Waking the cloud machine…', stalled: false });
+    expect(machineWaitLine('held')).toEqual({ line: 'Waking the cloud machine…', stalled: false });
   });
 
   it('every status carries a written reason, so no surface has to compose one', () => {
@@ -839,7 +902,7 @@ describe('the freshest heartbeat', () => {
 
   it('turns "seen now, does not answer" into online', () => {
     const now = Date.parse('2026-09-06T21:02:10.000Z');
-    const polled = { desiredReplicas: 1, lastSeenAt: '2026-09-06T20:58:00.000Z', lastWakeAt: '2026-09-06T20:50:00.000Z', lifecycle: 'running' };
+    const polled = { desiredReplicas: 1, lastSeenAt: '2026-09-06T20:58:00.000Z', lastWakeAt: '2026-09-06T20:50:00.000Z', startedAt: '2026-09-06T20:50:00.000Z', lifecycle: 'running' };
     expect(machineState(polled, null, now).status).toBe('unreachable');
     expect(machineState({ ...polled, lastSeenAt: newestSeen(polled.lastSeenAt, '2026-09-06T21:02:00.000Z') }, null, now).status).toBe('online');
   });

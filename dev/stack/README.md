@@ -35,7 +35,7 @@ Migrations live in [`supabase/migrations/`](../../supabase/migrations) and are a
 |---|---|
 | **Fresh dev DB** | [`init/00-bootstrap.sh`](init/00-bootstrap.sh) auto-discovers + applies **every** migration on first `up` (and records `schema_migrations`). No hand-maintained list — a fresh stack is always current. |
 | **Running dev DB** | `pnpm db:dev-migrate` — applies any migration the dev DB doesn't have yet. Run it after you add a `supabase/migrations/NNNN_*.sql` to test it locally. Idempotent. |
-| **Prod** | The Vercel production build runs the same `migrate.mjs` (`packages/control-api/vercel.json` `buildCommand`) before new code serves traffic. |
+| **Prod** | A reviewed Cloud Run migration job runs the migration code before explicit runtime promotion. Merging source does not apply it. See [infra/README.md](../../infra/README.md). |
 
 > The first `pnpm db:dev-migrate` against a legacy (untracked) dev DB adopts tracking at the latest migration — it assumes the running DB is already current and records the set without re-running. New migrations apply normally after that.
 
@@ -47,7 +47,7 @@ allowlist and schema hash. A new table also needs a change-capture trigger and w
 Deploy additive API/schema changes before clients that consume them.
 
 [`powersync/sync-config.yaml`](powersync/sync-config.yaml) is a frozen contract for older
-installed clients during the [retirement rollout](../../docs/design/powersync-retirement-2026-10/plan.md).
+installed clients during the completed [retirement rollout](../../docs/design/powersync-retirement-2026-10/plan.md).
 It is neither mounted by this stack nor deployed by CI. The old sync-rule commands and workflow
 have been removed.
 

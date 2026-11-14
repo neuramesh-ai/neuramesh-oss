@@ -144,6 +144,7 @@ export function engineeringActivePresentation(
   mode: EngineeringMode,
 ): EngineeringActivityPresentation {
   if (activity?.phase === 'restoring') return { kind: 'runtime', title: 'Loading conversation', detail: 'Restoring recorded history', status: 'info' };
+  if (activity?.phase === 'installing') return { kind: 'runtime', title: 'Installing dependencies', detail: 'The machine installs the packages in the lockfile', status: 'info' };
   if (activity?.phase === 'tool' && activity.toolName) {
     const copy = toolCopy(activity.toolName);
     return { kind: copy.kind, title: copy.active, detail: 'Repository tool is running', status: 'info' };

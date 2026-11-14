@@ -14,13 +14,23 @@
  *  TextDecoder with `{ stream: true }` holds the partial sequence between calls, so one
  *  decoder per channel is what makes `git log` render instead of speckle. */
 export function makeDecoder(): (b64: string) => string {
+  const dec = makeByteDecoder();
+  return (b64) => dec(b64ToBytes(b64));
+}
+
+/** the same streaming decoder, one step later: a resumed session cuts the bytes a pane already has
+ *  off the front of a frame BEFORE they are decoded, so the cut is a byte count, never a character count */
+export function makeByteDecoder(): (bytes: Uint8Array) => string {
   const dec = new TextDecoder('utf-8');
-  return (b64) => {
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-    return dec.decode(bytes, { stream: true });
-  };
+  return (bytes) => dec.decode(bytes, { stream: true });
+}
+
+/** base64 → the bytes it carries */
+export function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
 /** text → base64. btoa is LATIN-1 ONLY: it throws on any code point above 255, so typing
@@ -35,7 +45,7 @@ export function encodeB64(text: string): string {
 
 /** the relay's coded refusals, said as something a person can act on. Mirrors CLOSE in
  *  packages/relay/src/protocol.ts — kept as literals so the browser bundle does not pull a
- *  node package in for seven integers. */
+ *  node package in for a handful of integers. */
 export function closeReason(code: number): string {
   switch (code) {
     case 4401: return 'This machine did not accept the connection. Try reloading.';
@@ -49,6 +59,12 @@ export function closeReason(code: number): string {
     case 4410: return 'The machine went away.';
     case 1013: return 'Cannot reach NeuraMesh to check permissions. Try again shortly.';
     case 1008: return 'The relay refused the connection.';
+    // the relay instance retired for a newer revision (rollover.ts). A session on a machine that can
+    // resume never shows this: the client dials again and takes it back
+    case 1012: return 'The relay restarted for an update. Try again.';
+    // a shard refused this machine and the client could not follow (shard.ts): it already followed
+    // one refusal, or the refusal named no shard it knows. Only a page with the current list helps
+    case 4421: return 'This machine is on another relay shard. Reload the page to get the current list of relays.';
     // EVERY OTHER CODE CARRIES ITS NUMBER. The bare sentence was indistinguishable from the four
     // named refusals above, so a report of "The connection closed" ruled nothing in or out — which
     // is exactly where one stalled (George, 2026-09-06). 1006 is a handshake that never completed;
@@ -62,3 +78,6 @@ export function closeReason(code: number): string {
  *  speaks CRLF and these bytes go straight to the emulator. Yellow, because this is the
  *  same "nm:" voice the desktop terminal already uses for its own notes. */
 export const notice = (text: string): string => `\r\n\x1b[33mnm:\x1b[0m \x1b[2m${text}\x1b[0m\r\n`;
+
+/** a line in that voice, from this client or the machine edge: never the shell's own output */
+export const isNotice = (d: string): boolean => d.startsWith('\r\n\x1b[33mnm:\x1b[0m ');

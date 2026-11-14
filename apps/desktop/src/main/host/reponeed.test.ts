@@ -123,6 +123,10 @@ test('readable means the connector, or a GitHub repository and this machine\'s g
   assert.deepEqual(await repoReadable(replica({ repo: GITHUB }), 'ch', async () => false), { ok: false, repoName: 'site' });
   assert.deepEqual(await repoReadable(replica({ repo: GITHUB }), 'ch', async () => true), { ok: true, repoName: 'site' });
   assert.deepEqual(await repoReadable(replica({ repo: null }), 'ch'), { ok: false, repoName: null });
+  // a git or bundle repository: not readable here, and marked so the caller puts no GitHub card up (r7 evals ede25023)
+  const git = { id: 'r3', org_name: 'e2e', name: 'ledger', clone_url: 'file:///nm/work/e2e/ledger.git', local_path: null, provider: 'git' };
+  assert.deepEqual(await repoReadable(replica({ repo: git, connected: true }), 'ch', async () => true), { ok: false, repoName: 'ledger', notGitHub: true });
+  assert.deepEqual(await repoReadable(replica({ repo: { ...git, clone_url: 'nm-bundle:k1', provider: 'bundle' } }), 'ch', async () => true), { ok: false, repoName: 'ledger', notGitHub: true });
 });
 
 test('the reader: a refusal a grant fixes puts the card up and tells the model to stop, and without the hook it keeps its prose', async () => {

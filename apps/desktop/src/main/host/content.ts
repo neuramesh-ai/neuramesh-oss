@@ -41,10 +41,10 @@ export function makeContent(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   apiUrl: string;
   blockFor: ReturnType<typeof makeBlock>['blockFor'];
-  brainBriefing: (subject: SubjectRef | null, dir: string) => string;
+  brainBriefing: (subject: SubjectRef | null, dir: string) => string | Promise<string>;
   db: ReplicaDatabase;
   designerOverride: (a: { ch: { id: string; slug: string; workspace_id: string }; taskId: string | null; label: string; brief: string; dir: string; brainSubject: SubjectRef | null }) => Promise<PromptOverride>;
-  ensureChatWorkspace: (threadId: string) => string;
+  ensureChatWorkspace: (threadId: string) => string | Promise<string>;
   legSummary: (out: string) => string;
   narrate: ReturnType<typeof makeRuns>['narrate'];
   openRun: ReturnType<typeof makeRuns>['openRun'];

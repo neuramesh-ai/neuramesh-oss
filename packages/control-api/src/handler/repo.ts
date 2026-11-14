@@ -32,6 +32,7 @@ import type { Command } from '../commands';
 import { DomainError } from '../errors';
 
 
+import { bundleObject, memberOf, repoBundleStorage } from '../repo-bundles';
 import { type Store } from '../store';
 import { actorAddress, parseRepoUrl } from './guards';
 
@@ -58,6 +59,11 @@ export async function repoCommands(store: Store, actor: Actor, cmd: Command): Pr
       const parsed = parseRepoUrl(cmd.url);
       ({ provider, orgName, name, cloneUrl } = parsed);
       localPath = null;
+      if (provider === 'bundle') {
+        await assertBundleLinkable(store, actor, cmd.workspace, name);
+        // the key names the upload; the person's name for it is the row's name when they gave one
+        name = cmd.name?.trim() || name;
+      }
     } else {
       throw new DomainError('INVALID_INPUT', 'provide a repo URL or a local folder path');
     }
@@ -76,4 +82,14 @@ export async function repoCommands(store: Store, actor: Actor, cmd: Command): Pr
     return { ok: true, repoId: id, inserted } as never;
   }
   return undefined;
+}
+
+/** a bundle row must point at an object that exists, in a workspace the caller belongs to: the object
+ *  path is built from the command's workspace, so a stranger could otherwise probe another
+ *  workspace's uploads, and a row that points at nothing fails only later, on a machine */
+async function assertBundleLinkable(store: Store, actor: Actor, workspace: string, key: string): Promise<void> {
+  if (!(await memberOf(store, actor, workspace))) throw new DomainError('NOT_PERMITTED', 'not your workspace');
+  const storage = repoBundleStorage();
+  if (!storage) throw new DomainError('INVALID_INPUT', 'bundle storage is not configured on this server');
+  if (!(await storage.stat(bundleObject(workspace, key)))) throw new DomainError('NOT_FOUND', 'no uploaded bundle has that key in this workspace. Upload it first (POST /v1/repos/bundles/sign, then PUT the file).');
 }

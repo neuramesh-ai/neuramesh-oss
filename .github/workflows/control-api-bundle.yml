@@ -1,8 +1,8 @@
 name: control-api bundle
 
-# Keeps packages/control-api/index.js (the esbuild bundle Vercel deploys verbatim) in lockstep
+# Keeps the retained Vercel-compatible packages/control-api/index.js bundle in lockstep
 # with its sources. index.js is generated from src/vercel.ts + @neuramesh/shared, so any PR that
-# touches those can leave the committed bundle stale — prod would then silently run old code
+# touches those can leave compatibility consumers on old code; Cloud Run builds separately
 # (the drift behind #17/#34). On such a PR this rebuilds the bundle and, if it changed, commits
 # it back so the regenerated diff is in the PR for review.
 #

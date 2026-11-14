@@ -1,3 +1,4 @@
+import * as mockPermissions from '../../../../hq/preview/mock-permissions';
 // The mock NMBridge the preview harness installs on `window.nm` — extracted from
 // mock-nm.ts's fixture world (track D-preview). Fixtures live in ./mock-fixtures.
 import { planLabel, seatLimitReason, threadTitle } from '@neuramesh/shared';
@@ -512,11 +513,9 @@ const explicit: Record<string, any> = {
   // Agent policy (Phase 1): persisted overrides on top of the shared baseline — the destructive-shell
   // rule tightened to deny, and network egress tightened to ask (this workspace reviews every outbound
   // host) — so the panel shows the merge + a non-default row in each group in a screenshot.
-  policies: async () => [
-    { id: 'ovr-shell', scope: 'workspace', capability: 'shell.exec', selector: JSON.stringify({ kind: 'shellClass', value: 'destructive' }), verdict: 'deny', rationale: 'Tightened to deny for this workspace', locked: 0, project_id: null },
-    { id: 'ovr-egress', scope: 'workspace', capability: 'net.egress', selector: JSON.stringify({ kind: 'any' }), verdict: 'ask', rationale: 'Review every outbound host in this workspace', locked: 0, project_id: null },
-    { id: 'ovr-protect', scope: 'workspace', capability: 'fs.read', selector: JSON.stringify({ kind: 'path', glob: '**/.config/acme-secrets/**' }), verdict: 'deny', rationale: 'Agents can’t read .config/acme-secrets', locked: 0, project_id: null },
-  ],
+  policies: mockPermissions.policies,
+  getPermissions: mockPermissions.getPermissions,
+  setPermissions: mockPermissions.setPermissions,
   policySet: async () => ({ ok: true }),
   policyDelete: async () => ({ ok: true }),
   sandboxGet: async () => ({ enabled: true, envForced: false }),

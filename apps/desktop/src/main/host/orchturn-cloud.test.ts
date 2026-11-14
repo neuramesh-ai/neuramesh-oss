@@ -134,9 +134,14 @@ test('image-capable NeuraMesh turns use the attachment tool instead of Codex cli
 });
 
 test('the agy transport answers outside electron, and its shim lands in NM_USERDATA', async () => {
-  standIn('agy', `echo '{"event":"result","result":{"status":"SUCCESS","response":"hello from agy"}}'`);
+  standIn('agy', `cat > "\${NM_USERDATA}/agy-input.json"
+echo '{"event":"result","result":{"status":"SUCCESS","response":"hello from agy"}}'`);
 
-  const reply = await agyOrchestratorTurn({ ...ARGS, model: 'gemini-3.5-flash' });
+  const transcript = 'uncompacted history '.repeat(10000) + 'latest question';
+  const reply = await agyOrchestratorTurn({ ...ARGS, transcript, model: 'gemini-3.5-flash' });
+  const frame = JSON.parse(readFileSync(join(state, 'agy-input.json'), 'utf8'));
+  assert.ok(frame.message.content.includes(transcript));
+  assert.doesNotMatch(readFileSync(join(root,'agy.argv'),'utf8'), /latest question/);
 
   assert.equal(reply, 'hello from agy');
   const shim = join(state, 'nm-orch-mcp-shim.mjs');

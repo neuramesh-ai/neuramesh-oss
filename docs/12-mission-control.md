@@ -1,5 +1,7 @@
 # Mission Control — the Home dashboard (spec + build plan)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** slice 1 shipped in **v0.9.0** (merged as e36c542, published 2026-07-02); **slices 2–3 shipped in v0.23.0 (2026-07-07; v0.21–v0.22 were taken by parallel sessions #100/#102)** — decisions as a first-class synced table + the ⌘K quick-actions palette. Drafted from the wow-factor review ([mockups/wow-factor/05-mission-control.html](../mockups/wow-factor/05-mission-control.html), PR #42). This is the review artifact for WOW 10; WOW 13 (decision inbox) rode in as slice 2 (cards in the needs-you queue, not a separate view — the 08 mock's card anatomy), WOW 15 (⌘K) as slice 3. Evidence: `docs/evidence/mission-control/` (kept local by repo convention — shots attached to each slice's PR). **Build-time corrections are marked ▸ inline below.**
 
 ## 1. Goal

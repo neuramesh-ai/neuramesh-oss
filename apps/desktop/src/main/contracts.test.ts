@@ -43,7 +43,9 @@ test('BYTE FINGERPRINT: the channel contract is pinned', () => {
   // vs architect-drafts; take-default vs pre-named offers), every rule stated 2–6×, changelog
   // dates and a hardcoded seat name in live prose. Rewritten as ONE decision tree under the
   // one-home-per-rule rule: tool mechanics live in tool descriptions, judgment lives here.
-  assert.equal(t.length, 7480, 'the channel contract changed length — if that was deliberate, update this number IN THE SAME COMMIT');
+  // 7480 → 7574, DELIBERATELY (2026-11-06, round 9 live narration): GROUND TRUTH runs only when the
+  // answer needs this project's facts. A self-contained ask took ten lookups and 66 seconds before.
+  assert.equal(t.length, 7574, 'the channel contract changed length — if that was deliberate, update this number IN THE SAME COMMIT');
   assert.equal(t.split('\n').length, 39, 'the channel contract changed line count');
 });
 
@@ -101,7 +103,9 @@ test('powers and style match their pinned size', () => {
   // bar (the first live run invented one). The routine's parts ride propose_routine's schema.
   // 5633 → 5722 (the third live run): never ask for a time zone (it asked twice), and propose_routine is the
   // one way a card is posted (it wrote v2 by hand; the server now drops such a block, routineCardGuard).
-  assert.equal(c.prompt!['powers']!.length, 5722);
+  // 5722 → 5840 (2026-11-06, round 9 live narration): the ladder's build-is-coding line. A request to build
+  // software opens a coding session, so the orchestrator never pastes a whole program into the thread.
+  assert.equal(c.prompt!['powers']!.length, 5840);
   assert.equal(c.prompt!['style']!.length, 1430);
 });
 
@@ -116,6 +120,9 @@ test('the contract makes solving in-thread the default, and filing a proposal', 
   assert.match(powers, /create_task, directly/);
   // the code door (0144): hands on the repo now → open_code_session, one rung above the board's bar
   assert.match(powers, /open_code_session/);
+  // round 9: a build ask is coding work, never a pasted program, and lookups run only for project facts
+  assert.match(powers, /A request to build software is coding work\. Never paste a whole program\. Open a coding session/);
+  assert.match(channel, /GROUND TRUTH, only when the answer depends on this project's facts \(a self-contained ask needs no lookups\)/);
   // the routine writer: work that repeats is rung 0, written WITH the person, and a run is never re-written
   assert.match(powers, /0\. \*\*It asks for work that repeats\*\*/);
   assert.match(powers, /propose_routine/);

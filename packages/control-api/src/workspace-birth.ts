@@ -15,6 +15,7 @@ import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
 import { activationEnabled } from './activation';
 import { grantCredits } from './credit-ledger';
 import { sqlOf } from './credits';
+import { emailSelfAsserted } from './email-proof';
 import { localMode } from './localmode';
 import { mintWorkspaceRunner } from './plan-flip';
 import type { Store } from './store';
@@ -54,7 +55,38 @@ export async function birthFirstWorkspace(store: Store, userId: string, workspac
     console.error(`signup_birth_skipped workspace=${workspaceId}:`, e);
     return;
   }
-  await grantSignupCredits(store, workspaceId);
+  await grantSignupOnce(store, userId, workspaceId);
   const sql = sqlOf(store);
   if (sql) await mintWorkspaceRunner(store, sql, workspaceId, 'signup');
+}
+
+/** THE SIGNUP CREDITS ARE THE PERSON'S, ONCE (R10 lane A, NM-024). "First" was decided by current
+ *  membership only, and workspace.delete hard-deletes a sole owner's workspace with its grants, so
+ *  delete-then-sign-in-again funded a fresh "first" workspace every time (and two tabs racing the
+ *  first sign-in funded two). The grant is now claimed on the person's own row
+ *  (nm_users.signup_grant_at, migration 0186) before it is written, and a claim that came back
+ *  empty grants nothing. An account whose address is only the in-app sign-up's say-so waits for its
+ *  email proof (email-proof.ts, NM-010): the proof grants it then. An identity with no nm_users row
+ *  (the dev/legacy path, where the JWT sub is our uuid) keeps the membership test alone. */
+export async function grantSignupOnce(store: Store, userId: string, workspaceId: string): Promise<boolean> {
+  const sql = sqlOf(store);
+  if (!sql) return grantSignupCredits(store, workspaceId);
+  if (await emailSelfAsserted(store, userId)) {
+    console.log(`signup_grant_deferred user=${userId} workspace=${workspaceId} reason=email_unproven`);
+    return false;
+  }
+  try {
+    const [known] = await sql`select signup_grant_at from nm_users where id = ${userId}::uuid`;
+    if (known) {
+      const claimed = await sql`update nm_users set signup_grant_at = now() where id = ${userId}::uuid and signup_grant_at is null returning id`;
+      if (!claimed.length) { console.log(`signup_grant_skipped user=${userId} workspace=${workspaceId} reason=already_granted`); return false; }
+    }
+  } catch (e) {
+    console.error(`signup_grant claim FAILED user=${userId}:`, e);
+    return false;
+  }
+  const ok = await grantSignupCredits(store, workspaceId);
+  // a grant that did not land gives the claim back, so the person is not left with neither
+  if (!ok) await sql`update nm_users set signup_grant_at = null where id = ${userId}::uuid`.catch(() => {});
+  return ok;
 }

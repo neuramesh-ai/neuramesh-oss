@@ -104,6 +104,19 @@ test('rearm makes a bounced task runnable again — the request_changes path, ma
   assert.equal(runs, 2);
 });
 
+test('Unblock requeues once even when the previous failed attempt has not settled', async () => {
+  const q = new HostQueue({ caps: { slots: 2, perAgent: 2 } });
+  const ending = gate(), restarted = gate();
+  const order: string[] = [];
+  q.run(work('task'), async () => { order.push('old'); await ending.done; order.push('settled'); });
+  q.rearm('task');
+  assert.equal(q.run(work('task'), async () => { order.push('retry'); restarted.release(); }), true);
+  assert.equal(q.run(work('task'), async () => { order.push('duplicate'); }), false);
+  assert.deepEqual(order, ['old']);
+  ending.release();
+  await restarted.done;
+  assert.deepEqual(order, ['old', 'settled', 'retry']);
+});
 test('no over-admission under a re-entrant drain', async () => {
   // Every settle re-enters drain(); without the latch two drains each see the same free slot.
   const q = new HostQueue({ caps: { slots: 2, perAgent: 5 } });
@@ -230,4 +243,78 @@ test('a turn with no subject still runs — it simply is not filed', async () =>
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(ran, true, 'a room-level turn has no subject and must not be blocked by that');
   assert.deepEqual(opened, [undefined]);
+});
+
+// ── A turn that never started says so (the sandbox browser run, 2026-10-27) ────────────────
+// The brain's cloud load runs in `around`, before the wake. It failed with a 503, the queue logged
+// "flow … threw", and the thread read "in progress" forever. The caller's hook hears the error now.
+test('a flow that throws in its around hands the error to the caller, after its slot is free', async () => {
+  const heard: Array<{ message: string; running: number }> = [];
+  let ran = false;
+  const q = new HostQueue({
+    caps: { slots: 1, perAgent: 1 },
+    around: async () => { throw new Error('The cloud brain could not load (503). Retry before this thread continues.'); },
+  });
+  q.run({ key: 'wake:m-1:rex', kind: 'chat', cause: 'message', agentId: 'rex', subject: { kind: 'thread', id: 'th-1' } },
+    async () => { ran = true; },
+    (err) => { heard.push({ message: (err as Error).message, running: q.stats().running }); });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ran, false, 'the wake itself never ran');
+  assert.deepEqual(heard, [{ message: 'The cloud brain could not load (503). Retry before this thread continues.', running: 0 }]);
+});
+
+test('a flow that ends normally never calls its failure hook, and a refused offer keeps none', async () => {
+  const heard: unknown[] = [];
+  const q = new HostQueue({ caps: { slots: 1, perAgent: 1 } });
+  q.run(work('fine'), async () => {}, (err) => { heard.push(err); });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(q.run(work('fine'), async () => { throw new Error('a refused key never runs'); }, (err) => { heard.push(err); }), false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(heard, []);
+});
+
+test('a failure hook that throws is logged, and the queue keeps admitting', async () => {
+  const lines: string[] = [];
+  const q = new HostQueue({ caps: { slots: 1, perAgent: 1 }, log: (l) => lines.push(l) });
+  q.run(work('boom'), async () => { throw new Error('flow exploded'); }, () => { throw new Error('the notice failed too'); });
+  await new Promise((r) => setTimeout(r, 20));
+  let next = false;
+  q.run(work('after'), async () => { next = true; });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(next, true);
+  assert.ok(lines.some((l) => l.includes('failure hook threw: the notice failed too')), lines.join('\n'));
+});
+
+// ── The Cloud Run drain's admission stop (cloudrun/lifecycle.ts) ────────────────────────────
+test('holdAdmission stops new turns without dropping them; release admits them; inFlight counts the running', async () => {
+  const q = new HostQueue({ caps: { slots: 2, perAgent: 2 } });
+  const base = HostQueue.inFlight();
+  const g = gate();
+  const started: string[] = [];
+  q.run(work('before', 'a'), async () => { started.push('before'); await g.done; });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(HostQueue.inFlight() - base, 1);
+  HostQueue.holdAdmission(true);
+  try {
+    assert.equal(q.run(work('during', 'b'), async () => { started.push('during'); }), true, 'still accepted into the queue');
+    g.release();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(started, ['before'], 'nothing new starts while held, even when a slot frees');
+    assert.equal(HostQueue.inFlight() - base, 0);
+  } finally {
+    HostQueue.holdAdmission(false);
+  }
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(started, ['before', 'during']);
+});
+
+test('useCpuCount: a Cloud Run quota, not os.cpus(), sizes the default caps', () => {
+  HostQueue.useCpuCount(2);
+  try {
+    assert.equal(new HostQueue().stats().slots, 1, 'two vCPUs leave one slot after the daemon\'s own two');
+    HostQueue.useCpuCount(6);
+    assert.equal(new HostQueue().stats().slots, 4);
+  } finally {
+    HostQueue.useCpuCount(null);
+  }
 });

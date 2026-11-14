@@ -47,6 +47,8 @@ const asHuman = (actor: Actor) => ({ 'x-nm-actor': JSON.stringify(actor) });
 
 beforeEach(() => {
   store = new MemoryStore();
+  // This fixture's Marketing setup is performed by the workspace owner.
+  store.destinations.directory = async workspace => workspace === 'ws_acme' ? [{id:'george',kind:'human',name:'George',role:'owner',description:null,owner:true}] : [];
   mails = [];
   deps = {
     read: async () => ({ releases: [{ tag: 'v1.2.0', name: 'The shared inbox', body: 'One thread per customer.', publishedAt: '2026-09-16T15:00:00Z', url: null }], prs: [{ number: 41, title: 'The shared inbox', mergedAt: '2026-09-16T10:00:00Z', labels: [], url: null, author: 'galonge' }], tags: [], repo: { private: false, homepage: 'https://o.dev', defaultBranch: 'main', description: null } }),
@@ -78,6 +80,8 @@ describe('POST /announce/detect', () => {
 describe('the private path with the App configured (the live install, 2026-09-18)', () => {
   const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;
   const calls: string[] = [];
+  /** when GitHub says installation 162852885 was installed: just now, unless a case says otherwise */
+  let installedAt = new Date().toISOString();
   /** GitHub: o/p is private; the App holds installation 162852885 on it and its token reads it */
   const github: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -87,6 +91,7 @@ describe('the private path with the App configured (the live install, 2026-09-18
     if (url.endsWith('/repos/o/p/installation')) return json({ id: 162852885, account: { login: 'o' } });
     if (url.endsWith('/app/installations/162852885/access_tokens')) return json({ token: 'ghs_test', expires_at: '2026-09-18T22:00:00Z' }, 201);
     if (url.endsWith('/installation/repositories?per_page=100')) return json({ repositories: [{ full_name: 'o/p' }, { full_name: 'o/q' }] });
+    if (url.endsWith('/app/installations/162852885')) return json({ account: { login: 'o' }, repository_selection: 'selected', created_at: installedAt });
     if (url.endsWith('/repos/o/p')) return auth === 'Bearer ghs_test' ? json({ private: true, homepage: null }) : json({ message: 'Not Found' }, 404);
     if (url.includes('/repos/o/p/releases')) return json([RELEASE]);
     if (url.includes('/repos/o/p/pulls')) return json([]);
@@ -95,37 +100,66 @@ describe('the private path with the App configured (the live install, 2026-09-18
   beforeEach(() => {
     vi.stubEnv('GITHUB_APP_ID', '4994365');
     vi.stubEnv('GITHUB_APP_PRIVATE_KEY_B64', Buffer.from(pem).toString('base64'));
+    vi.stubEnv('NM_CONNECTOR_KEY', 'test-connector-key-door');
+    installedAt = new Date().toISOString();
     calls.length = 0;
     deps.read = async (slug, _since, opts) => { calls.push(`read ${slug} ${opts.token ?? 'anon'}`); return { releases: [{ tag: 'v1.2.0', name: 'The shared inbox', body: '', publishedAt: '2026-09-16T15:00:00Z', url: null }], prs: [], tags: [], repo: { private: true, homepage: null, defaultBranch: 'main', description: null } }; };
     deps.token = async (id) => `ghs_for_${id}`;
     app = createApp(store, { announce: { deps, fetchFn: github } });
   });
   afterEach(() => { vi.unstubAllEnvs(); });
-  it('detect finds the installation on GitHub when the callback never wrote a row, and remembers it', async () => {
+  // R10 NM-001: the door used to find "the App's installation for this repository" on its own (the
+  // table, else GitHub), so ANY installation, a tenant's included, read a private repository for an
+  // anonymous asker. Only the grant the door's own install callback hands back reads one now.
+  const grantFromCallback = async (): Promise<string | null> => {
+    const start = await app.request('/connect/github/start?repo=o/p');
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!;
+    const back = await app.request(`/connect/github/callback?installation_id=162852885&setup_action=install&state=${encodeURIComponent(state)}`);
+    expect(back.status).toBe(302);
+    return new URL(back.headers.get('location')!).searchParams.get('grant');
+  };
+  it('detect with no grant never mints a token for a private repository, whoever installed the App on it', async () => {
+    await store.announcements.upsertInstallation({ installationId: 162852885, account: 'o', repos: ['o/p'], selection: 'selected', workspaceId: 'ws_tenant' });
     const r = await j(await post('/announce/detect', { repo: 'o/p' }));
-    expect(r).toMatchObject({ ok: true, slug: 'o/p', private: true, installed: true, latest: { tag: 'v1.2.0' }, install: null });
-    expect(await store.announcements.installationForRepo('o/q')).toEqual({ installationId: 162852885 });
+    expect(r).toMatchObject({ ok: true, slug: 'o/p', private: true, installed: false, latest: null, prs: 0 });
+    expect(calls.some((c) => c.includes('access_tokens') || c.endsWith('installation'))).toBe(false);
   });
-  it('create carries the installation to the job, so the read goes through the App and never anonymously', async () => {
-    const { id } = await j(await post('/announce', { repo: 'o/p', website: 'o.dev', email: 'maya@o.dev' }));
+  it('create with no grant carries no installation: the job reads anonymously', async () => {
+    const { id } = await j(await post('/announce', { repo: 'o/p', tag: 'v1.2.0', website: 'o.dev', email: 'maya@o.dev' }));
+    await j(await app.request('/internal/announce-due', { headers: { authorization: 'Bearer cron-test' } }));
+    expect(calls).toContain('read o/p anon');
+    expect(calls.some((c) => c.includes('ghs_for_'))).toBe(false);
+    expect(id).toBeTruthy();
+  });
+  it('the door\'s own install of the repository hands back a grant, and detect and create read through it', async () => {
+    const grant = await grantFromCallback();
+    expect(grant).toBeTruthy();
+    const r = await j(await post('/announce/detect', { repo: 'o/p', grant }));
+    expect(r).toMatchObject({ ok: true, slug: 'o/p', private: true, installed: true, latest: { tag: 'v1.2.0' }, install: null });
+    const { id } = await j(await post('/announce', { repo: 'o/p', website: 'o.dev', email: 'maya@o.dev', grant }));
     const run = await j(await app.request('/internal/announce-due', { headers: { authorization: 'Bearer cron-test' } }));
     expect(run.processed).toBe(1);
-    const view = await j(await app.request(`/announce/${id}`));
-    expect(view.status).toBe('ready');
+    expect((await j(await app.request(`/announce/${id}`))).status).toBe('ready');
     expect(calls).toContain('read o/p ghs_for_162852885');
   });
-  it('a client that names no release gets the latest one resolved, so a second ask serves the first row', async () => {
-    const first = await j(await post('/announce', { repo: 'o/p', website: 'o.dev', email: 'maya@o.dev' }));
-    const second = await post('/announce', { repo: 'o/p', website: 'o.dev', email: 'maya@o.dev' });
-    expect(second.status).toBe(200);
-    expect(await j(second)).toMatchObject({ id: first.id });
-    expect((await j(await app.request(`/announce/${first.id}`))).tag).toBe('v1.2.0');
+  it('a grant is for its repository only', async () => {
+    const grant = await grantFromCallback();
+    const r = await j(await post('/announce/detect', { repo: 'o/q', grant }));
+    expect(r).toMatchObject({ installed: false, latest: null });
   });
-  it('the grant callback is the App route, not the social connectors\' 501', async () => {
+  it('an old installation replayed onto the callback by id earns no grant', async () => {
+    installedAt = '2024-01-01T00:00:00Z';
+    expect(await grantFromCallback()).toBeNull();
+  });
+  it('an installation a workspace holds earns the door no grant', async () => {
+    await store.announcements.upsertInstallation({ installationId: 162852885, account: 'o', repos: ['o/p'], selection: 'selected', workspaceId: 'ws_tenant' });
+    expect(await grantFromCallback()).toBeNull();
+  });
+  it('the grant callback is the App route, not the social connectors\' 501 (an older link\'s bare-slug state: no grant)', async () => {
     const r = await app.request('/connect/github/callback?installation_id=162852885&setup_action=install&state=o%2Fp');
     expect(r.status).toBe(302);
     expect(r.headers.get('location')).toContain('/announce?granted=1');
-    expect(await store.announcements.installationForRepo('o/q')).toEqual({ installationId: 162852885 });
+    expect(r.headers.get('location')).not.toContain('grant=');
   });
 });
 

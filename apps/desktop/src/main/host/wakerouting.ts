@@ -1,3 +1,4 @@
+import type { WakeRoutingContext } from "./wakerouting-context";
 // WHO ANSWERS — routing a message to an agent, and the gate that says whether it may run.
 //
 // Split from wake.ts (state-ownership round, 2026-08-16). The dependency is one-way and that is
@@ -13,52 +14,29 @@ import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
 import { addressedIn, hostSpeaksForOrigin, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
-import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
+
 import { afterMessageSync } from './message-commit-gate';
 import { sweepMessagesQuery } from './chat-message-queries';
 import { githubAsker } from './github-asker';
-import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
-import type { HostGuards } from './guards';
-import type { HostQueue } from '../harness/hostqueue';
-import type { makeRuns } from './runs';
-import type { makeChatTurn } from './chatturn';
-import type { makeStaffing } from './staffing';
-import type { makeMarketing } from './marketing';
-import type { makeSchedules } from './schedules';
-import type { makeWake } from './wake';
+
+
+
+
+
+
+
+
+
+
 import { routeTeamRequest, routeOwnedThread } from './team-routing';
+import { waitForIntake } from './intake-wait';
 import { makeSleeperWake } from './sleepers';
 import { noComputeNotice, noComputeReasonOf, sleeperNotice } from '../computenotice';
 import { PROVIDER_LABEL, resolveToken } from '../agents';
 import { providerFor } from '../runtime/adapter';
 
-export function makeWakeRouting(ctx: {
-  db: ReplicaDatabase;
-  /** the credential probe behind the no-compute notice needs the API (2026-09-16) */
-  apiUrl: string;
-  LEASE_LOST: ReturnType<typeof makeRuns>['LEASE_LOST'];
-  SWEEP_LOOKBACK_MS: number;
-  agents: Map<string, HostedAgent>;
-  claimVerdict: (runtime: string, model: string | null, originUserId: string | null, elapsedMs: number, extra?: { agentId?: string; priorMachineId?: string | null; threadMachineId?: string | null; origin?: SessionOrigin | null; modelFree?: boolean }) => Promise<ClaimVerdict>;
-  confirmAddAgent: ReturnType<typeof makeStaffing>['confirmAddAgent'];
-  confirmCreateAgent: ReturnType<typeof makeStaffing>['confirmCreateAgent'];
-  confirmFailover: ReturnType<typeof makeStaffing>['confirmFailover'];
-  defaultResponder: ReturnType<typeof makeChatTurn>['defaultResponder'];
-  execQueue: HostQueue;
-  offerAddAgents: ReturnType<typeof makeStaffing>['offerAddAgents'];
-  ownerActorId: string;
-  peerMachines: () => Promise<MachineCapability[]>;
-  post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
-  priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>;
-  processed: HostGuards["processed"];
-  queueWake: (agent: HostedAgent, m: { id: string; channel_id: string; thread_id?: string | null; body: string }) => void;
-  runDueSchedules: ReturnType<typeof makeSchedules>['runDueSchedules'];
-  runMarketingBootstrap: ReturnType<typeof makeMarketing>['runMarketingBootstrap'];
-  /** the runner half — the one edge between the two, and it points this way only */
-  wakeThread: ReturnType<typeof makeWake>['wakeThread'];
-  saidNoCompute: HostGuards["saidNoCompute"];
-}) {
-  const { db, apiUrl, LEASE_LOST, SWEEP_LOOKBACK_MS, agents, claimVerdict, confirmAddAgent, confirmCreateAgent, confirmFailover, defaultResponder, execQueue, offerAddAgents, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake, runDueSchedules, runMarketingBootstrap, saidNoCompute, wakeThread } = ctx;
+export function makeWakeRouting(ctx: WakeRoutingContext) {
+  const { db, apiUrl, LEASE_LOST, SWEEP_LOOKBACK_MS, agents, claimVerdict, confirmAddAgent, confirmCreateAgent, confirmFailover, defaultResponder, execQueue, offerAddAgents, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake, runDueSchedules, runMarketingBootstrap, saidNoCompute, wakeFailed, wakeThread } = ctx;
   const { requestSleeperWake } = makeSleeperWake({ peerMachines, post });
 
   /**
@@ -214,6 +192,10 @@ export function makeWakeRouting(ctx: {
     if (m.thread_id && live) {
       processed.add(m.id);
       void (async () => {
+        // round 9: a new thread's first message waits, briefly, for nm-api's intake decision (intake-wait.ts).
+        // A coding ask becomes a coding thread there, and the read below then sends it to the coding runtime.
+        const intake = await waitForIntake(db, m.thread_id!);
+        if (intake !== 'none') console.log(`intake_wait thread=${m.thread_id} outcome=${intake}`);
         // a CODING thread (0144): the coding runtime owns every turn in it, and no room agent
         // answers there — by construction, never by prompt (ruling 2, 2026-09-26)
         if (await routeOwnedThread({ db, agents, processed, queueWake }, m)) return;
@@ -336,7 +318,9 @@ export function makeWakeRouting(ctx: {
       else if (who === 'orchestrator' || (who === 'assignee' && modelFreeItemId(m.body))) target = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
     }
     if (!target) return;
-    execQueue.run({ key: `thread:${m.id}:${target.id}`, kind: 'chat', cause: 'message', agentId: target.id, subject: { kind: 'task', number: t.number } }, () => wakeThread(target, m, t));
+    const responder = target;
+    execQueue.run({ key: `thread:${m.id}:${responder.id}`, kind: 'chat', cause: 'message', agentId: responder.id, subject: { kind: 'task', number: t.number } }, () => wakeThread(responder, m, t),
+      (err) => wakeFailed(responder, m, { channelId: t.channel_id, taskId: t.id }, err));
   }
 
   async function sweepDeadLetters(): Promise<void> {

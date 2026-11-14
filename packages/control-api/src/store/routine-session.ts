@@ -15,8 +15,9 @@ export const ROUTINE_TAKEN = 'This session already holds a routine. Open a new s
 /** Serialize retries on the home, without merging distinct routines. */
 export async function existingHomeRoutineSql(sql: postgres.Sql, ws: string, input: ScheduleInput): Promise<{ id: string } | null> {
   if (!input.session) return null;
-  const [home] = await sql`select home_agent_id from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${input.session.threadId}::uuid and workspace_id=${ws}::uuid for update`;
   if (!home?.['home_agent_id']) return null;
+  if (home['archived_at']) throw new DomainError('CONFLICT', 'Create this routine in the agent’s current conversation.');
   const [existing] = await sql`select id from schedules where owner_home_thread_id=${input.session.threadId}::uuid and title=${input.title} and payload->>'prompt'=${input.prompt} and cadence=${input.cadence} and at_time=${input.atTime} and tz=${input.tz} and weekday is not distinct from ${input.weekday}::integer`;
   return existing ? { id: existing['id'] as string } : null;
 }
@@ -27,8 +28,9 @@ export async function linkRoutineSessionSql(
 ): Promise<void> {
   const s = input.session;
   if (!s) return;
-  const [home] = await sql`select home_agent_id from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
+  const [home] = await sql`select home_agent_id,archived_at from threads where id=${s.threadId}::uuid and workspace_id=${ws}::uuid and channel_id=${input.channelId}::uuid for update`;
   if (home?.['home_agent_id']) {
+    if (home['archived_at']) throw new DomainError('CONFLICT', 'Create this routine in the agent’s current conversation.');
     // A long-lived agent thread can own several routines; none takes over its identity.
     await sql`update schedules set owner_home_thread_id=${s.threadId}::uuid, agent_id=${home['home_agent_id']}::uuid where id=${scheduleId}::uuid`;
     await sql`insert into messages(id,workspace_id,channel_id,thread_id,author_kind,author_id,body)

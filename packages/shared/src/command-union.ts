@@ -162,6 +162,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
+  z.object({ type: z.literal('task.request_release_checklist'), taskId }),
   z.object({ type: z.literal('task.claim_ship'), taskId }),
   z.object({
     type: z.literal('task.propose_ship_plan'),
@@ -321,7 +322,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     type: z.literal('memory.refresh_block'),
     workspace: z.string().min(1),
     channel: z.string().min(1),
-    kind: z.enum(['channel_summary', 'project_brief']).default('channel_summary'),
+    // project_summary (D15): the project memory block. `channel` names any channel of the project
+    kind: z.enum(['channel_summary', 'project_brief', 'project_summary']).default('channel_summary'),
     content: z.string().min(1).max(4000),
     basisCount: z.number().int().nonnegative().default(0),
   }),

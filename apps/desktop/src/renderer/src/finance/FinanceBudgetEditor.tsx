@@ -1,0 +1,26 @@
+import {useId,useRef,useState} from 'react';
+import type {FinanceBudget,FinanceBudgetDraft,FinanceBudgetProposal,FinanceSnapshot} from '@neuramesh/shared';
+import {nm} from '../bridge/nm';
+import {Modal} from '../ui/Modal';
+import {anchorPoint} from '../ui/anchor';
+import {financeMoney} from './FinanceDataViews';
+export function FinanceBudgetEditor({snapshot,budget,draft,onClose,onSaved}:{snapshot:FinanceSnapshot;budget?:FinanceBudget;draft?:Omit<FinanceBudgetDraft,'requestId'>;onClose:()=>void;onSaved:()=>void}) {
+ const formId=useId(),requestId=useRef(crypto.randomUUID()),[origin]=useState(()=>anchorPoint());
+ const [budgetType,setBudgetType]=useState<'category'|'group'>(draft?.budgetType??budget?.budgetType??'category');
+ const [category,setCategory]=useState(draft?.categoryName??budget?.categoryName??snapshot.categoryOptions[0]?.name??snapshot.categories[0]??'');
+ const [amount,setAmount]=useState(String(draft?.monthlyLimit??budget?.monthlyLimit??'')),[proposal,setProposal]=useState<FinanceBudgetProposal|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const currency=draft?.currency??budget?.currency??snapshot.scope.currency;
+ const choices=snapshot.categoryOptions.length?snapshot.categoryOptions.map(option=>budgetType==='group'?option.group:option.name):snapshot.categories;
+ async function prepare(operation:'upsert'|'delete') {
+  setBusy(true);setError('');
+  try{if(!currency)throw new Error('Choose a currency first.');const value=Number(amount);if(operation==='upsert'&&(!Number.isFinite(value)||value<=0))throw new Error('Enter a positive monthly limit.');setProposal(await nm!.financeBudgetPrepare({requestId:requestId.current,operation,categoryName:category,budgetType,currency,...(operation==='upsert'?{monthlyLimit:value}:{}),...(budget?{budgetId:budget.id}:draft?.budgetId?{budgetId:draft.budgetId}:{})}));}
+  catch(e){setError(e instanceof Error?e.message:'Could not prepare this change.');}finally{setBusy(false);}
+ }
+ async function commit(){if(!proposal)return;setBusy(true);setError('');try{const result=await nm!.financeBudgetCommit(proposal.id);if(result.state!=='committed')throw new Error('The budget change was not committed.');onSaved();onClose();}catch(e){setError(e instanceof Error?e.message:'Could not save this change.');}finally{setBusy(false);}}
+ function close(){if(busy)return;if(proposal)void nm!.financeBudgetDismiss(proposal.id).catch(()=>{});onClose();}
+ const title=proposal?'Review budget change':draft?.operation==='delete'?'Remove budget':budget||draft?.budgetId?'Edit budget':'Create a budget';
+ const footer=proposal?<><button className="btn" disabled={busy} onClick={close}>Dismiss change</button><button className="btn primary" disabled={busy} onClick={()=>void commit()}>{busy?'Saving…':'Confirm budget change'}</button></>:<><button className="btn" disabled={busy} onClick={close}>Cancel</button>{budget&&<button className="btn" disabled={busy} onClick={()=>void prepare('delete')}>Remove budget…</button>}<button className="btn primary" form={formId} type="submit" disabled={busy||!category||!currency}>{busy?'Preparing…':'Review change'}</button></>;
+ return <Modal title={title} subtitle="Workspace Finance · Kinshi" onClose={close} origin={origin} dismissible={!busy} escape={!busy} footer={footer}>
+  <div className="finance-budget-editor">{error&&<p className="finance-error" role="alert">{error}</p>}{proposal?<><p>{proposal.categoryName} <span className="finance-note">· {proposal.currency}</span></p><div className="finance-budget-change"><div><small>Current limit</small><strong>{proposal.beforeLimit===null?'No budget':financeMoney(proposal.beforeLimit,proposal.currency)}</strong></div><span aria-hidden>→</span><div><small>{proposal.operation==='delete'?'New state':'New limit'}</small><strong>{proposal.operation==='delete'?'Remove budget':financeMoney(proposal.afterLimit,proposal.currency)}</strong></div></div><p>This changes the budget in Kinshi. Spending progress in Finance covers only the shared accounts.</p><p className="finance-note">Approval expires {new Date(proposal.expiresAt).toLocaleTimeString()}. If this budget changes elsewhere, review it again.</p></>:<form id={formId} onSubmit={event=>{event.preventDefault();void prepare(draft?.operation??'upsert');}}><label>Budget type<select value={budgetType} disabled={!!budget||!!draft} onChange={event=>{const value=event.target.value as 'category'|'group';setBudgetType(value);setCategory(snapshot.categoryOptions[0]?(value==='group'?snapshot.categoryOptions[0].group:snapshot.categoryOptions[0].name):snapshot.categories[0]??'');}}><option value="category">Category</option><option value="group">Category group</option></select></label><label>{budgetType==='group'?'Category group':'Category'}<select autoFocus value={category} disabled={!!budget||!!draft?.budgetId} onChange={event=>setCategory(event.target.value)}>{[...new Set([category,...choices])].filter(Boolean).map(value=><option key={value}>{value}</option>)}</select></label>{draft?.operation!=='delete'&&<label>Monthly limit ({currency??'choose a currency'})<input type="number" min="0.01" step="0.01" required value={amount} onChange={event=>setAmount(event.target.value)}/></label>}<p className="finance-note">You’ll review the exact change before it is saved.</p></form>}</div>
+ </Modal>;
+}

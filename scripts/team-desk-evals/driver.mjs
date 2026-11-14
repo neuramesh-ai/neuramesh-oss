@@ -22,6 +22,10 @@ export async function drive(taskSpace,c) {
   const api=async(path,body)=>{const r=await request(path,body);const data=await r.json();if(!r.ok)throw Error(`${path}: ${r.status} ${JSON.stringify(data)}`);return data;};
   const persist=()=>save(join(c.out,'run.json'),run);
   const card=name=>`.teamdesk-card:not([hidden])[aria-label="${name} agent thread"]`;
+  const cardAction=async(name,label)=>{
+    await p.click(`${card(name)} button[aria-label="Card actions for ${name}"]`);
+    await p.click(`${card(name)} [role="menuitem"]:text-is("${label}")`);
+  };
   const shot=async label=>{
     await p.evaluate(()=>{const e=document.querySelector('.teamdesk');if(e)e.scrollTop=0;});
     await p.cdp('Runtime.evaluate',{expression:'new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))',awaitPromise:true});
@@ -92,9 +96,9 @@ export async function drive(taskSpace,c) {
       await selectModel(p,card(name),'GPT-5.6 Sol');
     }
     const lead=run.homes[0];
-    await p.click(`${card(lead.name)} button[aria-label="Focus ${lead.name}"]`);await p.click(`${card(lead.name)} .cmodel`);await p.keyboard.press('Escape');
+    await p.click(`${card(lead.name)} button[aria-label="Maximize ${lead.name} card"]`);await p.click(`${card(lead.name)} .cmodel`);await p.keyboard.press('Escape');
     check('model Escape closes menu without leaving the focused card',await p.evaluate(()=>!document.querySelector('.cmodpop')&&!!document.querySelector('.teamdesk-card.is-expanded')));
-    await p.click('button[aria-label="Return to Agent Desk"]');
+    await p.click(`${card(lead.name)} button[aria-label="Return to Agent Desk"]`);
     // Prefill all three before sending: the UI must accept work without waiting for another card.
     for(const h of run.homes){
       const facts=h.seat==='research'?'Customer discovery found 37 founder interviews and a maximum pilot budget of 4800 USD. Recommend prioritizing activation.':h.seat==='design'?'Onboarding must support keyboard-only operation in 3 steps and a minimum text contrast of 4.5:1. Recommend labelled coachmarks.':'The pilot lasts 14 days. You coordinate research and design; do not contact them until I ask.';
@@ -125,16 +129,26 @@ export async function drive(taskSpace,c) {
     await until('returned contributions and combined article',async()=>{const e=await evidence();await save(join(c.out,'evidence.json'),e);return e.artifacts.some(a=>a.inline_content?.includes(run.marker))&&e.runs.every(r=>r.state!=='running');},240000);
     const e=await evidence();await save(join(c.out,'evidence.json'),e);
     const oracle=grade(e);result.checks.push(...oracle.checks);check('independent multi-agent workflow oracle passes',oracle.passed);
-    await p.click(`${card(lead.name)} button[aria-label="Focus ${lead.name}"]`);
+    await p.click(`${card(lead.name)} button[aria-label="Maximize ${lead.name} card"]`);
     await p.click(`${card(lead.name)} button:text-is("Open article")`);
     await p.waitForSelector('.sidedock .wtpane.on[role="tabpanel"]',{state:'visible'});
     check('delivered article opens in the shared right pane',await p.evaluate(marker=>[...document.querySelectorAll('.sidedock .wtpane.on[role="tabpanel"]')].some(e=>e.getBoundingClientRect().width>200&&e.textContent.includes(marker)),run.marker));
-    await shot('combined-deliverable');await p.click('[aria-label="Fold the side panel"]');await p.click('[aria-label="Return to Agent Desk"]');
+    await shot('combined-deliverable');await p.click('[aria-label="Fold the side panel"]');await p.click(`${card(lead.name)} button[aria-label="Return to Agent Desk"]`);
     const ids=run.homes.map(h=>h.id).sort();await p.reload();await p.waitForSelector(`${card(lead.name)} textarea`,{timeout:30000});
     const restored=await api(`/v1/team?workspace=${c.workspace}&projectId=${run.projects[0].id}`);
     const restoredEval=restored.homes.filter(h=>ids.includes(h.id));
     check('reload retains all home IDs and full persisted history',JSON.stringify(restoredEval.map(h=>h.id).sort())===JSON.stringify(ids)&&restoredEval.every(h=>h.msg_count===e.messages.filter(m=>m.thread_id===h.id).length));
     check('fixed owner and model remain after reload',await p.evaluate(homes=>homes.every(h=>{const c=document.querySelector(`.teamdesk-card:not([hidden])[aria-label="${h.name} agent thread"]`);return c?.querySelector('.composer-agent-identity')?.textContent.includes(h.name)&&!c.querySelector('button[aria-label^="Agent:"]')&&c.querySelector('.cmodel')?.textContent.includes('GPT-5.6 Sol');}),run.homes));
+    await cardAction(lead.name,'Remove from desk');
+    await p.waitForSelector(card(lead.name),{state:'detached'});
+    await p.reload();await p.waitForSelector(card(peers[0].name));
+    check('removed custom card stays off this desk after reload',await p.evaluate(selector=>!document.querySelector(selector),card(lead.name)));
+    await p.click('.teamdesk-toolbar button:text-is("Add agent")');await p.click(`.teamdesk-roster button:has-text("${lead.name}")`);
+    await p.waitForSelector(`${card(lead.name)} textarea`);
+    check('re-adding reopens the original writable thread',await p.evaluate(({selector,id})=>{
+      const c=document.querySelector(selector),input=c?.querySelector('textarea');
+      return c?.dataset.threadId===id && input===document.activeElement && !input.disabled;
+    },{selector:card(lead.name),id:lead.id}));
     await shot('restored-team');result.status='passed';
   } catch(error) {
     result.status='failed';result.error=error.stack??String(error);await shot('failure').catch(()=>{});if(run.homes.length)await save(join(c.out,'evidence.json'),await evidence()).catch(()=>{});console.error(error);

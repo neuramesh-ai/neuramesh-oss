@@ -13,6 +13,7 @@ function fakeStore(init: { members: string[]; devices: Record<string, string[]> 
   const clock = { now: 0 };
   const sent = new Map<string, number>();
   const store = {
+    async getThreadRoutineId() { return null; },
     async humanMemberIds() {
       return init.members;
     },
@@ -162,6 +163,17 @@ describe('PushService.notifyCardMessage', () => {
     expect(calls).toHaveLength(0);
     await push.notifyCardMessage({ id: 'm-bl', workspace: 'ws', channelId: 'chan1', taskId: null, authorKind: 'agent', authorId: 'rex', body: auth(false) }, '#marketing');
     expect(calls).toHaveLength(1);
+  });
+
+  it('names a stopped routine and the missing Claude Code login even when an older host omitted context', async () => {
+    const { store } = fakeStore({ members: ['bob'], devices: { bob: ['tok-b'] } });
+    store.getThreadRoutineId = async () => 'routine-1';
+    const { sender, calls } = fakeSender();
+    await new PushService(store, sender).notifyCardMessage({ id: 'm-routine', workspace: 'ws', channelId: 'chan1',
+      taskId: null, threadId: 'routine-thread', authorKind: 'agent', authorId: 'bosun',
+      body: authCardBlock({ provider: 'anthropic', why: 'This machine has no Claude login.' }) }, '#build');
+    expect(calls[0]?.[0]?.title).toBe('Routine could not run · #build');
+    expect(calls[0]?.[0]?.body).toBe('Claude Code login unavailable on the cloud machine. Open NeuraMesh to choose how to continue.');
   });
 
   it('ignores a human-authored message (only agents raise cards)', async () => {

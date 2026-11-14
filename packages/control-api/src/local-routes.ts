@@ -2,6 +2,7 @@
 // plus the two non-Clerk token mints. Extracted from app.ts, which sits at its ratchet cap.
 import { MIN_DESKTOP_VERSION, type Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
+import { boardsUrl } from './boards-guard';
 import { signDevToken } from './devtoken';
 import { LOCAL_USER, localUserIdForBearer, signLocalSyncToken } from './local-auth';
 import { localMode } from './localmode';
@@ -41,6 +42,8 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
   // shows the Update state, never a half-working shell). No ids — F1: an id here was the one value a
   // forger needed. `schemaVersion` is the last migration the runner applied. `minDesktopVersion` is
   // the soft floor (docs/46 rule 3): a desktop below it shows one line on its update card.
+  // `boardsUrl` is where Message boards is (NM_BOARDS_URL): null when it is off, and always on the
+  // local stack, which has no hosted identity for it.
   app.get('/.well-known/nm-config', async (c) =>
     c.json({
       mode: localMode() ? 'local' : 'cloud',
@@ -48,6 +51,7 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
       version: nmVersion(),
       schemaVersion: store.schemaVersion ? await store.schemaVersion() : null,
       minDesktopVersion: MIN_DESKTOP_VERSION,
+      boardsUrl: localMode() ? null : boardsUrl(),
     }),
   );
 }

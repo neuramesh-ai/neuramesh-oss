@@ -34,6 +34,7 @@ export interface Connection extends ConnectionUrls {
   markerPath: string;
   db: ReplicaDatabase | null;
   agentHostStarted: boolean;
+  financeWorkerStop?: () => void;
   /** the workspace this connection stands in, and its display identity */
   ws: string;
   wsInfo: { name: string; slug: string };
@@ -250,6 +251,7 @@ export const connections = {
   remove(id: string): void {
     const i = list.findIndex((c) => c.id === id);
     if (i < 0) return;
+    list[i]!.financeWorkerStop?.();
     list.splice(i, 1);
     if (foregroundId === id) foregroundId = list[0]?.id ?? null;
     connections.notify();

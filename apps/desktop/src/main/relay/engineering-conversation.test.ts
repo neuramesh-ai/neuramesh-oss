@@ -242,3 +242,17 @@ test('one bad deliverable cannot suppress good files or the conversation checkpo
     assert.deepEqual(remote.head().runtimeMessages, messages);
   } finally { await conversation.close().catch(() => {}); await rm(root, { recursive: true, force: true }); }
 });
+
+test('an arbitrary image cannot be published as a validation capture or silently promoted by a checkpoint', async () => {
+  const root = await mkdtemp('/tmp/nm-unverified-image-'), remote = cloud();
+  const conversation = new EngineeringConversation({...options,root:join(root,'brain'),fetchImpl:remote.fetchImpl},root);
+  try {
+    const name='validation/after/home.png';
+    await mkdir(join(root,'.nm-artifacts/validation/after'),{recursive:true});
+    await writeFile(join(root,'.nm-artifacts',name),'generated pixels');
+    await assert.rejects(conversation.publishArtifact(name),/requires a real capture/);
+    await assert.rejects(conversation.publishArtifact(name,{sha256:'0'.repeat(64),target:'fixture'}),/changed before/);
+    await conversation.checkpointMessages([], {});
+    assert.equal(remote.bytes.size,0);
+  } finally {await conversation.close();await rm(root,{recursive:true,force:true});}
+});

@@ -26,10 +26,10 @@ export function makeTurnContext(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   apiUrl: string;
   blockFor: ReturnType<typeof makeBlock>['blockFor'];
-  brainBriefing: (subject: SubjectRef | null, dir: string) => string;
+  brainBriefing: (subject: SubjectRef | null, dir: string) => string | Promise<string>;
   db: ReplicaDatabase;
   designerOverride: (a: { ch: { id: string; slug: string; workspace_id: string }; taskId: string | null; label: string; brief: string; dir: string; brainSubject: SubjectRef | null }) => Promise<PromptOverride>;
-  ensureChatWorkspace: (threadId: string) => string;
+  ensureChatWorkspace: (threadId: string) => string | Promise<string>;
   legSummary: (out: string) => string;
   narrate: ReturnType<typeof makeRuns>['narrate'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
@@ -70,7 +70,7 @@ async function threadTranscript(agent: HostedAgent, t: ThreadTask): Promise<stri
   const block = await blockFor(t.channel_id);
   const cutoff = rows.length - THREAD_FULL_RECENT;
   return (
-    (block ? `[channel summary block]\n${block}\n\n` : '') +
+    (block ? `[project memory block]\n${block}\n\n` : '') +
     `[task #${t.number}: ${t.title}]\nstate: ${t.state}${t.description ? `\ndescription: ${t.description}` : ''}\n\n[thread]\n` +
     rows
       .map((r, i) => {
@@ -128,7 +128,7 @@ function orchSpawnFor(
     // the conversation's OWN brain workspace — legs of one thread share it, and it is the same
     // directory the thread's notes and result envelopes live beside (docs/harness/01 §3.2)
     const brainSubject: SubjectRef | null = threadId ? { kind: 'thread', id: threadId } : null;
-    const dir = ensureChatWorkspace(threadId ?? ch.id);
+    const dir = await ensureChatWorkspace(threadId ?? ch.id);
     try {
       const cred = await resolveToken(apiUrl, ch.workspace_id, seated, ownerActorId);
       // a synthetic subject: promptOverride bypasses buildCodingPrompt entirely, so the leg needs
@@ -146,7 +146,7 @@ function orchSpawnFor(
       // `claudeDesign` flag that is the ONLY thing unlocking `mcp__claude-design__*`.
       const override = i.role === 'designer'
         ? await designerOverride({ ch, taskId: await taskOf(threadId), label, brief: i.prompt, dir, brainSubject })
-        : { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger question for ${orch.name}, the orchestrator of #${ch.slug}. Do exactly this piece, then report what you found and how you know. You cannot create, offer or route board work — your parent owns this and reports for you.${brainBriefing(brainSubject, dir)}` };
+        : { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger question for ${orch.name}, the orchestrator of #${ch.slug}. Do exactly this piece, then report what you found and how you know. You cannot create, offer or route board work — your parent owns this and reports for you.${await brainBriefing(brainSubject, dir)}` };
       // the Claude Design project URL arrives in a TOOL RESULT, before the model's summary —
       // caught here and announced by the OWNER, since the leg has no board identity to post with
       const projectWatch = claudeDesignProjectWatch();

@@ -1,3 +1,4 @@
+import { cronAuthorized } from './cron-auth';
 // neuramesh.app/announce, the public door (docs/design/release-drafts-2026-09 §4.8): the detect,
 // the form's queue, the page's read, the release card, the GitHub App's install callback, the
 // minute cron that works the queue, and the claim a signed-in person makes. Public routes sit
@@ -12,7 +13,8 @@ import { defaultDeps, runAnnounceJob, type AnnounceDeps } from './announce-job';
 import { claimAnnouncement } from './announce-claim';
 import { actorInWorkspace } from './credits';
 import { githubAppConfigured, githubGet, installUrl, installationToken, parseRepoInput } from './github-app';
-import { githubApiRoutes, githubConnectRoutes, installationFor as installationForRepo } from './github-connect';
+import { githubApiRoutes, githubConnectRoutes } from './github-connect';
+import { doorState, grantFor } from './announce-grant';
 import { queueAndSend } from './onauth';
 import type { Store } from './store';
 import type { AnnouncementRow } from './store/announce';
@@ -24,8 +26,8 @@ const cap = (name: string, fallback: number): number => { const n = Number(proce
 const ipHashOf = (ip: string | undefined): string | null => (ip ? createHash('sha256').update(ip.trim()).digest('hex').slice(0, 32) : null);
 const maskEmail = (e: string): string => { const [u = '', d = ''] = e.split('@'); return `${u.slice(0, 1)}•••@${d}`; };
 
-const CreateSchema = z.object({ repo: z.string().min(3).max(200), tag: z.string().max(120).nullable().optional(), website: z.string().trim().min(3).max(400), email: z.string().trim().max(200) });
-const DetectSchema = z.object({ repo: z.string().min(3).max(200) });
+const CreateSchema = z.object({ repo: z.string().min(3).max(200), tag: z.string().max(120).nullable().optional(), website: z.string().trim().min(3).max(400), email: z.string().trim().max(200), grant: z.string().max(2000).optional() });
+const DetectSchema = z.object({ repo: z.string().min(3).max(200), grant: z.string().max(2000).optional() });
 
 interface Latest { tag: string; name: string | null; publishedAt: string }
 type Fetch = typeof fetch;
@@ -74,16 +76,21 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
   app.use('/announce/*', cors({ origin: siteOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'] }));
   app.use('/announce', cors({ origin: siteOrigin, allowMethods: ['POST', 'OPTIONS'] }));
 
-  // the App's installation for a repository: the row a callback wrote, else GitHub's own answer,
-  // remembered (github-connect.ts, shared with the in-app connector). The callback is not the only
-  // door: the grant can land on another deployment's callback, and on the live install (2026-09-18)
-  // create read only the table, so the job read the private repository anonymously and failed on
-  // 404 while detect said installed.
-  const installationFor = (slug: string): Promise<{ installationId: number } | null> => installationForRepo(ann()!, slug, fetchFn);
+  // THE DOOR'S OWN GRANT ONLY (announce-grant.ts, R10 NM-001): this used to be "the App's installation
+  // for a repository", the table's row else GitHub's own answer, so any tenant's installation read
+  // any private repository for an anonymous asker. A private repository is read only through a grant
+  // the door's own install callback handed this browser for that repository.
+  const grantToken = async (grant: unknown, slug: string): Promise<{ installationId: number; token: string } | null> => {
+    const installationId = grantFor(grant, slug);
+    if (installationId === null) return null;
+    const token = (await installationToken(installationId, { fetchFn }).catch(() => null))?.token ?? null;
+    return token ? { installationId, token } : null;
+  };
 
   app.post('/announce/detect', async (c) => {
     if (!ann()) return c.json({ ok: false, reason: 'unconfigured' }, 501);
     const body = DetectSchema.safeParse(await c.req.json().catch(() => null));
+    const grant = body.success ? body.data.grant : undefined;
     const parsed = body.success ? parseRepoInput(body.data.repo) : null;
     if (!parsed) return c.json({ ok: false, reason: 'invalid' });
     const slug = parsed.slug;
@@ -91,13 +98,14 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
     let repo = await githubGet(`/repos/${slug}`, { fetchFn });
     let installed = false;
     if (repo.status !== 200) {
-      // a stranger sees 404 for a private repository and a missing one alike: the App's grant tells them apart
-      const inst = await installationFor(slug);
+      // a stranger sees 404 for a private repository and a missing one alike: only THIS browser's door
+      // grant for this repository tells them apart (never another tenant's installation)
+      const inst = await grantToken(grant, slug);
       if (inst) {
-        token = (await installationToken(inst.installationId, { fetchFn }).catch(() => null))?.token ?? null;
-        if (token) { repo = await githubGet(`/repos/${slug}`, { token, fetchFn }); installed = repo.status === 200; }
+        token = inst.token;
+        repo = await githubGet(`/repos/${slug}`, { token, fetchFn }); installed = repo.status === 200;
       }
-      if (repo.status !== 200) return c.json({ ok: true, slug, private: true, installed: false, latest: null, prs: 0, homepage: null, install: githubAppConfigured() ? installUrl(slug) : null });
+      if (repo.status !== 200) return c.json({ ok: true, slug, private: true, installed: false, latest: null, prs: 0, homepage: null, install: githubAppConfigured() ? installUrl(doorState(slug)) : null });
     }
     const facts = repo.json as { private?: boolean; homepage?: string | null };
     const { latest, prs } = await latestOf(slug, token, fetchFn);
@@ -121,14 +129,13 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
     if ((await ann()!.countSince({ email, sinceIso: day })) >= cap('ANNOUNCE_EMAIL_CAP', 5)) return c.json({ error: 'This email already asked for five draft sets today. Try again tomorrow.' }, 429);
     if (ipHash && (await ann()!.countSince({ ipHash, sinceIso: hour })) >= cap('ANNOUNCE_IP_CAP', 10)) return c.json({ error: 'Too many requests from this address. Try again in an hour.' }, 429);
     if ((await ann()!.countSince({ sinceIso: day })) >= cap('ANNOUNCE_DAILY_CAP', 200)) return c.json({ error: 'The door is busy today. Try again tomorrow.' }, 429);
-    const inst = await installationFor(parsed.slug);
+    const inst = await grantToken(body.data.grant, parsed.slug);
     // a client that names no release (the terminal, CI, a plain curl) gets the latest one resolved
     // HERE, so the same release for the same email serves the existing row instead of a second one
     // whose job then trips the one-per-release index (the live re-run, 2026-09-18)
     let tag = body.data.tag ?? null;
     if (!tag) {
-      const token = inst ? (await installationToken(inst.installationId, { fetchFn }).catch(() => null))?.token ?? null : null;
-      tag = (await latestOf(parsed.slug, token, fetchFn).catch(() => ({ latest: null }))).latest?.tag ?? null;
+      tag = (await latestOf(parsed.slug, inst?.token ?? null, fetchFn).catch(() => ({ latest: null }))).latest?.tag ?? null;
     }
     const made = await ann()!.create({ repo: parsed.slug, tag, website, email, private: !!inst, installationId: inst?.installationId ?? null, ipHash });
     if (made) return c.json({ id: made.id, status: 'queued' }, 202);
@@ -157,8 +164,7 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
 
   // the cron: one row per tick, so a job's reads and its one model turn fit a function's time
   app.get('/internal/announce-due', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     if (!ann()) return c.json({ processed: 0, note: 'announcements not served by this store' });
     const mail: AnnounceDeps['mail'] = (row, email) => queueAndSend(store, { toEmail: row.email, template: 'announce-ready', kind: 'transactional', dedupeKey: `announce:${row.id}`, payload: { id: row.id, repo: row.repo, tag: row.tag } }, email, null);
     const deps: AnnounceDeps = { ...defaultDeps(mail), ...opts.deps };

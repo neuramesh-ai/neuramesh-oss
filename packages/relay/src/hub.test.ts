@@ -30,13 +30,14 @@ interface Relay {
   server: Server;
 }
 
-const open: { servers: Server[]; socks: WebSocket[]; machines: MachineClient[] } = { servers: [], socks: [], machines: [] };
+const open: { servers: Server[]; websocketServers: WebSocketServer[]; socks: WebSocket[]; machines: MachineClient[] } = { servers: [], websocketServers: [], socks: [], machines: [] };
 
 function startRelay(overrides: Partial<HubOptions> = {}, keepaliveMs = 0): Promise<Relay> {
   const logs: string[] = [];
   const hub = createHub({ ...validators, ...overrides, log: (l) => logs.push(l) });
   const server = createServer();
   const wss = new WebSocketServer({ server });
+  open.websocketServers.push(wss);
   wss.on('connection', (sock, req) => {
     // index.ts's own habit: the server keeps every socket alive (keepalive.ts), the hub routes
     if (keepaliveMs > 0) keepAlive(sock, keepaliveMs, () => logs.push('keepalive_reap: no pong, terminating'));
@@ -44,7 +45,7 @@ function startRelay(overrides: Partial<HubOptions> = {}, keepaliveMs = 0): Promi
   });
   open.servers.push(server);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo;
       resolve({ url: `ws://127.0.0.1:${port}`, hub, logs, server });
     });
@@ -97,10 +98,17 @@ async function attach(url: string, token = 'clerk-good'): Promise<WebSocket> {
   return c;
 }
 
-afterEach(() => {
-  for (const m of open.machines.splice(0)) m.close();
-  for (const s of open.socks.splice(0)) s.close();
-  for (const srv of open.servers.splice(0)) srv.close();
+afterEach(async () => {
+  const websocketServers = open.websocketServers.splice(0);
+  // A paused flood receiver can outlive termination of its client. Own and close both ends.
+  const sockets = [...new Set([...open.machines.splice(0).map(machine => machine.sock), ...open.socks.splice(0),
+    ...websocketServers.flatMap(server => [...server.clients])])];
+  await Promise.all(sockets.map(sock => new Promise<void>(resolve => {
+    if (sock.readyState === sock.CLOSED) { resolve(); return; }
+    sock.once('close', () => resolve()); sock.terminate();
+  })));
+  await Promise.all(websocketServers.map(server => new Promise<void>(resolve => server.close(() => resolve()))));
+  await Promise.all(open.servers.splice(0).map(srv => new Promise<void>(resolve => srv.close(() => resolve()))));
 });
 
 describe('relay hub', () => {
@@ -482,5 +490,35 @@ describe('relay hub', () => {
     const closed = closedWith(c);
     c.send(JSON.stringify({ t: 'attach', machineId: M1, token: 'clerk-good' }));
     expect((await closed).code).toBe(CLOSE.MACHINE_OFFLINE);
+  });
+
+  it('fences a live socket on its next frame even when the lease expiry timer has not run', async () => {
+    let held = true;
+    const r = await startRelay({ canServe: () => held });
+    const sock = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    sock.send(JSON.stringify({ t: 'hello', machineId: M1 }));
+    await until(() => r.hub.stats().machines.includes(M1), 'owned machine');
+    const closed = closedWith(sock);
+    held = false;
+    sock.send(JSON.stringify({ ch: 'stale', t: 'data', d: toB64('must not route') }));
+    expect((await closed).code).toBe(CLOSE.RETIRED);
+    await until(() => r.hub.stats().machines.length === 0, 'fenced machine removal');
+    expect(r.hub.stats().machines).toEqual([]);
+    expect(r.logs.some(line => line.includes('drop_unowned'))).toBe(false);
+  });
+
+  it('does not admit buffered hello frames after asynchronous validation outlives ownership', async () => {
+    let held = true; let started = false;
+    let finish!: (value: { machineId: string; workspaceId: string }) => void;
+    const r = await startRelay({ canServe: () => held, validateMachine: () => {
+      started = true; return new Promise(resolve => { finish = resolve; });
+    } });
+    const sock = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    const closed = closedWith(sock);
+    sock.send(JSON.stringify({ t: 'hello', machineId: M1 }));
+    await until(() => started, 'pending machine validation');
+    held = false; finish({ machineId: M1, workspaceId: 'fixture-workspace' });
+    expect((await closed).code).toBe(CLOSE.RETIRED);
+    expect(r.hub.stats().machines).toEqual([]);
   });
 });

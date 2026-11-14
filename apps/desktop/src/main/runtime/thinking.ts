@@ -27,3 +27,15 @@ export function geminiThinking(s: Seat): { thinkingConfig?: { thinkingLevel: Gem
   const l = levelOf(s);
   return l ? { thinkingConfig: { thinkingLevel: l.toUpperCase() as GeminiLevel } } : {};
 }
+
+/** a routing (triage) turn thinks at most at Medium (round 9 live narration). Its job is to decide and
+ *  route. On High the model spent two silent minutes before it wrote a word. No pick stays no pick */
+export function triageThinking(level?: ThinkingLevel | null): ThinkingLevel | null {
+  return level === 'high' ? 'medium' : level ?? null;
+}
+
+/** the API lane's first round of a turn thinks one level below the turn's level, so the first words and
+ *  the first tool calls come sooner. Later rounds, where the answer is written, keep the level */
+export function firstRoundThinking(level?: ThinkingLevel | null): ThinkingLevel | null {
+  return level === 'high' ? 'medium' : level === 'medium' ? 'low' : level ?? null;
+}

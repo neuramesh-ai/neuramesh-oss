@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { CODE_APPROVAL_CATEGORIES, CODE_SESSION_MODES, CODE_SESSION_STATES } from './code-sessions';
 import { THREAD_KINDS } from './threads';
+import { WORKSPACE_MODES } from './intake';
 
 export const CODE_SESSION_COMMANDS = [
   z.object({ type: z.literal('code_session.name'), workspace: z.string().min(1), codeSessionId: z.string().uuid(), title: z.string().trim().min(1).max(100) }),
@@ -49,10 +50,15 @@ export const CODE_SESSION_COMMANDS = [
   // coding runtime works on the project's repository in it) or goes back to chat. A human, or the
   // room's orchestrator from its triage turn (ruling 1, 2026-09-26); handler/thread.ts refuses a
   // task thread (its unit IS the code path) and a project with no repository (REPO_REQUIRED).
+  // `codeWorkspace` (round 9, 0177): `scratch` makes a coding thread with no repository (a local
+  // scratch workspace on the machine), `repo` a worktree of the project repository (`repoId`, else
+  // the primary one). Absent: the old rule (the project's repository, workspace_mode unchanged).
   z.object({
     type: z.literal('thread.set_kind'),
     workspace: z.string().min(1),
     threadId: z.string().uuid(),
     kind: z.enum(THREAD_KINDS),
+    codeWorkspace: z.enum(WORKSPACE_MODES).optional(),
+    repoId: z.string().uuid().optional(),
   }),
 ] as const;
