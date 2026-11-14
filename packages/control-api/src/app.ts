@@ -1,3 +1,7 @@
+import { memoryRoutes } from './memory-routes';
+import { destinationCors, workspaceDestinationRoutes } from './workspace-destinations';
+import { marketingAccessRoutes } from './marketing-access';
+import {MessageInputSchema} from './message-input';
 import { publicationImage } from './publication-image';
 import { createHash, randomBytes } from 'node:crypto';
 import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, repairCardFences, RETRO_RANGES, routineCardGuard, routineDecisionQuestion, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';   import { needDecision } from './need-cards';
@@ -6,24 +10,31 @@ import { cronRoutes } from './cron-routes';
 import { announceClaimRoute, announceRoutes } from './announce';
 import { fleetRoutes } from './fleet';
 import { relayRoutes } from './relay';
-import { resolveBearerActor } from './bearer-auth';
+import { actorSecretOk, resolveBearerActor, withServerRole } from './bearer-auth';
 import { resolveTokenLane } from './local-auth';
 import { localAuthRoutes, meRoute } from './local-routes';
 import { localMode } from './localmode';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import { billingEnabled, constructWebhookEvent, createCheckoutSession, createCreditsCheckout, createPortalSession, creditGrantFromEvent, planPatchFromEvent } from './billing';
-import { linkedinCallback, linkedinStartUrl, providerConfigured, xCallback, xSearchOnConnector, xStartUrl } from './connectors';
-import { instagramCallback, instagramStartUrl, tiktokCallback, tiktokStartUrl } from './connectors-meta';
-import { seal, verifyMediaSig } from './connector-crypto';
+import { providerConfigured, xSearchOnConnector } from './connectors';
+import { socialConnectApiRoutes, socialConnectRoutes } from './connect-social';
+import { verifyMediaSig } from './connector-crypto';
+import { SafeFetchError, safeFetch } from './safe-fetch';
+import { AUTH_LIMITS, allowHit, clientIp } from './auth-throttle';
 import { clerkCreateUser, clerkFindUserByEmail, clerkPrimaryEmail, clerkVerifyPassword, createClerkSession, mintApiToken, mintPowerSyncToken, verifyClerkToken } from './clerk';
 import { unsubscribePage, verifyUnsubscribeToken } from './mail';
 import { fireWakeBump, lifecycleRoutes } from './fleet-lifecycle';
-import { applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
+import { actorInWorkspace, applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
 import { trialReminder, trialRoutes } from './trial';
 import { applyPlanPatch } from './plan-flip';
 import { actorMayReadCredentials } from './credentials-authz';
+import { routeMayWrite } from './handler/scope';
+import { canaryClerkAllowed, isMigrationCanary } from './migration-canary';
+import { fireIntake, type IntakeOptions } from './intake';
+import { intakeReadRoutes } from './intake-read';
 import { onAuthArrival } from './onauth';
+import { emailProofRoutes, emailSelfAsserted, resendEmailProof, sendEmailProof } from './email-proof';
 import { ActorSchema, CommandSchema } from './commands';
 import { DomainError } from './errors';
 import { activationRoutes } from './activation';
@@ -31,7 +42,16 @@ import { exportRoutes } from './export';
 import { importRoutes } from './import';
 import { contentMediaRoute, publicContentMediaRoute } from './content-media-route';
 import { brainRoutes } from './brain-routes';
+import { machineSnapshotRoutes } from './machine-snapshots';
+import { machineVaultRoutes } from './machine-vault';
+import { repoBundleRoutes } from './repo-bundles';
+import { machineFactRoutes } from './machine-facts';
+import { boardsRoutes } from './boards-credentials';
+import { fireParkReplies } from './machine-parks';
+import { machineParkRoutes, parkHumanRoutes } from './machine-park-routes';
+import { threadFollowupRoutes } from './thread-followups';
 import { teamRoutes } from './team-routes';
+import { permissionRoutes } from './permission-routes';
 import { apiError } from './api-error';
 import { taskDetailRoute } from './store/artifact-content';
 import { localSyncRoutes } from './local-sync';
@@ -40,50 +60,6 @@ import { filmsCronRoute, starterVideoRoutes } from './starter-video';
 import { executeCommand } from './handler';
 import { pushAfterCommand, type PushService } from './push';
 import type { Store } from './store';
-
-const MessageInputSchema = z.object({
-  // Client-supplied id keeps optimistic local rows identical to server rows
-  // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z.string().uuid().optional(),
-  workspace: z.string().min(1),
-  channel: z.string().min(1).optional(),
-  project: z.string().uuid().optional(),
-  // may be empty when the message carries only attachments (no caption)
-  body: z.string(),
-  taskId: z.string().min(1).optional(),
-  // the conversation thread this message belongs to (conversation-first shell). A
-  // fresh client-generated id births the thread transactionally with the message.
-  threadId: z.string().uuid().optional(),
-  // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
-  // A later message carrying it is ignored — the mode is the thread's, and changing it is
-  // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z.enum(['tasks', 'chat']).optional(),
-  // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
-  // the same birth-time contract as threadMode above, and for the same reason. Moving it
-  // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z.record(z.string(), z.string()).nullable().optional(),
-  // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
-  // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z.string().uuid().optional(),
-  // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
-  // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
-  // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z.string().uuid().optional(),
-  // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
-  // births the thread — the same birth-time contract as the three above. Moving the machine
-  // afterwards is thread.set_machine (human-only); the origin never moves.
-  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
-  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
-  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z.string().uuid().nullable().optional(), threadOrigin: z.enum(['desktop', 'web', 'routine']).optional(), threadKind: z.enum(['chat', 'coding']).optional(),
-  // the message this reply ANSWERS (agent wake replies) — the server enforces one
-  // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z.string().uuid().optional(),
-  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
-  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
-  // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z.literal(true).optional(), needCard: z.literal(true).optional(),
-}).refine(v => !!v.channel || !!v.project, { message: 'A project is required.' });
 
 // Chat attachment forwarded by the desktop's PowerSync uploadData. The full bytes stay on the
 // host; only metadata + a small thumbnail (inlineContent) are persisted here and synced.
@@ -128,7 +104,7 @@ const WhiteboardPatchSchema = z.object({
   archivedAt: z.string().nullable().optional(),
 });
 
-type Env = { Variables: { actor: Actor } };
+type Env = { Variables: { actor: Actor; marketingContextAllowed?:boolean; memberId?:string; machine?: { id:string; workspaceId:string; kind:string } } };
 
 /** The origins the marketing site is served from (plus local dev for e2e). EVERY route the
  *  BROWSER calls has to be mounted with these CORS headers — a browser-called route without
@@ -139,12 +115,25 @@ const webOrigin = (origin: string): string | null =>
   origin === 'https://neuramesh.app' || origin === 'https://www.neuramesh.app'
   || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 
-export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2]; brain?: Parameters<typeof brainRoutes>[2] } = {}) {
+export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2]; brain?: Parameters<typeof brainRoutes>[2]; snapshots?: Parameters<typeof machineSnapshotRoutes>[2]; vault?: Parameters<typeof machineVaultRoutes>[2]; intake?: IntakeOptions } = {}) {
   const app = new Hono<Env>();
 
   app.onError(apiError);
 
-  app.get('/healthz', (c) => c.json({ ok: true }));
+  // Message boards (boards-credentials.ts): an nmbd_ bearer is refused on EVERY route, so the refusal
+  // registers before the first one, with the machine route that hands a granted agent its credential
+  boardsRoutes(app, store);
+
+  app.use('*', async (c, next) => {
+    const path = c.req.path;
+    if (isMigrationCanary() && ((path.startsWith('/connect/') && /\/(callback|webhook)$/.test(path))
+      || (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && !/^\/(v1|auth|internal)(\/|$)/.test(path)))) {
+      return c.json({ error: 'This deployment is not open to customer traffic yet', code: 'AUTH_UNAVAILABLE' }, 503);
+    }
+    await next();
+  });
+
+  for (const path of ['/health', '/healthz']) app.get(path, (c) => c.json({ ok: true }));
 
   // A2A discovery (public, read-only — outside the /v1 auth scope). Agent Cards
   // carry only team-visible facts (name, role-derived skills, runtime, channels)
@@ -186,6 +175,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // runs middleware in declaration order, a `use` below a handler never fires for it, and an
   // OPTIONS carries no bearer, so the guard would answer it 401 before cors could.
   for (const path of ['/invites/*', '/auth/clerk', '/v1/workspaces', '/v1/billing/*', '/v1/announce/*']) app.use(path, cors({ origin: webOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['authorization', 'content-type'] }));
+  destinationCors(app, webOrigin);
   app.use('/v1/brain/*', cors({ origin: (origin) => origin === 'https://hq.neuramesh.app' ? origin : webOrigin(origin), allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['authorization', 'content-type', 'x-nm-actor'], exposeHeaders: ['etag', 'content-disposition'] }));
   app.post('/auth/clerk', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { token?: string };
@@ -196,7 +186,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       const clerkId = String(claims.sub);
       const primary = await clerkPrimaryEmail(clerkId);
       const email = primary?.email ?? null;
-      const { id, created } = await store.resolveClerkUser(clerkId, email);
+      const { id, created } = await store.resolveClerkUser(clerkId, email, !!primary?.byAdmin);
       // first-arrival side effects: welcome mail, and REPORT (never claim) pending invitations —
       // joining is the invitee's own act now, see workspace.accept_invite
       const { pending } = await onAuthArrival(store, { userId: id, email, emailVerified: !!primary?.verified, isNew: created, firstName: primary?.firstName ?? null });
@@ -205,7 +195,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     } catch (e) {
       if (e instanceof DomainError) return c.json({ error: e.message, code: e.code }, e.status as 401);
       console.error('clerk auth error:', e);
-      return c.json({ error: 'authentication failed', code: 'AUTH_FAILED' }, 401);
+      // an unclassified throw is OUR failure (a DB or network hiccup), never a verdict on the credential: 503 (R10 NM-096)
+      return c.json({ error: 'the sign-in check is unavailable', code: 'AUTH_UNAVAILABLE' }, 503);
     }
   });
 
@@ -216,22 +207,26 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   app.post('/auth/clerk/password', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { email?: string; password?: string };
     if (!body.email || !body.password) return c.json({ error: 'email and password required', code: 'INVALID_INPUT' }, 400);
+    if (!allowHit(`ip-pw:${clientIp((n) => c.req.header(n))}`, AUTH_LIMITS.ipPassword) || !allowHit(`email-pw:${body.email.trim().toLowerCase()}`, AUTH_LIMITS.emailPassword)) return c.json({ error: 'too many attempts, try again in a few minutes', code: 'RATE_LIMITED' }, 429);
     try {
       const found = await clerkFindUserByEmail(body.email);
       // same opaque message whether the account is missing or the password is wrong
       if (!found || !(await clerkVerifyPassword(found.id, body.password))) {
         return c.json({ error: 'incorrect email or password', code: 'AUTH_FAILED' }, 401);
       }
-      const { id, created } = await store.resolveClerkUser(found.id, found.email);
+      if (!canaryClerkAllowed(found.id)) throw new DomainError('AUTH_UNAVAILABLE', 'This deployment is not open to customer traffic yet');
       // an existing account signing in still claims any invitation waiting on its address
       const primary = await clerkPrimaryEmail(found.id);
+      const { id, created } = await store.resolveClerkUser(found.id, found.email, !!primary?.byAdmin);
       await onAuthArrival(store, { userId: id, email: found.email, emailVerified: !!primary?.verified, isNew: created, firstName: primary?.firstName ?? null });
       const sessionId = await createClerkSession(found.id);
-      return c.json({ userId: id, email: found.email, sessionId });
+      // an account whose address is not proven yet gets its proof link again here (email-proof.ts)
+      return c.json({ userId: id, email: found.email, sessionId, emailProof: await resendEmailProof(store, id, found.email) });
     } catch (e) {
       if (e instanceof DomainError) return c.json({ error: e.message, code: e.code }, e.status as 401);
       console.error('clerk password auth error:', e);
-      return c.json({ error: 'authentication failed', code: 'AUTH_FAILED' }, 401);
+      // an unclassified throw is OUR failure (a DB or network hiccup), never a verdict on the credential: 503 (R10 NM-096)
+      return c.json({ error: 'the sign-in check is unavailable', code: 'AUTH_UNAVAILABLE' }, 503);
     }
   });
 
@@ -241,17 +236,21 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // The renderer's "Create account" mode was copy-only until this existed: it
   // submitted the sign-in endpoint, which 401s on any new email.
   app.post('/auth/clerk/signup', async (c) => {
+    if (isMigrationCanary()) return c.json({ error: 'This deployment is not open for account creation yet', code: 'AUTH_UNAVAILABLE' }, 503);
     const body = (await c.req.json().catch(() => ({}))) as { email?: string; password?: string };
     if (!body.email || !body.password) return c.json({ error: 'email and password required', code: 'INVALID_INPUT' }, 400);
+    if (!allowHit(`ip-pw:${clientIp((n) => c.req.header(n))}`, AUTH_LIMITS.ipPassword) || !allowHit(`email-pw:${body.email.trim().toLowerCase()}`, AUTH_LIMITS.emailPassword)) return c.json({ error: 'too many attempts, try again in a few minutes', code: 'RATE_LIMITED' }, 429);
     try {
       const created = await clerkCreateUser(body.email.trim(), body.password);
-      const { id, created: isNew } = await store.resolveClerkUser(created.id, created.email);
-      // In-app sign-up: Clerk marks the address verified when it creates the user with a
-      // password, but re-read it rather than assuming — this is the invite-claim boundary.
+      const { id, created: isNew } = await store.resolveClerkUser(created.id, created.email, true);
+      // In-app sign-up: Clerk marks a Backend-API address VERIFIED, so its word proves nothing here
+      // (R10 NM-010: anyone could sign up as an invitee's address and accept their invitation). The
+      // account is self-asserted until the person opens the link mailed to the address (email-proof.ts).
       const primary = await clerkPrimaryEmail(created.id);
-      await onAuthArrival(store, { userId: id, email: created.email, emailVerified: !!primary?.verified, isNew, firstName: primary?.firstName ?? null });
+      await onAuthArrival(store, { userId: id, email: created.email, emailVerified: false, isNew, firstName: primary?.firstName ?? null });
+      if (isNew) void sendEmailProof(id, created.email);
       const sessionId = await createClerkSession(created.id);
-      return c.json({ userId: id, email: created.email, sessionId });
+      return c.json({ userId: id, email: created.email, sessionId, emailProof: isNew ? 'sent' : null });
     } catch (e) {
       if (e instanceof DomainError) return c.json({ error: e.message, code: e.code }, e.status as 401);
       console.error('clerk signup error:', e);
@@ -263,8 +262,13 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // the workspace sync rule maps it → our uuid via nm_users). PowerSync validates
   // it against Clerk's JWKS — no client holds a signing key.
   app.on('POST', ['/auth/clerk/token', '/auth/clerk/api-token'], async (c) => {
+    if (process.env['NM_DEPLOYMENT'] === 'production' && !c.req.path.endsWith('/api-token')) {
+      return c.json({ error: 'Update NeuraMesh to use the API replica.', code: 'SYNC_RETIRED' }, 410);
+    }
     const body = (await c.req.json().catch(() => ({}))) as { sessionId?: string };
     if (!body.sessionId) return c.json({ error: 'missing sessionId', code: 'INVALID_INPUT' }, 400);
+    // a session id is a bearer here until proof of possession lands: budget it per session (auth-throttle.ts, R10 NM-080)
+    if (!allowHit(`sid:${body.sessionId}`, AUTH_LIMITS.sessionMint)) return c.json({ error: 'too many token requests, try again shortly', code: 'RATE_LIMITED' }, 429);
     try {
       const jwt = await (c.req.path.endsWith('/api-token') ? mintApiToken : mintPowerSyncToken)(body.sessionId);
       return c.json({ token: jwt });
@@ -276,6 +280,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return c.json({ error: 'token mint temporarily unavailable', code: 'AUTH_UNAVAILABLE' }, 503);
     }
   });
+
+  emailProofRoutes(app, store); // /auth/verify-email/:token: an in-app sign-up proves its address with its password (email-proof.ts, R10 NM-010)
 
   // the non-Clerk token mints (/auth/dev/token, /auth/local/token) and /.well-known/nm-config —
   // public, outside /v1 like /auth/clerk (local-routes.ts)
@@ -314,7 +320,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       const clerkId = String(claims.sub);
       const primary = await clerkPrimaryEmail(clerkId);
       const email = primary?.email ?? null;
-      const { id, created } = await store.resolveClerkUser(clerkId, email);
+      const { id, created } = await store.resolveClerkUser(clerkId, email, !!primary?.byAdmin);
       await onAuthArrival(store, { userId: id, email, emailVerified: !!primary?.verified, isNew: created, firstName: primary?.firstName ?? null });
       const { ok } = await store.completeDesktopAuth(body.nonce, { userId: id, email, sessionId: (claims['sid'] as string) ?? null });
       if (!ok) return c.json({ error: 'sign-in request expired — restart from the app', code: 'NOT_FOUND' }, 404);
@@ -322,7 +328,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     } catch (e) {
       if (e instanceof DomainError) return c.json({ error: e.message, code: e.code }, e.status as 401);
       console.error('desktop auth complete error:', e);
-      return c.json({ error: 'authentication failed', code: 'AUTH_FAILED' }, 401);
+      // an unclassified throw is OUR failure (a DB or network hiccup), never a verdict on the credential: 503 (R10 NM-096)
+      return c.json({ error: 'the sign-in check is unavailable', code: 'AUTH_UNAVAILABLE' }, 503);
     }
   });
 
@@ -369,17 +376,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // ── connectors (marketing-channel plan §4.8): the OAuth round-trips run in the user's
   // external browser against these PUBLIC routes (the billing-checkout pattern). Sealed
   // tokens land in connector_secrets and never leave the server. Env-gated per provider:
-  // a provider without its app keys 501s while the others keep working.
-  const CONNECT_FLOWS: Record<string, {
-    start: (ctx: { workspace: string; channel: string | null; actor: string }, redirectUri: string) => string;
-    callback: (code: string, state: string, redirectUri: string) => Promise<{ workspace: string; channel: string | null; actor: string; handle: string; tokens: unknown }>;
-    scopes: string;
-  }> = {
-    x: { start: xStartUrl, callback: xCallback, scopes: 'tweet.read tweet.write users.read offline.access' },
-    linkedin: { start: linkedinStartUrl, callback: linkedinCallback, scopes: 'openid profile w_member_social' },
-    instagram: { start: instagramStartUrl, callback: instagramCallback, scopes: 'instagram_basic instagram_content_publish pages_show_list business_management' },
-    tiktok: { start: tiktokStartUrl, callback: tiktokCallback, scopes: 'user.info.basic video.upload' },
-  };
+  // a provider without its app keys 501s while the others keep working. The START is a
+  // signed-in POST /v1/connect/:provider/start since R10 (NM-011, connect-social.ts).
 
   // the public door (announce.ts): /announce/*, /internal/announce-due, and the GitHub App's two
   // doors (github-connect.ts, mounted from announce.ts): /connect/github/start + /callback serve the
@@ -389,35 +387,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   announceRoutes(app, store, opts.announce);
   filmsCronRoute(app, store, opts.starterVideo); // GET /internal/films-due — the video rung's minute cron (starter-video.ts)
 
-  app.get('/connect/:provider/start', (c) => {
-    const provider = c.req.param('provider');
-    const flow = CONNECT_FLOWS[provider];
-    if (!flow || !process.env['NM_CONNECTOR_KEY'] || !providerConfigured(provider)) return c.text(`${provider} connect is not configured on this server`, 501);
-    const workspace = c.req.query('workspace');
-    const actor = c.req.query('actor');
-    if (!workspace || !actor) return c.text('missing workspace/actor', 400);
-    const redirectUri = `${new URL(c.req.url).origin}/connect/${provider}/callback`;
-    return c.redirect(flow.start({ workspace, channel: c.req.query('channel') ?? null, actor }, redirectUri), 302);
-  });
-
-  app.get('/connect/:provider/callback', async (c) => {
-    const provider = c.req.param('provider');
-    const flow = CONNECT_FLOWS[provider];
-    if (!flow || !process.env['NM_CONNECTOR_KEY'] || !providerConfigured(provider)) return c.text(`${provider} connect is not configured on this server`, 501);
-    const code = c.req.query('code');
-    const state = c.req.query('state');
-    if (!code || !state) return c.text('missing code/state', 400);
-    try {
-      const redirectUri = `${new URL(c.req.url).origin}/connect/${provider}/callback`;
-      const out = await flow.callback(code, state, redirectUri);
-      const { id } = await store.upsertConnector({ workspace: out.workspace, channelId: out.channel, provider, handle: out.handle, connectedBy: out.actor, scopes: flow.scopes });
-      await store.setConnectorSecret(id, seal(out.tokens));
-      return c.html(`<!doctype html><meta charset="utf-8"><title>Connected</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center"><div style="font-size:34px">✓</div><p><b>${out.handle || provider}</b> is connected.</p><p style="color:#8f8f8f">Head back to NeuraMesh — the room already knows.</p></div></body>`);
-    } catch (e) {
-      console.error(`${provider} connect callback failed:`, e);
-      return c.text('connection failed — close this tab and try again from NeuraMesh', 400);
-    }
-  });
+  // the social connectors' OAuth callback (and the retired public start): connect-social.ts
+  socialConnectRoutes(app, store);
 
   // TikTok's photo pull: TikTok only fetches from developer-verified domains, so the
   // poster hands it THIS route (verify the api domain once in the TikTok portal) and we
@@ -440,21 +411,29 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return new Response(new Uint8Array(output.bytes), { headers: { 'content-type': output.mime, 'cache-control': 'private, max-age=300' } });
     }
     if (!media.mediaUrl) return c.text('no media on this item', 404);
-    let u: URL;
-    try { u = new URL(media.mediaUrl); } catch { return c.text('bad media url', 400); }
-    const host = u.hostname.toLowerCase();
-    const privateHost = u.protocol !== 'https:' || host === 'localhost' || host.endsWith('.local')
-      || /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === '[::1]';
-    if (privateHost) return c.text('media must be a public https url', 400);
-    const res = await fetch(u.toString(), { signal: AbortSignal.timeout(15_000), redirect: 'follow' }).catch(() => null);
-    if (!res || !res.ok || !res.body) return c.text('media url did not load', 502);
-    const ct = (res.headers.get('content-type') ?? '').toLowerCase();
-    if (!ct.startsWith('image/')) return c.text('media url is not an image', 415);
-    if (Number(res.headers.get('content-length') ?? 0) > 20_000_000) return c.text('image too large', 413);
-    return new Response(res.body, { headers: { 'content-type': ct, 'cache-control': 'private, max-age=300' } });
+    // every hop a public https address, a streaming cap, and no active image type (safe-fetch.ts,
+    // R10 NM-089 + NM-115): the hostname-only check let a redirect or a DNS name reach the VPC, and an
+    // SVG passed through as a document on our own origin
+    const got = await safeFetch(media.mediaUrl, { maxBytes: 20_000_000, timeoutMs: 15_000 }).catch((e: unknown) => e as SafeFetchError);
+    if (got instanceof Error) {
+      const code = (got as SafeFetchError).code;
+      return code === 'TOO_LARGE' ? c.text('image too large', 413) : code === 'BAD_URL' || code === 'PRIVATE_ADDRESS' ? c.text('media must be a public https url', 400) : c.text('media url did not load', 502);
+    }
+    if (got.status < 200 || got.status >= 300) return c.text('media url did not load', 502);
+    const ct = (got.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+    if (!/^image\/(png|jpe?g|gif|webp|avif|bmp)$/.test(ct)) return c.text('media url is not a raster image', 415);
+    return new Response(new Uint8Array(got.bytes), { headers: { 'content-type': ct, 'cache-control': 'private, max-age=300', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" } });
   });
 
   fleetRoutes(app, store);
+  // POST /v1/machines/snapshots/sign, ABOVE the /v1 gate: it proves the machine bearer itself, and a
+  // replaced Cloud Run token must earn 409 STALE_EPOCH there, not the gate's 401 (machine-snapshots.ts)
+  machineSnapshotRoutes(app, store, opts.snapshots);
+  // GET and PUT /v1/machines/vault, the login vault (NM_VAULT=1), ABOVE the gate for the same reason
+  machineVaultRoutes(app, store, opts.vault);
+  // the durable facts and parks of a Cloud Run machine, ABOVE the gate for the same reason (0156)
+  machineFactRoutes(app, store);
+  machineParkRoutes(app, store);
   relayRoutes(app, store);
   cronRoutes(app, store, opts.push);
 
@@ -507,7 +486,9 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     if (bearer?.startsWith('nmm_') || bearer?.startsWith('nmh_')) {
       const lane = await resolveTokenLane(store, bearer, c.req.header('x-nm-actor'));
       if (!('actor' in lane)) return c.json({ error: lane.error, code: lane.code }, lane.status);
-      c.set('actor', lane.actor);
+      c.set('actor', await withServerRole(store, lane.actor));
+      if (lane.machine) c.set('machine', lane.machine);
+      if (lane.memberId) c.set('memberId',lane.memberId);
       return next();
     }
     if (bearer) {
@@ -519,7 +500,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
         // workspace, or the member; an illegitimate agent claim is refused, never re-attributed
         const actor = await resolveBearerActor(store, id, c.req.header('x-nm-actor'));
         if (!actor) return c.json({ error: 'this account cannot act as that agent', code: 'FORBIDDEN' }, 403);
-        c.set('actor', actor);
+        c.set('actor', await withServerRole(store, actor));
+        c.set('memberId',id);
       } catch (e) {
         // 401 IS A VERDICT ON THE TOKEN, NEVER ON OUR LUCK. Both branches used to answer 401, so a
         // JWKS blip or a database hiccup told every client its credential was dead: the desktop
@@ -532,21 +514,24 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       }
       return next();
     }
-    // 2) the bare header — read ONLY when the lane is explicitly open
-    const raw = process.env['NM_ALLOW_ACTOR_HEADER'] === '1' ? c.req.header('x-nm-actor') : undefined;
+    // 2) the bare header — read ONLY when the lane is open, and with its secret when one is set (bearer-auth.ts)
+    const raw = process.env['NM_ALLOW_ACTOR_HEADER'] === '1' && actorSecretOk(c.req.header('x-nm-actor-secret')) ? c.req.header('x-nm-actor') : undefined;
     if (raw) {
       const parsed = ActorSchema.safeParse(safeJson(raw));
       if (!parsed.success) return c.json({ error: 'invalid actor' }, 401);
-      c.set('actor', parsed.data);
+      c.set('actor', await withServerRole(store, parsed.data, true));
       return next();
     }
     return c.json({ error: 'missing credentials', code: 'AUTH_REQUIRED' }, 401);
   });
+  marketingAccessRoutes(app, store);
   activationRoutes(app, store);
   // machine lifecycle: the machine-sweep cron + the usage meter (fleet-lifecycle.ts).
   // registered AFTER the /v1 gate — /v1/machines/usage reads the actor it sets. So is /v1/me.
   lifecycleRoutes(app, store);
+  parkHumanRoutes(app, store); // GET /v1/parks, POST /v1/parks/:id/resolve: a person answers a parked turn (machine-parks.ts)
   creditRoutes(app, store);
+  repoBundleRoutes(app, store); // POST /v1/repos/bundles/sign: a person uploads a repository that is not on GitHub, NM_REPO_BUNDLES=1 (repo-bundles.ts)
   trialRoutes(app, store); // the card trial: its session and the read after the form (trial.ts)
   meRoute(app, store);
   exportRoutes(app, store); // GET /v1/workspaces/:id/export — owner only, exempt from the gate (export.ts)
@@ -555,7 +540,13 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
   brainRoutes(app, store, opts.brain);
   teamRoutes(app, store);
+  workspaceDestinationRoutes(app, store);
+  threadFollowupRoutes(app, store);
+  permissionRoutes(app, store);
   localSyncRoutes(app, store);
+  // round 9: the client that birthed a thread reads its intake decision at once (intake-read.ts)
+  intakeReadRoutes(app, store);
+  socialConnectApiRoutes(app, store); // POST /v1/connect/:provider/start: a member starts a social connect (connect-social.ts, R10 NM-011)
   webFrameRoute(app); // GET /v1/web/frame: may the web client frame this page? (web-frame.ts)
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
 
@@ -566,7 +557,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return c.json({ error: 'invalid command', issues: parsed.error.issues }, 400);
     }
     try {
-      const outcome = await executeCommand(store, c.get('actor'), parsed.data);
+      const outcome = await executeCommand(store, c.get('actor'), parsed.data, c.get('machine'),c.get('memberId'));
       // fire-and-forget push when a command lands a task on a human gate, or a Code approval waits (push.ts)
       if (opts.push) pushAfterCommand(opts.push, c.get('actor').id, parsed.data, outcome);
       return c.json(outcome);
@@ -598,6 +589,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return c.json({ error: 'x is not configured on this server', code: 'NOT_CONFIGURED' }, 501);
     }
     const channel = c.req.query('channel') ?? null;
+    // the workspace's own X connection is for its own members and agents (R10 NM-043: this was the one read with no membership check)
+    if (!(await routeMayWrite(store, c.get('actor'), workspace, [['channel', channel]], { machine: c.get('machine'), memberId: c.get('memberId') }))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     const max = Math.min(100, Math.max(10, Number(c.req.query('max') ?? 25) || 25));
     const order = c.req.query('order') === 'latest' ? 'latest' : 'top';
     const hours = Number(c.req.query('hours')) || 0;
@@ -613,6 +606,10 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const parsed = MessageInputSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid message', issues: parsed.error.issues }, 400);
     const actor = c.get('actor');
+    // every actor posts only into a workspace it belongs to, and only into rows of that workspace (handler/scope.ts, R10 NM-012)
+    const m = parsed.data;
+    if (!(await routeMayWrite(store, actor, m.workspace, [['message', m.id], ['channel', m.channel], ['project', m.project], ['task', m.taskId], ['thread', m.threadId], ['message', m.rootMessageId], ['schedule', m.scheduleId], ['message', m.replyTo], ['machine', m.threadMachineId]], { machine: c.get('machine'), memberId: c.get('memberId') }))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
+    if (parsed.data.permissionMode && (actor.kind !== 'human' || c.get('machine') || !(await actorInWorkspace(store, actor, parsed.data.workspace)))) return c.json({error:'Only a workspace member can select thread permissions.'},403);
     // the workspace voice, ENFORCED at the one boundary every agent message crosses
     // (docs/design/agent-comm-rules-2026-08 slice 3): with noEmdash on, agent-authored
     // prose is scrubbed fence-aware — quoted code stays untouched by construction.
@@ -633,6 +630,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
       threadMode: parsed.data.threadMode ?? null,
+      permissionMode: actor.kind === 'human' && !c.get('machine') ? parsed.data.permissionMode : undefined,
       // A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16; docs/10 §15.6): the thread a
       // schedule opens is born with the orchestrator on the house model, so the run never waits on a
       // Claude, Codex or Gemini login — credits serve it, which is one thing Pro buys. Server-stamped
@@ -644,8 +642,9 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       // (apps/desktop host/starterfallback.ts); an explicit override on the opener still rides.
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
+      schedulePermission: parsed.data.schedulePermission, machineAuthored: !!c.get('machine'),
       // a routine's slot is its own origin, whichever daemon posts it
-      threadMachineId: parsed.data.threadMachineId ?? null, threadOrigin: parsed.data.scheduleId ? 'routine' : parsed.data.threadOrigin ?? null, threadKind: parsed.data.threadKind ?? null,
+      threadMachineId: parsed.data.threadMachineId ?? null, threadOrigin: parsed.data.scheduleId ? 'routine' : parsed.data.threadOrigin ?? null, threadKind: parsed.data.threadKind ?? null, threadWorkspace: parsed.data.threadWorkspace ?? null,
       author: { kind: actor.kind, id: actor.id },
       body: styledBody,
       createdAt: new Date().toISOString(),
@@ -671,12 +670,12 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const inChatThread = actor.kind === 'agent' && msg.threadId
       ? (await store.getThreadMode(msg.workspace, msg.threadId)) === 'chat'
       : false;
-    const cards = actor.kind === 'agent' && !inChatThread ? parseQuestions(styledBody) : [];
+    const cards = actor.kind === 'agent' ? parseQuestions(styledBody).filter(q => !inChatThread || q.kind === 'permission') : [];
     const decisions = cards.map((q) => ({
       id: crypto.randomUUID(),
       question: q.question,
       options: q.options ?? [],
-      allowOther: q.allowOther !== false,
+      allowOther: q.allowOther !== false, ...(q.kind === 'permission' ? {requiresExactAnswer: true} : {}),
     }));
     // An AUTH card is a needs-you item too (George, 2026-09-17: "the message '@rex cannot run…' is
     // easily missed"). The agent cannot run here and waits on the person, so it mints a decision
@@ -707,6 +706,11 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       // cloud wake (cloud-first): a delivered message is workspace activity — bump the fleet's
       // idle clocks fire-and-forget, never in (or failing) the response path.
       fireWakeBump(store, saved.workspace, actor.kind === 'human' ? actor.id : null);
+      // intake (round 9, intake.ts): a person's first message in a new conversation is categorized and
+      // planned on the starter brain, in parallel with the machine wake. Fire and forget: never in the response path.
+      fireIntake(store, { ...msg, workspace: saved.workspace, body: saved.body, createdAt: saved.createdAt }, { kind: actor.kind }, opts.intake);
+      // …and a reply-line answer (`**question** → Approve`) resolves the parked turn it answers, waking its machine
+      if (actor.kind === 'human') fireParkReplies(store, saved.workspace, { taskId: msg.taskId ?? null, threadId: msg.threadId ?? null }, saved.body, actor);
       // fire-and-forget push when an agent posts an nmq/nmauth decision card. The daemon posts
       // by channel ID, so the room in the title was a UUID fragment ("A question for you · #b66…"
       // on George's lock screen, 2026-09-08): name the room by its slug. A slug-addressed post
@@ -734,6 +738,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const parsed = ArtifactCreateSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid artifact', issues: parsed.error.issues }, 400);
     const actor = c.get('actor');
+    if (!(await routeMayWrite(store, actor, parsed.data.workspace, [['artifact', parsed.data.id], ['channel', parsed.data.channel], ['task', parsed.data.taskId], ['message', parsed.data.messageId]], { machine: c.get('machine'), memberId: c.get('memberId') }))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     const limits = attachmentLimits(localMode() ? 'cloud' : await store.workspacePlan(parsed.data.workspace));
     try {
       const saved = await store.createAttachment(
@@ -769,6 +774,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const parsed = WhiteboardPutSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid whiteboard', issues: parsed.error.issues }, 400);
     const actor = c.get('actor');
+    // the CHANNEL decides where the store files the board, so it must live in the body's workspace (R10 NM-043)
+    if (!(await routeMayWrite(store, actor, parsed.data.workspace, [['whiteboard', parsed.data.id], ['channel', parsed.data.channel], ['thread', parsed.data.threadId], ['task', parsed.data.taskId]], { machine: c.get('machine'), memberId: c.get('memberId') }))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     try {
       const saved = await store.createWhiteboard(
         {
@@ -804,6 +811,9 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const parsed = WhiteboardPatchSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid whiteboard patch', issues: parsed.error.issues }, 400);
     const actor = c.get('actor');
+    // the board's own workspace decides: a stranger's patch answers as a missing board
+    const board = await store.getWhiteboard(c.req.param('id'));
+    if (board && !(await routeMayWrite(store, actor, board.workspace, [], { machine: c.get('machine'), memberId: c.get('memberId') }))) return c.json({ error: 'not found', code: 'NOT_FOUND' }, 404);
     const { applied } = await store.patchWhiteboardLww({
       id: c.req.param('id'),
       rev: parsed.data.rev,
@@ -821,18 +831,22 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   app.get('/v1/whiteboards', async (c) => {
     const { workspace, channel, archived, limit } = c.req.query();
     if (!workspace && !channel) return c.json({ error: 'workspace or channel required', code: 'INVALID_INPUT' }, 400);
+    if (workspace && !(await actorInWorkspace(store, c.get('actor'), workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     const rows = await store.listWhiteboards({
       workspace,
       channel,
       includeArchived: archived === '1',
       limit: limit ? Number(limit) : undefined,
     });
+    // a channel-only list names no workspace up front: its rows do, and they share one
+    if (!workspace && rows[0] && !(await actorInWorkspace(store, c.get('actor'), rows[0].workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     return c.json({ whiteboards: rows });
   });
 
   app.get('/v1/whiteboards/:id', async (c) => {
     const row = await store.getWhiteboard(c.req.param('id'));
-    if (!row) return c.json({ error: 'not found', code: 'NOT_FOUND' }, 404);
+    // a board outside the caller's workspaces answers exactly as a missing one does
+    if (!row || !(await actorInWorkspace(store, c.get('actor'), row.workspace))) return c.json({ error: 'not found', code: 'NOT_FOUND' }, 404);
     // the snapshot SVG never rides the API read — cards read it from the sync replica; an agent
     // reading a board wants the scene/source, and 150KB of SVG per read is pure drag
     const { snapshotSvg, ...rest } = row;
@@ -874,6 +888,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   app.get('/v1/retro', async (c) => {
     const { workspace, range = 'week' } = c.req.query();
     if (!workspace) return c.json({ error: 'workspace required' }, 400);
+    if (!(await actorInWorkspace(store, c.get('actor'), workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     if (!(range in RETRO_RANGES)) return c.json({ error: `range must be one of ${Object.keys(RETRO_RANGES).join('|')}` }, 400);
     if (!store.retro) return c.json({ error: 'retro requires the postgres store' }, 501);
     const dayStart = new Date();
@@ -904,9 +919,16 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // Pending invitations for the Members tab — not PowerSync-replicated (same doctrine as
   // /v1/workspaces): an invite is operator state, and it carries addresses of people who are
   // not members yet and so have no business in anyone's replica.
+  // THE WORKSPACE READS BELOW (invites, memory, recall, retro, model packs, whiteboards) took a
+  // workspace or board id and answered any authenticated caller, so a stranger read invitees' email
+  // addresses, the rooms' facts, full-text hits over every message (the Cloud Run feature suite,
+  // 2026-10-30). They now answer a member or an agent of the workspace (credits.ts actorInWorkspace).
   app.get('/v1/invites', async (c) => {
     const { workspace } = c.req.query();
     if (!workspace) return c.json({ error: 'workspace required', code: 'INVALID_INPUT' }, 400);
+    // the addresses of people who are not members yet: a human member's business, nobody else's
+    const actor = c.get('actor');
+    if (actor.kind !== 'human' || !(await actorInWorkspace(store, actor, workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     return c.json({ invites: await store.pendingInvites(workspace) });
   });
 
@@ -918,7 +940,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     const actor = c.get('actor');
     if (actor.kind !== 'human') return c.json({ invites: [] });
     const identity = await store.userIdentity(actor.id);
-    if (!identity) return c.json({ invites: [] });
+    // an address that nobody proved reads no invitation: the list names workspaces, roles and inviters (NM-010)
+    if (!identity || (await emailSelfAsserted(store, actor.id))) return c.json({ invites: [] });
     let email = identity.email;
     if (identity.clerkUserId) {
       const primary = await clerkPrimaryEmail(identity.clerkUserId);
@@ -933,6 +956,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   app.get('/v1/model-packs', async (c) => {
     const { workspace } = c.req.query();
     if (!workspace) return c.json({ error: 'workspace required' }, 400);
+    if (!(await actorInWorkspace(store, c.get('actor'), workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     return c.json({ packs: await store.listModelPacks(workspace) });
   });
 
@@ -977,25 +1001,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     return c.json({ url });
   });
 
-  app.get('/v1/memory', async (c) => {
-    const { workspace, channel } = c.req.query();
-    if (!workspace || !channel) return c.json({ error: 'workspace and channel required' }, 400);
-    if (channel.startsWith('project:') && c.get('actor').kind !== 'human') return c.json({ error: 'Project memory requires workspace membership.', code: 'NOT_PERMITTED' }, 403);
-    try {
-      return c.json(await store.channelMemory(workspace, channel));
-    } catch (err) {
-      if (err instanceof DomainError) return c.json({ error: err.message, code: err.code }, err.status as 404);
-      throw err;
-    }
-  });
-
-  app.post('/v1/recall', async (c) => {
-    const b = (await c.req.json()) as { workspace?: string; channel?: string; query?: string; k?: number };
-    if (!b.workspace || !b.query) return c.json({ error: 'workspace and query required', code: 'BAD_REQUEST' }, 400);
-    const t0 = performance.now();
-    const hits = await store.recall(b.workspace, b.channel ?? null, b.query, Math.min(b.k ?? 8, 25));
-    return c.json({ hits, ms: Math.round(performance.now() - t0) });
-  });
+  memoryRoutes(app, store);
 
   taskDetailRoute(app, store);
 

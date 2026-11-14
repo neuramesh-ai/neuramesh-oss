@@ -1,5 +1,7 @@
 # 02 — Implementation Options & Recommendation
 
+> **Historical decision (June 2026).** This comparison records the original selection, not the current hosted deployment. Production now uses Cloud Run, Cloud SQL and the API SQLite replica. See [the current architecture](09-system-architecture.md) and [operations](../infra/README.md).
+
 Three real architectures, not three brand-swaps. All three share the same **product foundation** (§1); they fork on the **data plane, vendor posture, and shell** (§2). Comparison in §3, recommendation in §4.
 
 Constraint set: solo + agents, ~6-week alpha, macOS first, SaaS multiplayer, **offline-capable day one**, Claude Code first behind an adapter seam, A2A 1.0 agent contract, channel-scoped fleets with per-channel orchestrators, "Linear-fast" feel.

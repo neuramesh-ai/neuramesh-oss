@@ -1,0 +1,76 @@
+# The sync feed under load (scripts/e2e-cloudrun/feed-load.mjs): K feed clients across M fresh
+# workspaces against the live nm-api, one writer at a steady rate, then the server side of the same
+# window from Cloud Monitoring (feed-metrics.mjs). Both reports go to the reports bucket.
+# Run it as the e2e builder:
+#
+#   gcloud builds submit . --region=us-east4 --config=scripts/e2e-cloudrun/cloudbuild-feed-load.yaml \
+#     --substitutions=_API_URL=<nm-api url> \
+#     --service-account=projects/<project>/serviceAccounts/nm-e2e-builder@<project>.iam.gserviceaccount.com \
+#     --gcs-source-staging-dir=gs://<project>-nm-e2e-source/staging
+#
+# Substitutions: _API_URL, _CLIENTS (200), _WORKSPACES (20), _RATE (writes per second, 2),
+# _SECONDS (180), _MODE (auto | poll | wait), _CLEANUP (a run tag: only remove that run's kept workspaces),
+# _SYNC_PATH (/v1/sync, or /v1/brain/replica).
+steps:
+  - id: load
+    name: node:24-bookworm
+    entrypoint: bash
+    allowFailure: true
+    secretEnv: ["FLEET_SECRET", "NM_ACTOR_SECRET"]
+    env:
+      - NM_API_URL=${_API_URL}
+      - NM_LOAD_CLIENTS=${_CLIENTS}
+      - NM_LOAD_WORKSPACES=${_WORKSPACES}
+      - NM_LOAD_WRITES_PER_S=${_RATE}
+      - NM_LOAD_SECONDS=${_SECONDS}
+      - NM_LOAD_MODE=${_MODE}
+      - NM_LOAD_CLEANUP=${_CLEANUP}
+      - NM_LOAD_SYNC_PATH=${_SYNC_PATH}
+      - NM_LOAD_REPORT=/workspace/feed-load.json
+    args:
+      - -c
+      - |
+        set -o pipefail
+        node --version
+        node scripts/e2e-cloudrun/feed-load.mjs 2>&1 | tee /workspace/feed-load.log
+        rc=${PIPESTATUS[0]}
+        echo "FEED_LOAD_EXIT=$rc"
+        exit $rc
+  # Cloud Monitoring lags a minute or two behind, so wait before reading the window
+  - id: metrics
+    name: node:24-bookworm
+    entrypoint: bash
+    allowFailure: true
+    env:
+      - PROJECT_ID=${PROJECT_ID}
+      - FEED_LOAD_REPORT=/workspace/feed-load.json
+      - OUT=/workspace/feed-metrics.json
+    args: ["-c", "[ -n \"${_CLEANUP}\" ] || sleep 180; node scripts/e2e-cloudrun/feed-metrics.mjs"]
+  - id: upload
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        tag="$(date -u +%Y%m%dT%H%M%SZ)-${BUILD_ID}"
+        for f in feed-load.json feed-metrics.json feed-load.log; do
+          [ -f "/workspace/$f" ] && gsutil -q cp "/workspace/$f" "gs://${PROJECT_ID}-nm-e2e-reports/feed-load/$tag/$f"
+        done
+        echo "REPORTS=gs://${PROJECT_ID}-nm-e2e-reports/feed-load/$tag/"
+availableSecrets:
+  secretManager:
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-fleet-secret/versions/latest
+      env: FLEET_SECRET
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-actor-secret/versions/latest
+      env: NM_ACTOR_SECRET
+substitutions:
+  _CLIENTS: "200"
+  _WORKSPACES: "20"
+  _RATE: "2"
+  _SECONDS: "180"
+  _MODE: auto
+  _CLEANUP: ""
+  _SYNC_PATH: /v1/sync
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 2400s

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { agyConversationStream } from './agy-stream';
+import { agyConversationStream, agyFailureMessage } from './agy-stream';
+import { narrationStats } from './narration-stats';
 
 test('Gemini conversation streams provider thinking, tool activity and reply across chunk boundaries', () => {
   const updates: Array<[string, string | undefined]> = [];
@@ -77,4 +78,45 @@ test('malformed reasoning-as-text never streams, becomes public progress or a fi
   assert.throws(() => stream.finish(), /incorrectly formatted response/);
   assert.deepEqual(messages, []);
   assert.ok(visible.every(text => text === ''));
+});
+
+test('a startup failure explains how to recover and never exposes CLI help or login URLs', () => {
+  const help = 'flags provided but not defined: -settings\nUsage of agy:\n' + 'plugin help '.repeat(700);
+  assert.match(agyFailureMessage(2, help), /newer Gemini runtime.*Choose another model/);
+  assert.doesNotMatch(agyFailureMessage(2, help), /Usage|plugin/);
+  assert.match(agyFailureMessage(1, 'authentication required'), /Reconnect your Google account/);
+  assert.match(agyFailureMessage(2, 'Usage of agy:'), /Retry/);
+});
+
+test('narration before a tool step stays on screen as a progress line, and the reply stays only the answer', () => {
+  const updates: Array<{ text: string; progress: readonly string[] }> = [];
+  const stats = narrationStats('agy', 'thread-1');
+  const stream = agyConversationStream(['list_library', 'read_library_doc'], (text, _thinking, progress) => updates.push({ text, progress: progress ?? [] }), undefined, undefined, stats);
+  const frame = (step: Record<string, unknown>) => JSON.stringify({ event: 'step_update', step_update: { conversation_id: 'a', step_index: 1, step_type: 'agent_response', state: 'ACTIVE', ...step } }) + '\n';
+  stream.push(frame({ text_delta: 'I will check the library ' }));
+  stream.push(frame({ text_delta: 'for a brief.', state: 'DONE' }));
+  assert.equal(updates.at(-1)!.text, 'I will check the library for a brief.');
+  // two tools in one batch: the words before them become one progress line, and they are not wiped
+  stream.push(frame({ step_index: 2, step_type: 'tool', tool_name: 'list_library' }));
+  stream.push(frame({ step_index: 3, step_type: 'tool', tool_name: 'read_library_doc' }));
+  assert.equal(updates.at(-1)!.text, '');
+  assert.deepEqual(updates.at(-1)!.progress, ['I will check the library for a brief.']);
+  stream.push(frame({ step_index: 4, text_delta: 'The brief names the colors. I will write the page now.', state: 'DONE' }));
+  stream.push(frame({ step_index: 5, step_type: 'tool', tool_name: 'list_library' }));
+  assert.deepEqual(updates.at(-1)!.progress, ['I will check the library for a brief.', 'The brief names the colors. I will write the page now.']);
+  stream.push(frame({ step_index: 6, text_delta: 'Here is the page.', state: 'DONE' }));
+  assert.equal(updates.at(-1)!.text, 'Here is the page.');
+  assert.equal(updates.at(-1)!.progress.length, 2, 'the progress lines stay while the answer types');
+  const response = 'I will check the library for a brief.The brief names the colors. I will write the page now.Here is the page.';
+  stream.push(JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response } }));
+  assert.equal(stream.finish(), 'Here is the page.');
+  assert.match(stats.line(), /tools=3 batches=2 progress=2/);
+  assert.match(stats.line(), /firstTextMs=\d+/);
+});
+
+test('a turn with no words before its tools shows no progress line', () => {
+  const updates: Array<readonly string[] | undefined> = [];
+  const stream = agyConversationStream(['list_library'], (_text, _thinking, progress) => updates.push(progress));
+  stream.push(JSON.stringify({ event: 'step_update', step_update: { conversation_id: 'a', step_index: 1, step_type: 'tool', state: 'ACTIVE', tool_name: 'list_library' } }) + '\n');
+  assert.deepEqual(updates.at(-1), []);
 });

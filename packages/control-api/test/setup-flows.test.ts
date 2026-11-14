@@ -35,6 +35,8 @@ async function makeMarketingRoom(slug = 'marketing'): Promise<string> {
 
 beforeEach(() => {
   store = new MemoryStore();
+  // This fixture's Marketing setup is performed by the workspace owner.
+  store.destinations.directory = async workspace => workspace === 'ws_acme' ? [{id:'george',kind:'human',name:'George',role:'owner',description:null,owner:true}] : [];
   app = createApp(store);
 });
 

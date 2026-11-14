@@ -36,9 +36,11 @@ export function conversationActivity(events: readonly BrainConversationEvent[], 
       const turn = current.get(turnId ?? (open.size === 1 ? [...open][0]! : ''));
       const body = p.text.trim();
       if (turn && body && !/^(?:NO_REPLY|HEARTBEAT_OK)$/.test(body)) {
-        const pending = prose.get(turn) ?? [];
+        // A host-generated compaction stage is public progress in its own right.
+        // It can last minutes without any subsequent model tool call to flush it.
+        const pending = p.source === 'compaction' ? turn.messages : (prose.get(turn) ?? []);
         if (pending.at(-1)?.body !== body) pending.push({ id: `progress-${event.id}`, role: 'assistant', body, createdAt: event.timestamp });
-        prose.set(turn, pending);
+        if (p.source !== 'compaction') prose.set(turn, pending);
       }
     } else if (event.type === 'tool.call' && typeof p.id === 'string' && typeof p.name === 'string' && !p.name.startsWith('mcp__')) {
       if(calls.has(p.id)) continue;
@@ -58,6 +60,15 @@ export function conversationActivity(events: readonly BrainConversationEvent[], 
       const failed=p.ok===false||p.isError===true||object(p.output).ok===false||/^error\s*:/i.test(output);
       const duration=Date.parse(event.timestamp)-Date.parse(call.message.createdAt);
       call.message.tool={...call.message.tool!,output,state:failed?'failed':'succeeded',...(failed?{error:'This action failed.'}:{}),...(duration>=0?{durationMs:duration}:{})};
+    }
+  }
+  // A RUNNING turn's prose shows before its next tool (round 9 live narration): the person reads the plan
+  // while the model still thinks, even where no live stream reaches the browser. Only while the thread
+  // is live: once the turn settles, its last prose is the final answer, which the message row carries.
+  if (liveSince) {
+    for (const [turn, pending] of prose) {
+      if (turn.state !== 'running' || Date.parse(turn.startedAt) < Date.parse(liveSince)) continue;
+      turn.messages.push(...pending.map((message) => ({ ...message, id: `pending-${message.id}` })));
     }
   }
   return [...turns.values()].filter(turn=>turn.messages.length).map(turn=>({ ...turn, messages:turn.messages.map(message=>

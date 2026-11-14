@@ -126,3 +126,24 @@ export function projectEngineeringCoreEvent(event: CoreSessionEvent): Record<str
   }
   return { type: typeof source['type'] === 'string' ? text(source['type'], 100) : 'unknown' };
 }
+
+export function forwardCodingEvent(event: CoreSessionEvent, emit: (event: import('../../engineering-protocol').EngineeringRuntimeEvent) => void,
+  running: (value: boolean) => void, checkpoint: (id: string) => void, refreshChanges: () => void) {
+    if (event.type === 'ended') { running(false); checkpoint(event.payload.sessionId); emit({ type: 'ended', reason: event.payload.reason }); }
+    else if (event.type === 'status') { running(event.payload.status !== 'idle'); if (event.payload.status === 'idle') checkpoint(event.payload.sessionId); emit({ type: 'status', status: event.payload.status }); }
+    else {
+      const projected = projectEngineeringCoreEvent(event);
+      emit({ type: 'agent_event', event: projected });
+      const payload = projected['payload'] as Record<string, unknown> | undefined;
+      const agentEvent = payload?.['event'] as Record<string, unknown> | undefined;
+      const mutationTools = new Set(['editor', 'apply_patch', 'run_commands']);
+      if (projected['type'] === 'agent_event' && agentEvent?.['type'] === 'content_end' && agentEvent['contentType'] === 'tool' && mutationTools.has(String(agentEvent['toolName']))) refreshChanges();
+      // The SDK's reusable local session can finish a turn without ending the session or
+      // emitting idle. Its final agent receipt is authoritative for the next prompt's gate.
+      if (event.type === 'agent_event' && event.payload.event.type === 'done') {
+        running(false);
+        emit({ type: 'ended', reason: event.payload.event.reason });
+        checkpoint(event.payload.sessionId);
+      }
+    }
+}

@@ -212,7 +212,7 @@ export function playbookTools(tc: ToolCtx, capable: () => Promise<boolean> = ghL
         definitionOfDone: plan.definitionOfDone,
         playbook: pb.id,
         ...(marketer ? { offerTo: marketer.name } : {}),
-        ...(convoThreadId ? { originThread: convoThreadId } : {}),
+        ...(convoThreadId ? { originThread: convoThreadId, permissionRunId:tc.permissionRunId } : {}),
       });
       const body = (await res.json().catch(() => ({}))) as { task?: { id?: string; number?: number }; error?: string; code?: string };
       if (!res.ok) return `error ${res.status}: ${body.error ?? body.code ?? 'task.create failed'}`;

@@ -1,5 +1,7 @@
 # 14 — The Design Stage: designer role + mockup approval gate (spec + build plan)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** v1 shipped 2026-07-02 (PR #72 · desktop v0.11.0). **Rollout (v0.11.1):** workspaces
 > onboarded before v0.11 never seeded a designer, so the boot-time backfill that already ensures a
 > curator now also registers **iris 🦋** once per workspace — pack-aware brain, never clobbering a

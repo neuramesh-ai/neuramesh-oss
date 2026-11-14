@@ -1,0 +1,47 @@
+# The boot guards' live check (scripts/e2e-cloudrun/boot-guards.mjs): the crash-loop breaker trips on
+# a throwaway workspace's runner and posts its notice, a person's message retries it once, and a parked
+# machine's pool scaled to 1 behind the fleet's back gets 409 PARKED and starts nothing.
+#
+#   gcloud builds submit . --project=galonge-sandbox-04 --region=us-east4 \
+#     --config=scripts/e2e-cloudrun/cloudbuild-boot-guards.yaml \
+#     --substitutions=_API_URL=https://nm-api-aqnc7mc2lq-uk.a.run.app \
+#     --service-account=projects/galonge-sandbox-04/serviceAccounts/nm-e2e-builder@galonge-sandbox-04.iam.gserviceaccount.com \
+#     --gcs-source-staging-dir=gs://galonge-sandbox-04-nm-e2e-source/staging
+#
+# The builder reads the fleet and actor secrets, and Cloud Logging (roles/logging.viewer). The ghost
+# phase scales a worker pool through the Admin API: it needs run.workerPools.get and .update
+# (roles/run.developer). Without them, pass _ARGS=--no-ghost. Exit 3 = the ghost phase was
+# inconclusive (no instance started in 3 tries), 1 = a check failed.
+steps:
+  - id: boot-guards
+    name: node:24-bookworm
+    entrypoint: bash
+    secretEnv: ["FLEET_SECRET", "NM_ACTOR_SECRET"]
+    env:
+      - NM_API_URL=${_API_URL}
+      - PROJECT=${PROJECT_ID}
+      - REGION=us-east4
+      - NM_BOOT_LOOP_MAX=${_BOOT_LOOP_MAX}
+      - NM_E2E_REPORT=/workspace/boot-guards.json
+    args:
+      - -c
+      - |
+        set -o pipefail
+        node --version
+        node scripts/e2e-cloudrun/boot-guards.mjs ${_ARGS} 2>&1 | tee /workspace/boot-guards.log
+        rc=${PIPESTATUS[0]}
+        echo "BOOT_GUARDS_EXIT=$rc"
+        exit $rc
+availableSecrets:
+  secretManager:
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-fleet-secret/versions/latest
+      env: FLEET_SECRET
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-actor-secret/versions/latest
+      env: NM_ACTOR_SECRET
+substitutions:
+  _API_URL: https://nm-api-aqnc7mc2lq-uk.a.run.app
+  _ARGS: ""
+  _BOOT_LOOP_MAX: "8"
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 3600s

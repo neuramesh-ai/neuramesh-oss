@@ -24,7 +24,7 @@ export function brainActivityProjection(value: unknown): unknown {
   if (event.type === 'tool.call' && (typeof p.name !== 'string' || p.name.startsWith('mcp__'))) return undefined;
   const fields = event.type === 'turn.open' ? ['turnId', 'agentId', 'kind']
     : event.type === 'turn.settle' ? ['turnId', 'state']
-    : event.type === 'assistant.message' ? ['text', 'turnId']
+    : event.type === 'assistant.message' ? (p.source === 'compaction' ? ['text', 'turnId', 'source'] : ['text', 'turnId'])
     : event.type === 'tool.call' ? ['id', 'name', 'input', 'turnId']
     : ['id', 'name', 'output', 'ok', 'isError', 'turnId'];
   return { id: event.id, type: event.type, timestamp: event.timestamp,

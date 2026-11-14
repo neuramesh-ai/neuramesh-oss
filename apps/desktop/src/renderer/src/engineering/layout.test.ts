@@ -121,8 +121,8 @@ test('Code primary approvals and context selectors stay inside the shared compos
   assert.match(css, /\.engapprovalactions \.primary \{[^}]*background: var\(--brand\);[^}]*border-color: var\(--brand\);/);
   assert.match(css, /\.engapprovalactions \.primary:hover \{[^}]*background: color-mix\(in srgb, var\(--brand\) 88%, var\(--text\)\);/);
   assert.match(composer, /<CodingComposer[\s\S]*contextChips=\{project \? <ProjectChip/);
-  assert.match(coding, /<SessionComposer[\s\S]*controls=\{<>[\s\S]*\{contextChips\}[\s\S]*<ModeSeg[\s\S]*<PermissionsPop[\s\S]*aria-label="Send"/);
-  assert.equal(coding.match(/<ModeSeg /g)?.length, 1);
+  assert.match(coding, /<SessionComposer[\s\S]*controls=\{<>[\s\S]*\{contextChips\}[\s\S]*<CodingModePicker[\s\S]*<PermissionPicker[\s\S]*<CodingBrains [^>]*part="agent"[^>]*\/>\s*<button[\s\S]*?aria-label="Send"/);
+  assert.equal(coding.match(/<CodingModePicker /g)?.length, 1);
   assert.match(css, /\.cbox \.engmodebar\.row \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.engmodebar \.cchip \{ min-height: 30px; \}/);
   assert.match(css, /\.engmodebar \.engmodes\.threadseg \{[^}]*min-height: 30px;[^}]*border-color: transparent;[^}]*border-radius: var\(--r-pill\);[^}]*background: transparent;/);

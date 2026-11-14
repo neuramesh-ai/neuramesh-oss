@@ -1,3 +1,4 @@
+import {agentDataIdentity} from './host/agent-data-context';
 // WHAT PROVES WHO WE ARE ON A /v1 CALL.
 //
 // Its own module rather than a corner of sync.ts, for two reasons: sync.ts imports agents.ts, so
@@ -63,7 +64,7 @@ export function authModeFor(apiUrl: string): AuthMode {
  * Read at call time, not at module load: `machined` reads its config from the environment during
  * boot, and a value captured at import would be a snapshot of the wrong moment.
  */
-const machineBearer = (env: NodeJS.ProcessEnv = process.env): string | null => {
+export const machineBearer = (env: NodeJS.ProcessEnv = process.env): string | null => {
   const t = env['NM_MACHINE_TOKEN'];
   return t && t.startsWith('nmm_') ? t : null;
 };
@@ -83,6 +84,9 @@ export function authHeadersFor(actor: Actor, token: string | null): Record<strin
     'content-type': 'application/json',
     'x-nm-actor': JSON.stringify(actor),
   };
+  if (token?.startsWith('nmm_')) head['x-nm-agent-scopes']='1';
+  const context=agentDataIdentity.getStore();
+  if(actor.kind==='agent'&&context?.agentId===actor.id)head['x-nm-agent-context']=JSON.stringify({workspace:context.workspace,subject:context.subject});
   if (token) head['authorization'] = `Bearer ${token}`;
   return head;
 }

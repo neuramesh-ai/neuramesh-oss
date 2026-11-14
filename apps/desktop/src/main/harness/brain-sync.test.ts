@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmS
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import type { BrainCommitRequest, BrainThreadSnapshot } from '@neuramesh/shared';
-import { bindConversationCallback, ConversationBrain, conversationContext, portableBrainValue, withConversationBrain } from './brain-sync';
+import { bindConversationCallback, ConversationBrain, conversationContext, flushConversationBrains, portableBrainValue, withConversationBrain } from './brain-sync';
 import { recordRuntimeEvent } from '../runtime/brain-recording';
 
 const workspace = '11111111-1111-4111-8111-111111111111';
@@ -216,4 +216,37 @@ test('an artifact rollout gate explains the missing delivery and retains the upl
     await assert.rejects(brain.artifact({ name: 'cover.png', inlineContent: 'data:image/png;base64,AA==' }, { kind: 'human', id: 'member-a' }), /Artifact uploads are not enabled/);
     assert.equal(readdirSync(join(brain.path, 'uploads')).length, 1);
   } finally { await brain.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('flushConversationBrains publishes every open outbox without waiting for its timer', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-drain-');
+  const server = service();
+  try {
+    const brain = open(root, server);
+    brain.record('user.message', { text: 'drain me' });
+    assert.equal(server.requests.length, 0, 'the 60 s timer has not fired');
+    const result = await flushConversationBrains();
+    assert.ok(result.flushed >= 1);
+    assert.equal(server.requests.length, 1);
+    assert.equal(brain.pending(), 0);
+    await brain.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a progress event uploads within progressFlushMs while a plain event waits for the interval', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-progress-');
+  const server = service();
+  try {
+    const brain = new ConversationBrain({ root, workspace, actorId: 'member-a', threadId, apiUrl: 'https://api.test', headers: async () => ({}), fetchImpl: server.fetchImpl, intervalMs: 60_000, progressFlushMs: 20 });
+    brain.record('runtime.event', { provider: 'agy' });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(server.requests.length, 0, 'a plain event keeps the 60 s interval');
+    brain.record('assistant.message', { text: 'I will check the library first.' });
+    for (let i = 0; i < 50 && server.requests.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(server.requests.length, 1, 'the narration line went up at once, with the event queued before it');
+    await brain.flush();
+    assert.equal(brain.pending(), 0);
+    assert.equal(server.requests[0]!.events.length, 2);
+    await brain.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

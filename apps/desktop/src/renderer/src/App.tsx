@@ -1,10 +1,17 @@
+import { RosterCluster } from './ui/RosterCluster';
+import { DestinationBoundary, DestinationRoster } from './destinations/DestinationAccess';
+import { FinanceHome } from './finance/FinanceHome';
+import { useTaskReference } from './thread/useTaskReference';
+import { isPlanDoc, normalizeTaskMarkdown } from '@neuramesh/shared';
+import { TaskApprovalEnvironment } from './thread/TaskApprovalCard';
+import { CodingTaskSurface, codingTaskReady } from './thread/task/CodingTaskSurface';
 import { ThreadOverviewEnvironment } from './thread/ThreadOverview'; import { openLink } from './lib/links';
 import type { EngineeringSelection } from '@neuramesh/shared';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { agentInChannel, type ShipPlan, awaitingAgent, actionableByHuman, decisionHandled, tasksInProject, rowsInProject, replyPreview, MARKETING_SETUP_FLOW, setupProgress, placementFor, type MachineCapability, type ThreadStatus , planLabel } from '@neuramesh/shared';
 import { historyRows, plainTitle, resolveRoomSurface, roomBriefs, roomTabsFor, type HistoryRow, type RoomSurface, liveKinOf } from './room-tabs';
 import { rekeyOwner, setConversation, type WTab } from './wtabs';
-import { emptyNavScope, navFlat, type NavScope, isChatRow, isCodeRow } from './navtree';
+import { emptyNavScope, navFlat, type NavScope, isChatRow } from './navtree';
 import { bindReview, designVer, reviewKind, reviewPacket, type ReviewArtifact, type ReviewBinding, type ReviewComment, type ReviewKind, type ReviewRound, type ReviewSubject, type ReviewVerdict } from './review';
 import { familyEntry, refreshRev, reviewKey, reviewTitle, roundMockupsOf, stageMockup } from './review-round';
 import { BrandLockup } from './brand';
@@ -62,7 +69,6 @@ import { ProjectChip } from './projects/ProjectChip';
 import { Modal } from './ui/Modal';
 
 
-import { type TaskRefInfo } from './cards/parse';
 import { FailoverBannerContext } from './context/FailoverBanner';
 import { CLAUDE_DESIGN_TERMINAL_EVENT, type ClaudeDesignLaunch } from './cards/terminal';
 import { FailoverFlyup } from './cards/FailoverCard';
@@ -299,7 +305,8 @@ const SURFACE_TABS: Partial<Record<MainView, string>> = {
   footprint: "Agents' footprint", // machine-scoped — a #channel-slug fallback title would be a lie
   worktrees: 'Worktrees', // machine-scoped too (docs/design/worktrees-2026-09)
   credits: 'Credits', // workspace-scoped billing read — a room slug on its tab would be a lie
-  marketing: 'Marketing OS',
+  marketing: 'Marketing',
+  finance: 'Finance',
   engineering: 'Code',
 };
 
@@ -612,20 +619,6 @@ export function App() {
   const [navFolded, setNavFolded] = useState(() => { try { return localStorage.getItem('nm:navFolded') === '1'; } catch { return false; } });
   const foldNav = (v: boolean) => { setNavFolded(v); try { localStorage.setItem('nm:navFolded', v ? '1' : '0'); } catch { /* private */ } };
   const navIsFolded = navFolded && navPos !== 'top';
-  // THE RAIL'S MODE (rail-ink round, 2026-09-04 — the Chat | Code switch under the head, Gemini's
-  // Chat | Spark shape): the one place the rail changes what it lists, never its anatomy. Code
-  // relists to repo-backed work (navtree.isCodeRow) with the branch as each row's fact, and the
-  // band shows code's nouns. Persisted like the fold; never a destination tab strip (docs/33 §8).
-  const [navMode, setNavMode] = useState<'chat' | 'code'>(() => { try { return localStorage.getItem('nm:navMode') === 'code' ? 'code' : 'chat'; } catch { return 'chat'; } });
-  // switching the mode also takes you there (Gemini's Chat | Spark): Code opens the Engineering
-  // floor (#391), Chat brings you home from it — a mode is a place, not a filter you toggle blind
-  // Code is a FILTER on the one list (coding threads, 0144 — ruling 3, 2026-09-26): switching to it
-  // lands on Home with the rail relisted, never on a separate floor. A legacy Engineering session
-  // still opens its floor from its own row; a coding thread opens on the one session surface.
-  const setRailMode = (m: 'chat' | 'code') => {
-    setNavMode(m); try { localStorage.setItem('nm:navMode', m); } catch { /* private mode */ }
-    if (m === 'code' || view === 'engineering') goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView('dashboard'); });
-  };
   // RECENTS · PROJECTS (the nav-recents round, 2026-09-12): the rail's grouping is a machine-local preference like the mode
   const [navView, setNavView] = useState<'recents' | 'projects'>(() => { try { return localStorage.getItem('nm:navView') === 'recents' ? 'recents' : 'projects'; } catch { return 'projects'; } });
   const setRailView = (v: 'recents' | 'projects') => { setNavView(v); try { localStorage.setItem('nm:navView', v); } catch { /* private mode */ } };
@@ -831,7 +824,7 @@ export function App() {
       ?? live
       ?? [...arts].sort((x, y) => rank[previewType(x.name, x.kind, x.content ?? '')] - rank[previewType(y.name, y.kind, y.content ?? '')])[0];
     if (!pick) return;
-    const one = { id: pick.id, kind: pick.kind, name: pick.name, content: pick.content ?? '' };
+    const one = { id: pick.id, kind: pick.kind, name: pick.name, content: isPlanDoc(pick.name) ? normalizeTaskMarkdown(pick.content ?? '') : pick.content ?? '' };
     const kind = reviewKind(one.name, one.kind);
     if (kind) openReviewTab(kind, one, kind === 'design' ? roundMockupsOf(arts, designVer(one.name)) : [], name ? one.name : null, rounds, task, owned);
     else openArtifactTab(one, task, owned);
@@ -1937,7 +1930,7 @@ export function App() {
   const panelSession = panelSessionOf({
     taskId: openTask?.id ?? null,
     threadId: openTask ? null : openThreadId,
-    coding: openCodingThread,
+    coding: openCodingThread || !!(openTask && codingTaskReady(openTask, chanThreads, codeSessionsAll)),
     roomId: roomHome ? current!.id : null,
     roomSections,
     // a task's worktree is a Files tab only where this client can browse it (never on the web)
@@ -2080,16 +2073,17 @@ export function App() {
   // markdown `components` map below can be memoized on it — that keeps react-markdown from giving
   // each inline TaskRefLink a fresh identity every sync, which was remounting it (wiping the hover
   // card mid-hover) and replaying its entry animation (the blip).
-  const mdTaskRef = useCallback((n: number): TaskRefInfo | null => {
-    const t = tasks.find((x) => x.number === n) ?? tasksAll.find((x) => x.number === n);
-    if (!t) return null;
-    const ag = t.assignee_kind === 'agent' ? roster.agents.find((x) => x.id === t.assignee_id)?.name ?? null : null;
-    return { id: t.id, number: n, title: t.title, state: t.state, assignee: ag, branch: t.branch, pr: t.pr_number };
-  }, [tasks, tasksAll, roster.agents]);
+  const mdTaskRef = useTaskReference(tasks, tasksAll, roster.agents);
 
   // ── THE TASK TAB's body (the side-panel round, 2026-10-03, §3.7) ─────────────────────────
   // The SAME TaskThread the full surface renders, in a tab of the session's side panel, with
   // `peek` swapping the back crumb for `Open the task ›`. The tab strip's ✕ closes it.
+  const codingTaskSurface = (task: NonNullable<typeof openTask>, full = false) => !codingTaskReady(task, chanThreads, codeSessionsAll) ? null : <CodingTaskSurface task={task} threads={chanThreads} sessions={codeSessionsAll} channels={chans} tasks={tasksAll}
+    back={sessionBack} repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} workspaceId={boot?.workspaceId ?? 'workspace'}
+    onReposChanged={() => { if (nm) void nm.channelMeta(task.channel_id).then(r => setMeta({projects:r?.projects ?? [],repos:r?.repos ?? [],reposAll:r?.reposAll ?? []})); }}
+    defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} agents={roster.agents} decisions={decisionsAll.filter(d => d.task_id === task.id)}
+    onOpenTask={peekTask} onOpenDoc={openDocTab} onOpenArticle={openArticleTab} onOpenWhiteboard={openWhiteboardTab}
+      {...(full ? { codeSlot: panelCodeSlot, codeTab: sessionTabKeyOf(front) as EngineeringWorkspaceTab | null, onCodeTab, onCodeCounts: setCodeCounts } : {})} />;
   const taskTab = (tabId: string, pt: NonNullable<typeof openTask>) => {
     const chan = chans.find((c) => c.id === pt.channel_id) ?? null;
     const row = tasksAll.find((x) => x.id === pt.id);
@@ -2099,10 +2093,11 @@ export function App() {
       <TaskThread
         key={pt.id}
         task={pt}
+        codingSurface={codingTaskSurface(pt)}
         back={sessionBack}
         // the promotion: the task takes the whole sheet with a back crumb, as a click on a task does everywhere else
-        peek={{ onFull: () => { closeWTab(tabId); setOpenTaskId(pt.id); } }}
-        convoThreadId={convo?.id ?? pt.origin_thread_id ?? null}
+        peek={{ onFull: () => { closeWTab(tabId); openTaskFromAnywhere(pt.id); } }}
+        convoThreadId={convo?.id ?? null}
         convoThread={convo}
         threadBrain={(convo ?? chanThreads.find((t) => t.id === pt.origin_thread_id))?.brain_override ?? null}
         brainProject={proj ? { id: proj.id, name: proj.name, pack: proj.model_pack ?? null } : null}
@@ -2471,7 +2466,7 @@ export function App() {
   const navList = useMemo(() => {
     const keyed = (pick: Set<string>) => new Set(histTreeRows.filter((r) => (r.task && pick.has(r.task.id)) || (r.threadId && pick.has(r.threadId))).map((r) => r.key));
     return navFlat({
-      filter: navMode === 'code' ? isCodeRow : isChatRow,
+      filter: isChatRow,
       rows: histTreeRows,
       cap: navView === 'recents' ? 10_000 : undefined, // Recents pages its own rows in the rail; the folders keep the flat cap
       channels: chans,
@@ -2485,13 +2480,13 @@ export function App() {
       askKeys: keyed(askIds),
       liveKeys: keyed(histLiveIds),
     });
-  }, [histTreeRows, chans, wsProjects, askIds, histLiveIds, navScope, navMode, navView]);
+  }, [histTreeRows, chans, wsProjects, askIds, histLiveIds, navScope, navView]);
 
-  // THE GROUPED RAIL (rail-ink round): Chat mode's folders, one per project — state and list in one hook
-  const navGroups = useNavGroups({ filter: navMode === 'code' ? isCodeRow : isChatRow, rows: histTreeRows, channels: chans, projects: wsProjects.filter((p) => p.status !== 'archived'), askIds, liveIds: histLiveIds });
+  // Unified session folders, one per project, including coding threads.
+  const navGroups = useNavGroups({ filter: isChatRow, rows: histTreeRows, channels: chans, projects: wsProjects.filter((p) => p.status !== 'archived'), askIds, liveIds: histLiveIds });
   // THE CONNECTION BANDS (U3b): every other connection's rows through the rail's union, built with the
   // same `historyRows` the foreground's go through, then both lanes under LOCAL · CLOUD
-  const navBandsState = useNavBands({ authed, connections: conns, foregroundId: fgConnId, rows: histTreeRows, filter: navMode === 'code' ? isCodeRow : isChatRow, channels: chans, projects: wsProjects.filter((p) => p.status !== 'archived'), askIds, liveIds: histLiveIds, groupFold: { folded: navGroups.folded, expanded: navGroups.expanded } });
+  const navBandsState = useNavBands({ authed, connections: conns, foregroundId: fgConnId, rows: histTreeRows, filter: isChatRow, channels: chans, projects: wsProjects.filter((p) => p.status !== 'archived'), askIds, liveIds: histLiveIds, groupFold: { folded: navGroups.folded, expanded: navGroups.expanded } });
   // the cloud machine's state (cloud-cap round) — polled, not watched; see useCompute
   const computeState = useCompute(authed);
   // THE BROWSER'S STATIC SHELL (lib/staticshell.ts) stays up only while this renders the splash: Home's
@@ -2646,7 +2641,7 @@ export function App() {
       // leave the palette naming a child whose parent it has never heard of.
       [<IconRepeat s={13} key="v-au" />, 'Scheduled · Routines', () => { setNav('home'); setView('automations'); }],
       [<IconCalendar s={13} key="v-ca" />, 'Content calendar', () => { setNav('home'); setView('calendar'); }],
-      [<IconTrend s={13} key="v-mk" />, 'Marketing OS', () => { setNav('home'); setView('marketing'); }],
+      [<IconTrend s={13} key="v-mk" />, 'Marketing', () => { setNav('home'); setView('marketing'); }],
       [<IconFootprint s={13} key="v-fp" />, "Agents' footprint", () => { setNav('home'); setView('footprint'); }],
       [<IconBranch s={13} key="v-wt" />, 'Worktrees', () => { setNav('home'); setView('worktrees'); }],
       [<IconCredits s={13} key="v-cr" />, 'Credits', () => { setNav('home'); setView('credits'); }],
@@ -2759,6 +2754,7 @@ export function App() {
         <AddAgentsOverlay
           agents={activeAgents}
           channel={current}
+          projectName={activeProj?.name||current.slug}
           scopedTasks={scopedTasksAll}
           onAdd={async (a) => {
             try {
@@ -2781,7 +2777,7 @@ export function App() {
         <AddPeopleOverlay
           members={members}
           inRoomIds={new Set(railPeople.map((p) => p.user_id))}
-          channel={current}
+          projectName={activeProj?.name||current.slug}
           meId={auth?.user?.id ?? null}
           selfEmail={auth?.user?.email}
           onAdd={async (m) => {
@@ -3142,11 +3138,6 @@ export function App() {
                   follows the DESTINATION rather than making that screen grow a second add control
                   of its own (George, 2026-08-01). ⌘N still means New chat, so the shortcut badge
                   steps aside instead of claiming a key it doesn't own. */}
-              {/* the Chat | Code switch — a segmented control, the shell's ONE mode switch */}
-              <div className="navseg" role="tablist" aria-label="Rail mode">
-                <button type="button" role="tab" aria-selected={navMode === 'chat'} className={navMode === 'chat' ? 'on' : ''} onClick={() => setRailMode('chat')}>Chat</button>
-                <button type="button" role="tab" aria-selected={navMode === 'code'} className={navMode === 'code' ? 'on' : ''} onClick={() => setRailMode('code')}>Code</button>
-              </div>
               <div className="navnew" onMouseLeave={() => setFtMenuOpen(false)}>
                 {/* ALWAYS New chat (2026-08-16, George). It used to become "New automation" on
                     the Scheduled destination — a creation verb that changes under you is a verb
@@ -3160,11 +3151,11 @@ export function App() {
                     home (#391). The 2026-08-16 "always New chat" ruling was about the verb changing
                     under you per DESTINATION; a mode you switched on purpose is a state you can see. */}
                 <button type="button" className="navnewrow"
-                  onClick={() => { setFtMenuOpen(false); if (navMode === 'code') newChat({ repo: 'primary' }); else newChat(); }}
-                  title={navMode === 'code' ? 'New session' : 'New chat — ⌘N'} aria-label={navMode === 'code' ? 'New session' : 'New chat'}>
-                  <span className="nncico" aria-hidden>{navMode === 'code' ? <IconCode s={15} /> : <IconCompose s={15} />}</span>
-                  <span className="navhomelbl">{navMode === 'code' ? 'New session' : 'New chat'}</span>
-                  {navMode === 'chat' && <span className="nnck" aria-hidden>⌘N</span>}
+                  onClick={() => { setFtMenuOpen(false); newChat(); }}
+                  title="New session — ⌘N" aria-label="New session">
+                  <span className="nncico" aria-hidden><IconCompose s={15} /></span>
+                  <span className="navhomelbl">New session</span>
+                  <span className="nnck" aria-hidden>⌘N</span>
                 </button>
                 {/* a real chevron, not a ▾ glyph: at 9px the character was almost invisible against
                     the row's own weight (George, 2026-08-01) — and it is the only sign the launcher
@@ -3194,10 +3185,10 @@ export function App() {
                 {/* rows derived in shell/navdest.ts (tested), drawn in shell/NavDestBand.tsx —
                     extracted from here in the marketing-os round to hold App's line ratchet */}
                 {!navSec.shortcuts && (
-                  <NavDestBand nav={nav} view={view} mode={navMode}
+                  <NavDestBand nav={nav} view={view}
                     goView={(v) => goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView(v); })}
                     goFiles={() => goConversation(() => { setNav('artifacts'); setOpenTaskId(null); setOpenThreadId(null); })}
-                    goCode={() => setRailMode('code')} />
+                    goAgents={() => goConversation(() => { setNav('agents'); setOpenTaskId(null); setOpenThreadId(null); })} />
                 )}
                 {!chans.length && <div className="navsect">syncing…</div>}
                 {/* The "no channels here" prompt retired with the channel list (2026-08-07): a
@@ -3263,7 +3254,7 @@ export function App() {
               view={navView} onView={setRailView}
               bands={navBandsState.bands} onToggleBand={navBandsState.toggleFold} onOpenOn={openOnConnection}
               onNewChatIn={(pid) => { setActiveProject(pid); newChat(); }}
-              codeMode={navMode === 'code'}
+              codeMode={false}
               onArchive={archiveConversation}
               // rename from the row (rail-ink round): a chat through thread.update, a task through
               // task.update_details — the server freezes a task's title once work starts
@@ -3369,6 +3360,7 @@ export function App() {
       )}
       <div className="shellbody">
       {/* what the side panel shows in front, so a thread's one-row card can say "In the panel" */}
+      <TaskApprovalEnvironment.Provider value={(task, name) => { void openTaskArtifact(task, name); }}>
       <PanelShownContext.Provider value={panelShown}>
       <ThreadOverviewEnvironment.Provider value={{ workspace: boot?.workspaceId ?? 'workspace', owner: panelSession.key, paneOpen: dockOpen, expanded: panelExpanded, openLink: (url: string) => openLink(url),
         processes: procsView.terminals.flatMap((proc) => { const tab = wtabs.find((t) => t.id === subIdToTab[proc.subId] && t.owner === panelSession.key && t.kind === 'terminal'); return tab ? [{ id: tab.id, label: proc.title, detail: 'Terminal', open: () => { activateWTab(tab.id); openDock(true); } }] : []; }),
@@ -3392,30 +3384,22 @@ export function App() {
               {/* the room's crew — facts ABOUT the room you are standing in, so they keep their
                   gate: an open task or thread is not a room, and the rail would be lying. */}
               {channelScoped && !onWorkspaceDestination && !(openTaskId || openThreadId) && current && !!railPeople.length && (
-                <button className="rosterclu" data-tip={`${railPeople.length} ${railPeople.length === 1 ? 'person' : 'people'} in #${current.slug} — add or invite`}
-                  aria-label={`People in this channel (${railPeople.length})`} onClick={() => setAddPeopleOpen(true)}>
-                  <span className="cluav">
+                <RosterCluster count={railPeople.length} tip="Project people" label={`People in this channel (${railPeople.length})`} onClick={() => setAddPeopleOpen(true)}>
                     {railPeople.slice(0, 3).map((p) => {
                       const nm2 = p.user_id === auth?.user?.id ? selfLabel(p.display_name, auth?.user?.email) : (p.display_name ?? 'member');
                       return <span key={p.user_id} className="clutile">{(nm2[0] ?? 'M').toUpperCase()}</span>;
                     })}
-                  </span>
-                  <span className="clun">{railPeople.length}</span>
-                </button>
+                </RosterCluster>
               )}
               {channelScoped && !onWorkspaceDestination && !(openTaskId || openThreadId) && current && !!railOrder.length && (
-                <button className="rosterclu" data-tip={`${railOrder.length} agent${railOrder.length === 1 ? '' : 's'} in #${current.slug} — add, remove or hire`}
-                  aria-label={`Agents in this channel (${railOrder.length})`} onClick={() => setAddAgentsOpen(true)}>
-                  <span className="cluav">
+                <RosterCluster count={railOrder.length} tip="Project agents" label={`Agents in this channel (${railOrder.length})`} onClick={() => setAddAgentsOpen(true)}>
                     {railOrder.slice(0, 3).map((a) => (
                       <span key={a.id} className="cluagent">
                         {(agentBusy(a) || openRuns.some((r) => r.agent_id === a.id && !r.parent_run_id)) && <span className="cluping" aria-hidden />}
                         <AgentAvatar name={a.name} size={22} radius={6} />
                       </span>
                     ))}
-                  </span>
-                  <span className="clun">{railOrder.length}</span>
-                </button>
+                </RosterCluster>
               )}
               {!(openTaskId || openThreadId) && (
                 <button className={`utilbtn${viewMenuOpen ? ' on' : ''}`} data-tip="Views" aria-label="Views" onClick={() => setViewMenuOpen((v) => !v)}>
@@ -3467,7 +3451,7 @@ export function App() {
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('calendar'); }}><IconCalendar s={14} /><span className="navlabel">Calendar</span>{roomContent ? <span className="navitembadge">{roomContent}</span> : null}</button>
               <button role="menuitem" onClick={() => setHistOpen(true)}><IconHistory s={14} /><span className="navlabel">History</span>{roomUnseenThreads ? <span className="navitembadge">{roomUnseenThreads > 9 ? '9+' : roomUnseenThreads}</span> : null}</button>
               <div className="viewmenusep" />
-              <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('marketing'); }}><IconTrend s={14} /><span className="navlabel">Marketing OS</span></button>
+              <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('marketing'); }}><IconTrend s={14} /><span className="navlabel">Marketing</span></button>
               
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('skills'); }}><IconSkill s={14} /><span className="navlabel">Skills</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('artifacts'); }}><IconLibrary s={14} /><span className="navlabel">Files</span></button>
@@ -3586,7 +3570,7 @@ export function App() {
             greeting={selfFirst}
             composeSignal={homeCompose}
             initialTarget={chatTarget}
-            initialDraft={chatDraft}
+            initialDraft={chatDraft} initialDraftSeed={chatDraft === introDraft}
             firstSendHint={needsFirstSend}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} initialRepo={chatRepo} onConnectRepo={() => setAddRepoOpen(true)}
             onCodingBirth={(id, repoId, selection) => setCodingRepoPicks((m) => new Map(m).set(id, { repo: repoId, selection }))}
@@ -3663,15 +3647,16 @@ export function App() {
             destination — the Calendar/Files ungating ruling applied a third time. Session and
             task doors flip back to the conversation surface first (the :1070 invariant closes
             any open session the moment this view mounts, so the door must leave it). */}
+        {view === 'finance' && <DestinationBoundary key={boot?.workspaceId} destination="finance"><FinanceHome onConnect={p=>{setFocusProvider(p);setWsOpen(true);void refreshCreds();}} /></DestinationBoundary>}
         {view === 'marketing' && (
-          <>
-            <div className="topbar">Marketing OS<span className="desc">every project’s marketing, one desk</span></div>
+          <DestinationBoundary key={boot?.workspaceId} destination="marketing">
+            <div className="topbar destination-marketing-header">Marketing<span className="desc">every project’s marketing, one desk</span><DestinationRoster /></div>
             <MarketingOS projects={wsProjects} chans={chans} scope={scopeOf('marketing')} setScope={(x) => setScope('marketing', x)}
               alerts={alerts} refreshAlerts={refreshAlerts} dismissAlert={dismissAlert} threads={histAll} tasks={tasksAll} messages={[]} marksOf={rowMarks}
               onOpenCalendar={() => { setNav('home'); setView('calendar'); }} onOpenRoutines={() => { setNav('home'); setView('automations'); }}
               onOpenSession={(r) => goConversation(() => { setNav('home'); setView('dashboard'); openSession(r); })}
               onOpenTask={(id) => goConversation(() => { setNav('home'); setView('dashboard'); setOpenTaskId(id); })} onAsk={openMarketingAsk} />
-          </>
+          </DestinationBoundary>
         )}
         {view === 'whiteboards' && (
           <>
@@ -4068,7 +4053,7 @@ export function App() {
           // the header's toggle: opening it lands on Details, because that is what the button in
           // a TASK's action row promises — not whatever face you last left the panel on
 
-          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? openTask.origin_thread_id ?? null}
+          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? null}
           convoThread={chanThreads.find((t) => t.task_id === openTask.id) ?? null}
           threadBrain={(chanThreads.find((t) => t.task_id === openTask.id) ?? chanThreads.find((t) => t.id === openTask.origin_thread_id))?.brain_override ?? null}
           brainProject={(() => {
@@ -4087,6 +4072,7 @@ export function App() {
           onOpenWhiteboard={openWhiteboardTab} onOpenDoc={openDocTab} onOpenArticle={openArticleTab}
           back={sessionBack}
           task={openTask}
+          codingSurface={codingTaskSurface(openTask, true)}
           agents={roster.agents}
           machines={roster.machines}
           members={members}
@@ -4224,6 +4210,7 @@ export function App() {
       )}
       </ThreadOverviewEnvironment.Provider>
       </PanelShownContext.Provider>
+      </TaskApprovalEnvironment.Provider>
       </div>
       {cmdkOpen && <CmdKPalette items={buildCmdkItems()} onClose={() => setCmdkOpen(false)} />}
       <LinkChoiceHost openInApp={openBrowserTab} />

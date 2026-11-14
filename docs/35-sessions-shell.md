@@ -1,5 +1,7 @@
 # 35 — The sessions shell: a room is a folder of sessions (spec)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILDING (2026-07-29). Approved by George 2026-07-29 off
 > [mockups/sessions-shell.html](../mockups/sessions-shell.html) — **that mockup is the visual
 > contract** (5 stops, both themes, the alternatives table). A **session** is a chat thread or a

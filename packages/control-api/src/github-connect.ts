@@ -28,10 +28,11 @@ import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { seal, unseal } from './connector-crypto';
 import { actorInWorkspace } from './credits';
 import { GitHubApiError, githubAppConfigured, installUrl, parseRepoInput, readRepoSignals } from './github-app';
+import { doorState, grantable, readDoorState, sealGrant } from './announce-grant';
 import { authorizeUrl, grantStartUrl, isProofState, ownerProofConfigured, sealProofState, type GrantState } from './github-proof';
 import { proveGrant } from './github-prove';
-import { readRepoCommits, readRepoFile, readRepoImage, readRepoTree } from './github-reads';
-import { installationFor, rememberInstallation, resolveConnector, slugOf } from './github-resolve';
+import { installationFacts, readRepoCommits, readRepoFile, readRepoImage, readRepoTree } from './github-reads';
+import { connectionReads, installationFor, rememberInstallation, resolveConnector, slugOf } from './github-resolve';
 import { githubWriteRoutes } from './github-write';
 import { APP_URL, HQ_URL } from './mail';
 import { shelfCopy } from './shelf-image';
@@ -83,7 +84,8 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
       return c.redirect(installUrl(seal(state)), 302);
     }
     const parsed = parseRepoInput(c.req.query('repo') ?? '');
-    return c.redirect(installUrl(parsed?.slug ?? ''), 302);
+    // the door's state is sealed with the repository and an issue time (announce-grant.ts, R10 NM-001)
+    return c.redirect(installUrl(parsed?.slug ? doorState(parsed.slug) : ''), 302);
   });
 
   app.get('/connect/github/callback', async (c) => {
@@ -106,14 +108,27 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
         return c.html(page('GitHub', ['The grant did not land.', 'Close this tab and try again from Connections in neuramesh.']), 400);
       }
     }
-    // the public door: the state is the repository slug, and the person goes back to the site
-    const slug = parseRepoInput(raw)?.slug ?? '';
+    // the public door: the state is the sealed door state (or, from an older link, the bare slug), and
+    // the person goes back to the site. A GRANT comes back only for a fresh installation of that very
+    // repository that no workspace holds (announce-grant.ts, R10 NM-001): GitHub signs nothing here,
+    // so an installation id replayed onto this route must not become anyone's read of a private repo
+    const sealedSlug = readDoorState(raw);
+    const slug = sealedSlug ?? parseRepoInput(raw)?.slug ?? '';
     if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.redirect(`${APP_URL}/announce?granted=0`, 302);
-    try { await rememberInstallation(ann()!, id, fetchFn, null); } catch (e) {
+    let doorGrant: string | null = null;
+    try {
+      const names = await rememberInstallation(ann()!, id, fetchFn, null);
+      if (sealedSlug) {
+        const facts = await installationFacts(id, { fetchFn }).catch(() => null);
+        const doorRow = await ann()!.installationForRepo(sealedSlug, { unrecorded: true }).catch(() => null);
+        if (grantable({ createdAt: facts?.createdAt ?? null, repos: names, boundToWorkspace: doorRow?.installationId !== id }, sealedSlug)) doorGrant = sealGrant(id, sealedSlug);
+        else console.warn(`github door callback: no grant for installation=${id} repo=${sealedSlug} (stale, not covering it, or a workspace's)`);
+      }
+    } catch (e) {
       console.warn(`github app callback failed: ${e instanceof Error ? e.message : String(e)}`);
       return c.redirect(`${APP_URL}/announce?granted=0${slug ? `&repo=${encodeURIComponent(slug)}` : ''}`, 302);
     }
-    return c.redirect(`${APP_URL}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ''}`, 302);
+    return c.redirect(`${APP_URL}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ''}${doorGrant ? `&grant=${encodeURIComponent(doorGrant)}` : ''}`, 302);
   });
 }
 
@@ -174,6 +189,12 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
     if (!conn) return { status: 409, body: { error: 'GitHub is not connected for this room', code: 'NOT_CONNECTED' } };
     const reconnect: Refusal = { status: 409, body: { error: `GitHub no longer lets neuramesh read ${slug}. A person needs to connect GitHub again from Connections.`, code: 'RECONNECT_REQUIRED' } };
     if (conn.status !== 'connected') return reconnect;
+    // THE CONNECTION NAMES THE REPOSITORY IT READS (R10 NM-001). The resolve connects only a repository
+    // this workspace's own grant covers; the read then minted for "the room's repository", which any
+    // member could re-point at another tenant's private one with repo.link, read through any
+    // installation GitHub knows. A room reads the repository its connection names, or another of its
+    // project's repositories that an installation recorded for THIS workspace covers (connectionReads)
+    if (!(await connectionReads(ann()!, conn.handle, slug, repo.workspaceId))) return { status: 409, body: { error: `GitHub is connected for ${conn.handle}, not ${slug}. Connect ${slug} from Connections.`, code: 'NOT_CONNECTED' } };
     try {
       // a deleted installation answers 404 on the token mint and GitHub names no other: the grant is
       // gone, and the row says so
@@ -243,3 +264,4 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
     } catch (e) { const f = failed(e); return c.json(f.body, f.status); }
   });
 }
+

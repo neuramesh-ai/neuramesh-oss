@@ -13,8 +13,10 @@ import type { MachineStatus } from '@neuramesh/shared';
  * whole explanation instead of one adjective. The state rides colour and one small overlay:
  *
  *   online       the machine, lit
- *   asleep       the machine, dim
+ *   asleep       the machine, dim (it uses no credits)
+ *   sleeping     the machine, dim (going to sleep: it saves its work first)
  *   waking       the machine, breathing
+ *   held         the machine with a PAUSE bar, in warn (paused after failed starts)
  *   capped       the machine with a PAUSE bar, in warn
  *   unreachable  the machine with an ALERT dot, in warn
  *   stopped      the machine, struck through
@@ -42,7 +44,7 @@ export function ComputePill({ status, reason, onOpen }: {
         <path d="M7.3 12.6v2.8" strokeLinecap="round" />
         <path d="M12.9 6.3h3.4a1.7 1.7 0 0 0 .2-3.4 2.4 2.4 0 0 0-4.6.8 1.45 1.45 0 0 0 1 2.6z" strokeLinejoin="round" />
         {/* capped: a pause bar, because the machine is stopped ON PURPOSE and can resume */}
-        {status === 'capped' && <path d="M5.7 7.4v3M8.9 7.4v3" strokeLinecap="round" />}
+        {(status === 'capped' || status === 'held') && <path d="M5.7 7.4v3M8.9 7.4v3" strokeLinecap="round" />}
         {/* unreachable: an alert, because this one is a fault rather than a rest */}
         {status === 'unreachable' && <path d="M7.3 7v2.3M7.3 11.1v.05" strokeLinecap="round" />}
         {/* stopped: struck through — there is no machine to have a state */}

@@ -12,6 +12,7 @@ import { NM_TOOLS } from '@neuramesh/shared';
 import { TOOL_SPECS, type SpeccedTool } from './toolspec';
 import { WHITEBOARD_DEFS } from './tooldefs-whiteboard';
 import { WEB_DEFS } from './tooldefs-web';
+import { MESSAGE_BOARD_DEFS } from './tooldefs-messageboards';
 import { text } from './toolbus';
 import type { ToolDef, ToolHost } from './toolbus';
 
@@ -166,6 +167,7 @@ export const DEFS: ToolDef[] = [
   },
   ...WHITEBOARD_DEFS,
   ...WEB_DEFS,
+  ...MESSAGE_BOARD_DEFS,
   {
     ...spec('advance_beat'),
     async run(host, input) {

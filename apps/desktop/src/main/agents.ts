@@ -1,3 +1,6 @@
+export {isTextual} from './host/textual';
+import {agentDataDb,agentDataAround} from './host/agent-data';
+import { workspaceSkills } from './host/workspace-skills';
 import { brainApiBaseUrl } from '@neuramesh/shared';
 // AgentHost slice 1: channel-scoped @mention wake → reply, posted through the
 // control-api as a real agent actor. `runAgentTurn` is the seam where the
@@ -26,7 +29,7 @@ import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { AgentLog, LogFn } from './agentlog';
 import { buildDesignPrompt, designSystemPrompt, claudeDesignPromptBlock, designProviderFromEvents, mentionRe, bareAddressRe, defaultBaselineRules, STARTER_MODEL, TURN_BUDGETS, type Actor, type DesignProvider, type NMEvent, type SessionOrigin } from '@neuramesh/shared';
 
-import { HostQueue, durableStore } from './harness/hostqueue';
+import { HostQueue, durableStore, isSharedFacts } from './harness/hostqueue';
 // shared compute (0114): one origin-affinity rule, shared with every other client
 import { shouldClaim, type ClaimVerdict, type ComputePrefs, type MachineCapability } from '@neuramesh/shared';
 import { Brain, type SubjectRef, cachePath, deliverablePath } from './harness/brain';
@@ -100,6 +103,7 @@ import { makeLookups } from './host/lookups';
 import { makeOrchTools } from './host/orchtools';
 import type { HostCtx } from './host/ctx';
 import { anthropicOrchestratorTurn, codexSdkOrchestratorTurn, geminiDispatch, type OrchTransportArgs } from './host/orchturn';
+import { failedWake, type WakeAt } from './host/wakefail';
 import { makeChatTurn } from './host/chatturn';
 import { makeFlows } from './host/flows';
 import { makeEcho } from './host/echo';
@@ -130,6 +134,7 @@ export interface HostedAgent {
 export type SkillRef = { name: string; description: string; body: string; pack_name?: string | null };
 
 interface HostOpts {
+  engineering?: () => import('./relay/engineering-host').EngineeringMachineHost;
   headless?: boolean;
   db: ReplicaDatabase;
   machineId: string;
@@ -497,17 +502,25 @@ export async function awaitDecision(
   where: { taskId: string } | { threadId: string },
   question: string,
   timeoutMs = TURN_BUDGETS.review.wallMs, // docs/harness/05 §3.6
+  exactDecision = false,
+  // a Cloud Run machine that begins to drain stops waiting at once: the wait is a durable park there
+  // (cloudrun/parks.ts), so ending it loses nothing
+  stop?: () => boolean,
 ): Promise<string | null> {
   const taskId = 'taskId' in where ? where.taskId : null;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (taskId && executing.get(taskId)?.signal.aborted) return null;
+    if (stop?.()) return null;
     // 1) authoritative: the decision row flipped (a desktop decision.answer)
     const drows = await db
       .getAll<{ status: string; answer: string | null }>('select status, answer from decisions where message_id = ? limit 1', [messageId])
       .catch(() => [] as { status: string; answer: string | null }[]);
     const d = drows[0];
     if (d && d.status !== 'open') return d.status === 'answered' ? d.answer : null;
+    // Permission grants are for exactly one operation. A matching answer from
+    // last week (or a parallel command) can never authorize a fresh request.
+    if (exactDecision) { await new Promise(r => setTimeout(r, 1500)); continue; }
     // 2) reply-line answer (`**question** → Approve`) — how a mobile client answers today
     const mrows = await db
       .getAll<{ body: string }>(
@@ -580,10 +593,7 @@ export function parseSkillMarker(body: string): { name: string; pack?: string } 
 // manifest appended to the transcript so EVERY runtime is at least aware of (and can read text
 // from) them — image vision is Claude-only, the rest degrade to the manifest.
 export type AttDbLike = { getAll<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> };
-const TEXTUAL_EXT = /\.(md|markdown|txt|text|json|jsonc|ya?ml|toml|csv|tsv|log|ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cpp|cc|cs|php|sh|bash|zsh|sql|html?|css|scss|xml|svg|env|ini|cfg|conf|dockerfile|diff|patch)$/i;
-export function isTextual(mime: string, name: string): boolean {
-  return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || TEXTUAL_EXT.test(name);
-}
+
 
 // Locally git-exclude host/agent staging dirs in a repo checkout, so the submit's
 // `git add -A` can never sweep them into the commit/PR: .nm-attachments/ (staged chat
@@ -602,7 +612,7 @@ export async function excludeFromGit(dir: string, patterns: string[]): Promise<v
     if (missing.length) await appendFile(file, `\n${missing.join('\n')}\n`);
   } catch { /* not a git repo / no exclude — best effort */ }
 }
-export const STAGING_EXCLUDES = ['.nm-evidence/', '.nm-attachments/'];
+export const STAGING_EXCLUDES = ['.nm-evidence/', '.nm-attachments/', '.nm-artifacts/'];
 
 
 
@@ -727,7 +737,7 @@ export async function generateBrandImage(cred: ImageCred, reviewSeat: string, br
 const hostsStarted = new Set<string>();
 // The two task shapes the plan/design flows read. Declared at module level so the flows
 // module (host/flows.ts) shares the SAME shape rather than restating it.
-export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null };
+export type PlanTask = { id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null; repo_id: string | null; base_ref: string | null; assignee_id?: string | null; offered_agent_id?: string | null };
 export type DesignTask = PlanTask & { repo_id: string | null; base_ref: string | null; updated_at: string };
 
 /** a skill pack mid-import — the curator watch and the flow that runs it share the shape */
@@ -738,13 +748,14 @@ export type ImportPack = { id: string; name: string; channel_id: string; source_
 export { collectFiles, runCoding, worktreeRun } from './execution';
 export { RESEARCH_OUTPUT_CONTRACT, loadMessageAttachments, openPlanningWorkspace, stageApprovedDesigns, stageBrandContext, stageConnections, stagePriorDesignRound, stageTaskAttachments } from './staging';
 
-export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless }: HostOpts) {
+export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId, agentLog, killTaskPtys, headless, engineering }: HostOpts) {
   const hostKey = `${apiUrl}|${workspace}`;
   if (hostsStarted.has(hostKey)) {
     console.warn(`agent_host already running for ${workspace.slice(0, 8)} — second start ignored (one host per backend and workspace)`);
     return;
   }
   hostsStarted.add(hostKey);
+  db = agentDataDb(db,workspace);
   ideasHost = { db, apiUrl, ownerActorId }; // lend the launcher's ideas one-shot its handles
   setStarterLane({ apiUrl, workspace, actorId: ownerActorId }); configureStarterFallback({ db, apiUrl, ownerActorId }); // the Starter lane + its fallback door (runtime/starter.ts, host/starterfallback.ts)
   // Containment L1: bring up the egress proxy once per daemon and route every agent's HTTP(S) traffic
@@ -915,10 +926,12 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // Best-effort by construction — the recorder is wrapped in try/catch at the queue, because a brain
   // that cannot be written must degrade the RECORD, never the work.
   const brain = new Brain();
+  const dataAround=agentDataAround(apiUrl,workspace);
+  const conversationAround=hostConversationRecorder({ db, workspace, actorId: ownerActorId, apiUrl, progressFlushMs: 250, headers: () => apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }), headersForActor: (actor) => apiAuthHeaders(apiUrl, actor as Actor), log: (line) => console.warn(`agent_host ${line}`) });
   const execQueue = new HostQueue({
     headless,
     log: (line) => console.log(`agent_host ${line}`),
-    around: hostConversationRecorder({ db, workspace, actorId: ownerActorId, apiUrl, headers: () => apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }), headersForActor: (actor) => apiAuthHeaders(apiUrl, actor as Actor), log: (line) => console.warn(`agent_host ${line}`) }),
+    around: (work,run) => dataAround(work,()=>conversationAround(work,run)),
     turns: {
       open: (w) => {
         const subject = w.subject;
@@ -982,7 +995,14 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // message both answer, while the same pair can never answer twice.
   function queueWake(agent: HostedAgent, m: { id: string; channel_id: string; thread_id?: string | null; body: string }): void {
     execQueue.run({ key: `wake:${m.id}:${agent.id}`, kind: 'chat', cause: 'message', agentId: agent.id,
-      ...(m.thread_id ? { subject: { kind: 'thread' as const, id: m.thread_id } } : {}) }, () => wake(agent, m));
+      ...(m.thread_id ? { subject: { kind: 'thread' as const, id: m.thread_id } } : {}) }, () => wake(agent, m),
+      (err) => wakeFailed(agent, m, { channelId: m.channel_id, threadId: m.thread_id ?? null }, err));
+  }
+
+  // a wake that threw before its turn started (its thread's brain did not load) answers its message
+  // with the reason, so the thread ends instead of reading "in progress" forever (host/wakefail.ts)
+  function wakeFailed(agent: HostedAgent, m: { id: string; body: string }, at: WakeAt, err: unknown): Promise<unknown> {
+    return failedWake({ db, openWakeRun, post, log: (line) => console.warn(`agent_host ${line}`) }, agent, m, at, err);
   }
 
   async function post(path: string, actor: { kind: string; id: string; role?: string }, body: unknown) {
@@ -1153,7 +1173,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     executeHire, generateDraftImage, generateShareImage, libraryDocs, startDeepWork, subjectFor, whiteboardClosures,
     workspaceListing, workspaceRead,
   });
-  const { chatTurn, defaultResponder, threadModeFor } = makeChatTurn({
+  const { chatTurn, defaultResponder, threadModeFor, permissionsFor } = makeChatTurn({
     apiUrl, ownerActorId,
     post, machineId, guards, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace,
     generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures,
@@ -1235,7 +1255,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     return {
       // the leg still needs to know it is ONE direction among several and that its parent reports
       // for it — that framing rides on top of the design brief rather than replacing it
-      prompt: `${prompt}\n\nYou are drawing ONE direction ("${a.label}") for ${a.ch.slug}'s orchestrator, alongside other designers working different directions. Draw only this one. You cannot create, offer or route board work — your parent owns this round and posts your mockups for the human's approval.${brainBriefing(a.brainSubject, a.dir)}`,
+      prompt: `${prompt}\n\nYou are drawing ONE direction ("${a.label}") for ${a.ch.slug}'s orchestrator, alongside other designers working different directions. Draw only this one. You cannot create, offer or route board work — your parent owns this round and posts your mockups for the human's approval.${await brainBriefing(a.brainSubject, a.dir)}`,
       system: designSystemPrompt(designBlocks(), 'the designer', false),
       claudeDesign: provider === 'claude-design',
     };
@@ -1331,15 +1351,8 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // AND enabled AND (no pack OR its pack is enabled). Shared by the worker (before
   // it executes) and the orchestrator (so it can steer toward a fitting skill).
   // Disabled = structurally absent from what any agent ever sees. Replica = 0/1.
-  async function discoverSkills(channelId: string, workspaceId: string): Promise<SkillRef[]> {
-    return db.getAll<SkillRef>(
-      `select s.name, s.description, s.body, p.name as pack_name from skills s
-       left join skill_packs p on p.id = s.pack_id
-       where s.status = 'active' and s.enabled = 1 and (s.pack_id is null or p.enabled = 1)
-         and (s.channel_id = ? or (s.channel_id is null and s.workspace_id = ?))
-       order by s.channel_id is null limit 60`,
-      [channelId, workspaceId],
-    );
+  async function discoverSkills(_channelId: string, workspaceId: string): Promise<SkillRef[]> {
+    return workspaceSkills(db, workspaceId);
   }
 
 
@@ -1421,7 +1434,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     // attributed to that member, so their own machine gets first refusal on it. An
     // orchestrator-filed task has no such origin — it is unattributed and any capable machine may
     // take it at once, which is the right default for work nobody typed directly.
-    `select id, number, title, channel_id, kind, offered_agent_id, repo_id, base_ref, branch, requirements, requirements_confirmed,
+    `select id, number, title, channel_id, state, kind, offered_agent_id, repo_id, base_ref, branch, requirements, requirements_confirmed,
             creator_kind, creator_id
        from tasks
      where workspace_id = ? and state in ('todo', 'plan_review') and offered_agent_id is not null
@@ -1432,7 +1445,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     [workspace],
     {
       onResult: (r) => {
-        for (const t of (r.rows?._array ?? []) as OfferedTask[]) {
+        for (const t of (r.rows?._array ?? []) as Array<OfferedTask & {state: string}>) {
           const agent = agents.get(t.offered_agent_id);
           if (!agent || claimed.has(t.id)) continue;
           claimed.add(t.id);
@@ -1446,7 +1459,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
           // exactly this shape, and a ternary hides one of them from it)
           const flow = owning ? () => ownFlow(agent, t) : () => claimFlow(agent, t);
           execQueue.run(
-            { key: t.id, kind: owning ? 'own' : 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
+            { key: t.id, kind: owning ? 'own' : 'work', cause: t.state === 'plan_review' ? 'approval' : 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
             flow,
           );
         }
@@ -1554,7 +1567,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   db.watch(
     `select t.id, t.number, t.channel_id, t.assignee_id, t.pr_number, t.pr_url, r.org_name, r.name as repo_name, r.clone_url, r.local_path
      from tasks t join repos r on r.id = t.repo_id
-     where t.state = 'accepted' and t.pr_number is not null`,
+     where t.state = 'accepted' and t.pr_number is not null and json_type(t.work_plan,'$.codingDelivery') is null`,
     [],
     {
       onResult: async (r) => {
@@ -1656,7 +1669,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
 
   db.watch(
-    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id from tasks where state = 'planning'`,
+    `select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id, offered_agent_id from tasks where state = 'planning'`,
     [],
     {
       onResult: (r) => {
@@ -1933,7 +1946,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     orchPlanDecision, ownFlow,
     remoteDelegate, resumeFlow,
   } = makeFlows({
-    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
+    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed, engineering,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
     handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,
@@ -1963,7 +1976,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     drawOnAsk, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, execQueue, handleExhaustion,
     offerAddAgents, openWakeRun, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake,
     rearmWake, reviseContentDrafts, runDueSchedules, runMarketingBootstrap, saidNoCompute, seatFor, setStatus,
-    threadModeFor, threadTranscript, wakeEnded, wakeStarted,
+    threadModeFor, threadTranscript, wakeEnded, wakeFailed, wakeStarted,
     // a THUNK: orchestratorTurn is built below, from services this maker also needs
     orchestratorTurn: (...a: Parameters<typeof orchestratorTurn>) => routineReplyTurn(orchestratorTurn, a, { db, post, runtimeFor }), // a routine's drafted replies land as the card
   };
@@ -1990,7 +2003,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     const [bl] = await db.getAll<{ n: number }>(`select count(*) as n from tasks where channel_id = ? and state = 'backlog'`, [ch.id]);
     const backlog = (bl?.n ?? 0) > 0 ? await db.getAll<{ number: number; title: string }>(`select number, title from tasks where channel_id = ? and state = 'backlog' order by number desc limit 8`, [ch.id]) : [];
     const block = await blockFor(ch.id);
-    return (block ? `[channel summary block]\n${block}\n\n` : '') +
+    return (block ? `[project memory block]\n${block}\n\n` : '') +
       `Open tasks on #${ch.slug}:\n${open.map((t) => `#${t.number} ${t.title} [${t.state}${t.assignee ? ` · ${t.assignee}` : ''}]`).join('\n') || '(none)'}\n\n` +
       `Backlog on #${ch.slug} (parked ideas, not open work): ${bl?.n ?? 0}${backlog.length ? `\n${backlog.map((t) => `#${t.number} ${t.title}`).join('\n')}` : ''}\n\n` +
       `Recent #${ch.slug} channel messages (newest first):\n${recent.map((r) => `${r.author_kind === 'agent' ? 'agent' : 'human'}: ${r.body.slice(0, 200)}`).join('\n') || '(none)'}`;
@@ -2006,6 +2019,9 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     db, post, agents, claimed, guards, apiUrl, ownerActorId, startedAt, buildOrchestratorTools,
     SUMMARY_MARKER, sweepPeriod, summaryPostedToday,
     channelMonitorSignals, sweepTranscript, dispatchOrchestrator, discoverSkills, arun, resumeStrandedRoutines,
+    // one machine per sweep tick where the guard store is shared across machines (Cloud Run, 0156)
+    ...(isSharedFacts(hostGuards) ? { claimTick: (key: string) => hostGuards.claim(key) } : {}),
+    tickMs: { full: ORCH_FULL_SWEEP_MS, watchdog: ORCH_WATCHDOG_MS },
   });
 
   // Route an orchestrator transport call to the agent's provider — shared by message turns AND the
@@ -2024,7 +2040,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // The orchestrator's turn (host/orchestratorturn.ts) — it assembles the turn and hands it to
   // whichever transport the provider needs. Choosing is not the same job as running.
   const { orchestratorTurn } = makeOrchTurn({
-    db, NO_RUN, buildOrchestratorTools, draftsForAnchor, ensureChatWorkspace, orchSpawnFor,
+    db, NO_RUN, buildOrchestratorTools, draftsForAnchor, ensureChatWorkspace, orchSpawnFor, permissionsFor,
     dispatchOrchestrator,
   });
 

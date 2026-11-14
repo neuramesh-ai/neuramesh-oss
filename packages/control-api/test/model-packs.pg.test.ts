@@ -24,6 +24,7 @@ function send(actor: Actor, body: unknown) {
 
 let ws = '';
 let agentId = '';
+let orchestratorId = '';
 
 beforeAll(async () => {
   if (!DB) return;
@@ -34,6 +35,8 @@ beforeAll(async () => {
   const machineId = (await sql!`select id from machines where workspace_id = ${ws}::uuid and name = 'pack-mac'`)[0]!['id'] as string;
   expect((await send(george, { type: 'agent.register', workspace: ws, machineId, name: 'tmpdev', role: 'developer', model: 'claude-opus-4-8', runtime: 'claude-code', channels: ['build'] })).status).toBe(200);
   agentId = (await sql!`select id from agents where workspace_id = ${ws}::uuid and name = 'tmpdev'`)[0]!['id'] as string;
+  expect((await send(george,{type:'agent.register',workspace:ws,machineId,name:'pack-rex',role:'orchestrator',model:'gpt-5.6-sol',runtime:'codex',channels:['build']})).status).toBe(200);
+  orchestratorId=(await sql!`select id from agents where workspace_id=${ws}::uuid and name='pack-rex'`)[0]!['id'] as string;
 });
 
 afterAll(async () => {
@@ -71,7 +74,7 @@ describe.skipIf(!DB)('model config packs (real schema)', () => {
     // the capacity-failover executor re-seats every agent as the orchestrator, then moves
     // this pointer. It used to 403 and be swallowed, leaving the workspace disagreeing
     // with its own seats — so the next pack apply silently reverted the switch.
-    const rex: Actor = { kind: 'agent', id: 'rex', role: 'orchestrator' };
+    const rex: Actor = { kind: 'agent', id: orchestratorId, role: 'orchestrator' };
     expect((await send(rex, { type: 'workspace.update', workspace: ws, activeModelPack: 'openai-core' })).status).toBe(200);
     expect(await packCol()).toBe('openai-core');
     // policy toggles stay human-only — an agent must never flip auto-failover on itself
@@ -80,7 +83,7 @@ describe.skipIf(!DB)('model config packs (real schema)', () => {
     expect((await send(rex, { type: 'workspace.update', workspace: ws, activeModelPack: 'claude-core', autoFailover: false })).status).toBe(403);
     expect(await packCol()).toBe('openai-core'); // the refused command changed nothing
     // a worker agent has no business here at all
-    expect((await send({ kind: 'agent', id: 'patch', role: 'developer' } as Actor, { type: 'workspace.update', workspace: ws, activeModelPack: 'claude-core' })).status).toBe(403);
+    expect((await send({ kind: 'agent', id: agentId, role: 'developer' } as Actor, { type: 'workspace.update', workspace: ws, activeModelPack: 'claude-core' })).status).toBe(403);
     await send(george, { type: 'workspace.update', workspace: ws, activeModelPack: 'claude-core' }); // restore for later cases
   });
 

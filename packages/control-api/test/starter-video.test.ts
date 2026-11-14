@@ -22,7 +22,7 @@ function fakeLedger(remainingMicros: number) {
   let remaining = remainingMicros;
   const ledger: Ledger = {
     balance: async () => ({ grantedMicros: remaining, spentMicros: 0, purchasedMicros: 0, purchasedSpentMicros: 0, remainingMicros: remaining, grantRemainingMicros: remaining, purchasedRemainingMicros: 0, periodStart: '2026-09-01' }),
-    usage: async () => ({ day: '2026-09-19', minutes: 0, activeSeconds: 0, modelCalls: 0, modelMicros: 0, machineMicros: 0, videoClips: 0, videoMicros: 0 }),
+    usage: async () => ({ day: '2026-09-19', minutes: 0, activeSeconds: 0, alwaysOnSeconds: 0, modelCalls: 0, modelMicros: 0, machineMicros: 0, videoClips: 0, videoMicros: 0 }),
     spend: async () => ({ remainingMicros: remaining }),
     spendFilm: async (_w, micros, clip) => { calls.push({ op: 'spendFilm', micros, seconds: clip.seconds }); if (remaining < micros) return null; remaining -= micros; return { remainingMicros: remaining, grantMicros: micros, purchasedMicros: 0 }; },
     refundFilm: async (_w, split, note) => { calls.push({ op: 'refundFilm', micros: split.grantMicros + split.purchasedMicros, note }); remaining += split.grantMicros + split.purchasedMicros; },

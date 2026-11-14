@@ -10,7 +10,7 @@ import { projectContext, type ProjectAnchor } from './project-context';
 // server's wire shape, so there is one renderer per read.
 import type { ScanPr, ScanRelease, ScanTag } from '@neuramesh/shared';
 import type { ApiGetFn } from './searchx';
-import { ghLoggedIn, ghRaw, repoSlugFor } from './gh';
+import { ghLoggedIn, ghRaw, repoSlug, repoSlugFor } from './gh';
 import { readRepoSignals as readSignalsViaGh, type RepoSignals } from './releasewatch';
 
 type ReplicaDb = { getAll<T>(sql: string, params?: unknown[]): Promise<T[]> };
@@ -30,6 +30,14 @@ const FILE_TEXT_CAP = 60_000;
 const TREE_CAP = 500;
 const NOT_CONNECTED = 'This room cannot read its repository: GitHub is not connected for this project and this machine has no GitHub login. Say so plainly and point the human at Connections › GitHub (one minute on GitHub). For a playbook ask, still call run_playbook: it posts the Connect GitHub card the human can click. Never guess what the repository contains.';
 const NO_REPO = 'This room\'s project has no GitHub repository attached. Say so plainly: the human attaches one in the project (Attach the repository), then asks again.';
+/** a repository that is not on GitHub (a plain git URL such as file:///…, or an uploaded bundle, nm-bundle:…):
+ *  no GitHub grant or login can read it, so a GitHub hint would send the human to the wrong fix */
+/** a repository row that no GitHub door reaches: a git or bundle provider, or a clone URL that is not GitHub's */
+export function isNotOnGitHub(repo: { clone_url: string | null; provider: string | null }): boolean {
+  const url = (repo.clone_url ?? '').trim();
+  return (!!url && !repoSlug(url)) || repo.provider === 'git' || repo.provider === 'bundle';
+}
+export const notOnGitHub = (name: string): string => `${name} is not a GitHub repository, so this conversation cannot read it through GitHub, and connecting GitHub would not change that. Say so plainly. A coding session on this repository reads its own checkout. Never guess what the repository contains.`;
 const RECONNECT = 'GitHub no longer lets neuramesh read this repository: the grant ended on GitHub. Tell the human plainly to connect GitHub again from Connections. Do not retry, and never fill the gap with guesses.';
 /** the refusal once a Connect GitHub card is up (host/reponeed.ts): stop, one line, and the grant resumes the work */
 export const CARD_UP = 'Nothing here can read this room\'s repository yet, so a Connect GitHub card is in this conversation now. Stop the work that needs the code. Say in one short line that you wait for GitHub, then end the turn. The conversation continues by itself when the person connects. Never guess what the repository contains.';
@@ -153,7 +161,9 @@ export function renderTree(t: TreeOut): string {
 }
 
 /** the reader for one room: the connector first, the machine's gh second, the honest refusal third */
-export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; at?: ProjectAnchor; capable?: () => Promise<boolean>; onNeed?: () => Promise<boolean> }): RepoReader {
+/** `checkout`: a checkout of the repository on this machine already (a coding session's worktree). The
+ *  room reads it directly, before any GitHub door, and no GitHub hint is ever its answer */
+export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; at?: ProjectAnchor; capable?: () => Promise<boolean>; onNeed?: () => Promise<boolean>; checkout?: (repoId: string | undefined) => string | null }): RepoReader {
   if (deps.at) {
     const reader = async () => {
       const project = await projectContext(deps.db, deps.channelId, deps.at);
@@ -168,10 +178,14 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
   // refusal that a grant fixes then puts the card up, and the model reads one instruction to stop
   const needed = async (text: string): Promise<string> => (deps.onNeed && (await deps.onNeed().catch(() => false)) ? CARD_UP : text);
   // which door, decided per call: the row can flip between two reads (a human just connected)
-  const door = async (repoId?: string): Promise<{ kind: 'api' } | { kind: 'local'; path: string } | { kind: 'gh'; slug: string } | { kind: 'none'; text: string }> => {
+  const door = async (repoId?: string): Promise<{ kind: 'api' } | { kind: 'local'; path: string } | { kind: 'gh'; slug: string } | { kind: 'none'; text: string; final?: boolean }> => {
     if (repoId && !await primaryRepoRow(db, channelId, repoId)) return { kind: 'none', text: 'That repository is not attached to the active project.' };
+    const checkout = deps.checkout?.(repoId) ?? null;
+    if (checkout && existsSync(checkout)) return { kind: 'local', path: checkout };
     const repo = await primaryRepoRow(db, channelId, repoId);
     if (repo?.local_path && existsSync(repo.local_path)) return { kind: 'local', path: repo.local_path };
+    // a git or bundle repository has no GitHub door at all: say that, never "connect GitHub"
+    if (repo && isNotOnGitHub(repo)) return { kind: 'none', text: notOnGitHub(repo.name), final: true };
     if (await githubConnected(db, channelId)) return { kind: 'api' };
     if (!repo) return { kind: 'none', text: NO_REPO };
     const slug = await repoSlugFor(repo);
@@ -184,7 +198,7 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
     async changes(i) {
       const since = i.since && !Number.isNaN(Date.parse(i.since)) ? new Date(i.since).toISOString() : new Date(Date.now() - 30 * 86_400_000).toISOString();
       const d = await door(i.repo);
-      if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'none') return d.final ? d.text : needed(d.text);
       if (d.kind === 'local') return localRepoRead(d.path, 'changes', '', undefined, since);
       if (d.kind === 'gh') return renderChanges(await ghChanges(d.slug, since));
       const r = await viaApi<Changes>(apiGet, actor, 'changes', { channel: channelId, since, repo: i.repo });
@@ -192,7 +206,7 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
     },
     async file(i) {
       const d = await door(i.repo);
-      if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'none') return d.final ? d.text : needed(d.text);
       if (d.kind === 'local') return localRepoRead(d.path, 'file', i.path, i.ref);
       if (d.kind === 'gh') { const f = await ghFile(d.slug, i.path, i.ref); return typeof f === 'string' ? f : renderFile(f); }
       const r = await viaApi<FileOut>(apiGet, actor, 'file', { channel: channelId, path: i.path, ref: i.ref, repo: i.repo });
@@ -200,7 +214,7 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
     },
     async tree(i) {
       const d = await door(i.repo);
-      if (d.kind === 'none') return needed(d.text);
+      if (d.kind === 'none') return d.final ? d.text : needed(d.text);
       if (d.kind === 'local') return localRepoRead(d.path, 'tree', i.path, i.ref);
       if (d.kind === 'gh') { const t = await ghTree(d.slug, i.path, i.ref); return typeof t === 'string' ? t : renderTree(t); }
       const r = await viaApi<TreeOut>(apiGet, actor, 'tree', { channel: channelId, path: i.path, ref: i.ref, repo: i.repo });

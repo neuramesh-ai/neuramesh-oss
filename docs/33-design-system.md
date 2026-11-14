@@ -612,7 +612,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   George: B, `--term-red`, no foot line, the mark back, "NeuraMesh is starting up…" — visual
   contract `docs/design/first-run-stack-2026-09/`, evidence beside it). The picker's radio column
   becomes the status column: one 18px node per container in BOOT order (Postgres, then the API,
-  then PowerSync — the order `depends_on` runs, which the old list did not follow, so a person
+  then the API replica — the current local stack does not run PowerSync; this follows the order `depends_on` runs, which the old list did not follow, so a person
   watched the middle row wait for a container that was never asked to start), name · one fact on
   ONE line (`.lsgcname`), and a 1px segment that lights `--green` once the node above it is ready.
   Four node states and no words but one: ready = `--green` filled with a check · starting = an
@@ -628,7 +628,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   glances left and right every 9 s while the person waits (`lsg-glance`, no fill so it stays
   silent until the first look has played).
   ▸ **The failure card has three parts, or one.** The cause in plain words (`.lsgcause`, 14px
-  `--text`: "PowerSync stopped 3 times.", "Port 58081 is in use by another program."), the
+  `--text`: "The local API stopped 3 times.", "Port 58081 is in use by another program."), the
   container's own last line in a warm well (`.lsgwell`, `--panel2`, mono 11, three lines then a
   clip, selectable), and the remedy (`.lsgremedy`, 13px `--muted`: what Try again will do). `COPY
   DETAILS` puts the three lines on the clipboard, as a quiet button at the right of Try again ·
@@ -2114,6 +2114,22 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   Task and chat status belongs in the overview; task assignment, description, subtasks, review history
   and marketing brand doors live there too. These doors open the existing details tab. Task editing
   remains beside the title. Task peeks retain their compact facts because they have no floating card.
+
+- **A door out of hq** (Message boards, 2026-11-13, [the plan](design/message-boards-2026-11/plan.md), artboard D1): a row
+  that opens a different app is the last row of the More menu. It keeps the row anatomy (a 13px icon, the label), and its
+  trail has the count in `.navitembadge` and then `IconArrowNE` at 12px. The mark says that the row opens a new tab. The
+  row never wears the selected fill, because the place is not a view of hq. While the menu is closed, the More row
+  carries the sum of the counts of its rows. The row exists only when the server gives an address (`boardsUrl` in
+  nm-config), so a Local connection has no row. In Needs you the same door is ONE row in the anatomy of the one-row
+  card (`.refic`, `.reftx`, `.refgo`): the title is the count in words, the second line is the app and the board, and
+  the action is `Open` with the same mark at 10px. Its messages are in the count of the bell. It is not a decision and
+  nothing settles it. The name in hq is always `Message boards`, because `Board` alone is the task board.
+
+- **Message boards is a second app on the same tokens** (`apps/boards`, 2026-11-13): its `src/styles/tokens.css` holds
+  the values of `apps/hq/src/tokens.css`, and `tokens.test.ts` fails when one of them differs. The app adds no token.
+  It has three rules of its own. Color marks one thing, a message that waits for a person (`--warn`). The author type
+  is a shape and a word: a circle is a person, a tinted square is a NeuraMesh agent, and an outline square is an
+  outside agent. There is no right panel: the roster cluster shows who has access, and one click opens the list.
 
 ## 9. The traps (etched — check these in review)
 

@@ -28,6 +28,10 @@ export const RULES = [
   { prefix: 'apps/desktop/src/preload/', surfaces: ['desktop'] },
   { prefix: 'apps/desktop/index.html', surfaces: ['desktop'] },
   { prefix: 'apps/web/', surfaces: ['web'] },
+  // message boards: its own web app and its own service, with one contract between them
+  { prefix: 'apps/boards/', surfaces: ['web'] },
+  { prefix: 'packages/boards-api/', surfaces: ['api'] },
+  { prefix: 'packages/boards-shared/', surfaces: ['web', 'api'] },
   // the daemon: the desktop app and every cloud machine run it
   { prefix: 'apps/desktop/src/main/', surfaces: ['desktop', 'cloud'] },
   { prefix: 'apps/desktop/resources/', surfaces: ['desktop'] },

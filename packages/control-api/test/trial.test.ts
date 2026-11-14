@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEvent, formatAddress } from '@neuramesh/shared';
 
 const stripe = vi.hoisted(() => ({
+  enabled: true,
   publishableKey: 'pk_test_x' as string | null,
   created: [] as Array<Record<string, unknown>>,
   state: { workspace: null as string | null, status: 'open' as string | null, subscription: null as Record<string, unknown> | null },
@@ -15,7 +16,7 @@ vi.mock('../src/billing', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/billing')>();
   return {
     ...real,
-    billingEnabled: () => true,
+    billingEnabled: () => stripe.enabled,
     billingPublishableKey: () => stripe.publishableKey,
     createTrialSession: async (input: Record<string, unknown>) => { stripe.created.push(input); return { id: 'cs_test_1', clientSecret: 'cs_test_1_secret' }; },
     trialSessionState: async () => stripe.state,
@@ -35,6 +36,11 @@ let app: ReturnType<typeof createApp>;
 let workspace: string;
 
 beforeEach(async () => {
+  // these requests sign in with the x-nm-actor header. The package's test script turns that lane
+  // on (NM_ALLOW_ACTOR_HEADER=1), and the sandbox CI runs vitest without the script, so the file
+  // turns it on itself (CI 97448d25: every request here answered 401 without it)
+  vi.stubEnv('NM_ALLOW_ACTOR_HEADER', '1');
+  stripe.enabled = true;
   stripe.publishableKey = 'pk_test_x';
   stripe.created.length = 0;
   stripe.applied.length = 0;
@@ -76,6 +82,36 @@ describe('who is offered the card trial', () => {
     const res = await post('/v1/billing/trial', { workspace });
     expect(res.status).toBe(404);
     expect(stripe.created).toHaveLength(0);
+  });
+});
+
+// round 5: hq asks this once and keeps the step and the sheet away where billing is off, rather than
+// reading the trial's 404 (every wizard on the sandbox logged one)
+describe('what billing can do on this stack', () => {
+  const config = async () => {
+    const res = await app.request('/v1/billing/config', { headers: { 'x-nm-actor': JSON.stringify({ kind: 'human', id: 'u-owner' }) } });
+    expect(res.status).toBe(200);
+    return res.json();
+  };
+
+  it('billing on, with the publishable key: checkout and the card trial', async () => {
+    expect(await config()).toEqual({ checkout: true, trial: true });
+  });
+
+  it('no publishable key: checkout, and no card trial, which is exactly when the trial answers 404', async () => {
+    stripe.publishableKey = null;
+    expect(await config()).toEqual({ checkout: true, trial: false });
+    expect((await post('/v1/billing/trial', { workspace })).status).toBe(404);
+  });
+
+  it('billing off: neither, and the answer is still a 200 the page reads quietly', async () => {
+    stripe.enabled = false;
+    expect(await config()).toEqual({ checkout: false, trial: false });
+    expect((await post('/v1/billing/trial', { workspace })).status).toBe(404);
+  });
+
+  it('needs a credential, like every /v1 read', async () => {
+    expect((await app.request('/v1/billing/config')).status).toBe(401);
   });
 });
 

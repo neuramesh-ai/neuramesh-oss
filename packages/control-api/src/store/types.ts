@@ -1,9 +1,11 @@
 // Row + input shapes the Store speaks — extracted from store.ts (track C-store).
 // Pure types: no behaviour, so both implementations and every caller share ONE
 // definition instead of three that drift.
-import { type BrainOverride, type ActorRef, type NMEvent, type RunKind, type Task, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
+import { type BrainOverride, type ActorRef, type NMEvent, type RunKind, type Task, type ThreadKind, type ThreadMode, type WorkspaceMode } from '@neuramesh/shared';
 
 export interface MutationResult {
+  /** An idempotent command already applied. Avoid writing the row and advancing its version. */
+  unchanged?: true;
   task: Task;
   events: NMEvent[];
   // set on submit — persisted as artifact rows alongside the transition
@@ -101,6 +103,9 @@ export interface NMMessage {
    * (a later message carrying it is ignored — the mode is the thread's, and it moves only
    * through thread.set_mode). Absent reads as 'tasks', so every existing caller is correct. */
   threadMode?: ThreadMode | null;
+  schedulePermission?: string;
+  machineAuthored?: boolean;
+  permissionMode?: import('@neuramesh/shared').PermissionMode;
   /** docs/10 §15: the composer's brain draft, applied only when this send BIRTHS the thread.
    * Parsed through the same gate the daemon reads with, so a stale client cannot seat an agent
    * on a model the runtime would refuse. */
@@ -114,6 +119,8 @@ export interface NMMessage {
   threadOrigin?: 'desktop' | 'web' | 'routine' | null;
   /** 0144, coding threads — birth-only, like the two above: `coding` when the repo chip was set */
   threadKind?: ThreadKind | null;
+  /** round 9 (0177), birth-only with threadKind coding: `scratch` for a coding thread with no repository */
+  threadWorkspace?: WorkspaceMode | null;
 }
 
 // A decision seed: one ```nmq card extracted from an agent message's body at POST
@@ -124,6 +131,7 @@ export interface DecisionSeed {
   id: string;
   question: string;
   options: Array<{ label: string; description?: string; icon?: 'iris' | 'claude-design'; provider?: 'iris' | 'claude-design' }>;
+  requiresExactAnswer?: boolean;
   allowOther: boolean;
 }
 
@@ -136,6 +144,7 @@ export interface DecisionRow {
   asker: ActorRef;
   question: string;
   options: Array<{ label: string; description?: string; icon?: 'iris' | 'claude-design'; provider?: 'iris' | 'claude-design' }>;
+  requiresExactAnswer?: boolean;
   allowOther: boolean;
   status: 'open' | 'answered' | 'dismissed';
   answer: string | null;

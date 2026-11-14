@@ -436,13 +436,13 @@ describe('enforcement (the server, not prompts)', () => {
     const atlas: Actor = { kind: 'agent', id: 'atlas', role: 'architect' };
     const task = await createTask({ title: 'landing page hero refresh' });
 
-    // a worker can't route work into design; the orchestrator can, assigning the channel designer
+    // A worker cannot route work into design. A design phase does not assign the designer as owner.
     expect((await send(patch, { type: 'task.request_design', taskId: task.id, designer: 'iris' })).status).toBe(403);
     const routed = await send(rex, { type: 'task.request_design', taskId: task.id, designer: 'iris', provider: 'claude-design' });
     expect(routed.status).toBe(200);
     expect((await j(routed)).task.state).toBe('designing');
     const routedDetail = await j(await app.request(`/v1/tasks/${task.id}`, { headers: { 'x-nm-actor': JSON.stringify(george) } }));
-    expect(routedDetail.task.assignee).toMatchObject({ id: 'iris' });
+    expect(routedDetail.task.assignee).toBeNull();
     expect(routedDetail.events.find((e: { type: string }) => e.type === 'task.design_requested')?.payload).toMatchObject({ provider: 'claude-design' });
 
     // only the designer proposes; a proposal without mockups doesn't parse
@@ -465,7 +465,7 @@ describe('enforcement (the server, not prompts)', () => {
     expect((await j(await send(george, { type: 'task.revise_design', taskId: task.id, feedback: 'warmer palette, sticky header' }))).task.state).toBe('designing');
     expect((await send(iris, { type: 'task.propose_design', taskId: task.id, round: 2, mockups: [{ name: 'Hero warm', html: '<html>w</html>' }] })).status).toBe(200);
 
-    // human approval releases it to planning, clears the assignee for the architect watch,
+    // Human approval releases it to planning without changing ownership,
     // and promotes ONLY the approved (latest) round into the channel library
     const approved = await send(george, { type: 'task.approve_design', taskId: task.id });
     expect(approved.status).toBe(200);

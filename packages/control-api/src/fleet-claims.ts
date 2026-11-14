@@ -19,13 +19,18 @@ import { mintMachineToken } from './machine-auth';
 import { sqlOf } from './credits';
 import type { Store } from './store';
 
-export type MachineSubstrate = 'volume' | 'claim';
+export type MachineSubstrate = 'volume' | 'claim' | 'cloudrun';
 
 /** what a NEW machine is made of, runner or member: `claim` only where the cluster runs a pool (the
  *  k3d harness and production). A member's login needs a disk, and it gets one the way a runner's
  *  does: the shell promotes the machine before the sign-in (R4, George 2026-09-25). The env name is
- *  older than R4, when only runners took it. */
-export const newMachineSubstrate = (): MachineSubstrate => (process.env['FLEET_RUNNER_SUBSTRATE'] === 'claim' ? 'claim' : 'volume');
+ *  older than R4, when only runners took it. `cloudrun` (a Worker Pool, fleet-cloudrun.ts) only
+ *  while FLEET_CLOUDRUN=1, so the value alone can never move new machines off the cluster. */
+export const newMachineSubstrate = (): MachineSubstrate => {
+  const want = process.env['FLEET_RUNNER_SUBSTRATE'];
+  if (want === 'cloudrun' && process.env['FLEET_CLOUDRUN'] === '1') return 'cloudrun';
+  return want === 'claim' ? 'claim' : 'volume';
+};
 
 const LIVE = (sql: postgres.Sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
 

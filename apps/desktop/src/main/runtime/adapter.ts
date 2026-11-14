@@ -16,6 +16,7 @@ import type { HostedAgent, ExecTask, SkillRef } from '../agents';
 import { shippedContract } from '../contracts';
 import { composePrompt, type TurnKind } from '@neuramesh/shared';
 import type { WhiteboardToolClosures } from '../harness/toolbus';
+import { boxRelayEnv, boxRuntime } from '../cloudrun/runtime-state';
 
 export type RuntimeName = 'claude-code' | 'codex' | 'gemini';
 export type ProviderName = 'anthropic' | 'openai' | 'gemini';
@@ -88,6 +89,8 @@ export type SpawnFn = (i: { role: string; prompt: string; label?: string }) => P
 export type ParkFn = (i: { until: string; prNumber?: number; afterMinutes?: number; note: string }) => Promise<{ ok: boolean; error?: string }>;
 
 export interface TurnOpts {
+  /** Only the host supplies these. A permissioned worker routes side effects through the managed tool registry. */
+  permissionRules?: import('@neuramesh/shared').PolicyRule[];
   spawn?: SpawnFn;
   park?: ParkFn;
   /** whiteboards (docs/38): the four tool closures — built once per turn by the daemon */
@@ -101,15 +104,19 @@ export interface TurnOpts {
   repo?: RepoReader;
   /** the agents' browser (board C3): browser/agent-tools.ts closed over the turn, a cloud machine only */
   web?: import('../browser/agent-tools').WebTools;
+  /** Message boards (docs/design/message-boards-2026-11 §7.6): host/messageboards.ts bound to the turn's
+   *  agent. null or absent = the agent has no access to a board, and the turn has no board tool */
+  messageBoards?: import('../host/messageboards').MessageBoardTools | null;
   /** the REAL turn kind for the tool bus. The CLI adapters used to hardcode
    *  `promptOverride ? 'design' : 'work'`, so a leg bridged as a design turn and
    *  TOOL_KINDS could never grant a leg anything — that literal is now the fallback only. */
   turnKind?: TurnKind;
 }
 
-/** the live bubble's feed: the reply's whole text so far, and the turn's thoughts so far when the runtime
- *  shows them (the repo-connect round's Option A: codex reasoning summaries, Claude's summarized thinking) */
-export type DeltaFn = (text: string, thinking?: string) => void;
+/** the live bubble's feed: the reply's whole text so far, the turn's thoughts so far when the runtime
+ *  shows them (the repo-connect round's Option A: codex reasoning summaries, Claude's summarized thinking),
+ *  and the turn's finished progress lines so far (round 9 live narration, absent = unchanged) */
+export type DeltaFn = (text: string, thinking?: string, progress?: readonly string[]) => void;
 
 export interface RuntimeAdapter {
   // tool-less streaming reply (chat / thread). onDelta feeds the live bubble. attachments (chat
@@ -173,6 +180,8 @@ const AGENT_ENV_ALLOW_PREFIX = ['LC_'];
 // null and agents run un-proxied rather than losing all egress.
 let _agentProxyUrl: string | null = null;
 export function setAgentProxy(url: string | null): void { _agentProxyUrl = url; }
+/** the egress proxy's loopback URL (the agent box reaches it through a veth forward, cloudrun/runtime-start.ts) */
+export function agentProxyUrl(): string | null { return _agentProxyUrl; }
 
 // Containment L1b (kernel FS sandbox) is DEFAULT-ON, mirroring the egress proxy: agents run jailed from
 // credential stores + NeuraMesh's userData. Two controls, env wins over UI: the NM_SANDBOX_FS env var
@@ -240,12 +249,17 @@ export function agentBaseEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.Pr
 // Build the child env for a provider invocation. apikey mode injects the key into the var the tool
 // reads; subscription mode injects nothing — the allowlist already excludes every inherited key, so
 // the CLI/SDK falls back to its own stored login instead of a stray key that would silently bill.
+// On a Cloud Run machine with the box runtimes on, this env reaches the relay wrapper, not the CLI:
+// machined re-filters it for the box, maps host paths to /work, and moves the key (anything named or
+// shaped like a credential) into `secretEnv` 0400 files, never argv (cloudrun/runtime-box.ts). The
+// wrapper needs a ticket to reach machined, which `boxRelayEnv` adds (empty everywhere else).
 export function providerEnv(provider: ProviderName, token: string | null | undefined, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env = agentBaseEnv(source);
   if (token) {
     const inject = provider === 'openai' ? 'OPENAI_API_KEY' : provider === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY';
     env[inject] = token;
   }
+  Object.assign(env, boxRelayEnv());
   return env;
 }
 
@@ -269,6 +283,10 @@ export function asarUnpackedPath(resolved: string): string {
 // this. Never throws: on any resolution failure return undefined and let the SDK surface its own
 // "native CLI not found" error.
 export function claudeExecutablePath(loadElectron: () => unknown = () => require('electron')): string | undefined {
+  // A Cloud Run machine with the box runtimes on: the SDK spawns the relay wrapper, and the real
+  // `claude` runs in the agent box (cloudrun/runtime-relay.ts). The wrapper starts no process itself.
+  const box = boxRuntime();
+  if (box) return box.wrapper('claude');
   // NO ELECTRON IS NOT PACKAGED. A cloud machine runs this module under plain node, where the
   // electron package has no binary and its index THROWS at require ("Electron failed to install
   // correctly"). Unguarded, that killed every Agent SDK turn on a cloud machine before it began

@@ -1,5 +1,7 @@
 # 20 — Threads mode: focused room or live feed (as built)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-09). A per-channel toggle, `channels.thread_mode` (`'on'` default | `'off'`),
 > surfaced as a chip on the composer's `.cfoot` (beside the project chip) and as a row in the channel
 > settings modal. **On** keeps today's behavior — task replies live in their threads, the channel reads

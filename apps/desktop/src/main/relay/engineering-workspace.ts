@@ -1,3 +1,4 @@
+import { hydratePath, hydrateMatching } from '../harness/hydration';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
@@ -5,10 +6,12 @@ import type { EngineeringMachineOpenMeta } from '../../engineering-protocol';
 import { withRepoLock } from '../agents';
 import { cachePath } from '../harness/brain';
 import { worktreeCloneDir } from '../harness/workspaces';
-import { git, repoSlug, type GhEnv } from '../host/gh';
+import { depCache, type DepPhase } from '../cloudrun/depcache';
+import { bundleKeyOf, git, repoSlug, type GhEnv } from '../host/gh';
 import { ENGINEERING_WORKTREE_PREFIX, engineeringBranchName, engineeringWorktreeName, safeSegment as safe } from '../harness/worktree-rows';
 import type { RepoCredResult } from '../host/repocred';
 import { validatedEngineeringGitMounts } from './engineering-safe-executors';
+import { ensureScratchWorkspace, pinRelativeGitdir, scratchThreadOf } from './engineering-scratch';
 
 interface RepoRow { name: string | null; clone_url: string | null; default_branch: string | null; local_path: string | null }
 
@@ -18,7 +21,7 @@ export const engineeringRepoRoot = (repoId: string): string => cachePath('repos'
  *  against, which is the cache clone the worktree came from (a twin's included). A desktop checkout
  *  passes null: commands can use the worktree, but receive no mounts of the person's own Git
  *  refs, objects or logs. Only a machine-owned cache clone may supply those mounts. */
-export interface EngineeringWorkspace { cwd: string; repoRoot: string | null; privateRepoRoot?: string }
+export interface EngineeringWorkspace { cwd: string; repoRoot: string | null; privateRepoRoot?: string; taskBaseRef?: string }
 
 /** a cloud session that cannot reach its code until GitHub is connected: the relay names it, and the
  *  thread's gate seat puts up the GitHub card instead of a raw error (docs/design/repo-connect-2026-10) */
@@ -44,13 +47,13 @@ const SLUG = `lower(r.org_name || '/' || r.name)`;
  *  folder's name (the resolve's hintFor), ties sorted as repoForChannel sorts them, the connected one
  *  first. The connected repository is the twin of a folder with another name only in the shape the
  *  pick makes: the folder is the primary, and the project holds the two of them and no other. */
-async function cloneTarget(db: Db, workspaceId: string, meta: EngineeringMachineOpenMeta, repo: RepoRow, cloud: boolean): Promise<CloneTarget> {
+export async function repositoryCloneTarget(db: Db, workspaceId: string, meta: Pick<EngineeringMachineOpenMeta, 'repoId' | 'repoName'> & Partial<Pick<EngineeringMachineOpenMeta, 'projectId' | 'threadId' | 'branch'>>, repo: RepoRow, cloud: boolean): Promise<CloneTarget> {
   if (repo.clone_url) return targetOf(meta.repoId, repo.clone_url, meta.branch || repo.default_branch);
   const project = meta.projectId ?? (await db.get<{ project_id: string | null }>(`select c.project_id from threads t join channels c on c.id = t.channel_id where t.id = ?`, [meta.threadId]).catch(() => null))?.project_id ?? null;
   const handle = (await db.get<{ handle: string }>(
-    `select k.handle from threads t join channels c on c.id = t.channel_id join connectors k on k.project_id = c.project_id
-      where t.id = ? and k.workspace_id = ? and k.provider = 'github' and k.status = 'connected' limit 1`,
-    [meta.threadId, workspaceId],
+    `select k.handle from connectors k
+      where k.project_id = ? and k.workspace_id = ? and k.provider = 'github' and k.status = 'connected' limit 1`,
+    [project, workspaceId],
   ).catch(() => null))?.handle?.toLowerCase() || null;
   const twin = (where: string, params: string[]) => db.get<{ id: string; clone_url: string; default_branch: string | null }>(
     `select r.id, r.clone_url, r.default_branch from repos r join project_repos pr on pr.repo_id = r.id
@@ -79,16 +82,52 @@ function cloneRefusal(error: unknown, name: string, cloud: boolean, cred: RepoCr
   return new Error(`This cloud machine cannot reach ${name}: ${cred.error}`);
 }
 
+/** a fetched repository bundle file (cloudrun/repo-bundle.ts), and how to remove it after the clone */
+export interface FetchedBundle { file: string; dispose(): void }
+
+/** THE CACHE CLONE OF A REPOSITORY BUNDLE (control-api repo-bundles.ts): a row whose clone URL is
+ *  `nm-bundle:<key>`. git cannot fetch that URL, so the machine fetches the bundle file and clones or
+ *  fetches from the file, then names the URL as origin. The bundle's branches become origin's, so
+ *  the worktree is cut from origin/<base> as for any other clone. A key never names two contents (a
+ *  new upload is a new key), so a clone whose origin is already this URL is current and the
+ *  download is skipped. */
+async function syncBundleClone(cloneDir: string, url: string, key: string, name: string, fetchBundle: ((key: string) => Promise<FetchedBundle>) | undefined): Promise<void> {
+  if (!fetchBundle) throw new Error(`${name} is an uploaded repository bundle, and this machine cannot fetch repository bundles.`);
+  if (existsSync(cloneDir) && (await git(['remote', 'get-url', 'origin'], cloneDir).catch(() => '')) === url) return;
+  let got: FetchedBundle;
+  try { got = await fetchBundle(key); } catch (e) { throw new Error(`This cloud machine cannot fetch the repository bundle of ${name}: ${e instanceof Error ? e.message : String(e)}`); }
+  try {
+    if (!existsSync(cloneDir)) await git(['clone', got.file, cloneDir]);
+    else await git(['fetch', '--prune', got.file, '+refs/heads/*:refs/remotes/origin/*'], cloneDir);
+    await git(['remote', 'set-url', 'origin', url], cloneDir);
+  } finally {
+    got.dispose();
+  }
+}
+
+export async function hydrateEngineeringThread(actorId: string, threadId: string): Promise<void> {
+  const head = `${ENGINEERING_WORKTREE_PREFIX}${safe(actorId)}-`, tail = `-${safe(threadId)}`;
+  await hydrateMatching(path => { const name = basename(path); return name.startsWith(head) && name.endsWith(tail); });
+}
+
+export function retainedEngineeringWorktree(actorId: string, threadId: string): string | null {
+  const root = cachePath('worktrees');
+  const head = `${ENGINEERING_WORKTREE_PREFIX}${safe(actorId)}-`, tail = `-${safe(threadId)}`;
+  const name = existsSync(root) && readdirSync(root, { withFileTypes: true }).find(entry =>
+    entry.isDirectory() && entry.name.length > head.length + tail.length && entry.name.startsWith(head) && entry.name.endsWith(tail))?.name;
+  return name ? join(root, name) : null;
+}
+
 /** the worktree an earlier open cut for this thread, whichever clone it came from: a later pick can
  *  change the twin, and a reopen lands on its own files. Only a cache clone is the shell's check root.
  *  The directory name was created by the host, outside the command's writable subtree. Its clone
  *  segment selects the cache root; the editable .git pointer only confirms it. A local checkout
  *  comes from the host's repo row and is validated the same way, but never receives Git mounts. */
 function earlierWorktree(meta: EngineeringMachineOpenMeta, local: string | null): EngineeringWorkspace | null {
-  const head = `${ENGINEERING_WORKTREE_PREFIX}${safe(meta.actorId)}-`; const tail = `-${safe(meta.threadId)}`;
-  const name = (existsSync(cachePath('worktrees')) ? readdirSync(cachePath('worktrees')) : []).find((n) => n.length > head.length + tail.length && n.startsWith(head) && n.endsWith(tail));
-  if (!name) return null;
-  const cwd = cachePath('worktrees', name);
+  const cwd = retainedEngineeringWorktree(meta.actorId, meta.threadId);
+  if (!cwd) return null;
+  const name = basename(cwd);
+  const head = `${ENGINEERING_WORKTREE_PREFIX}${safe(meta.actorId)}-`, tail = `-${safe(meta.threadId)}`;
   const cloneId = name.slice(head.length, -tail.length);
   const privateRepoRoot = local && cloneId === safe(meta.repoId) ? realpathSync(worktreeCloneDir(local) ?? local) : null;
   if (local && privateRepoRoot) {
@@ -136,9 +175,25 @@ export async function ensureEngineeringWorkspace(
    *  this machine with a local path, the thread's worktree is cut from that checkout — the
    *  member's own clone, their remotes, their credentials — instead of a cache clone. A cloud
    *  machine never has one, so the default is the clone. `credFor` is the cloud's App token lane
-   *  (host/repocred.ts): a login-less machine clones a private repository through it. */
-  opts: { preferLocal?: boolean; credFor?: (slug: string, channelId: string) => Promise<RepoCredResult> } = {},
+   *  (host/repocred.ts): a login-less machine clones a private repository through it. `bundle`
+   *  fetches a repository bundle file through the machine's sign route (cloudrun/repo-bundle.ts):
+   *  only a Cloud Run machine has one. */
+  opts: { preferLocal?: boolean; credFor?: (slug: string, channelId: string) => Promise<RepoCredResult>; bundle?: (key: string) => Promise<FetchedBundle>; depPhase?: (phase: DepPhase) => void } = {},
 ): Promise<EngineeringWorkspace> {
+  // round 9 (0177): a scratch thread has no repository. It gets a fresh local repository and a worktree
+  // of it, in the same shape as below (engineering-scratch.ts). The thread row decides, not the client
+  const scratch = await scratchThreadOf(db, workspaceId, meta);
+  // Authorize the thread/repository before downloading any retained customer files.
+  if (scratch) {
+    await hydrateEngineeringThread(meta.actorId, meta.threadId);
+    const earlier = earlierWorktree(meta, null);
+    // a worktree an older machine cut keeps an absolute git pointer: it turns relative here, so git works in the box
+    if (earlier) { pinRelativeGitdir(earlier.cwd); return earlier; }
+    const made = await ensureScratchWorkspace(meta, scratch);
+    validatedEngineeringGitMounts(made.cwd, made.repoRoot);
+    if (made.created) await hydrateDependencies(made.cwd, meta.repoName, opts.depPhase);
+    return { cwd: made.cwd, repoRoot: made.repoRoot };
+  }
   const repo = await db.get<RepoRow>(
     `select r.name, r.clone_url, r.default_branch, r.local_path from repos r
       where r.id = ? and r.workspace_id = ?
@@ -147,14 +202,28 @@ export async function ensureEngineeringWorkspace(
   ).catch(() => null);
   // a late replica, or another project's repository: no grant and no pick adds the row, so no GitHub card
   if (!repo) throw new Error(`${meta.repoName} is not in this project on this machine.`);
+  await hydrateEngineeringThread(meta.actorId, meta.threadId);
+  const task = await db.get<{number:number;repo_id:string;base_ref:string|null}>(`select k.number,k.repo_id,k.base_ref from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.created_by=? and t.kind='coding'`,[meta.threadId,workspaceId,`human:${meta.actorId}`]).catch(()=>null);
+  if (task && task.repo_id === meta.repoId) {
+    const cwd = cachePath('worktrees',`nm-${task.number}`);
+    const repoRoot = engineeringRepoRoot(meta.repoId);
+    await hydratePath(cwd);
+    await hydratePath(repoRoot);
+    if (existsSync(cwd)) { validatedEngineeringGitMounts(cwd,repoRoot); return {cwd,repoRoot}; }
+    // A planning/blocked task has no implementation branch yet. Its inactive
+    // history pane may read the base; only the dispatcher creates the task worktree.
+    meta = {...meta, branch:task.base_ref || repo.default_branch || 'main'};
+  }
   const local = opts.preferLocal && repo.local_path && existsSync(repo.local_path) ? repo.local_path : null;
   const earlier = earlierWorktree(meta, local);
   if (earlier) return earlier;
-  const target = local ? null : await cloneTarget(db, workspaceId, meta, repo, !!opts.credFor);
+  const target = local ? null : await repositoryCloneTarget(db, workspaceId, meta, repo, !!opts.credFor);
   const clone = target?.id ?? meta.repoId;
   const cloneDir = local ?? engineeringRepoRoot(clone);
   const worktreeDir = cachePath('worktrees', engineeringWorktreeName(meta.actorId, clone, meta.threadId));
   const workspace: EngineeringWorkspace = { cwd: worktreeDir, repoRoot: local ? null : engineeringRepoRoot(clone), ...(local ? { privateRepoRoot: realpathSync(worktreeCloneDir(local) ?? local) } : {}) };
+  await hydratePath(cloneDir);
+  await hydratePath(worktreeDir);
   if (existsSync(worktreeDir)) return workspace;
   mkdirSync(cachePath('repos'), { recursive: true });
   mkdirSync(cachePath('worktrees'), { recursive: true });
@@ -163,8 +232,12 @@ export async function ensureEngineeringWorkspace(
   const cred = target?.slug && channel && opts.credFor ? await opts.credFor(target.slug, channel).catch(() => null) : null;
   const env: GhEnv | undefined = cred?.ok ? cred.env : undefined;
   const refused = (e: unknown): never => { throw cloneRefusal(e, meta.repoName, !!opts.credFor, cred); };
+  // a bundle never reaches GitHub, so its failures keep their own words and never put up the GitHub card
+  const bundleKey = target ? bundleKeyOf(target.url) : null;
+  let created = false;
   await withRepoLock(clone, async () => {
     if (local) { await git(['fetch', '--all', '--prune'], cloneDir).catch(() => undefined); } // a local checkout may have no remote at all
+    else if (bundleKey) await syncBundleClone(cloneDir, target!.url, bundleKey, meta.repoName, opts.bundle);
     // a public repository clones and fetches with no grant. A private one needs it, and the refusal names its cause.
     else if (!existsSync(cloneDir)) await git(['clone', target!.url, cloneDir], undefined, env).catch(refused);
     else await git(['fetch', 'origin', '--prune'], cloneDir, env).catch(refused);
@@ -177,10 +250,22 @@ export async function ensureEngineeringWorkspace(
     // restart or an operator cleanup while the branch still contains committed work; `-B`
     // would silently throw that work away by moving the branch back to origin/base.
     const branchExists = await git(['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], cloneDir).then(() => true).catch(() => false);
+    created = true;
     if (branchExists) { await git(['worktree', 'add', worktreeDir, branch], cloneDir); return; }
     // a local checkout's base is its own branch when it has one; a cache clone's is always origin's
     const localBase = local ? await git(['show-ref', '--verify', '--quiet', `refs/heads/${base}`], cloneDir).then(() => true).catch(() => false) : false;
     await git(['worktree', 'add', '-b', branch, worktreeDir, localBase ? base : `origin/${base}`], cloneDir);
   });
+  // THE DEPENDENCY CACHE (cloudrun/depcache.ts, NM_DEPCACHE=1): a Code session's shell has no network,
+  // so a restore when the worktree is cut is the only way its dependencies arrive. It runs outside the
+  // repo lock, because a download must not hold up the other threads of the repository. A miss or a
+  // failure leaves the worktree as it is, and never fails the open. On a miss the supervisor installs
+  // the lockfile (D17, cloudrun/depinstall.ts), and the tab sees `installing_dependencies` meanwhile.
+  if (created) await hydrateDependencies(worktreeDir, meta.repoName, opts.depPhase);
   return workspace;
+}
+
+async function hydrateDependencies(worktreeDir: string, name: string, phase?: (phase: DepPhase) => void): Promise<void> {
+  const dc = depCache();
+  if (dc) await dc.hydrate(worktreeDir, phase).catch((e: unknown) => console.warn(`[engineering] depcache restore failed for ${name}: ${e instanceof Error ? e.message : String(e)}`));
 }

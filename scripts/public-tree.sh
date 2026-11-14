@@ -17,8 +17,11 @@ PUBLIC_EXCLUDE=(
   apps/web                                     # the site and the cloud web app (neuramesh.app)
   apps/hq                                      # hq, the browser client (hq.neuramesh.app), split from the desktop renderer 2026-09-26
   apps/mobile                                  # the phone app: Pro only, built and shipped from the Expo account
+  apps/boards                                  # the Message boards web app (boards.neuramesh.app): Pro only
   infra                                        # the cloud platform: Pulumi, the cluster, the machine, fleet and relay images
   packages/fleet                               # the cluster operator that runs the cloud machines
+  packages/boards-api                          # the Message boards service, hosted only
+  packages/boards-shared                       # the contract between that service and its web app
   packages/bench/suite                         # the held-out task set (docs/decisions.md D4)
   scripts/fleet-e2e.sh                         # the operator's k3d proving ground
   scripts/fleet-local.sh                       # the operator against a local cluster

@@ -41,7 +41,9 @@ async function preview(cwd: string, tool: string, input: unknown): Promise<{ cha
         if (op.kind === 'Delete' && next?.kind === 'Add' && relativePath(root, next.path) === path) {
           const before = snapshots.get(path);
           if (!before?.exists) throw new Error('The file to replace no longer exists.');
-          normalized.push(`*** Update File: ${path}`, '@@', ...before.value.replace(/\n$/, '').split('\n').filter(() => !!before.value).map((line) => `-${line}`), ...next.lines.filter((line) => line.startsWith('+')), '*** End of File');
+          // The full old snapshot is already the anchor. An artificial EOF marker makes
+          // the SDK's fuzzy tail search skip the first line on newline-terminated files.
+          normalized.push(`*** Update File: ${path}`, '@@', ...before.value.replace(/\n$/, '').split('\n').filter(() => !!before.value).map((line) => `-${line}`), ...next.lines.filter((line) => line.startsWith('+')));
           index++;
         } else {
           normalized.push(`*** ${op.kind} File: ${path}`);

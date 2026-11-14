@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { LogFn } from '../agentlog';
+import { boxRuntime } from '../cloudrun/runtime-state';
 
 // pkg='' = a native-install CLI we can't provision for the user (agy) — surface install steps.
 // Google's `gemini` CLI was deprecated 2026-06-18; its successor is Antigravity's `agy` (Google
@@ -79,6 +80,11 @@ const installing = new Map<string, Promise<string>>();
 export async function ensureCli(runtime: string, log?: LogFn): Promise<string> {
   const spec = CLI[runtime];
   if (!spec) throw new Error(`no coding CLI is mapped for the "${runtime}" runtime`);
+  // A Cloud Run machine with the box runtimes on (cloudrun/README.md): the CLI is the image's own copy
+  // inside the agent box, so nothing is resolved, versioned or installed here. The caller spawns the
+  // relay wrapper, with the ticket providerEnv / boxRelayEnv put in its env.
+  const box = boxRuntime();
+  if (box) return box.wrapper(spec.bin === 'agy' ? 'agy' : 'codex');
   const found = await which(spec.bin);
   if (found) {
     if (!spec.minVersion || !spec.pkg) return found;

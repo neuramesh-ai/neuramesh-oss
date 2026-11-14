@@ -1,0 +1,22 @@
+import { ipcRenderer } from 'electron';
+export const financeBridge = {
+  destinationAccess: (destination: 'finance' | 'marketing') => ipcRenderer.invoke('nm:destination-access', { destination }),
+  destinationMember: (destination: 'finance' | 'marketing', input: { kind: 'human' | 'agent'; id: string; on: boolean }) => ipcRenderer.invoke('nm:destination-member', { destination, ...input }),
+  financeMigration: () => ipcRenderer.invoke('nm:finance-migration'),
+  financeAdopt: () => ipcRenderer.invoke('nm:finance-adopt', { confirm: true }),
+  financeStatus: () => ipcRenderer.invoke('nm:finance-status'),
+  financeManage: () => ipcRenderer.invoke('nm:finance-manage'),
+  financeOverview: (query: import('@neuramesh/shared').FinanceQuery) => ipcRenderer.invoke('nm:finance-overview', query),
+  financeRefresh: () => ipcRenderer.invoke('nm:finance-refresh'),
+  financeBudgetPrepare: (draft: import('@neuramesh/shared').FinanceBudgetDraft) => ipcRenderer.invoke('nm:finance-budget-prepare', draft),
+  financeBudgetCommit: (proposalId: string) => ipcRenderer.invoke('nm:finance-budget-commit', { proposalId }),
+  financeBudgetDismiss: (proposalId: string) => ipcRenderer.invoke('nm:finance-budget-dismiss', { proposalId }),
+  financeChats: () => ipcRenderer.invoke('nm:finance-chats'),
+  financeChatGet: (id: string) => ipcRenderer.invoke('nm:finance-chat-get', { id }),
+  financeChatSend: (input: { chatId: string; requestId: string; text: string; month: string; currency?: string; model?:string; thinking?:'low'|'medium'|'high'|null }) => ipcRenderer.invoke('nm:finance-chat-send', input),
+  financeAccounts: () => ipcRenderer.invoke('nm:finance-accounts'),
+  financeStart: (intent: 'create' | 'connect') => ipcRenderer.invoke('nm:finance-start', { intent }),
+  financeConfirm: (identity: string) => ipcRenderer.invoke('nm:finance-confirm', { identity }),
+  financeDisconnect: () => ipcRenderer.invoke('nm:finance-disconnect'),
+  financeOpen: (url: string) => ipcRenderer.invoke('nm:finance-open', url),
+};

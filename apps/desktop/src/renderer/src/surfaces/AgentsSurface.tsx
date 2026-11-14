@@ -8,7 +8,7 @@
 // filter, and the three lookups the machine rows need. What stayed in App is what App also uses —
 // activeAgents, placeOf, machNameOf, refreshRoster and refreshCreds all have callers elsewhere.
 
-import { isHouseBrain, planLabel } from '@neuramesh/shared';
+import { hostsAgent, isHouseBrain, modelLabel, planLabel } from '@neuramesh/shared';
 import { nm } from '../bridge/nm';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { agentLive, isOnline } from '../lib/presence';
@@ -85,7 +85,9 @@ export function AgentsSurface({ members, machineCaps, activeAgents, boot, isClou
                     "0 agents" about a machine able to serve seven — which is exactly what
                     made joining a workspace look broken. Say what the machine CAN do. */}
                 <div className="machmeta">
-                  serves <b>{activeAgents.filter((a) => a.kind !== 'remote' && machRuntimes(m).includes(a.runtime ?? 'claude-code')).length}
+                  {/* by the ladder's own rule (shared compute-hosts.ts): a house-brain agent needs
+                      no runtime, so a runner with none still serves it (the sandbox's "0 of 8") */}
+                  serves <b>{activeAgents.filter((a) => a.kind !== 'remote' && hostsAgent(machRuntimes(m), a)).length}
                   {' of '}{activeAgents.filter((a) => a.kind !== 'remote').length}</b> agents
                   {machRuntimes(m).map((r) => <span key={r} className="cmprt" style={{ marginLeft: 5 }}>{r}</span>)}
                 </div>
@@ -118,8 +120,10 @@ export function AgentsSurface({ members, machineCaps, activeAgents, boot, isClou
                     <AgentAvatar name={a.name} size={34} radius={9} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="agentname">{a.name} <span className="rolechip" style={{ marginLeft: 6 }} data-role={a.role}>{a.role}</span>{a.kind === 'remote' ? <span className="rolechip rmchip" style={{ marginLeft: 5 }}>REMOTE</span> : a.runtime && a.runtime !== 'claude-code' && <span className="rolechip rtchip" style={{ marginLeft: 5 }}>{runtimeLabel(a.runtime)}</span>}</div>
-                    <div className="agentmodel">{a.kind === 'remote' ? 'External A2A agent' : `${runtimeLabel(a.runtime)} · ${a.model}`}</div>
+                    <div className="agentname">{a.name} <span className="rolechip" style={{ marginLeft: 6 }} data-role={a.role}>{a.role}</span>{a.kind === 'remote' ? <span className="rolechip rmchip" style={{ marginLeft: 5 }}>REMOTE</span> : a.runtime && a.runtime !== 'claude-code' && !isHouseBrain(a.model) && <span className="rolechip rtchip" style={{ marginLeft: 5 }}>{runtimeLabel(a.runtime)}</span>}</div>
+                    {/* the house brain wears the house name (shared model-labels.ts): "Gemini ·
+                        gemini-3.5-flash-lite" and a GEMINI chip read as a sign-in it never needs */}
+                    <div className="agentmodel">{a.kind === 'remote' ? 'External A2A agent' : isHouseBrain(a.model) ? modelLabel(a.model!) : `${runtimeLabel(a.runtime)} · ${a.model}`}</div>
                     {/* WHERE IT RUNS (0119). Two different questions: `hosted_on` is live
                         truth (whose machine holds its run this second), placement is where
                         YOUR next request would go — often a different machine entirely. */}

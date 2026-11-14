@@ -260,6 +260,10 @@ describe('replica lifecycle and recovery', () => {
       await db.importLegacy(snapshot,owner,'old');
       expect(await db.get('select body from messages')).toEqual({ body:'Original' });
       expect(await db.get('select count(*) n from nm_outbox')).toEqual({ n:1 });
+      // R10 NM-120: another person signing in first on this browser inherits none of alice's queued writes
+      const bobs = create();
+      await bobs.importLegacy(snapshot,{ kind:'human',id:'bob' },'old');
+      expect(await bobs.get('select count(*) n from nm_outbox')).toEqual({ n:0 });
       expect(legacy.prepare('select count(*) n from ps_crud').get()).toEqual({ n:1 });
       legacy.prepare('insert into ps_crud values (?,?)').run(2,JSON.stringify({op:'DELETE',type:'unknown',id:'bad'}));
       await expect(readLegacyReplica(source)).rejects.toThrow('unsupported legacy write');

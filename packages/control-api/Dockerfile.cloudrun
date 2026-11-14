@@ -1,0 +1,72 @@
+# The control-api on Cloud Run (scripts/e2e-cloudrun/README.md): the SAME bundle as ./Dockerfile
+# (esbuild of src/server.ts), but the hosted shape instead of the Local one — no NM_LOCAL, no seeded
+# human, no migrations at start. One image, two commands:
+#
+#   (default)  serve    node dist/server.mjs on $PORT (Cloud Run sets it; 8080)
+#   migrate             node scripts/migrate.mjs --force: the tracked runner Vercel's build runs,
+#                       auth shim on a plain Postgres, schema_migrations ledger, a transaction-level
+#                       advisory lock per file. Run it as a Cloud Run Job before the service rolls.
+#
+#   docker build -f packages/control-api/Dockerfile.cloudrun -t control-api-cloudrun .
+#
+# Build context is the repository root. Dockerfile.cloudrun.dockerignore scopes the context.
+# All installs require the tracked manifest hook and frozen lockfile.
+
+# ── stage 1: bundle ─────────────────────────────────────────────────────────────────────────────
+FROM node:24-bookworm-slim AS build
+ENV CI=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /app
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs tsconfig.base.json ./
+COPY patches ./patches
+COPY packages/shared ./packages/shared
+COPY packages/client-core ./packages/client-core
+COPY packages/control-api ./packages/control-api
+RUN pnpm install --filter @neuramesh/control-api... --frozen-lockfile --no-optional
+RUN pnpm --filter @neuramesh/control-api build:server
+
+# ── stage 2: production dependencies ────────────────────────────────────────────────────────────
+FROM node:24-bookworm-slim AS deps
+ENV CI=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /app
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs ./
+COPY patches ./patches
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/client-core/package.json ./packages/client-core/package.json
+COPY packages/control-api/package.json ./packages/control-api/package.json
+RUN pnpm install --filter @neuramesh/control-api... --frozen-lockfile --no-optional --prod --ignore-scripts
+
+# ── stage 3: what runs ──────────────────────────────────────────────────────────────────────────
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json ./package.json
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/control-api/node_modules ./packages/control-api/node_modules
+COPY --from=deps /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=deps /app/packages/client-core/package.json ./packages/client-core/package.json
+COPY packages/control-api/package.json ./packages/control-api/package.json
+COPY --from=build /app/packages/control-api/dist ./packages/control-api/dist
+COPY packages/control-api/scripts/migrate.mjs packages/control-api/scripts/cloudsql.mjs packages/control-api/scripts/db-runtime.mjs packages/control-api/scripts/bootstrap-db.mjs ./packages/control-api/scripts/
+COPY packages/control-api/cloudrun-entrypoint.sh ./packages/control-api/cloudrun-entrypoint.sh
+# what the migrate command applies: every migration, and the auth shim a plain Postgres (Cloud SQL) needs
+COPY supabase/migrations ./supabase/migrations
+COPY supabase/validate/auth-shim.sql ./supabase/validate/auth-shim.sql
+# Hosted, not Local. Mail never leaves (no Resend in a sandbox) and push is off; every other switch —
+# the actor header, the machine feed, the Cloud Run fleet lane, the e2e doors — is the deploy's env
+# (README), so this image boots as an ordinary hosted control-api when none is set.
+ENV NODE_ENV=production \
+    NM_LOCAL=0 \
+    HOST=0.0.0.0 \
+    PORT=8080 \
+    PUSH_ENABLED=0 \
+    NM_MAIL_DRY_RUN=1
+
+# Database/auth/schema readiness is checked by the production startup profile at deployment.
+RUN node --check packages/control-api/dist/server.mjs
+RUN chmod +x packages/control-api/cloudrun-entrypoint.sh
+
+USER node
+EXPOSE 8080
+ENTRYPOINT ["/app/packages/control-api/cloudrun-entrypoint.sh"]
+CMD ["serve"]

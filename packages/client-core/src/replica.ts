@@ -32,9 +32,19 @@ export interface ReplicaChange {
   row: Record<string, unknown> | null;
 }
 export interface ReplicaBatch {
+  /** Internal agent projection: protected replies publish only after authorized persistence. */
+  privateDestination?: 'marketing';
   schemaVersion: number;
   cursor: string;
   workspaces: string[];
   changes: ReplicaChange[];
   hasMore: boolean;
+  /** THE LONG-POLL CAPABILITY: the longest `wait` (seconds) this server holds a changes request that
+   *  has nothing newer. Absent on an older server: its client polls every pollMs instead. */
+  wait?: number;
+  /** the server is holding as many long-polls as it may: ask again after this many ms, not at once */
+  retryMs?: number;
 }
+
+/** the long-poll a client asks for when the server says it holds one (ReplicaBatch.wait) */
+export const SYNC_LONG_POLL_S = 25;

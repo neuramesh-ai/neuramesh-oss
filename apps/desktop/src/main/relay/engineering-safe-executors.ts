@@ -13,6 +13,8 @@ import { cleanupTempProfile, sandboxExecArgv, sandboxExecAvailable, strictCodeSe
 import { vetEgressDestination } from '../sandbox/egress';
 import { protectedPathsFromRules } from '../policygate';
 import { brainRoot } from '../harness/brain';
+import { engineeringNetworkSeccompFilter } from './engineering-network-policy';
+export { engineeringNetworkSeccompFilter } from './engineering-network-policy';
 
 const MAX_COMMAND_OUTPUT = 48_000;
 const MAX_WEB_BYTES = 2_000_000;
@@ -85,38 +87,34 @@ export function engineeringBubblewrapArgv(root: string, command: string, managed
   return args;
 }
 
-/** Native-architecture seccomp BPF: reject socket creation (including io_uring's alternate path)
- * while allowing the ordinary compiler/test syscalls needed inside the Code worktree. */
-export function engineeringNetworkSeccompFilter(): Buffer {
-  const platform = process.arch === 'x64'
-    ? { auditArch: 0xc000003e, socket: 41, socketpair: 53, ioUringSetup: 425 }
-    : process.arch === 'arm64'
-      ? { auditArch: 0xc00000b7, socket: 198, socketpair: 199, ioUringSetup: 425 }
-      : null;
-  if (!platform) throw new Error(`Code command execution does not support Linux architecture ${process.arch}.`);
-  const instructions: Array<[number, number, number, number]> = [
-    [0x20, 0, 0, 4], // load seccomp_data.arch
-    [0x15, 1, 0, platform.auditArch],
-    [0x06, 0, 0, 0x80000000], // kill a process that changes syscall ABI
-    [0x20, 0, 0, 0], // load seccomp_data.nr
-  ];
-  // x32 shares AUDIT_ARCH_X86_64 but ORs this bit into its syscall numbers. Refuse that ABI
-  // outright rather than letting its alternate socket numbers fall through to the allow rule.
-  if (process.arch === 'x64') instructions.push(
-    [0x45, 0, 1, 0x40000000], // BPF_JSET __X32_SYSCALL_BIT
-    [0x06, 0, 0, 0x00050001], // EPERM
-  );
-  for (const syscall of [platform.socket, platform.socketpair, platform.ioUringSetup]) {
-    instructions.push([0x15, 0, 1, syscall], [0x06, 0, 0, 0x00050001]); // EPERM
-  }
-  instructions.push([0x06, 0, 0, 0x7fff0000]); // allow
-  const filter = Buffer.alloc(instructions.length * 8);
-  instructions.forEach(([code, jt, jf, value], index) => {
-    const offset = index * 8;
-    filter.writeUInt16LE(code, offset); filter.writeUInt8(jt, offset + 2);
-    filter.writeUInt8(jf, offset + 3); filter.writeUInt32LE(value, offset + 4);
-  });
-  return filter;
+
+/** WHERE A LINUX CODE COMMAND'S BUBBLEWRAP RUNS. Unset (the desktop, GKE, and a Cloud Run machine set
+ *  to `supervisor`) it runs here, in this process's container. A Cloud Run machine can set a lane that
+ *  runs the same argv inside its agent box (cloudrun/code-shell.ts), so a Bubblewrap escape lands in
+ *  the box, not in the supervisor that holds the epoch token. The lane may refuse (the box is down). */
+export interface CodeShellLane {
+  readonly name: string;
+  /** run `bwrap <args>` with the network seccomp filter on fd 3; the combined output, or a throw */
+  run(bwrapArgs: readonly string[], root: string): Promise<string>;
+}
+/** answers the lane at call time: null = here. It may throw a refusal (no lane can run commands) */
+export type CodeShellLanePick = () => Promise<CodeShellLane | null>;
+let lanePick: CodeShellLanePick | null = null;
+/** machined installs the pick on Cloud Run (cloudrun/code-shell.ts); null everywhere else */
+export function useCodeShellLane(pick: CodeShellLanePick | null): void { lanePick = pick; }
+
+/** the env a Code command starts with: the agent allowlist, an empty home, and no proxy */
+export function engineeringShellEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...agentBaseEnv(), HOME: process.platform === 'linux' ? '/tmp/home' : homedir() };
+  delete env.HTTP_PROXY; delete env.HTTPS_PROXY; delete env.http_proxy; delete env.https_proxy;
+  delete env.NO_PROXY; delete env.no_proxy; delete env.ALL_PROXY; delete env.all_proxy;
+  return env;
+}
+
+/** the supervisor lane: Bubblewrap in this process's container (the self-check and the probe call it) */
+export function runSupervisorBubblewrap(args: readonly string[], root: string): Promise<string> {
+  if (!existsSync(BWRAP)) return Promise.reject(new Error('Code command execution is unavailable because the required OS sandbox is not installed.'));
+  return execBubblewrap(args, root, engineeringShellEnv());
 }
 
 function execBubblewrap(args: readonly string[], root: string, env: NodeJS.ProcessEnv): Promise<string> {
@@ -200,13 +198,17 @@ export function engineeringSeatbeltProfile(root: string, rules: readonly PolicyR
 
 /** Shell execution gets an exact allowlisted environment and a mandatory kernel boundary. Generic
  * shell commands have no network; approved web reads use the structured, DNS-pinned web executor. */
-export function createEngineeringShellExecutor(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string | null, privateRepoRoot?: string): NonNullable<ToolExecutors['bash']> {
+export function createEngineeringShellExecutor(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string | null, privateRepoRoot?: string,
+  o: { lane?: CodeShellLane | 'supervisor' } = {}): (command: Parameters<NonNullable<ToolExecutors['bash']>>[0], cwd?:string, context?:Parameters<NonNullable<ToolExecutors['bash']>>[2]) => Promise<string> {
   return async (command) => {
     if (managedRepoRoot === null && !privateRepoRoot) throw new Error('Code cannot isolate the original repository metadata.');
     const text = commandText(command);
-    const env: NodeJS.ProcessEnv = { ...agentBaseEnv(), HOME: process.platform === 'linux' ? '/tmp/home' : homedir() };
-    delete env.HTTP_PROXY; delete env.HTTPS_PROXY; delete env.http_proxy; delete env.https_proxy;
-    delete env.NO_PROXY; delete env.no_proxy; delete env.ALL_PROXY; delete env.all_proxy;
+    // a Cloud Run lane (or the probe's explicit one) runs the same Bubblewrap argv elsewhere
+    if (process.platform === 'linux' && o.lane !== 'supervisor') {
+      const lane = o.lane ?? (lanePick ? await lanePick() : null);
+      if (lane) return lane.run(engineeringBubblewrapArgv(root, text, managedRepoRoot), root);
+    }
+    const env = engineeringShellEnv();
     let executable = '/bin/bash';
     let args = ['--noprofile', '--norc', '-c', text];
     let profile: string | null = null;
@@ -214,10 +216,14 @@ export function createEngineeringShellExecutor(root: string, rules: readonly Pol
     if (process.platform === 'darwin' && sandboxExecAvailable()) {
       commandTemp = mkdtempSync(join(tmpdir(), 'nm-code-command-'));
       env.TMPDIR = commandTemp;
+      // npm writes its command log even for a passing test. Keep it inside the
+      // command's writable scratch directory, away from the user's home cache.
+      env.npm_config_cache = join(commandTemp, 'npm-cache');
       profile = writeTempProfile(engineeringSeatbeltProfile(root, rules, managedRepoRoot, commandTemp, privateRepoRoot));
       const wrapped = sandboxExecArgv(executable, args, profile);
       executable = wrapped[0]!; args = wrapped.slice(1);
     } else if (process.platform === 'linux' && existsSync(BWRAP)) {
+      env.npm_config_cache = '/tmp/npm-cache';
       executable = BWRAP; args = engineeringBubblewrapArgv(root, text, managedRepoRoot);
     } else {
       throw new Error('Code command execution is unavailable because the required OS sandbox is not installed.');

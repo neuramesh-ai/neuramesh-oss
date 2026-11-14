@@ -1,4 +1,7 @@
+import { withChatSteering } from './thread-followups';
+import type { WaitForPermission } from './permission-deadline';
 import { projectContext } from './project-context';
+import { intakeNoteFor } from './intake-note';
 // THE ORCHESTRATOR'S TURN — picking a transport and running one.
 //
 // Split out of startAgentHost to sit beside the four transports it dispatches to (orchturn.ts).
@@ -19,7 +22,8 @@ import { HIRE_CARD_SPEC } from '../hirecards';
 import { type AgentAttachment } from '../runtime/adapter';
 import { type OrchTransportArgs } from './orchturn';
 import { type RunHandle } from './runs';
-import { WEB_PREVIEW_PROMPT, composePrompt } from '@neuramesh/shared';
+import { NARRATION_RULE, WEB_PREVIEW_PROMPT, composePrompt } from '@neuramesh/shared';
+import { triageThinking } from '../runtime/thinking';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { makeRuns } from './runs';
 import type { makeOrchTools } from './orchtools';
@@ -40,6 +44,7 @@ export async function routineNoteFor(db: { getAll: <T>(sql: string, params?: unk
 }
 
 export function makeOrchTurn(ctx: {
+  permissionsFor?: ReturnType<typeof import('./chatturn').makeChatTurn>['permissionsFor'];
   db: ReplicaDatabase;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   buildOrchestratorTools: ReturnType<typeof makeOrchTools>['buildOrchestratorTools'];
@@ -69,12 +74,13 @@ export function makeOrchTurn(ctx: {
     run: RunHandle = NO_RUN,
     // live tokens to the renderer's bubble — the orchestrator NEVER streamed before this (the
     // transport had no onDelta), which is why rex's replies always appeared all at once
-    onDelta?: (t: string, thinking?: string) => void,
+    onDelta?: (t: string, thinking?: string, progress?: readonly string[]) => void,
+    waitForPermission?: WaitForPermission,
   ): Promise<string> {
     const actor = { kind: 'agent', id: agent.id, role: 'orchestrator' };
 
     const otools = await buildOrchestratorTools({
-      ch, agent, actor, skills, log, thread, convoThreadId, token,
+      ch, agent, actor, skills, log, thread, convoThreadId, token, permissionRunId:run.id || undefined,
       // a turn holding a task OWNS it (docs/harness §OWNING_KINDS); a room message is triage
       kind: thread ? 'own' : 'triage',
       // THE fix: the orchestrator can finally fan out. TOOL_KINDS.spawn has always listed 'triage',
@@ -198,6 +204,8 @@ export function makeOrchTurn(ctx: {
     // previous run rides as one line, and the session keeps its schedule's title (the server names it)
     const runContext = await previousRunNote(db, convoThreadId);
     const namedBySchedule = !!(await scheduleOfThread(db, convoThreadId));
+    // round 9: nm-api's intake decision (host/intake-note.ts), and the thread it already named
+    const intake = await intakeNoteFor(db, convoThreadId);
 
     // THE CONTRACT, not a literal. defaults/agents/orchestrator.yaml is the authoritative
     // statement of this agent's behaviour; this reads it. A machine-local copy overrides it
@@ -206,11 +214,13 @@ export function makeOrchTurn(ctx: {
     const contract = contractFor(agent.name, 'orchestrator');
     const powers = contract?.prompt?.['powers'] ?? '';
 
-    const style = contract?.prompt?.['style'] ?? '';
+    // live narration (round 9): one rule for every conversational turn, appended here so a machine-local
+    // contract copy that predates it still carries it (packages/shared/src/narration.ts)
+    const style = `${contract?.prompt?.['style'] ?? ''}\n\n${NARRATION_RULE}`;
 
     // conversation threads carry a provisional heuristic title until the orchestrator
     // names them — the instruction rides only on convo wakes (the tool is gated the same)
-    const convoNamer = convoThreadId && !namedBySchedule
+    const convoNamer = convoThreadId && !namedBySchedule && !intake.named
       ? `\n\nThis exchange lives in a conversation thread whose provisional title is the human's first message, near-verbatim. Once you understand the topic — normally in this first reply — call set_thread_title ONCE with a clean 2–6 word title (what it's ABOUT, e.g. "Backlog check-in", never their words echoed back), plus a one-line description when the title alone is thin. Don't rename it again unless the human asks.`
       : '';
 
@@ -234,7 +244,7 @@ export function makeOrchTurn(ctx: {
       'agent.name': agent.name, 'ch.slug': ch.slug, projLine, powers, style,
       skillsNote, convoNamer, marketingNote, marketingSchedulingContext,
       HIRE_CARD_SPEC,
-    }) + xResearchContext + routineContext + runContext;
+    }) + xResearchContext + routineContext + runContext + intake.note;
 
     // the task-thread turn is a contract block too (2026-08-18) — behaviour that cannot be read
     // cannot be reviewed, which is how the old literal kept a retired tool name for a week.
@@ -250,15 +260,28 @@ export function makeOrchTurn(ctx: {
     // Decoupled by provider: dispatch the SAME tool registry to the matching in-process transport.
     // The token is whatever resolveToken returned for the agent's provider (our free GEMINI_API_KEY
     // by default for a Gemini orchestrator; the user's subscription/key once they change the model).
+    const check = convoThreadId && ctx.permissionsFor?.(agent,ch,convoThreadId,run,waitForPermission);
+    const toolsFor = (signal?: AbortSignal) => check ? otools.map(tool => ({...tool, run: async (input:Record<string,unknown>) => {
+      signal?.throwIfAborted();
+      const decision = await check('mcp__nm__' + tool.name,input);
+      if (decision.decision !== 'allow') throw new Error(decision.reason ?? 'Permission declined.');
+      signal?.throwIfAborted();
+      return tool.run(input);
+    }})) : otools;
     const args: OrchTransportArgs = {
-      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools: otools, log, attachments, onDelta,
+      nativeGate: check || undefined,
+      // a routing turn thinks at most at medium (round 9): its job is to decide, and High hid 2 minutes of silence.
+      // a turn inside a task's thread does the owned work, and keeps the person's level
+      model: agent.model, thinking: thread ? agent.thinking ?? null : triageThinking(agent.thinking), traceKey: convoThreadId ?? thread?.id ?? ch.id, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools:toolsFor(), log, attachments, onDelta,
       // The turn used to run in os.tmpdir() with no file tools at all, which is why an
       // orchestrator asked to write a document truthfully said it could not. This is the SAME
       // directory its subagents work in (ensureChatWorkspace), so a file a leg produces is one
       // the orchestrator can read back and save with write_library_doc.
-      cwd: ensureChatWorkspace(convoThreadId ?? thread?.id ?? ch.id),
+      cwd: await ensureChatWorkspace(convoThreadId ?? thread?.id ?? ch.id),
     };
-    return dispatchOrchestrator(agent, args);
+    return convoThreadId ? withChatSteering(convoThreadId, transcript, (context, controller, progress) =>
+      dispatchOrchestrator(agent, { ...args, tools:toolsFor(controller.signal), transcript:context, abort:controller.signal, abortController:controller,
+        onDelta:(text,thinking,lines)=>{ progress(text); onDelta?.(text,thinking,lines); } })) : dispatchOrchestrator(agent, args);
   }
 
   return { orchestratorTurn };

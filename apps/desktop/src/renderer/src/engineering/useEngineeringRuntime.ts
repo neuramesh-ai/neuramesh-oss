@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { bridgeReady, nm, type NMBridge } from '../bridge/nm';
 import { codeBridge } from '../bridge/desktop-relay';
 import {
-  createEngineeringSession,
+  createEngineeringSession, REVIEW_ENGINEERING_PERMISSIONS,
   dismissEngineeringModeHandoff,
   setEngineeringModel,
   setEngineeringMode,
@@ -183,7 +183,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
   const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null; modelOverride?: string | null; agentId?: string | null; reasoningEffort?: EngineeringSelection['reasoningEffort'] }) => {
     const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing, true); return; }
     const text = spec.firstPrompt?.trim() ?? '';
-    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, agentId: spec.agentId ?? null, reasoningEffort: spec.reasoningEffort ?? null, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
+    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId, text ? undefined : REVIEW_ENGINEERING_PERMISSIONS), id: spec.id, agentId: spec.agentId ?? null, reasoningEffort: spec.reasoningEffort ?? null, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
     if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created, true); return; }
     setSessions((all) => [...all, harness ? submitEngineeringPrompt(created, text) : beginRemoteEngineeringPrompt(created, text, [])]); setActiveId(spec.id);
     if (harness) return;

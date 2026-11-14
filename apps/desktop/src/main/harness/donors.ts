@@ -1,3 +1,4 @@
+import { assertHydrated, hydratePath } from './hydration';
 // Dependency donors (worktree-berths round, docs/design/worktree-berths-2026-08 §3.2).
 //
 // A worktree's dependencies are a pure function of its lockfiles, and every attempt of every task
@@ -152,6 +153,8 @@ export function readManifest(donorDir: string): DonorManifest | null {
  * `donorsRepoDir` = cache/donors/<repoId>. Caller serializes per repo (withRepoLock).
  */
 export async function stashDonor(worktreeDir: string, donorsRepoDir: string): Promise<DonorNote> {
+  await hydratePath(worktreeDir);
+  await hydratePath(donorsRepoDir);
   const hash = lockHash(worktreeDir);
   if (!hash) return { action: 'skipped', reason: 'no-lockfile' };
   const donorDir = join(donorsRepoDir, hash);
@@ -192,6 +195,7 @@ export async function stashDonor(worktreeDir: string, donorsRepoDir: string): Pr
 
 /** Keep the newest KEEP_HASHES complete donors; everything else (and junk) goes. */
 export function pruneDonors(donorsRepoDir: string, keep = KEEP_HASHES): string[] {
+  assertHydrated(donorsRepoDir);
   if (!existsSync(donorsRepoDir)) return [];
   const entries = readdirSync(donorsRepoDir)
     .map((name) => ({ name, manifest: readManifest(join(donorsRepoDir, name)) }))
@@ -207,6 +211,8 @@ export function pruneDonors(donorsRepoDir: string, keep = KEEP_HASHES): string[]
  * repo does not gitignore the trees — hydration must never turn into a commit.
  */
 export async function hydrateFromDonor(worktreeDir: string, donorsRepoDir: string): Promise<DonorNote> {
+  await hydratePath(worktreeDir);
+  await hydratePath(donorsRepoDir);
   const hash = lockHash(worktreeDir);
   if (!hash) return { action: 'skipped', reason: 'no-lockfile' };
   const donorDir = join(donorsRepoDir, hash);

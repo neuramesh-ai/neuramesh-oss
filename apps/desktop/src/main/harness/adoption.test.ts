@@ -114,8 +114,8 @@ test('the orchestrator spawn closure is actually PASSED at the wake call site', 
   // the trailing onDelta closure is the live-bubble feed (2026-08-06 — before it, an
   // orchestrator's reply never streamed and popped in whole), and it carries the turn's thoughts
   // beside the text (the repo-connect round's Option A)
-  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t, th\) => emitChat\(t, false, th\)\)/,
-    'and passes its run + the stream feed, so legs parent onto it and tokens reach the bubble');
+  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t, th, pg\) => emitChat\(t, false, th, pg\), wait\)/,
+    'and passes its run, stream feed and permission wait, so the reply stays live through approvals');
 });
 
 test('a fan-out draws on the budget of the TURN, not of the role', () => {

@@ -35,11 +35,16 @@ export function machineRuntimeList(m: { runtimes?: string | null } | null | unde
 
 /** each provider's state for a coding session on `machine`: ready when that machine serves the provider,
  *  sign-in when the workspace set the provider up and the machine does not serve it, connect when nothing is
- *  set up. `_geminiKey` is read no more: a Google sign-in runs code too. Callers built before the agy lane pass it */
-export function codeProviderStates(machine: { runtimes?: string | null } | null, configured: ReadonlySet<string>, _geminiKey?: boolean): Record<CodeProvider, CodeProviderState> {
+ *  set up. Gemini follows the same rule (a Google sign-in runs code through agy), and a stored Gemini API key
+ *  (`geminiKey`) also makes it ready, whatever the machine last reported */
+export function codeProviderStates(machine: { runtimes?: string | null } | null, configured: ReadonlySet<string>, geminiKey?: boolean): Record<CodeProvider, CodeProviderState> {
   const runtimes = machineRuntimeList(machine);
   const state = (p: CodeProvider): CodeProviderState => (runtimes.includes(RUNTIME[p]) ? 'ready' : configured.has(p) ? 'signin' : 'connect');
-  return { anthropic: state('anthropic'), openai: state('openai'), gemini: state('gemini') };
+  // Gemini runs code on a Google sign-in through agy (upstream) OR on the workspace's API key alone (the
+  // machine resolves the key per session). A machine reports the gemini runtime only after it probes the
+  // key, at its next boot or within 10 minutes. So a runner that slept while the key was added offered no
+  // Gemini model in the Code chip (the Cloud Run coding evals, 2026-11-02). A stored key is enough.
+  return { anthropic: state('anthropic'), openai: state('openai'), gemini: geminiKey ? 'ready' : state('gemini') };
 }
 
 /** the provider a model needs, or null for the NeuraMesh brain (and a model no catalog knows) */

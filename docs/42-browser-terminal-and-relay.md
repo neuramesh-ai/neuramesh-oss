@@ -1,96 +1,108 @@
 # 42 — The browser terminal and nm-relay
 
-**Status: live in production (2026-08-30).** `relay.neuramesh.app` serves, workspace machines dial it, and the hq bundle carries its URL. This doc is the reference for the subsystem and, more usefully, for the four things about it that are not obvious.
+**Current production: 11 November 2026.** Two Cloud Run relay shards serve the hosted
+application. Both are request-billed with minimum zero and intended maximum one instance per
+shard. [Architecture](09-system-architecture.md) · [Pulumi operations](../infra/README.md).
+The dated transport investigations below preserve history; GKE-specific fixes are not current
+Cloud Run deployment commands.
 
-## Why it exists at all
+## Why it exists
 
-Two constraints collide, and neither is negotiable:
-
-1. **Machines never listen.** Outbound-only daemons is a security invariant (docs/09 §10), not a preference. A workspace pod has no inbound port, ever.
-2. **Vercel functions cannot hold a stream**, and a pty is nothing but a long-lived stream.
-
-So a browser has *no path at all* to a machine. `nm-relay` is the rendezvous: both sides dial **out** to it, and it joins them.
+Machines accept no public inbound connections. Clients and machines both dial out to a relay,
+which joins their authorized terminal, live-stream and browser channels. The relay delegates
+client/machine validation to the control API; it does not store customer provider logins.
 
 ```
-browser (xterm.js) ──dials out──▶  nm-relay  ◀──dials out── machine pod (node-pty)
-                    Clerk session             nmm_ token
-                                  │
-                                  ▼  validates BOTH credentials
-                            control-api /internal/relay/*
-                                  (RELAY_SECRET)
+browser / desktop / phone ──dials out──▶ relay shard ◀──dials out── machine
+                                          │
+                             control-api /internal/relay/*
+                                   (shared RELAY_SECRET)
 ```
 
-The relay itself **holds no keys and verifies nothing**. Both credentials go to control-api over the injected validators (`packages/relay/src/validate.ts`), so the hub is a stateless byte-forwarder that can restart freely.
+The relay is a transport, not a second application authorization service. A session on a
+member's own machine may run a vendor's interactive sign-in flow there. Personal subscriptions
+from the former shared runner were not copied into members' machines during migration.
 
-## What it unblocks beyond a terminal pane
+## Routing, health and connection lifetime
 
-The obvious win is a shell in the browser. The one that actually gated cloud-first is **vendor logins** (cloud-first plan §3.6): `claude setup-token`, `codex login --device-auth` and `gh auth login` must complete through the vendor's own flow, with the platform never collecting, storing or intermediating the token. A terminal attached to the member's own machine is precisely that — and until the relay existed, a web-only user could not connect a subscription to a cloud machine at all.
+### One instance per shard
 
-## The four non-obvious things
+Routing tables in `hub.ts` are process-local. A machine on one arbitrary instance cannot meet
+a client on another. Production scales by **two named shards**, with consistent machine-ID
+routing and wrong-shard redirection, rather than by uncoordinated replicas of one shard.
+Keep both minimums at zero; a stopped shard can cold-start on demand. The intended maximum
+is one, but revisions and platform rollover still require the reconnect protocol and monitoring.
 
-### 1. Exactly one replica, and it is not about cost
+### Readiness before attach
 
-The hub's routing tables (`machines`, `attached`, `owners` in `hub.ts`) are **in-memory and per-process**. Two replicas put a machine on one pod and its browser on another, where they can never find each other. The symptom is `MACHINE_OFFLINE` (4404) for a machine that is demonstrably online — which reads as a machine bug and is not one.
+A running Worker Pool is not sufficient proof that its terminal is usable. Wait for the
+machine's core restore and relay readiness. For a selected repository or thread, hydrate that
+subject before opening its working directory. The client retains the pending terminal request
+through startup/retry; a first attach must not fail merely because the machine is still booting.
 
-`replicas: 1` plus `maxSurge: 0`, so a rollout never briefly runs two. Scaling this needs a shared bus or consistent hashing by `machineId`, **not a bigger number**. The hub was built to restart freely instead: machines redial, and `CLOSE.TAKEOVER` exists so a reconnect displaces its own stale socket.
+The active lazy restore path loads essential state first and remaining subjects in the
+background. An old monolithic snapshot can still require a full restore. A failed restore must
+remain visible and recoverable, never become a successful empty workspace.
 
-### 2. There are TWO health checks, and the failing one is invisible from kubectl
+### WebSocket rollover
 
-GKE gives the backend service a default health check against `/`, which the relay correctly 404s (it serves only `/healthz` and a websocket upgrade). Meanwhile the kubelet's `readinessProbe` hits `/healthz` and passes.
+Production uses a 3,600-second request timeout. Both edges use ping/pong watchdogs to detect
+half-open connections; machine redial and client reattachment recover from socket/revision
+rollover. Keepalives do not extend Cloud Run's request lifetime indefinitely. See “Sessions
+outlive the relay socket” below for grace periods, buffers and limits.
 
-The result is a pod that reads `1/1 Running` while the load balancer answers every request with `503 unconditional drop overload`. `HealthCheckPolicy` (`relay-gateway.yaml`) points the LB at `/healthz` so the two checks cannot disagree.
+### Bytes, not strings
 
-### 3. Without `GCPBackendPolicy`, every terminal dies at 30 seconds
+PTY output is bytes and multibyte characters can split across frames. Use one streaming
+`TextDecoder` per channel. Do not decode frames independently or use `btoa` on arbitrary
+Unicode input. Preserve the existing channel/session framing during reconnect.
 
-That is the Google L7 default backend timeout. For request/response it is generous; for a WebSocket it is a hard cap on the life of the connection, so an idle terminal drops about half a minute in and reconnects forever. Raised to 3600s rather than papered over with client keepalives.
+## Working directory and machine selection
 
-**And then 3600 s came (2026-09-19).** The MACHINE's socket to the relay is idle by nature: nothing crosses it until a browser opens a terminal. One hour after `machine_online` the balancer closed it, the relay logged `machine_gone`, and the daemon on the other side never saw a close: a half-open socket that read as dialled for hours, no redial, and every browser attach answered 4404 while the machine's heartbeat kept the icon green. The pane then said "The machine is asleep. Start it", to a person looking at a running machine. So keepalives after all, on BOTH ends, with the timeout kept, one watchdog for both (`packages/relay/src/keepalive.ts`): the machine edge pings every 30 s and terminates a socket that misses a pong (which is the close event its redial loop waits for), and the relay server does the same to every socket it accepts, so the hub's close handlers reap it. Each is proven by a peer with `autoPong: false` (`machine-edge-keepalive.test.ts`, `hub.test.ts`). The 4404 sentence now says what is true: the machine is not on the relay yet, it reconnects within a minute. `ensureMachine` runs before every attach, so a machine that is truly asleep never reaches the attach at all.
+A personal shell uses the authorized member's selected machine. A thread terminal uses its
+thread/subject workspace on that machine. A project terminal resolves the selected repository
+identity to the checkout on the target machine. A project's original Mac `local_path` must not
+be sent as a cloud cwd; use its retained cloud repository twin and hydrate it before opening. A missing retained clone
+produces an explicit refusal; terminal attach does not create a replacement checkout.
+The visible prompt shows the path after `subjects`; this does not change the actual cwd.
 
-### 4. Bytes, not strings
-
-A pty emits **bytes**, and the socket chops them wherever it likes, so multi-byte characters split across frames routinely — any box-drawing character, any emoji, any accented name. Decoding each frame independently turns those into replacement characters, and the corruption is intermittent and load-dependent, which is the worst kind to chase later.
-
-One streaming `TextDecoder` **per channel** (`relay-frames.ts`). And `btoa` is replaced because it throws above U+00FF: typing an accented character would otherwise raise `InvalidCharacterError` instead of reaching the shell.
-
-## The jail is bash, and that is not a port
-
-The desktop's terminal jail writes a `.zshrc` and hooks `chpwd` through `add-zsh-hook`. The machine image has **bash 5.2 and no zsh** (checked in the image, not assumed), and bash has no `chpwd` hook — the equivalent is `PROMPT_COMMAND`, which fires per prompt rather than per cd. One file could not have served both shells; it would have shipped a jail that silently does nothing on one of them.
-
-It is a **working-directory jail, not isolation**: absolute paths still read, and the real boundary is the gVisor sandbox and the pod. A jail mistaken for a sandbox is worse than no jail.
-
-## It never pretends
-
-Every failure writes a sentence to the pane and exits — no machine yet, forbidden, asleep, relay unreachable (`relay-frames.ts:closeReason`). The rule is inherited from `webnm-local.ts` and the reason is the same: **a pane that renders empty reads as a hung shell**, which is the exact ambiguity this lane exists to remove.
-
-Close codes are the diagnostic vocabulary. `4403` versus `1013` is worth knowing by heart: a *wrong* `RELAY_SECRET` closes `1013 VALIDATE_UNAVAILABLE`, so a `4403 FORBIDDEN` proves the relay reached control-api, authenticated, and got a real membership verdict back.
-
-## Which machine a terminal opens (2026-09-25)
-
-A plain shell is where a person signs in, so it opens that person's own machine. The server names it as `yours` in `/v1/machines/usage`, and a person without a machine of their own gets the runner. The shell promotes that machine first, because a sign-in on a claim ends with the pod. It wakes only that machine.
-
-A task's terminal opens the runner, which holds the task's worktree, and never promotes it. A promotion ends the claim pod, and the worktree ends with it.
-
-Code keeps the runner (`machines[0]`), because a Code lane does not wake a machine before it attaches.
+A missing directory, unavailable provider login, denied machine and relay outage are different
+failures. Write an actionable reason to the pane and preserve the underlying diagnostic.
+The shell's directory restriction is a convenience, not the security sandbox: the Cloud Run
+machine runtime and its process boundary enforce isolation.
 
 ## Operational shape
 
-| Piece | Where |
+| Piece | Current production |
 |---|---|
-| Hub (stateless WSS) | `packages/relay/` → `infra/images/relay/Dockerfile` → `nm-relay` Deployment in `nm-system` |
-| Public endpoint | Gateway `gke-l7-global-external-managed`, static IP `nm-relay-ip`, `relay.neuramesh.app` |
-| TLS | Certificate Manager, Google-managed, **DNS-authorized** — no private key in the repo or the cluster |
-| Machine edge | `apps/desktop/src/main/relay/` (node-pty lives here, NOT in `packages/relay`, or the hub image would compile a native module it never calls) |
-| Browser edge | `packages/relay-client` (the tab's transport), wired at `apps/hq/web/webnm-relay.ts` (hq since 2026-09-26) |
-| Secret | `RELAY_SECRET` — on Vercel for control-api, and `nm-relay-secret` in `nm-system`. **They must match**; a mismatch fails as a permanent 403 whose symptom points at the wrong component. |
+| Hub | `packages/relay` → `infra/images/relay/Dockerfile` → two Cloud Run relay services |
+| Public routing | Pulumi-managed global edge; read its current static IP and hostname/path routes from `infra/cloudrun/edge` |
+| TLS | Google-managed Certificate Manager certificates with DNS authorization |
+| Machine edge | `apps/desktop/src/main/relay`; node-pty executes on the machine |
+| Client edge | `packages/relay-client`, HQ bridge and native terminal transport |
+| Shared validation | `RELAY_SECRET` through matching Secret Manager versions/service bindings; API validates membership and machine identity |
+| Shard list | `RELAY_SHARDS` / `RELAY_SHARD_INDEX`; `FLEET_RELAY_URLS`; gateway/client relay configuration |
 
-**Cost:** this is the cluster's first load balancer. A global external ALB bills roughly **$18/month just to exist**, plus traffic.
+Change shard topology as a coordinated client, gateway, fleet and relay rollout. An old URL
+or wrong revision can look like `MACHINE_OFFLINE` despite a healthy machine heartbeat.
+An unset relay capability must produce a named refusal rather than an empty terminal.
 
-### Switches
+**Cost:** minimum zero avoids an idle instance charge for an unused shard. Active WebSocket
+requests still incur usage. Load-balancer rule-group and traffic charges are separate; removing
+the old GKE frontend does not automatically remove a second fixed rule-group charge when the
+new frontend remains within the same billed group.
 
-- `NM_RELAY_URL` on a machine pod (`FLEET_RELAY_URL` on the operator) — empty is a valid machine: it logs that it has no browser terminal and carries on.
-- `VITE_NM_RELAY_URL` on the hq build — **baked at build time by Vite**, so changing it requires a redeploy, and its presence in the served JS is the only real proof it took effect.
+## Historical GKE incidents (August–September 2026)
 
-Both unset degrade to the honest refusal in `webnm-local.ts` ("No shell here"), so the feature is additive: nothing regresses when the relay is down or undeployed.
+The original relay ran as a single GKE Deployment. Its kubelet readiness probe used `/healthz`,
+while the separate load-balancer health check defaulted to `/`, returning 404 and causing 503s
+behind a healthy pod. `HealthCheckPolicy` corrected that legacy path. A `GCPBackendPolicy`
+raised the old backend's default 30-second timeout to 3,600 seconds. Those Kubernetes objects
+remain historical recovery configuration; they do not configure the Cloud Run services.
+
+The one-hour rollover later exposed half-open machine sockets and motivated the ping/pong
+watchdogs now shared by both ends. The deployment changed, but that transport requirement
+remains. Preserve the failure history when investigating a reconnect regression.
 
 ## The desktop is the second client (2026-09-04)
 
@@ -236,6 +248,92 @@ two profiles and the tools when `NM_CHROMIUM` names a binary, and
 ### Switches
 
 None new. The lane rides `NM_RELAY_URL` and `VITE_NM_RELAY_URL`, as the other lanes do.
+
+## Sessions outlive the relay socket (2026-10)
+
+On Cloud Run, every relay socket ends. The request timeout cuts it at 3600 s, a relay rollout
+retires it with code 1012, and a restart drops it. Before this change, the end of a socket ended
+every terminal and Code session on it. Now a session lives on, and its client takes it back.
+
+- **The machine edge** (`apps/desktop/src/main/relay/machine-edge.ts`). When its socket drops, or
+  the hub says that a client left (`detach`), the session detaches. It keeps running. Its newest
+  output stays in a bounded buffer with the offset of each byte (`resume-buffer.ts`). A session that
+  no client takes back in the grace window ends. A detached session is not work for the activity
+  meter, and it gives up its slot to a new open of the same person. The same Code thread opened
+  again takes over the session that its old channel left.
+- **The resume.** The client sends its open again with `resume: true` and `from`, the number of
+  bytes that it has. The machine answers `resumed` with `o`, `dropped` and the same `from`, and
+  replays from `o`. It never starts a second shell. A session that is gone answers `close` with a
+  reason. Only the person who opened a session can take it back.
+- **The hub** (`packages/relay/src/hub.ts`). On a machine that names `resume`, a client that leaves
+  costs its sessions a `detach`, not a `close`. A resume moves a channel to a newer socket of the
+  same person. A takeover tells the new machine socket which channels still have a client.
+- **The rotation.** Before the 3600 s cut, the machine and the browser each open a new socket and
+  move their sessions to it. The machine uses the hub's takeover (4409). The browser uses a resume
+  open, and then closes its old socket with code 4000.
+- **The client** (`packages/relay-client`). It dials again within its window and takes back every
+  terminal and Code session. A short drop prints nothing. A longer drop prints one line, and one
+  more line when the session is back. A live-reply or browser channel is not a session. It ends
+  with its socket, and its owner opens it again.
+- **Gating.** The machine names `resume` in its hello, and the hub repeats the name in `attached`.
+  A client resumes only when it sees the name. The hub refuses a resume to a machine that does not
+  name it, because an older daemon would start a second shell.
+- **A machine that just started** is not on the relay yet. It dials a few seconds after its first
+  heartbeat. `ensureMachine` marks a machine that it starts, and for 90 s the first attach to that
+  machine waits through 4404 and prints "Waiting for the machine to join the relay...". A 4404 from
+  any other machine still ends the attach at once.
+
+### Switches
+
+- `NM_RELAY_RESUME_GRACE_MS` on a machine (default 120000). 0 turns resume off. Then a session ends
+  with its client, as before, and the hello does not name `resume`.
+- `NM_RELAY_RESUME_BUFFER_BYTES` on a machine (default 262144). A Code session keeps four times as
+  much.
+- `NM_RELAY_ROTATE_MS` on a machine (default 3000000, 50 min). 0 turns the rotation off.
+- `resumeWindowMs` (110 s) and `rotateMs` (50 min) in the client's `RelayConfig`.
+
+### Limits
+
+- A byte that the buffer drops is gone. The pane says how many bytes.
+- A keystroke typed while the socket is down is not sent later. A Code command waits for the next
+  socket, but a command sent into a socket that died a moment before is lost.
+- The Code pane in hq shows the reconnect lines. The desktop and the phone resume the same way, but
+  they show no line yet.
+
+## Relay shards (2026-10)
+
+One relay instance holds every socket of the machines it serves, so one instance is a ceiling: about 1,000 sockets, a few hundred active machines. The relay now runs as N services, the shards. Each shard is one instance (min 1, max 1), as before. A machine lives on one shard, and its browsers dial that shard.
+
+- **One rule** (`packages/relay/src/shard.ts`). The shard of a machine is a rendezvous hash of its id over the shard indexes. The fleet, the hub, the browser client, the machine edge and the live check all import this one file. Test vectors in `shard.test.ts` pin it, from an independent Python reimplementation. A change to an output moves live machines.
+- **The list.** The shards are a comma list of URLs in shard order. One URL is the list of one (N=1). The order is what every side must agree on, because the hash keys on the index, not on the URL. One Cloud Run service answers on two URLs, and either form can appear in a list.
+- **Adding a shard** moves about 1/(N+1) of the machines, and each moved machine goes to the new shard. No machine moves between two old shards.
+- **The fleet** (`FLEET_RELAY_URLS`, or `FLEET_RELAY_URL` for one) stamps each pool with its machine's shard (`NM_RELAY_URL`). A new list changes the URL of the machines whose shard moved, and only theirs. That is a template change, so a running machine takes it at its next drain, and the fleet asks for a roll, as for any template change. A GKE warm pod has no machine id when it is stamped, so it gets the whole list and `machined` picks its own shard.
+- **hq** gets the list in `VITE_NM_RELAY_URL`. In the sandbox the gateway stamps it from `HQ_RELAY_URL`. The browser client (`packages/relay-client`) dials each machine's shard. The desktop and the phone take a list the same way. `PROD_RELAY_URL` is one URL (N=1).
+- **The refusal.** Each shard knows the list and its own index (`RELAY_SHARDS`, `RELAY_SHARD_INDEX`). A browser that attaches for a machine that lives on another shard hears close `4421` with the reason `shard <k>/<n> <url>`, before any credential is checked. The client dials the named URL once. A second refusal is final, and the pane says to reload the page. This covers a tab whose list is older than the relay's.
+- **The machine follows too.** A machine's hello names the `shard` capability. A shard refuses such a machine with the same `4421`, and the machine edge dials the named shard at once and keeps it. So a new list on the relays moves a running machine at its next redial, before the fleet restamps its pool. An older daemon, which does not name `shard`, is served where it lands, and a browser that dials there still meets it.
+- **The rollover watch** of each shard asks its own service URL: `RELAY_SELF_URL`, else its own entry in `RELAY_SHARDS`, else Cloud Run's URL for `K_SERVICE`. A shard never compares its revision with another shard's.
+
+### Switches
+
+- `RELAY_SHARDS` and `RELAY_SHARD_INDEX` on each relay. Unset, or a list of one, is the only relay. A list with a bad index stops the relay at start, because it would refuse its own machines.
+- `FLEET_RELAY_URLS` on nm-fleet (wins over `FLEET_RELAY_URL`).
+- `HQ_RELAY_URL` on the hq gateway, one URL or the list.
+- `NM_RELAY_URL` on a desktop or a machine, one URL or the list.
+
+### How to grow N in production
+
+1. Ship the client and machine code first, with one relay (N=1). The new hq bundle, the desktop, the phone and the machine image all follow a `4421`, and nothing refuses yet.
+2. Wait until no tab or daemon from before step 1 is left: tabs reload, and the machines roll onto the new image.
+3. Add the shard: the new relay service, then `RELAY_SHARDS` and `RELAY_SHARD_INDEX` on every relay, `FLEET_RELAY_URLS` on the fleet, and the list in the clients' relay setting.
+
+A client from before step 1 does not follow a refusal. It redials the wrong shard until its window ends and then shows "The connection closed (4421)". A reload fixes it. The sandbox saw this at its N=2 deploy (2026-10-30): an e2e script with its own relay code and the old single URL redialled shard 0 every 3 s until the scripts learned the list (`scripts/e2e-cloudrun/lib/relay.mjs`).
+
+### Limits
+
+- A shard restart drops only its own machines' sockets. Their terminals and Code sessions resume within the grace, as in "Sessions outlive the relay socket". The other shards see nothing.
+- Shards do not share load. A shard with many busy machines can fill while another is idle. The hash spreads machine ids evenly (within 5 % in the tests), not traffic.
+- A new list is a rollout of every relay, the fleet and the gateway. While it rolls, an older daemon that sits on its old shard can be out of reach for a browser with the new list (`4404`) until its roll. A machine with the `shard` capability moves at its next redial.
+- The phone's terminal WebView bundle (`apps/mobile/src/terminal-html.ts`) is an older build of the client, and it dials the URL it is given as it is. Give the phone one URL until that bundle is rebuilt.
 
 ## The lesson that cost the most
 

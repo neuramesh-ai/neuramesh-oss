@@ -1,6 +1,6 @@
 # THE BUNDLE TRAVELS WITH THE COMMIT THAT CHANGED IT.
 #
-# packages/control-api/index.js is the esbuild bundle Vercel deploys verbatim, generated from
+# packages/control-api/index.js is the retained Vercel-compatible bundle, generated from
 # control-api/src + @neuramesh/shared. A push that leaves it stale is caught by the `control-api
 # bundle` job, which regenerates it and commits it back to the PR — and THAT is the thing this hook
 # exists to prevent. The commit is authored by github-actions[bot], this repo holds bot-authored

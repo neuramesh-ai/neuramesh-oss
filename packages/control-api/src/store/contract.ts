@@ -6,12 +6,14 @@ import type { MarketingStore } from './marketing-contract';
 // doing alongside the repositories that implement them, and those wait on a shared
 // contract suite — today's memory/pg test pairs are hand-written twice with mostly
 // disjoint cases, so nothing yet proves the two implementations agree (plan §5).
-import { type BrainOverride, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
+import { type Actor, type BrainOverride, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, type WorkspaceMode } from '@neuramesh/shared';
 import type { LifecycleRow } from '../lifecycle';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
 
 
 export interface Store extends MarketingStore {
+  finance?: import('./finance').FinanceStore;
+  destinations?: import('./destinations').DestinationStore;
   nextTaskNumber(workspace: string): Promise<number>;
   // Agent Retro (docs/13) — optional: only the postgres store aggregates it
   // (events/facts are server-side); callers 501 when absent.
@@ -24,6 +26,11 @@ export interface Store extends MarketingStore {
   rotateMachineToken?(machineId: string, tokenHash: string): Promise<{ id: string } | null>;
   // nm-relay's client-attach check (relay.ts): which workspace does this machine live in?
   machineWorkspace?(machineId: string): Promise<import('../relay').MachineAttachRow | null>;
+  // the command scope guard (handler/scope.ts, store/scope-rows.ts): each row's owning workspace
+  // (null = no such row; a lookup error throws), and an agent's home + role from its row. Present =
+  // this store is a tenant boundary and the guard is strict; the in-memory store has neither.
+  scopeWorkspaces?(refs: import('./scope-rows').ScopeRef[]): Promise<Array<string | null>>;
+  agentHome?(agentId: string): Promise<{ workspace: string; role: string | null } | null>;
   // wake/idle-stop + starter metering (fleet-lifecycle.ts): the message path's wake bump, the
   // machine-sweep cron's pass (meter → cap-stop → idle-stop), and the UI meter's read.
   bumpMachineWake?(workspaceId: string, originUserId?: string | null): Promise<void>;
@@ -105,7 +112,7 @@ export interface Store extends MarketingStore {
   deleteAccount(userId: string): Promise<void>;
   // Auth-provider migration: map a Clerk user (JWT sub + email) to a stable
   // internal uuid, creating the mapping on first sign-in.
-  resolveClerkUser(clerkId: string, email: string | null): Promise<{ id: string; created: boolean }>;
+  resolveClerkUser(clerkId: string, email: string | null, selfAsserted?: boolean): Promise<{ id: string; created: boolean }>;
   // Read-only Clerk id → internal uuid for the /v1 Bearer middleware (the mapping
   // is created by resolveClerkUser at sign-in). null when no account is linked.
   userIdForClerkId(clerkId: string): Promise<string | null>;
@@ -186,12 +193,13 @@ export interface Store extends MarketingStore {
   // Memory view: the channel block + facts (valid first, recent superseded).
   // kind distinguishes lessons (review corrections) from plain facts; taskNumber
   // carries a lesson's provenance when it was recorded against a task.
-  channelMemory(workspace: string, channel: string): Promise<{
+  channelMemory(workspace: string, channel: string, actor?: Actor, marketing?:boolean): Promise<{
     block: { content: string; basisCount: number; updatedAt: string } | null;
     facts: Array<{ id: string; content: string; kind: string; taskNumber: number | null; validFrom: string; validUntil: string | null; supersededBy: string | null }>;
   }>;
-  // Hybrid recall over channel messages (FTS + vector legs, RRF-fused).
-  recall(workspace: string, channel: string | null, query: string, k: number): Promise<Array<{ id: string; kind: 'fact' | 'message'; body: string; channel: string; createdAt: string; score: number }>>;
+  // Hybrid recall over messages and facts (FTS + vector legs, RRF-fused), filtered to the projects the
+  // scope allows (store/project-memory.ts recallProjectsSql). No scope: the channel alone decides.
+  recall(workspace: string, channel: string | null, query: string, k: number, scope?: { actor?: Actor; marketing?:boolean; thread?: string | null; project?: string | null }): Promise<Array<{ id: string; kind: 'fact' | 'message'; body: string; channel: string; createdAt: string; score: number }>>;
   // Fact store: reconcile a candidate fact against valid facts in the channel
   // — ADD new, UPDATE (invalidate + supersede) on contradiction, NOOP on dup.
   // Reconcile is kind-scoped: a lesson never supersedes a decision-fact.
@@ -236,7 +244,7 @@ export interface Store extends MarketingStore {
   // stale id must not be mistaken for a chat). `setThreadMode` is the human-only escalation
   // valve behind thread.set_mode.
   getThreadMode(workspace: string, threadId: string): Promise<ThreadMode | null>;
-  setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void>; setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void>; // 0144, coding threads: store/thread-machine.ts
+  setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void>; setThreadKind(workspace: string, threadId: string, kind: ThreadKind, mode?: WorkspaceMode | null): Promise<void>; // 0144, coding threads (round 9: the workspace mode): store/thread-machine.ts
   /** Compute choice (0118): replace the ACTOR's own compute prefs. Validates every named
    *  machine/agent id against the workspace — a pref naming a foreign machine must 404 at set
    *  time, not silently mis-route at claim time. */
@@ -300,7 +308,7 @@ export interface Store extends MarketingStore {
    *  resolves to the owner), and a local one from any human member of its workspace. false: no
    *  machine this actor may beat has that id, and nothing moved or was charged. `daemonVersion`:
    *  the build a cloud machine reports (its image's commit); absent keeps the row's */
-  heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<boolean>;
+  heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string; permissionVersion?: number }): Promise<boolean>;
   // Upsert by (workspace, name); registers channel scope. Event on first insert.
   registerAgent(input: {
     workspace: string;
@@ -394,7 +402,7 @@ export interface Store extends MarketingStore {
   setScheduleStatus(scheduleId: string, status: 'active' | 'paused', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string; replyGap?: number | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteSchedule(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
-  claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ claimed: boolean }>;
+  claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent, authority?: { actor: import('@neuramesh/shared').Actor; machineWorkspace?: string }): Promise<{ claimed: boolean; schedulePermission?: string }>;
   /** Run now (routine sessions, 2026-09-28): the schedule is due at once, so the next tick fires it into its
    * session. INVALID_INPUT on a paused or finished row, NOT_FOUND on none (store/schedule-now.ts). */
   runScheduleNow(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;

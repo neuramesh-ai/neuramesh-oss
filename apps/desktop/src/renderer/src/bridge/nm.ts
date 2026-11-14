@@ -1,3 +1,5 @@
+import type { DestinationBridge } from '@neuramesh/shared';
+import type { FinanceBridge } from '@neuramesh/shared';
 /* eslint-disable max-lines -- the bridge drift tests intentionally scan this contract as one source */
 // The NMBridge contract + the `nm` singleton — extracted from App.tsx (track A1).
 //
@@ -108,7 +110,7 @@ export type WorkspaceExportResult = { ok: true; path: string } | { ok: false; co
 export type UpgradePhase = 'idle' | 'waiting' | 'landing' | 'done' | 'expired' | 'error';
 export interface UpgradePush { phase: UpgradePhase; url?: string; message?: string }
 
-export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
+export interface NMBridge extends DestinationBridge, FinanceBridge, EngineeringNMBridge, TerminalNMBridge {
   electron: string;
   channels(): Promise<ChannelRow[]>;
   send(channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: ThreadKind }): Promise<{ id: string }>;
@@ -164,6 +166,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
    *  meter that cannot read must not paint a full one. */
   usage(): Promise<WorkspaceUsage | null>;
   policies(): Promise<PolicyRowUI[]>;
+  getPermissions(threadId?: string, taskId?:string): Promise<import('@neuramesh/shared').PermissionSelection>;
+  setPermissions(mode: import('@neuramesh/shared').PermissionMode | null, threadId?: string, taskId?:string): Promise<import('@neuramesh/shared').PermissionSelection>;
   policySet(input: { id?: string; scope: string; projectId?: string | null; capability: string; selector: unknown; verdict: string; rationale?: string; locked?: boolean }): Promise<unknown>;
   policyDelete(id: string): Promise<unknown>;
   sandboxGet(): Promise<{ enabled: boolean; envForced: boolean }>;

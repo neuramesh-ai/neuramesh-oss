@@ -1,4 +1,24 @@
-import { createEngineeringPlanProgress, recoverEngineeringPlanProgress, updateEngineeringPlanProgress, isEngineeringWorkPlan, type EngineeringPlanProgress, type EngineeringRuntimeEvent } from '@neuramesh/shared';
+import { createEngineeringPlanProgress, recoverEngineeringPlanProgress, updateEngineeringPlanProgress, engineeringWorkPlanProblems, isEngineeringWorkPlan, type EngineeringPlanProgress, type EngineeringRuntimeEvent } from '@neuramesh/shared';
+
+/** the smallest plan the tool accepts, shown with a refusal so a model can copy its shape */
+const PLAN_EXAMPLE = JSON.stringify({
+  summary: 'Make formatDuration follow the README contract.',
+  report: { investigation: 'I read README.md and src/duration.mjs.', decisions: ['Validate the input before formatting, and cover the boundaries in tests.'], nextStep: 'Select Continue in Act to implement it.' },
+  considerations: [],
+  steps: [
+    { label: 'Implement the formatter', action: 'edit', target: 'src/duration.mjs', description: 'Format seconds as H:MM:SS and reject invalid input.' },
+    { label: 'Run the tests', action: 'command', target: 'npm test', description: 'Verify the boundary cases.' },
+  ],
+});
+
+/** a refusal that names each broken rule and shows a valid plan: the old one-line refusal taught a
+ *  model nothing, and the starter model sent the same broken plan six times in a row */
+export function workPlanRefusal(input: unknown): string {
+  // the first broken rule in upstream's words (workPlanProblem: a JSON string, a line too long), then every
+  // rule the shared check names, then a plan the tool accepts
+  const problems = typeof input === 'string' ? [] : engineeringWorkPlanProblems(input);
+  return `The work plan was not recorded: ${workPlanProblem(input)} ${problems.length ? `All problems: ${problems.join('; ')}.` : ''} Call propose_work_plan again with every required field. A valid example: ${PLAN_EXAMPLE}`;
+}
 
 const oneLine = (text: unknown, max: number): boolean => typeof text === 'string' && !!text.trim() && text.length <= max && !/[\r\n]/.test(text);
 const filled = (text: unknown, max: number): boolean => typeof text === 'string' && !!text.trim() && text.length <= max;
@@ -61,7 +81,7 @@ export function engineeringPlanTool(emit: (event: EngineeringRuntimeEvent) => vo
       },
     },
     execute: (input: unknown) => {
-      if (!isEngineeringWorkPlan(input)) throw new Error(`The work plan was not recorded. ${workPlanProblem(input)} Fix it and propose the plan again.`);
+      if (!isEngineeringWorkPlan(input)) throw new Error(workPlanRefusal(input));
       const planProgress = createEngineeringPlanProgress(input, crypto.randomUUID());
       emit({ type: 'work_plan', planId: planProgress.id, plan: input });
       return { recorded: true, planProgress, message: 'The UI now shows your investigation, key decisions and next step above the plan card. The formal plan is in the pane. Your final response must be one short readiness sentence only. Do not repeat the report or plan already rendered for the user. No changes have been applied.' };

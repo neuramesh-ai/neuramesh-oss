@@ -8,6 +8,7 @@ import { isEngineeringCommand, type EngineeringMachineOpenMeta, type Engineering
 import type { EngineeringConversation } from './engineering-conversation';
 import { EngineeringModelRefused, type EngineeringProviderResolution } from './engineering-provider';
 import { previewEngineeringFile } from './engineering-file-preview';
+import type { Park } from '../cloudrun/parks';
 
 /** what the wrapper needs from a lane: ClineChannelSession and AgyChannelSession both fit */
 export interface EngineeringLane {
@@ -15,6 +16,10 @@ export interface EngineeringLane {
   close(keepJournal?: boolean): Promise<unknown>;
   flush(): Promise<void>;
   readonly busy: boolean;
+  /** a turn runs and waits on nobody (the activity meter, machined.ts). Absent = `busy` */
+  readonly working?: boolean;
+  /** Cloud Run: continue with a parked approval's answer (engineering-park-resume.ts) */
+  continueParked?(park: Park, onSettled?: () => void): boolean;
 }
 
 export type LaneKind = 'cline' | 'agy';
@@ -42,6 +47,13 @@ export class EngineeringLanes {
   ) {}
 
   get busy(): boolean { return this.swapping || this.lane.busy; }
+  /** the activity meter reads the lane's own answer: an approval it holds is a durable park on Cloud Run */
+  get working(): boolean { return !this.swapping && (this.lane.working ?? this.lane.busy); }
+  /** a parked answer goes to the lane that runs now. A swap in progress cannot take it (the resumer retries) */
+  continueParked(park: Park, onSettled?: () => void): boolean {
+    if (this.swapping || !this.lane.continueParked) return false;
+    return this.lane.continueParked(park, onSettled);
+  }
   close(): Promise<void> { return this.lane.close().then(() => {}); }
   flush(): Promise<void> { return this.lane.flush(); }
 

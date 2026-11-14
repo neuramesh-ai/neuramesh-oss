@@ -1,0 +1,125 @@
+# EAS upload excludes. Keep repository ignore rules when updating this file.
+# EAS replaces all .gitignore files when this file exists.
+node_modules/
+dist/
+out/
+# never commit stray absolute-path trees (a 2026-07-30 incident committed a scratchpad
+# and a macOS $TMPDIR from another worktree under these roots)
+private/
+var/
+# spike runtime output (SQLite db + wal/shm)
+packages/sync-spike/.data/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.neuramesh/worktrees/
+coverage/
+# generated embedding-model cache (fastembed downloads it on first use; never commit)
+.fastembed-cache/
+# evidence screenshots are kept local, not shipped
+docs/evidence/
+
+# control-api Vercel build output (esbuild bundles src/vercel.ts here)
+packages/control-api/api/index.js.map
+
+# electron-builder packaged output (dmg/zip/blockmap/latest-mac.yml — these are
+# published to the releases repo by CI, never committed to the source tree)
+apps/desktop/release/
+
+# DMG background rendered at build time by scripts/dmg-render.cjs (clean base art
+# + the per-build version/arch pill) — derived from the committed base PNGs
+apps/desktop/build/.generated/
+
+# Agent working files + rendered email previews (`pnpm mail:preview`). Derived output —
+# regenerate with the script, never review it in a diff.
+.nm-evidence/
+.nm-release/
+.vercel
+# eslint --cache scratch
+.eslintcache
+
+# the dev machine-issuer keypair (scripts/fleet-local.sh generates it; never committed)
+dev/stack/secrets/
+
+# scripts/public-scan.sh: the founder-specific patterns (handles, exact infra ids). Never committed.
+.public-scan.local
+
+# verified downloads (scripts/agent-sandbox-manifest.sh)
+.cache/
+
+# Rules from apps/desktop/.gitignore
+/apps/desktop/**/.vercel
+
+# Rules from apps/mobile/.gitignore
+/apps/mobile/**/node_modules/
+/apps/mobile/**/.expo/
+/apps/mobile/**/dist/
+/apps/mobile/**/web-build/
+/apps/mobile/**/ios/
+/apps/mobile/**/android/
+/apps/mobile/**/*.log
+/apps/mobile/**/.env*
+
+# Rules from apps/web/.gitignore
+/apps/web/**/.vercel
+
+# Rules from docs/design/brain-gcs-2026-10/evidence/.gitignore
+!/docs/design/brain-gcs-2026-10/evidence/**/*.log
+
+# Rules from packages/control-api/.gitignore
+/packages/control-api/**/.vercel
+
+# Rules from packages/fonts/.gitignore
+/packages/fonts/**/.upstream/
+/packages/fonts/**/.venv/
+
+# Rules from scripts/perf/web/.gitignore
+/scripts/perf/web/**/results/
+/scripts/perf/web/**/logs/
+/scripts/perf/web/**/videos/
+/scripts/perf/web/**/traces/
+/scripts/perf/web/**/profiles/
+/scripts/perf/web/**/certs/
+/scripts/perf/web/**/.zcache/
+/scripts/perf/web/**/seed.json
+/scripts/perf/web/**/seed-created.md
+/scripts/perf/web/**/*.pid
+/scripts/perf/web/**/final.json
+
+# Migration evidence, infrastructure and local tools are not mobile build inputs.
+/.git
+/docs/
+/infra/
+/dev/
+/evals/
+/.github/
+/.codex/
+/.agents/
+/.claude/
+/memory/
+/mockups/
+/.husky/
+/.nm-evidence/
+/.nm-release/
+# Never upload credentials or retained application/customer state.
+.env
+.env.*
+credentials.json
+*.p8
+*.p12
+*.mobileprovision
+*.ipa
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.dump
+*.sql.gz
+*.sql.zst
+# Preserve the manifest hook, lockfile and checked-in workspace/native plugins.
+!.pnpmfile.cjs

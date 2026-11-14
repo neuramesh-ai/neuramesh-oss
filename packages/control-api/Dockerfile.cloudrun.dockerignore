@@ -1,0 +1,22 @@
+# Build context for packages/control-api/Dockerfile.cloudrun (repo root), read by BuildKit. The same
+# scope as Dockerfile.dockerignore minus the Local stack's PowerSync init files, which this image
+# never applies.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.pnpmfile.cjs
+!tsconfig.base.json
+!patches/**
+!packages/shared/**
+!packages/client-core/**
+!packages/control-api/**
+!supabase/migrations/**
+!supabase/validate/auth-shim.sql
+**/node_modules
+**/dist
+packages/control-api/index.js
+packages/control-api/api
+packages/control-api/test
+packages/control-api/.fastembed-cache
+packages/**/*.test.ts

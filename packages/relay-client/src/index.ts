@@ -3,10 +3,11 @@
 // the phone is the third, so the edge lives where all three can import it. Pure of any host:
 // a WebSocket, TextEncoder/TextDecoder and atob/btoa are the whole runtime contract (docs/42,
 // "bytes, not strings"). Nothing here knows a bridge, an IPC lane or a React tree.
-export { openRelayJsonChannel, openRelayPty, resetRelay, waitForRelayCapacity } from './relay-client';
+export { openRelayJsonChannel, openRelayPty, RECONNECTING, RELAY_JOINING, resetRelay, RESUME_WINDOW_MS, ROTATE_MS, waitForRelayCapacity } from './relay-client';
 export type { PtyHandle, RelayConfig, RelayJsonHandle } from './relay-client';
-export { closeReason, encodeB64, makeDecoder, notice } from './relay-frames';
+export { closeReason, encodeB64, isNotice, makeDecoder, notice } from './relay-frames';
 export { ensureMachine, ENSURE_TIMEOUT_MS } from './ensure-machine';
+export { JOIN_WINDOW_MS, joiningUntil, markMachineJoining } from './machine-joining';
 export { PROD_RELAY_URL, relayUrlFor } from './relay-url';
 export { LAND_MAX_MS, LAND_SETTLE_MS, createLiveStreamClient, openLiveStreamLane } from './live-stream';
 export type { LiveChannel, LiveClientDeps, OpenLiveChannel, StreamDb, StreamEnv, StreamEvent } from './live-stream';

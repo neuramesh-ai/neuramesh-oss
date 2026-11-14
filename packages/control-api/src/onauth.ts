@@ -5,6 +5,7 @@
 //
 // Fire-and-forget from the caller's point of view: a mail outage must never fail a sign-in.
 import { FREE_SEAT_CAP, TRIAL_LABEL, renderJoined, renderWelcome } from '@neuramesh/shared';
+import { emailSelfAsserted } from './email-proof';
 import { ensureFirstWorkspace } from './first-workspace';
 import { HQ_URL, sendEmail, unsubscribeUrl } from './mail';
 import type { Store } from './store';
@@ -33,7 +34,8 @@ export interface AuthArrival {
 export async function onAuthArrival(store: Store, a: AuthArrival): Promise<{ pending: string[] }> {
   const pending: string[] = [];
   try {
-    if (a.email && a.emailVerified) {
+    // an address only the in-app sign-up asserted is no proof, whatever Clerk says (email-proof.ts, R10 NM-010)
+    if (a.email && a.emailVerified && !(await emailSelfAsserted(store, a.userId))) {
       for (const inv of await store.pendingInvitesForEmail(a.email)) {
         pending.push(inv.workspaceId);
         console.log(`invite_pending user=${a.userId} workspace=${inv.workspaceId} role=${inv.role}`);

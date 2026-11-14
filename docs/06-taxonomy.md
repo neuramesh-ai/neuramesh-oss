@@ -35,7 +35,7 @@ Each row: a one-line definition, its scope and key relations, and **what enforce
 
 | Concept | One line | Scope / key relations | Enforced by |
 |---|---|---|---|
-| **Workspace** | The tenant — one team or org. | Top-level; contains everything. The RLS + sync boundary. | `workspaces`; `nm_is_member`; PowerSync rules |
+| **Workspace** | The tenant — one team or org. | Top-level; contains everything. The RLS + sync boundary. | `workspaces`; `nm_is_member`; authenticated API replica scope |
 | **Member** (human) | A person in the workspace. | Roles `owner` / `admin` / `member`; `channel_members` grants room access. | `workspace_members`, RLS |
 | **Machine** | A developer's computer running the daemon. | Workspace-scoped; owns local agents; outbound-only. | `machines`; [05 §5.4](05-engineering-philosophy.md) |
 | **Channel** | A **room**: chat + the **access boundary**. | Belongs to one project (`channels.project_id`, 1:N); `agent_channels` + `channel_members` gate who sees/works in it. | `channels`; channel registration |

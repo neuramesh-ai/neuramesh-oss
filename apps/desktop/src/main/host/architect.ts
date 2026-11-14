@@ -1,3 +1,5 @@
+import { runTaskCoding } from './coding-task-run';
+import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 // The architect's own flow — drafting an implementation plan. Split out of host/planflow.ts.
 import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import { openPlanningWorkspace, resolveToken, runtimeFor } from '../agents';
@@ -19,6 +21,8 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 
 export function makeArchitect(ctx: HostCtx & {
+  engineering?: () => import('../relay/engineering-host').EngineeringMachineHost;
+  repoCred: import('./repocred').RepoCred;
   db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
@@ -71,7 +75,7 @@ const {
 
 async function architectFlow(arch: HostedAgent, t: PlanTask) {
   arch = await seatFor(arch, t.channel_id, { taskId: t.id }); // per-project + per-thread brains (docs/10)
-  const actor = { kind: 'agent', id: arch.id, role: 'architect' };
+  const actor = { kind: 'agent', id: arch.id, role: arch.role };
   const beats = beatCursor(actor, t.id); // inert until declare(); the catch can fail() it safely
   let chRef: { id: string; slug: string; workspace_id: string } | undefined; // hold the channel so the catch can surface a failed plan to it
   let plog: LogFn | undefined; // the plan run's log sink, hoisted so a failure lands in the same run
@@ -79,6 +83,29 @@ async function architectFlow(arch: HostedAgent, t: PlanTask) {
   try {
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     chRef = ch;
+    const coding = await db.getAll("select id from threads where task_id=? and kind='coding'", [t.id]);
+    if (coding.length) {
+      // The same developer and native conversation own both revision and implementation.
+      setStatus(arch, 'thinking');
+      const log = arun(arch, t, ch.slug).log; plog = log;
+      const study = await openPlanningWorkspace(db, t, log, ctx.repoCred, t.channel_id);
+      cleanupStudy = study.cleanup;
+      if (!study.dir || !study.repoBacked) throw new Error('The repository could not be opened for plan revision. Reconnect its repository before retrying.');
+      const feedback = await db.getAll<{body:string}>("select body from messages where task_id=? and author_kind='human' order by created_at desc limit 4", [t.id]);
+      const prior = await db.get<ArtifactContentRow>("select id,workspace_id,storage_path,content_hash,inline_content from artifacts where task_id=? and name like 'implementation-plan%' order by created_at desc limit 1", [t.id]).catch(() => null);
+      const context = [`Current plan:\n${await readArtifactText(db, prior)}`, `Requirements: ${t.requirements ?? ''}`, `Review feedback:\n${feedback.reverse().map(f=>f.body).join('\n')}`, study.note].join('\n\n');
+      await post('/v1/messages', actor, {workspace:ch.workspace_id,channel:ch.id,taskId:t.id,body:`I'm revising the implementation plan with your feedback. I remain responsible for this task; the revised plan will return here for approval.`});
+      const run = await runTaskCoding({db,engineering:ctx.engineering,task:{...t,branch:null},agent:arch,dir:study.dir,context,log,mode:'plan'});
+      if (!run) throw new Error('The coding task conversation is unavailable.');
+      const response = await post('/v1/commands', actor, {type:'task.propose_plan',taskId:t.id,plan:run.note});
+      if (!response.ok) throw new Error(`Could not save the revised plan: ${response.status} ${await response.text()}`);
+      const dod = extractDefinitionOfDone(run.note);
+      if (dod) {
+        const saved = await post('/v1/commands', actor, {type:'task.set_definition_of_done',taskId:t.id,dod});
+        if (!saved.ok) throw new Error(`Could not save the revised Definition of Done: ${saved.status} ${await saved.text()}`);
+      }
+      return;
+    }
     let cred = await resolveToken(apiUrl, ch.workspace_id, arch, ownerActorId);
     // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit plans on the
     // Starter brain; a human's gets the reason and the card, and the unit blocks until they act.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { heartbeatBody, imageShaOf, readConfig } from './machined-config';
+import { cloudRunConfigOf, heartbeatBody, imageShaOf, readConfig, substrateOf } from './machined-config';
 
 const full = {
   NM_MACHINE_TOKEN: 'nmm_abc',
@@ -40,12 +40,39 @@ test('imageShaOf: the image names its commit, and only a full commit sha counts'
   assert.equal(imageShaOf({ NM_IMAGE_SHA: 'latest' }), null);
 });
 
-test('heartbeatBody: the beat carries the image sha as daemonVersion, and a beat with none keeps its old shape', () => {
+test('heartbeatBody: the beat carries the image sha as daemonVersion, and always declares its permission support', () => {
   assert.deepEqual(heartbeatBody('m1', { activeSeconds: 5, busy: true, runtimes: ['claude-code'], imageSha: SHA }), {
-    type: 'machine.heartbeat', machineId: 'm1', activeSeconds: 5, busy: true, runtimes: ['claude-code'], daemonVersion: SHA,
+    type: 'machine.heartbeat', permissionVersion: 1, machineId: 'm1', activeSeconds: 5, busy: true, runtimes: ['claude-code'], daemonVersion: SHA,
   });
-  // an unnamed build sends exactly what every machine sent before, so the API sees no new field
+  // An unnamed build can still enforce permissions.
   assert.deepEqual(heartbeatBody('m1', { activeSeconds: 0, busy: false, imageSha: null }), {
-    type: 'machine.heartbeat', machineId: 'm1', activeSeconds: 0, busy: false,
+    type: 'machine.heartbeat', permissionVersion: 1, machineId: 'm1', activeSeconds: 0, busy: false,
   });
+});
+
+test('substrateOf: unset is the default machine, cloudrun is opt-in, anything else stops the boot', () => {
+  assert.equal(substrateOf({}), 'default');
+  assert.equal(substrateOf({ NM_SUBSTRATE: '' }), 'default');
+  assert.equal(substrateOf({ NM_SUBSTRATE: 'cloudrun' }), 'cloudrun');
+  assert.throws(() => substrateOf({ NM_SUBSTRATE: 'lambda' }), /not a substrate/);
+});
+
+test('cloudRunConfigOf: the brain lives in the work dir, the secrets outside it', () => {
+  const cr = cloudRunConfigOf({});
+  assert.equal(cr.root, '/nm');
+  assert.equal(cr.workDir, '/nm/work');
+  assert.equal(cr.brainDir, '/nm/work/brain');
+  assert.equal(cr.secretsDir, '/nm/secrets');
+  assert.equal(cr.guardPct, 90);
+  assert.equal(cr.graceMs, 60_000);
+  assert.equal(cr.zstdLevel, 3);
+  assert.equal(cloudRunConfigOf({ NM_BRAIN: '/nm/work/b' }).brainDir, '/nm/work/b');
+  assert.throws(() => cloudRunConfigOf({ NM_BRAIN: '/nm/state/brain' }), /outside \/nm\/work/);
+  assert.throws(() => cloudRunConfigOf({ NM_BRAIN: '/nm/workshop' }), /outside/);
+  assert.throws(() => cloudRunConfigOf({ NM_CLOUDRUN_SECRETS: '/nm/work/secrets' }), /inside/);
+  assert.throws(() => cloudRunConfigOf({ NM_CLOUDRUN_WORK: 'a/b' }), /one directory/);
+  assert.throws(() => cloudRunConfigOf({ NM_OOM_GUARD_PCT: '120' }), /NM_OOM_GUARD_PCT/);
+  // grace plus snapshot must stay under the 180 s stop drain
+  assert.equal(cloudRunConfigOf({ NM_DRAIN_GRACE_MS: '120000' }).graceMs, 120_000);
+  assert.throws(() => cloudRunConfigOf({ NM_DRAIN_GRACE_MS: '120001' }), /NM_DRAIN_GRACE_MS/);
 });

@@ -315,3 +315,32 @@ test('a refusal that repeats the last warning adds no second row', () => {
   const waits = applyRemoteEngineeringEvent(applyRemoteEngineeringEvent(createEngineeringSession(repo), github), github);
   assert.equal(waits.messages.filter(isEngineeringGitHubWait).length, 1);
 });
+
+
+test('task attachment restores a live approval only for the same conversation and repository', () => {
+  const client = {...createEngineeringSession(repo), id:'task-thread', machineId:'client-machine', project:{id:'project',name:'Project',slug:'project'}};
+  const host = applyRemoteEngineeringEvent({...client, machineId:undefined, project:undefined}, {
+    type:'approval', approvalId:'edit-1', category:'edit', toolName:'apply_patch', input:{},
+  });
+  const restored = applyRemoteEngineeringEvent(client, {type:'task_state',session:host});
+  assert.equal(restored.pendingApproval?.id,'edit-1');
+  assert.equal(restored.machineId,client.machineId);
+  assert.deepEqual(restored.project,client.project);
+  assert.equal(applyRemoteEngineeringEvent(client,{type:'task_state',session:{...host,id:'other-thread'}}),client);
+  assert.equal(applyRemoteEngineeringEvent(client,{type:'task_state',session:{...host,repo:{...repo,id:'other-repo'}}}),client);
+});
+
+test('a Cloud Run machine\'s dependency install shows as its own activity and its end clears only that activity', async () => {
+  const { engineeringActivePresentation } = await import('../src/engineering/activity');
+  let session = applyRemoteEngineeringEvent(createEngineeringSession(repo), { type: 'status', status: 'installing_dependencies' });
+  assert.equal(session.state, 'streaming');
+  assert.equal(session.activeActivity?.phase, 'installing');
+  assert.equal(engineeringActivePresentation(session.activeActivity, session.mode).title, 'Installing dependencies');
+  session = applyRemoteEngineeringEvent(session, { type: 'status', status: 'dependencies_ready' });
+  assert.equal(session.state, 'idle');
+  assert.equal(session.activeActivity, null);
+  // a turn that runs is never stopped by a late end of the install
+  const running = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Fix the callback');
+  const after = applyRemoteEngineeringEvent(running, { type: 'status', status: 'dependencies_ready' });
+  assert.deepEqual([after.state, after.activeActivity?.phase], ['streaming', 'thinking']);
+});

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { STARTER_MODEL } from '@neuramesh/shared';
 import type { HostedAgent } from '../agents';
-import { configureStarterFallback, fallbackText, offerCard, owningThread, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { configureStarterFallback, conversationOrigin, fallbackText, offerCard, owningThread, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 
 const rex: HostedAgent = { id: 'a-rex', name: 'rex', role: 'orchestrator', model: 'gpt-5.6-sol', runtime: 'codex', modelSource: 'manual', channels: new Set() };
 const expired = { kind: 'login', provider: 'openai', reason: 'expired' } as const;
@@ -21,9 +21,9 @@ test('the reason is said plainly, and the text names what happens next', () => {
   assert.equal(whyUnavailable(expired, 'codex'), 'The OpenAI / Codex login on this machine expired.');
   assert.equal(whyUnavailable({ kind: 'nocompute', provider: 'anthropic', reason: null, cloudLacksLogin: true }, 'claude-code'), 'No machine available to me can serve Claude. Your cloud machine has no Claude login either.');
   assert.equal(whyUnavailable({ kind: 'capped', model: 'gpt-5.6-sol' }, 'codex'), 'The usage limit on gpt-5.6-sol is reached.');
-  assert.match(fallbackText(rex, expired, 'auto'), /^@rex cannot run on OpenAI \/ Codex here\. The OpenAI \/ Codex login on this machine expired\. This routine continues on the NeuraMesh brain, on credits\./);
-  assert.match(fallbackText(rex, expired, 'offer'), /Sign in to OpenAI \/ Codex again on this machine, or run this conversation on the NeuraMesh brain, on credits\.$/);
-  assert.match(fallbackText(rex, expired, 'nocredits'), /out of credits/);
+  assert.match(fallbackText(rex, expired, 'auto'), /^@rex: Routine continuing on NeuraMesh brain\. Codex login expired on this machine\./);
+  assert.match(fallbackText(rex, expired, 'offer'), /Use NeuraMesh brain on credits, or reconnect the provider on a machine you own and run it there\.$/);
+  assert.match(fallbackText(rex, expired, 'nocredits'), /NeuraMesh credits are unavailable/);
   for (const t of [fallbackText(rex, expired, 'auto'), fallbackText(rex, expired, 'offer')]) assert.doesNotMatch(t, /—|;/, 'STE: no em dash, no semicolon');
 });
 
@@ -31,7 +31,7 @@ test('the offer card carries the reason, the scope the button switches, and whet
   const body = offerCard(rex, expired, { threadId: 't1' }, true, 42);
   const json = JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(body)![1]!);
   assert.deepEqual(json, { provider: 'openai', reason: 'expired', agent: 'rex', taskNumber: 42, why: 'The OpenAI / Codex login on this machine expired.', starter: true, scope: { threadId: 't1', role: 'orchestrator' } });
-  assert.ok(body.startsWith('@rex cannot run on OpenAI / Codex here.'));
+  assert.ok(body.startsWith('@rex: Reply could not run.'));
   assert.equal(JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(offerCard(rex, expired, null, false))![1]!).scope, undefined);
 });
 
@@ -81,7 +81,7 @@ test('a ROUTINE conversation re-seats the failing role by itself: the override i
   // NOT a reply to the trigger: the turn continues, and its real answer replies to that trigger
   // next — a reason holding the one-reply-per-trigger slot had that answer refused as a duplicate
   assert.equal(said?.body.replyTo, undefined);
-  assert.match(said?.body.body, /This routine continues on the NeuraMesh brain/);
+  assert.match(said?.body.body, /Routine continuing on NeuraMesh brain/);
   // the auto path posts a card too, marked as the switch it already made: the docked notice reads
   // it (no button to click, no decision row — the server skips a switched card)
   const rec = JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(said?.body.body)![1]!);
@@ -113,7 +113,7 @@ test('on a CLOUD machine a human conversation moves by itself too: the NeuraMesh
     assert.deepEqual(setBrain?.body, { type: 'thread.set_brain', workspace: 'ws', threadId: 't-web', override: { orchestrator: STARTER_MODEL } });
     assert.equal(setBrain?.actor?.kind, 'human', 'the owner\'s word, as for a routine');
     const said = calls.find((c) => c.url.endsWith('/v1/messages'));
-    assert.match(said?.body.body, /This conversation continues on the NeuraMesh brain, on credits/);
+    assert.match(said?.body.body, /Reply continuing on NeuraMesh brain/);
     assert.doesNotMatch(said?.body.body, /routine/);
     assert.equal(said?.body.replyTo, undefined, 'the turn continues: its real answer replies to the trigger');
     assert.equal(JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(said?.body.body)![1]!).switched, true);
@@ -122,7 +122,7 @@ test('on a CLOUD machine a human conversation moves by itself too: the NeuraMesh
     rows['thread:t-web2'] = { id: 't-web2', schedule_id: null, brain_override: null };
     assert.equal(await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-web2', replyTo: 'm4' }), null);
     assert.ok(!calls.some((c) => c.url.endsWith('/v1/commands')));
-    assert.match(calls.find((c) => c.url.endsWith('/v1/messages'))?.body.body, /out of credits/);
+    assert.match(calls.find((c) => c.url.endsWith('/v1/messages'))?.body.body, /NeuraMesh credits are unavailable/);
   } finally { if (kind === undefined) delete process.env['NM_MACHINE_KIND']; else process.env['NM_MACHINE_KIND'] = kind; }
 });
 
@@ -143,7 +143,7 @@ test('out of credits: no move on either path, and the card offers no switch', as
   assert.equal(await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine' }), null);
   assert.ok(!calls.some((c) => c.url.endsWith('/v1/commands')));
   const said = calls.find((c) => c.url.endsWith('/v1/messages'));
-  assert.match(said?.body.body, /out of credits/);
+  assert.match(said?.body.body, /NeuraMesh credits are unavailable/);
   assert.equal(JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(said?.body.body)![1]!).starter, false);
 });
 
@@ -176,7 +176,7 @@ test('the next run of a routine is a new trigger: inside the memo window it read
   const again = await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine', replyTo: 'opener-2' });
   assert.equal(again?.model, STARTER_MODEL);
   assert.ok(calls.some((c, i) => i >= posted && c.body?.type === 'thread.set_brain'), 'the switch is written again');
-  assert.ok(calls.some((c, i) => i >= posted && typeof c.body?.body === 'string' && c.body.body.includes('continues on the NeuraMesh brain')), 'and said again');
+  assert.ok(calls.some((c, i) => i >= posted && typeof c.body?.body === 'string' && c.body.body.includes('Routine continuing on NeuraMesh brain')), 'and said again');
 });
 
 test('already moved by an earlier pass: the seat is taken silently, nothing is posted twice', async () => {
@@ -192,7 +192,7 @@ test('a CAP in a routine conversation is re-asked by the OWNER, mentioning the a
   assert.equal(next?.model, STARTER_MODEL);
   const said = calls.find((c) => c.url.endsWith('/v1/messages'));
   assert.equal(said?.body.threadId, 't-routine');
-  assert.match(said?.body.body, /^@rex cannot run on OpenAI \/ Codex here\. The usage limit on gpt-5\.6-sol is reached\. This routine continues on the NeuraMesh brain/);
+  assert.match(said?.body.body, /^@rex: Routine continuing on NeuraMesh brain\. The usage limit on gpt-5\.6-sol is reached\./);
   assert.equal(said?.actor?.kind, 'human', 'the OWNER speaks, so the message is a fresh human trigger');
   assert.match(said?.body.body, /@rex/, 'and it mentions the agent, which routes the wake to him');
 });
@@ -218,4 +218,15 @@ test('unconfigured (a test host, a build that never booted the lane): the door i
   configureStarterFallback(null);
   assert.equal(await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't' }), null);
   assert.equal(calls.length, 0);
+});
+
+
+test('agent-authored coding handoffs retain their authenticated human owner', async () => {
+  rows['own:task'] = { id: 'coding', schedule_id: null, brain_override: null };
+  rows['root:coding'] = { created_by: 'human:george', author_kind: 'agent', author_id: 'patch' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), 'george');
+  rows['root:coding'] = { author_kind: 'human', author_id: 'legacy-human' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), 'legacy-human');
+  rows['root:coding'] = { created_by: 'agent:patch', author_kind: 'agent', author_id: 'patch' };
+  assert.equal(await conversationOrigin({ taskId: 'task' }), null);
 });

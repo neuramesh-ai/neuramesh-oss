@@ -22,3 +22,11 @@ test('a turn the wall gave up on cannot open its bubble again: the stream ends o
   assert.deepEqual(sent, [['', false, undefined], ['', false, 'reading the board'], ['', true, undefined], ['', true, undefined]]);
   assert.equal(streams.stats().keys, 0, 'no key stays open on the machine, so no `live` list carries it');
 });
+
+test('private Marketing replies never enter the workspace-wide live stream', async()=>{
+ const {agentDataIdentity}=await import('./agent-data-context');
+ const sent:string[]=[];
+ const emit=agentDataIdentity.run({workspace:'w',agentId:'a',apiUrl:'http://localhost',privateDestination:'marketing'},()=>openStream(text=>sent.push(text)));
+ emit('Private draft',false,'Private thinking');emit('',true);
+ assert.deepEqual(sent,[],'the emitter stays private after its creating context returns');
+});

@@ -120,9 +120,8 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
     expect(removed!.changes.find(c => c.table === 'project_agents' && c.id === member!['id'])?.row).toBeNull();
   });
 
-  it('binds a repeatable snapshot to its cursor and never skips an uncommitted earlier revision', async () => {
+  it('binds a repeatable snapshot to its cursor and never skips an uncommitted earlier writer', async () => {
     const sql = store!.sql;
-    const initial = await localBootstrap(sql, actor);
     const channels = await sql<{ id: string }[]>`select id from channels where workspace_id=${ws} order by id limit 2`;
     let written!: () => void;
     let release!: () => void;
@@ -132,16 +131,14 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
     const hold = new Promise<void>((r) => { release = r; });
     const first = sql.begin(async (tx) => { await tx`update channels set topic=${markerA} where id=${channels[0]!.id}`; written(); await hold; });
     await wrote;
-    let secondCommitted = false;
-    const second = sql.begin(async (tx) => { await tx`update channels set topic=${markerB} where id=${channels[1]!.id}`; }).then(() => { secondCommitted = true; });
+    // 0159: the revision is taken at COMMIT, so a second writer of the workspace no longer waits for an open one
+    await sql.begin(async (tx) => { await tx`update channels set topic=${markerB} where id=${channels[1]!.id}`; });
     const during = await localBootstrap(sql, actor).finally(() => release());
-    const prematureCommit = secondCommitted;
-    await Promise.all([first, second]);
-    expect(decodeLocalCursor(during.cursor)?.revision).toBe(decodeLocalCursor(initial.cursor)?.revision);
+    await first;
     expect(during.changes.find((c) => c.table === 'channels' && c.id === channels[0]!.id)?.row?.['topic']).not.toBe(markerA);
-    expect(prematureCommit).toBe(false);
+    expect(during.changes.find((c) => c.table === 'channels' && c.id === channels[1]!.id)?.row?.['topic']).toBe(markerB);
     const delta = await localChanges(sql, actor, decodeLocalCursor(during.cursor)!);
-    expect(delta!.changes.filter((c) => c.table === 'channels').map((c) => c.row?.['topic'])).toEqual([markerA, markerB]);
+    expect(delta!.changes.filter((c) => c.table === 'channels').map((c) => c.row?.['topic'])).toEqual([markerA]);
   });
 
   it('keeps a transaction intact even with a one-row page and records real tombstones', async () => {
@@ -218,8 +215,8 @@ describe.skipIf(!url)('local replica protocol on real Postgres', { timeout: 30_0
     const sql = store!.sql;
     const before = await localBootstrap(sql, actor);
     const cursor = decodeLocalCursor(before.cursor)!;
-    await sql`update local_sync_state set retained_after=revision where singleton`;
-    expect(await localChanges(sql, actor, { ...cursor, revision: '0' })).toBeNull();
+    await sql`update sync_heads set retained_after=revision where workspace_id=${ws}`;
+    expect(await localChanges(sql, actor, { ...cursor, revisions: cursor.revisions.map(() => '0') })).toBeNull();
     await sql`delete from workspace_members where workspace_id=${ws} and user_id=${actor.id}`;
     expect(await localChanges(sql, actor, cursor)).toBeNull();
     const reset = await localBootstrap(sql, actor);

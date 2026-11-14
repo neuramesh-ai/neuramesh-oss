@@ -55,10 +55,14 @@ async function routineThread(): Promise<string> {
 
 beforeEach(async () => {
   store = new MemoryStore();
+  // These routine fixtures configure Marketing as the workspace owner.
+  store.destinations.directory = async workspace => workspace === 'ws_acme' ? [{id:george.id,kind:'human',name:'George',role:'owner',description:null,owner:true}] : [];
   app = createApp(store);
   // the room's crew — offers resolve by name, claims need a registered seat
   await cmd(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'plume', role: 'marketer', channels: ['dev'] });
   await cmd(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'scout', role: 'reviewer', channels: ['dev'] });
+  plume.id = await store.resolveOffer('ws_acme', 'dev', 'plume');
+  scout.id = await store.resolveOffer('ws_acme', 'dev', 'scout');
 });
 
 describe('a routine-born unit is hands-off end to end', () => {

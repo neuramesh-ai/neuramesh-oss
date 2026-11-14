@@ -20,8 +20,13 @@ export function chromiumBin(env: NodeJS.ProcessEnv = process.env): string | null
 
 export interface LaunchOpts { bin: string; profileDir: string; proxyPort: number; width: number; height: number }
 
+/** where the proxy listens, and whether loopback skips it. The defaults are the supervisor's browser.
+ *  The box's browser (cloudrun/box-browser.ts) reaches the proxy on the veth IP, and its loopback is
+ *  the box's own dev servers, so loopback goes direct there */
+export interface ProxyRoute { proxyHost?: string; loopbackDirect?: boolean; direct?: boolean }
+
 /** the flags, as a pure list so a test can read every one */
-export function chromiumArgs(o: Omit<LaunchOpts, 'bin'>): string[] {
+export function chromiumArgs(o: Omit<LaunchOpts, 'bin'> & ProxyRoute): string[] {
   return [
     // the image runs as root under gVisor, where Chromium's own sandbox cannot start (it needs user
     // namespaces). the pod and gVisor are the boundary, as they are for the agents' shells
@@ -33,8 +38,11 @@ export function chromiumArgs(o: Omit<LaunchOpts, 'bin'>): string[] {
     '--remote-debugging-pipe',
     `--user-data-dir=${o.profileDir}`,
     // every connection leaves through the egress proxy, loopback too (<-loopback drops Chromium's
-    // own bypass for it), and no UDP leaves at all: QUIC and WebRTC would go around the proxy
-    `--proxy-server=http://127.0.0.1:${o.proxyPort}`, '--proxy-bypass-list=<-loopback>', '--disable-quic',
+    // own bypass for it), and no UDP leaves at all: QUIC and WebRTC would go around the proxy.
+    // In the box, loopback keeps Chromium's own bypass: 127.0.0.1 there is the box, never this host
+    // `direct` (the box's browser): no proxy at all, because the box reaches the supervisor at no port
+    // (measured 2026-11-02) and its own egress already reaches nothing but the public internet
+    ...(o.direct ? [] : [`--proxy-server=http://${o.proxyHost ?? '127.0.0.1'}:${o.proxyPort}`, ...(o.loopbackDirect ? [] : ['--proxy-bypass-list=<-loopback>'])]), '--disable-quic',
     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
     `--window-size=${o.width},${o.height}`,
     '--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-component-update',

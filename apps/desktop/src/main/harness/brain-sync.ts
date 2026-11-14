@@ -6,7 +6,7 @@ import type { BrainCommitRequest, BrainCommitResult, BrainConversationEvent, Bra
 import { brainRoot } from './brain';
 import { durableAppend, durableWrite, packEvent, packRuntime, portableBrainValue, readJSON, unpackEvent, unpackRuntime } from './brain-sync-codec';
 export { portableBrainValue } from './brain-sync-codec';
-export { bindConversationCallback, captureConversationRecorder, conversationContext, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
+export { bindConversationCallback, captureConversationRecorder, conversationContext, conversationToolsThrough, setConversationHistoryBoundary, withoutConversationBrain, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
 
 export interface BrainSyncOptions {
   workspace: string;
@@ -18,6 +18,10 @@ export interface BrainSyncOptions {
   deviceId?: string;
   fetchImpl?: typeof fetch;
   intervalMs?: number;
+  /** round 9 live narration: upload a progress event (PROGRESS_EVENTS) after this many ms instead of
+   *  intervalMs, so the activity row shows the agent's plan and tool steps within a beat. Unset keeps
+   *  the plain interval (Code sessions and tests) */
+  progressFlushMs?: number;
   log?: (line: string) => void;
   headersForActor?: (actor: { kind: string; id: string; role?: string }) => Promise<Record<string, string>>;
 }
@@ -25,6 +29,16 @@ export interface BrainSyncOptions {
 interface LocalState { revision: number; acknowledged: number; runtimeHash?: string }
 interface RuntimeState { messages?: unknown[]; metadata?: Record<string, unknown> }
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
+/** the events a person watches arrive: a turn opening, its narration and its tool steps */
+export const PROGRESS_EVENTS: ReadonlySet<string> = new Set(['turn.open', 'assistant.message', 'tool.call', 'tool.result']);
+/** Every open brain in this process, so a Cloud Run drain can flush each outbox before its snapshot
+ *  (cloudrun/lifecycle.ts). The agent host and Code sessions each keep their brains private. */
+const liveBrains = new Set<ConversationBrain>();
+export async function flushConversationBrains(): Promise<{ flushed: number; failed: number }> {
+  const results = await Promise.allSettled([...liveBrains].map((brain) => brain.flush()));
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  return { flushed: results.length - failed, failed };
+}
 /** An append-only fsynced journal plus an idempotent durable cloud outbox. */
 export class ConversationBrain {
   readonly path: string;
@@ -34,6 +48,8 @@ export class ConversationBrain {
   private eventIds: Set<string>;
   private readonly secrets = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** when the armed timer fires (ms since epoch): a sooner upload may replace a later one */
+  private timerDue = 0;
   private flushing: Promise<void> | null = null;
   private closed = false;
   private runtimeDirty = false;
@@ -57,6 +73,7 @@ export class ConversationBrain {
     this.eventIds = new Set(this.journal.map((event) => event.id));
     if (this.state.acknowledged > this.journal.length) throw new Error('The local brain checkpoint is incomplete. Restore the thread before its next turn.');
     if (this.pending() || this.runtimeDirty || existsSync(join(this.path, 'pending.json')) || existsSync(join(this.path, 'uploads'))) this.schedule();
+    liveBrains.add(this);
   }
 
   private recover(): BrainConversationEvent[] {
@@ -94,7 +111,7 @@ export class ConversationBrain {
     durableAppend(join(this.path, 'events.jsonl'), JSON.stringify(event) + '\n');
     this.journal.push(event);
     this.eventIds.add(event.id);
-    this.schedule();
+    this.schedule(PROGRESS_EVENTS.has(type) ? this.options.progressFlushMs : undefined);
   }
 
   setRuntime(messages: unknown[], metadata?: Record<string, unknown>): void {
@@ -116,7 +133,7 @@ export class ConversationBrain {
     const dir = join(this.path, 'uploads');
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const request = { workspace: this.options.workspace, threadId: this.options.threadId, id, name: body['name'], mime: data?.[1] ?? body['mime'] ?? 'text/plain', contentBase64: bytes.toString('base64'), sha256,
-      ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
+      ...(body['capture'] ? { capture: body['capture'] } : {}), ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
     durableWrite(join(dir, `${digest(id)}.json`), JSON.stringify({ actor, request }));
     this.schedule();
     await this.flushArtifacts();
@@ -174,9 +191,14 @@ export class ConversationBrain {
     durableWrite(join(this.path, 'state.json'), JSON.stringify(this.state));
   }
 
-  private schedule(): void {
-    if (this.closed || this.timer) return;
-    this.timer = setTimeout(() => { this.timer = null; void this.flush().catch((error: unknown) => { this.options.log?.(`brain_sync_pending: ${error instanceof Error ? error.message : 'upload failed'}`); this.schedule(); }); }, this.options.intervalMs ?? 5_000);
+  private schedule(soonMs?: number): void {
+    if (this.closed) return;
+    const delay = Math.min(soonMs ?? Infinity, this.options.intervalMs ?? 5_000);
+    const due = Date.now() + delay;
+    // an armed timer stands unless this upload must go sooner (a progress event behind a plain one)
+    if (this.timer) { if (this.timerDue <= due) return; clearTimeout(this.timer); }
+    this.timerDue = due;
+    this.timer = setTimeout(() => { this.timer = null; void this.flush().catch((error: unknown) => { this.options.log?.(`brain_sync_pending: ${error instanceof Error ? error.message : 'upload failed'}`); this.schedule(); }); }, delay);
     this.timer.unref?.();
   }
 
@@ -238,6 +260,6 @@ export class ConversationBrain {
   }
 
   async close(): Promise<void> {
-    try { await this.flush(); } finally { this.closed = true; if (this.timer) clearTimeout(this.timer); }
+    try { await this.flush(); } finally { this.closed = true; if (this.timer) clearTimeout(this.timer); liveBrains.delete(this); }
   }
 }

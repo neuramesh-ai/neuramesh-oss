@@ -1,0 +1,39 @@
+# agy in the agent box (scripts/e2e-cloudrun/agy-box.mjs): its version and flags, its MCP config naming the nm bus
+# shim, and a headless BYOK turn with the evals Gemini key. Wakes the machine as its owner and parks it.
+#
+#   gcloud builds submit . --project=galonge-sandbox-04 --region=us-east4 --config=scripts/e2e-cloudrun/cloudbuild-agy-box.yaml \
+#     "--substitutions=^;^_USER_ID=<owner>;_WORKSPACE_ID=<ws>;_MACHINE_ID=<machine>" \
+#     --service-account=projects/galonge-sandbox-04/serviceAccounts/nm-e2e-builder@galonge-sandbox-04.iam.gserviceaccount.com \
+#     --gcs-source-staging-dir=gs://galonge-sandbox-04-nm-e2e-source/staging
+steps:
+  - id: agy
+    name: node:24-bookworm
+    entrypoint: bash
+    secretEnv: ["FLEET_SECRET", "NM_ACTOR_SECRET", "NM_RELAY_TOKEN_KEY", "AGY_KEY"]
+    env:
+      - NM_API_URL=${_API_URL}
+      - NM_RELAY_URL=${_RELAY_URL}
+      - AGY_USER_ID=${_USER_ID}
+      - AGY_WORKSPACE_ID=${_WORKSPACE_ID}
+      - AGY_MACHINE_ID=${_MACHINE_ID}
+      - OUT=/workspace/agy-box
+    args: ["-c", "node --version && node scripts/e2e-cloudrun/agy-box.mjs"]
+availableSecrets:
+  secretManager:
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-fleet-secret/versions/latest
+      env: FLEET_SECRET
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-actor-secret/versions/latest
+      env: NM_ACTOR_SECRET
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-relay-token-key/versions/latest
+      env: NM_RELAY_TOKEN_KEY
+    - versionName: projects/${PROJECT_ID}/secrets/nm-e2e-evals-google-api-key/versions/latest
+      env: AGY_KEY
+substitutions:
+  _API_URL: https://nm-api-aqnc7mc2lq-uk.a.run.app
+  _RELAY_URL: wss://nm-e2e-relay-aqnc7mc2lq-uk.a.run.app,wss://nm-e2e-relay-1-aqnc7mc2lq-uk.a.run.app
+  _USER_ID: ""
+  _WORKSPACE_ID: ""
+  _MACHINE_ID: ""
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 900s

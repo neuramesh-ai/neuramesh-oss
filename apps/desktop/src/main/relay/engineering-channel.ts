@@ -1,18 +1,24 @@
+import { CodingFollowups } from './engineering-followups';
 import type { EngineeringDisplayTool } from './engineering-display';
 import { checkpointEngineering, shutdownEngineering } from './engineering-checkpoint';
-import { EngineeringPromptQueue, forwardEngineeringUsage } from './engineering-turn';
+import { EngineeringPromptQueue, forwardEngineeringUsage, currentCodingPlan } from './engineering-turn';
 import type { ClineCore, CoreSessionEvent, ToolExecutors } from '@cline/sdk';
 import { isEngineeringCommand, type EngineeringCommand, type EngineeringControls, type EngineeringMachineOpenMeta, type EngineeringRuntimeEvent } from '../../engineering-protocol';
-import { recoverEngineeringPlanProgress, recoverRecordedEngineeringPlan, engineeringEffort, type EngineeringAgent, type EngineeringSelection, type PolicyRule } from '@neuramesh/shared';
+import { engineeringEffort, type EngineeringAgent, type EngineeringSelection, type PolicyRule } from '@neuramesh/shared';
 import { requestEngineeringApproval } from './engineering-approvals';
 import { createEngineeringChangeRefresh } from './engineering-changes';
-import { projectEngineeringCoreEvent } from './engineering-events';
+import { forwardCodingEvent } from './engineering-events';
 import type { EngineeringProviderResolution } from './engineering-provider';
-import { engineeringRuntimeInput, readRuntimeMessages, restoreRuntimeCheckpoint } from './engineering-runtime-input';
+import { engineeringRuntimeInput, readRuntimeMessages } from './engineering-runtime-input';
+import { restoreEngineeringSession } from './engineering-restore';
 import { EngineeringAttachmentInbox } from './engineering-attachments';
-import { EngineeringAttachmentQueue } from './engineering-attachment-queue';
+import { EngineeringAttachmentQueue, queueEngineeringAttachment } from './engineering-attachment-queue';
 import type { EngineeringConversation } from './engineering-conversation';
 import { engineeringCoreOptions } from './engineering-core';
+import { previewEngineeringChanges } from './engineering-preview';
+import { parks, type Park, type ParkResolution } from '../cloudrun/parks';
+import { codeParkFor, codeParkResumePrompt, offeredApproval } from './engineering-park-resume';
+import { manualEngineeringCompact, portableEngineeringCompaction, restoreEngineeringHistory } from './engineering-compaction';
 
 export class ClineChannelSession {
   private controls: EngineeringControls; private provider: EngineeringProviderResolution;
@@ -21,10 +27,18 @@ export class ClineChannelSession {
   /** The native tool registry is built at session start, so a mode change resumes in a new session. */
   private sessionMode: EngineeringControls['mode'] | null = null;
   private resumeMessages: Awaited<ReturnType<ClineCore['readMessages']>> | undefined;
+  private compactionState: unknown;
   private closing: Promise<void> | null = null; private closed = false; private running = false; private readonly pending = new Map<string, (approved: boolean) => void>();
   private readonly retiredSessions = new Set<string>(); private readonly promptQueue = new EngineeringPromptQueue();
   private readonly attachments: EngineeringAttachmentInbox; private readonly attachmentQueue = new EngineeringAttachmentQueue();
   private readonly refreshChanges: () => void;
+  /** CLOUD RUN (engineering-park-resume.ts): open parks of this thread shown again as approval cards,
+   *  the parks a continuation turn already took, and what runs when that turn settles */
+  private readonly offers = new Map<string, Park>(); private readonly continued = new Set<string>();
+  private settleHooks: Array<() => void> = [];
+
+  private readonly followups = new CodingFollowups();
+  private liveCoreId?: string;
 
   constructor(
     private readonly meta: EngineeringMachineOpenMeta,
@@ -43,7 +57,8 @@ export class ClineChannelSession {
     private readonly setThreadTitle?: (title: string) => Promise<unknown>,
     /** why this machine refused the open model: nothing runs until a new pick replaces it (engineering-host.ts) */
     private refusal: string | null = null,
-    private readonly displayTools?: (agent?: EngineeringAgent) => EngineeringDisplayTool[],
+    private readonly displayTools?: (agent?: EngineeringAgent) => EngineeringDisplayTool[] | Promise<EngineeringDisplayTool[]>,
+    private readonly permissionGate?: import('../thread-permission-gate').ThreadPermissionGate,
   ) {
     this.provider = provider;
     this.modelId = modelId;
@@ -53,29 +68,36 @@ export class ClineChannelSession {
     this.refreshChanges = createEngineeringChangeRefresh(this.cwd, (changes) => this.emit({ type: 'changes', changes }),
       (error) => this.log(`engineering_diff_failed repo=${this.meta.repoId}: ${error instanceof Error ? error.message : String(error)}`));
   }
-  async init(messages?: Awaited<ReturnType<ClineCore['readMessages']>>): Promise<void> {
+  async init(messages?: Awaited<ReturnType<ClineCore['readMessages']>>, allowFollowups = true): Promise<void> {
     this.conversation?.excludeSecret(this.provider.apiKey);
-    this.resumeMessages = messages;
     this.core = await this.createRuntimeCore(this.provider);
-    const prior = (await this.core.listHistory({ limit: 200, includeManifestFallback: true })).find((record) =>
-      record.metadata?.['neurameshThreadId'] === this.meta.threadId
-      && record.metadata?.['repoId'] === this.meta.repoId
-      && record.metadata?.['actorId'] === this.meta.actorId);
-    if (!this.resumeMessages?.length && prior) this.resumeMessages = await this.core.readMessages(prior.sessionId).catch(() => undefined);
+    const restored = await restoreEngineeringHistory(this.core, this.meta, messages, this.conversation?.brain.metadata()?.['compactionState']);
+    if (allowFollowups) this.followups.listen(this.meta.threadId, {
+      core: () => this.closed ? null : this.core,
+      busy: () => this.busy, refuse: () => this.refusal, mode: () => this.controls.mode,
+      session: () => this.sessionId ?? this.liveCoreId ?? null,
+      resolveFiles: async refs => { await this.attachmentQueue.wait(); return this.attachments.resolve(refs); },
+      releaseFiles: refs => this.attachments.release(refs),
+      start: (prompt, attachments) => this.promptQueue.run(() => this.runPrompt({type:'prompt', prompt, attachments})),
+      interruptApproval: () => this.pending.forEach((_, approvalId) => this.command({type:'approval', approvalId, approved:false})),
+      received: (id, text, attachments, steer) => {
+        this.conversation?.record('user.message', {text, attachments, permissions:this.controls.permissions, ...this.runtimeMetadata(), followupId:id, delivery:steer ? 'steer' : 'queue'});
+        this.emit({type:'followup_received', id, text, attachments});
+      },
+    });
+    this.resumeMessages = restored.messages; this.compactionState = restored.state;
     this.emit({ type: 'plan_progress', progress: await this.readPlanProgress() });
     this.emit({ type: 'ready', provider: this.provider.providerId, model: this.provider.modelId, cwd: this.cwd, modelId: this.modelId, brainPack: this.brainPack, agent: this.provider.agent, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort), ...(this.conversation ? { recordedRevision: this.conversation.brain.revision() } : {}) }); if (this.refusal) this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal });
+    void this.offerParked().catch((error: unknown) => this.log(`engineering_park_offer_failed: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   private readPlanMessages = async (): Promise<unknown> => this.core && this.sessionId ? readRuntimeMessages(this.core, this.sessionId) : this.resumeMessages;
-  private readPlanProgress = async () => {
-    const messages = await this.readPlanMessages();
-    return this.conversation ? recoverRecordedEngineeringPlan({ events: [...this.conversation.brain.events()], runtimeMessages: Array.isArray(messages) ? messages : [], metadata: this.conversation.brain.metadata() }) : recoverEngineeringPlanProgress(messages);
-  };
+  private readPlanProgress = async () => currentCodingPlan(await this.readPlanMessages(), this.conversation);
 
   private async createRuntimeCore(provider: EngineeringProviderResolution): Promise<ClineCore> {
     const core = await this.createCore(engineeringCoreOptions(provider, this.meta.threadId,
       { ...(this.toolExecutors ? { toolExecutors: this.toolExecutors } : {}),
-        requestToolApproval: (request) => requestEngineeringApproval(request, this.controls, this.policyRules, this.pending, this.emit, (type, payload) => this.conversation?.record(type, payload), this.cwd, () => !this.closed) },
+        requestToolApproval: (request) => requestEngineeringApproval(request, this.controls, this.policyRules, this.pending, this.emit, (type, payload) => this.conversation?.record(type, payload), this.cwd, () => !this.closed, this.permissionGate, { threadId: this.meta.threadId, repoId: this.meta.repoId, actorId: this.meta.actorId, openMeta: { ...this.meta, mode: this.controls.mode, permissions: { ...this.controls.permissions } } }) },
       (type, payload) => this.conversation?.record(type, payload), this.log));
     core.subscribe((event) => { if (this.core === core) this.forward(event); });
     return core;
@@ -95,6 +117,8 @@ export class ClineChannelSession {
     if (value.type === 'model') { void this.switchModel(value.modelId, null).catch((error: unknown) => this.fail(error)); return; }
     if (value.type === 'brain') { void this.switchModel(null, value.brainPack).catch((error: unknown) => this.fail(error)); return; }
     if (value.type === 'approval') {
+      const offered = this.offers.get(value.approvalId);
+      if (offered) { this.offers.delete(value.approvalId); void this.answerOffered(offered, value.approvalId, value.approved).catch((error: unknown) => this.fail(error)); return; }
       const resolve = this.pending.get(value.approvalId);
       if (!resolve) return this.emit({ type: 'error', code: 'APPROVAL_GONE', recoverable: true, message: 'That approval is no longer pending.' });
       this.pending.delete(value.approvalId);
@@ -111,8 +135,82 @@ export class ClineChannelSession {
   }
 
   get busy(): boolean { return !this.closed && (this.running || this.pending.size > 0 || this.promptQueue.queued); }
+  /** a turn is running and waits on nobody: work for the activity meter. A turn held on an approval is
+   *  not, because on Cloud Run that approval is a durable park and must not keep the machine awake */
+  get working(): boolean { return !this.closed && (this.running || this.promptQueue.queued) && this.pending.size === 0; }
+
+  /** CLOUD RUN (engineering-park-resume.ts): a parked approval of this thread was answered, and this epoch
+   *  holds the claim. One continuation turn tells the model the outcome. An approval's re-issued call finds
+   *  the claim (engineering-approvals.ts) and runs without a second card. A denial is done at once. When
+   *  the turn settles the park is done, so no later epoch replays it. A close before that (a drain) leaves
+   *  the claim, and the next epoch claims it again. false = this session cannot take it now. */
+  continueParked(park: Park, onSettled?: () => void): boolean {
+    const reg = parks();
+    if (!reg || !park.resolution || this.closed || !this.core || this.busy) return false;
+    if (this.continued.has(park.id)) return true;
+    this.continued.add(park.id);
+    const resolution = park.resolution;
+    for (const [id, offered] of this.offers) {
+      if (offered.id !== park.id) continue;
+      this.offers.delete(id);
+      this.emit({ type: 'approval_resolved', approvalId: id, approved: resolution.approved });
+    }
+    const consume = (): void => { const held = reg.held(park.key); if (held) void reg.consume(held).catch(() => {}); };
+    if (!resolution.approved) consume();
+    this.conversation?.record('approval.parked_answer', { parkId: park.id, toolName: park.request['toolName'] ?? null, approved: resolution.approved, reason: resolution.reason ?? null });
+    this.settleHooks.push(() => { consume(); onSettled?.(); });
+    this.command({ type: 'prompt', prompt: codeParkResumePrompt(park) });
+    return true;
+  }
+
+  /** CLOUD RUN: an approval this thread parked (a closed tab, a drain) shows again as its card, so the
+   *  person can answer it in the tab. One at a time, the newest first. */
+  private async offerParked(): Promise<void> {
+    const reg = parks();
+    if (!reg || this.closed) return;
+    await reg.refreshOpen().catch(() => {});
+    const offeredIds = new Set([...this.offers.values()].map((p) => p.id));
+    const park = reg.openList().find((p) => codeParkFor(p, this.meta) && !this.continued.has(p.id) && !offeredIds.has(p.id));
+    if (!park || this.closed) return;
+    const card = offeredApproval(park);
+    const changes = card.category === 'edit' && card.input && typeof card.input === 'object'
+      ? await previewEngineeringChanges(this.cwd, card.toolName, card.input).catch(() => []) : [];
+    if (this.closed) return;
+    this.offers.set(card.approvalId, park);
+    this.emit({ type: 'approval', ...card, ...(changes.length ? { changes } : {}) });
+  }
+
+  /** the person answered an offered park in the tab: resolve it through the machine route (no wake, this
+   *  machine is awake), claim it for this epoch, and continue */
+  private async answerOffered(park: Park, approvalId: string, approved: boolean): Promise<void> {
+    const reg = parks();
+    if (!reg) return;
+    const resolution: ParkResolution = { answer: approved ? 'Approve' : 'Deny', approved, source: 'machine' };
+    this.conversation?.record('approval.resolved', { approvalId, approved, source: 'park', parkId: park.id });
+    this.emit({ type: 'approval_resolved', approvalId, approved });
+    // an answer that already came another way (POST /v1/parks/:id/resolve) wins: the claim below reads it
+    await reg.relay(park, resolution).catch(() => {});
+    const prior = await reg.prior(park.key);
+    if (!prior || !('resolution' in prior)) {
+      this.emit({ type: 'error', code: 'APPROVAL_GONE', recoverable: true, message: 'That approval was already settled.' });
+      return;
+    }
+    const claimed = prior.park;
+    if (!this.continueParked(claimed)) {
+      // a turn the person started meanwhile: the answer is claimed, and it continues once that turn settles
+      this.settleHooks.push(() => { const t = setTimeout(() => { this.continueParked(claimed); }, 0); t.unref?.(); });
+      this.emit({ type: 'error', code: 'TURN_RUNNING', recoverable: true, message: 'The answer is saved. It applies when the current turn finishes.' });
+    }
+    void this.offerParked().catch(() => {});
+  }
+
+  /** the turn a continuation started has settled (or failed): its hooks run once */
+  private settle(): void { for (const hook of this.settleHooks.splice(0)) { try { hook(); } catch { /* a hook never breaks the session */ } } }
+
   close(keepJournal = false): Promise<void> {
-    if (this.closing) return this.closing; this.closed = true;
+    if (this.closing) return this.closing; this.closed = true; this.followups.close();
+    // a turn cut by a close did not settle: its park stays claimed, and the next epoch takes it again
+    this.settleHooks = [];
     for (const resolve of this.pending.values()) resolve(false); this.pending.clear();
     const attachmentsDrained = this.attachmentQueue.close(); void attachmentsDrained.finally(() => this.attachments.close());
     this.closeTools?.();
@@ -128,8 +226,16 @@ export class ClineChannelSession {
   private async runPrompt(command: Extract<EngineeringCommand, { type: 'prompt' }>): Promise<void> {
     if (this.closed || !this.core) return;
     // a refused model runs nothing: the reason again, and idle, so the thread's row stops at once
-    if (this.refusal) { this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal }); this.emit({ type: 'status', status: 'idle' }); return; }
+    if (this.refusal) { this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal }); this.emit({ type: 'status', status: 'idle' }); this.settle(); return; }
     if (this.running || this.pending.size > 0 || this.promptQueue.queued) return this.emit({ type: 'error', code: 'TURN_RUNNING', recoverable: true, message: 'Engineering is already working on this thread.' });
+    if (command.prompt.trim() === '/compact') return manualEngineeringCompact({ command, threadId: this.meta.threadId, provider: this.provider.providerId, model: this.provider.modelId,
+      conversation: this.conversation, metadata: this.runtimeMetadata, emit: this.emit, running: value => { this.running = value; },
+      read: async () => ({ messages: this.sessionId ? await readRuntimeMessages(this.core!, this.sessionId) : this.resumeMessages ?? [], state: this.sessionId ? await this.core!.readSessionCompactionState?.(this.sessionId) : this.compactionState }),
+      replace: async (messages, state) => {
+        if (this.sessionId) { this.retiredSessions.add(this.sessionId); await this.core!.stop(this.sessionId); }
+        this.sessionId = null; this.liveCoreId = undefined; this.sessionMode = null; this.compactionState = state; this.resumeMessages = messages;
+      },
+    });
     this.running = true;
     this.emit({ type: 'status', status: 'running' });
     let attachmentsResolved = false; try {
@@ -137,10 +243,11 @@ export class ClineChannelSession {
       if (this.closed) return;
       const attached = await this.attachments.resolve(command.attachments);
       attachmentsResolved = true;
-      this.conversation?.record('user.message', { ...this.runtimeMetadata(), text: command.prompt, attachments: command.attachments ?? [], model: this.provider.modelId, provider: this.provider.providerId });
+      this.conversation?.record('user.message', { permissions: { ...this.controls.permissions }, ...this.runtimeMetadata(), text: command.prompt, attachments: command.attachments ?? [], model: this.provider.modelId, provider: this.provider.providerId });
       if (this.sessionId && this.sessionMode !== this.controls.mode) {
         const previous = this.sessionId;
         this.resumeMessages = await readRuntimeMessages(this.core, previous).catch(() => undefined);
+        this.compactionState = await this.core.readSessionCompactionState?.(previous);
         this.retiredSessions.add(previous);
         await this.core.stop(previous).catch(() => {});
         this.sessionId = null;
@@ -148,7 +255,8 @@ export class ClineChannelSession {
       }
       if (!this.sessionId) {
         const startedMode = this.controls.mode;
-        const started = await this.core.start(engineeringRuntimeInput({ displayTools: this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls, prompt: command.prompt, initialMessages: this.resumeMessages, ...attached }));
+        const initialCompactionState = await portableEngineeringCompaction(this.resumeMessages ?? [], this.compactionState, this.provider.providerId, this.provider.modelId);
+        const started = await this.core.start(engineeringRuntimeInput({ displayTools: await this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls, prompt: command.prompt, initialMessages: this.resumeMessages, initialCompactionState, ...attached }));
         this.sessionId = started.sessionId;
         this.sessionMode = startedMode;
         this.resumeMessages = undefined;
@@ -164,9 +272,7 @@ export class ClineChannelSession {
   }
 
   private queueAttachment(id: string, index: number, bytes: number, task: () => void | Promise<void>): void {
-    if (this.closed) return;
-    const queued = this.attachmentQueue.push(bytes, task, () => this.emit({ type: 'attachment_ack', id, index }), (error) => this.emit({ type: 'error', code: 'INVALID_ATTACHMENT', recoverable: true, message: error instanceof Error ? error.message : 'The attachment could not be received.' }));
-    if (!queued) { this.emit({ type: 'error', code: 'ENGINEERING_PROTOCOL_LIMIT', message: 'The Engineering attachment queue exceeded its safe limit.' }); this.close(); }
+    if (!this.closed) queueEngineeringAttachment(this.attachmentQueue, { id, index, bytes, task, emit: this.emit, close: () => { void this.close(); } });
   }
 
 
@@ -187,6 +293,7 @@ export class ClineChannelSession {
       let messages = this.resumeMessages;
       if (previousCore && previousSessionId) {
         messages = await readRuntimeMessages(previousCore, previousSessionId).catch(() => messages);
+        this.compactionState = await previousCore.readSessionCompactionState?.(previousSessionId);
         await this.conversation?.checkpoint(previousCore, previousSessionId, this.runtimeMetadata());
       }
       await this.conversation?.flush();
@@ -198,7 +305,7 @@ export class ClineChannelSession {
       this.provider = nextProvider; this.refusal = null;
       this.modelId = modelId; this.brainPack = brainPack;
       if (selection) { this.meta.agentId = selection.agentId; this.meta.reasoningEffort = engineeringEffort(modelId, selection.reasoningEffort); }
-      this.sessionId = null; this.sessionMode = null; this.resumeMessages = messages;
+      this.sessionId = null; this.liveCoreId = undefined; this.sessionMode = null; this.resumeMessages = messages;
       this.conversation?.brain.setRuntime(messages ?? [], { ...this.conversation.brain.metadata(), ...this.runtimeMetadata() });
       if (previousCore && previousCore !== nextCore) await previousCore.dispose('Neuramesh Code model changed').catch(() => {});
       this.emit({ type: 'model_changed', provider: nextProvider.providerId, model: nextProvider.modelId, modelId, brainPack, agent: nextProvider.agent, reasoningEffort: engineeringEffort(modelId, this.meta.reasoningEffort) });
@@ -212,25 +319,14 @@ export class ClineChannelSession {
     if (this.closed) return;
     if ('sessionId' in event.payload && typeof event.payload.sessionId === 'string' && this.retiredSessions.has(event.payload.sessionId)) return;
     if (this.sessionId && 'sessionId' in event.payload && event.payload.sessionId !== this.sessionId) return;
+    if ('sessionId' in event.payload && typeof event.payload.sessionId === 'string') this.liveCoreId = event.payload.sessionId;
+    this.followups.observe(event);
     this.conversation?.event(event);
     forwardEngineeringUsage(event, this.emit);
-    if (event.type === 'ended') { this.running = false; this.checkpoint(event.payload.sessionId); this.emit({ type: 'ended', reason: event.payload.reason }); }
-    else if (event.type === 'status') { this.running = event.payload.status !== 'idle'; if (!this.running) this.checkpoint(event.payload.sessionId); this.emit({ type: 'status', status: event.payload.status }); }
-    else {
-      const projected = projectEngineeringCoreEvent(event);
-      this.emit({ type: 'agent_event', event: projected });
-      const payload = projected['payload'] as Record<string, unknown> | undefined;
-      const agentEvent = payload?.['event'] as Record<string, unknown> | undefined;
-      const mutationTools = new Set(['editor', 'apply_patch', 'run_commands']);
-      if (projected['type'] === 'agent_event' && agentEvent?.['type'] === 'content_end' && agentEvent['contentType'] === 'tool' && mutationTools.has(String(agentEvent['toolName']))) this.refreshChanges();
-      // The SDK's reusable local session can finish a turn without ending the session or
-      // emitting idle. Its final agent receipt is authoritative for the next prompt's gate.
-      if (event.type === 'agent_event' && event.payload.event.type === 'done') {
-        this.running = false;
-        this.emit({ type: 'ended', reason: event.payload.event.reason });
-        this.checkpoint(event.payload.sessionId);
-      }
-    }
+    forwardCodingEvent(event, this.emit, value => { this.running=value; }, id => this.checkpoint(id), this.refreshChanges);
+    // a turn that ended runs its continuation hooks (continueParked) once, after its `ended` or idle went out
+    const settled = event.type === 'ended' || event.type === 'status' || (event.type === 'agent_event' && event.payload.event.type === 'done');
+    if (settled && !this.running) this.settle();
   }
 
   private runtimeMetadata = (): Record<string, unknown> => ({ selection: { agentId: this.provider.agent?.id ?? this.meta.agentId ?? null, modelId: this.modelId, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort) }, agent: this.provider.agent, provider: this.provider.providerId, model: this.provider.modelId, providerSessionId: this.sessionId, repoId: this.meta.repoId, mode: this.controls.mode, completeness: 'full-runtime-events' });
@@ -244,6 +340,7 @@ export class ClineChannelSession {
     this.log(`cline_failed repo=${this.meta.repoId}: ${message}`);
     this.running = false;
     this.emit({ type: 'error', message, recoverable: true });
+    this.settle();
   }
 
   private async abort(): Promise<void> {
@@ -252,22 +349,11 @@ export class ClineChannelSession {
   }
 
   private async restore(checkpointRunCount: number): Promise<void> {
-    if (!this.core || !this.sessionId || this.running || this.pending.size > 0) {
-      this.emit({ type: 'error', code: 'RESTORE_UNAVAILABLE', recoverable: true, message: 'A checkpoint can be restored only while this Engineering thread is idle.' });
-      return;
-    }
-    this.running = true; this.emit({ type: 'status', status: 'running' });
-    try {
-      const restoredSessionId = await restoreRuntimeCheckpoint(this.core, this.sessionId, checkpointRunCount, this.cwd, engineeringRuntimeInput({ displayTools: this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls }));
-      this.resumeMessages = undefined; this.sessionId = restoredSessionId; this.sessionMode = this.controls.mode;
-      this.emit({ type: 'restored', checkpointRunCount });
-      const progress = recoverEngineeringPlanProgress(await this.readPlanMessages());
-      this.conversation?.record('plan.restored', { checkpointRunCount, progress });
-      await this.conversation?.checkpoint(this.core, this.sessionId, this.runtimeMetadata());
-      this.emit({ type: 'plan_progress', progress }); this.refreshChanges();
-    } finally {
-      this.running = false; if (!this.closed) this.emit({ type: 'status', status: 'idle' });
-    }
+    return restoreEngineeringSession({ core: this.core, sessionId: this.sessionId, busy: this.running || this.pending.size > 0, checkpointRunCount, cwd: this.cwd,
+      start: engineeringRuntimeInput({ displayTools: await this.displayTools?.(this.provider.agent), setThreadTitle: this.setThreadTitle, emit: this.emit, readPlanMessages: this.readPlanMessages, readPlanProgress: this.readPlanProgress, meta: this.meta, cwd: this.cwd, provider: this.provider, modelId: this.modelId, brainPack: this.brainPack, controls: this.controls }),
+      conversation: this.conversation, metadata: this.runtimeMetadata, running: value => { this.running = value; }, emit: this.emit, refresh: this.refreshChanges, closed: () => this.closed,
+      apply: sessionId => { this.resumeMessages = undefined; this.compactionState = undefined; this.sessionId = sessionId; this.sessionMode = this.controls.mode; },
+    });
   }
 
 }

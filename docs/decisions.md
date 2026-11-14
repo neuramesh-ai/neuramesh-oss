@@ -1,5 +1,7 @@
 # Decision log (ADR-lite)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 Per [05-engineering-philosophy.md](05-engineering-philosophy.md) §2/§7: two-way doors get a line here; one-way doors get a doc. Newest first.
 
 ## 2026-10-16: A Google sign-in runs code through agy, and a coding agent may use any available tool (doc: docs/design/gemini-code-lane-2026-10/plan.md)

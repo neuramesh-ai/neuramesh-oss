@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neuramesh/relay": "workspace:*",
     "@neuramesh/shared": "workspace:*"
   },
   "devDependencies": {

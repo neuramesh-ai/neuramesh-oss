@@ -327,7 +327,8 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     // alice is a member of this workspace, and bob's machine is still not hers to beat
     expect((await send(alice, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
     const stranger: Actor = { kind: 'human', id: '30000000-0000-0000-0000-000000000003' };
-    expect((await send(stranger, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
+    // a stranger is refused by the command scope guard before the handler looks (R10 NM-002): 403, not your workspace
+    expect((await send(stranger, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(403);
     const [ag] = await sql!`select id from agents where workspace_id = ${WS}::uuid limit 1`;
     const agent: Actor = { kind: 'agent', id: ag!['id'] as string, role: 'orchestrator' };
     expect((await send(agent, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(403);

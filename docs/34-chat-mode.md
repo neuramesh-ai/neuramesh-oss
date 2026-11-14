@@ -1,5 +1,7 @@
 # 34 — Chat mode: the Tasks toggle (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-27). Mockup: `mockups/chat-mode.html` (R1, four themes). Evidence:
 > `docs/evidence/chat-mode/` (cream + graphite, from the real renderer).
 > One chip on the composer decides what a message *becomes*. **Tasks on** — today's board flow, byte

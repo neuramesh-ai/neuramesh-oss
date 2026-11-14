@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { ChipMenu } from '../ui/ChipMenu';
-import { availableMachines, capResetLabel, placementFor, planLabel, type ComputePrefs, type MachineCapability } from '@neuramesh/shared';
+import { availableMachines, capResetLabel, machineLit, machineSeenFact, machineState, MACHINE_STATUS_LABEL, placementFor, planLabel, type ComputePrefs, type MachineCapability } from '@neuramesh/shared';
 import { isOnline } from '../lib/presence';
-import { refreshCompute, useCompute, type ComputeView } from './useCompute';
+import { refreshCompute, useCompute, useMachineIntents, type ComputeView } from './useCompute';
 import { wakeNow } from './CapGate';
 import { nm as nmBridge } from '../bridge/nm';
 import { parseComputePrefs } from './prefs';
@@ -39,12 +39,15 @@ const nm = nmBridge;
  *   · the sleep window is the server's own effective number (machineIntent derives it), never a
  *     constant retyped here — that is how the last stale "60 minutes" survived so long.
  */
-function MachineFacts({ state }: { state: ComputeView }) {
+/** what MachineFacts reads: a ComputeView, or a member machine's own derived state */
+type FactsOf = Pick<ComputeView, 'status' | 'lastSeenAt'> & Partial<Pick<ComputeView, 'startedAt' | 'parkedAt' | 'lastActiveAt' | 'idleStopMin'>>;
+function MachineFacts({ state }: { state: FactsOf }) {
   const up = state.startedAt && state.status === 'online' ? fmtDur(Date.now() - Date.parse(state.startedAt)) : null;
   const idleH = state.idleStopMin ? Math.round(state.idleStopMin / 60) : null;
   const bits = [
     up ? `up ${up}` : null,
-    state.lastSeenAt ? `seen ${timeAgo(state.lastSeenAt)}` : null,
+    // a stopped machine was seen seconds ago because it just drained: it says when it went to sleep
+    machineSeenFact(state.status, state, timeAgo),
     state.lastActiveAt ? `worked ${timeAgo(state.lastActiveAt)}` : null,
     idleH ? `sleeps after ${idleH}h idle` : state.idleStopMin === null ? 'never auto-sleeps' : null,
   ].filter(Boolean);
@@ -75,7 +78,7 @@ function CloudRow({ state, onUpgrade }: { state: ComputeView | null; onUpgrade?:
         {state.status === 'capped' && <button className="btn primary sm" onClick={() => onUpgrade?.(state.reason)}>Get {planLabel('cloud')}</button>}
         {/* "Wake now" is offered only where it can succeed. A capped machine cannot be woken, and
             a button that refuses is worse than one that is not there. */}
-        {(state.status === 'asleep' || state.status === 'unreachable') && (
+        {(state.status === 'asleep' || state.status === 'unreachable' || state.status === 'held') && (
           <button className="btn ghost sm" disabled={waking}
             onClick={() => { setWaking(true); void wakeNow((r) => onUpgrade?.(r)).finally(() => { setWaking(false); refreshCompute(); }); }}>
             {waking ? 'Waking…' : 'Wake now'}
@@ -100,6 +103,7 @@ export function ComputePanel({ machines, members, agents, selfMachineName, selfU
   selfUserId: string | null;
 }) {
   const cloudState = useCompute(true);
+  const intents = useMachineIntents(true);
   const nameOf = (userId?: string | null): string => {
     if (!userId) return 'unknown';
     const m = members.find((x) => x.user_id === userId);
@@ -138,6 +142,10 @@ export function ComputePanel({ machines, members, agents, selfMachineName, selfU
   const mine = machines.filter((m) => m.owner_user_id === selfUserId);
   const lent = machines.filter((m) => m.owner_user_id !== selfUserId && canUse(m));
   const closed = machines.filter((m) => !canUse(m));
+  // EVERY cloud machine's state comes from its intent (machineState), never from the heartbeat
+  // alone: a parked machine was seen seconds ago because it just drained (live build 25f8d8dd)
+  const cloudOf = (m: MachineRow, i = intents.find((x) => x.id === m.id)): (FactsOf & { reason: string }) | null =>
+    m.kind === 'runner' ? cloudState : i ? { ...i, ...machineState(i, cloudState?.cap ?? null, now) } : null;
 
   return (
     <>
@@ -202,7 +210,8 @@ export function ComputePanel({ machines, members, agents, selfMachineName, selfU
       {machines.length === 0 ? (
         <div className="locked"><span>No machines are serving this workspace yet.</span></div>
       ) : [...mine, ...lent, ...closed].map((m) => {
-        const online = isOnline(m.last_seen_at);
+        const cloud = cloudOf(m);
+        const online = cloud ? machineLit(cloud.status) : isOnline(m.last_seen_at);
         const rts = runtimesOf(m);
         const busy = busyOn(m);
         return (
@@ -226,14 +235,15 @@ export function ComputePanel({ machines, members, agents, selfMachineName, selfU
                   : <span className="cmprt none">nothing installed, so its work runs elsewhere</span>}
               </div>
               {m.kind === 'runner' && <CloudRow state={cloudState} onUpgrade={onUpgrade} />}
+              {m.kind !== 'runner' && cloud && <div className="cmpcloud"><div className="cmpwhy">{cloud.reason}</div><MachineFacts state={cloud} /></div>}
             </div>
             <span className="cmpstate">
               {/* A CLOUD machine has an intent as well as a heartbeat, so "offline" is not an
                   answer for it — cloudState carries the derived one (asleep / waking / capped /
                   unreachable) and the reason. A LOCAL machine has no fleet intent at all, so it
                   keeps the plain online/offline reading it always had. */}
-              {cloudState && m.kind === 'runner'
-                ? <span className={`cmpmstate ${cloudState.status}`} title={cloudState.reason}>{cloudState.status}</span>
+              {cloud && !(cloud.status === 'online' && busy.length)
+                ? <span className={`cmpmstate ${cloud.status}`} title={cloud.reason}>{MACHINE_STATUS_LABEL[cloud.status]}</span>
                 : !online ? <span className="cmpoff">offline</span>
                   : busy.length ? <span className="cmpbusy">{busy.map((a) => a.name).join(', ')} working</span>
                     : <span className="cmpidle">standing by</span>}

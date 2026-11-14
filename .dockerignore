@@ -5,6 +5,7 @@ node_modules
 .git
 .claude
 .vercel
+**/.env*
 **/dist
 **/.output
 **/out
@@ -12,7 +13,6 @@ apps/mobile
 apps/web
 mockups
 docs
-supabase
 dev
 e2e
 research

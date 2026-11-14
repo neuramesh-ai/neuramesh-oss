@@ -16,8 +16,8 @@ export function ScheduledHead({ view, routines, calendar, setView }: {
   const tabs = [['automations', 'Routines', routines], ['calendar', 'Calendar', calendar]] as const;
   return (
     <>
-      <div className="topbar">Scheduled</div>
-      <div className="roomtabbar desttabs" role="tablist" aria-label="Scheduled surfaces">
+      <div className="topbar">Automations</div>
+      <div className="roomtabbar desttabs" role="tablist" aria-label="Automations surfaces">
         {tabs.map(([v, label, n]) => (
           <button key={v} role="tab" aria-selected={view === v} className={`roomtab${view === v ? ' on' : ''}`} aria-label={label} onClick={() => setView(v)}>
             {label}

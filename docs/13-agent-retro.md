@@ -1,5 +1,7 @@
 # Agent Retro — real RSI tracking (spec + build plan)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** built 2026-07-02 (PR pending review) — evidence in `docs/evidence/retro/` (local by convention) + on the PR: three-agent live run, every on-screen number validated against seeded ground truth, both themes, quarter re-bucketing asserted in-DOM. WOW 14 from the wow-factor review ([mockups/wow-factor/09-rsi-retro.html](../mockups/wow-factor/09-rsi-retro.html)); the founder ask: charts from **actual tracked metrics** for **all agents**, time filters like Home, custom stroke icons (no emoji). docs/12 §5 deferred XP/levels "until they derive from measured signals" — this is that derivation.
 
 ## 1. Goal & litmus

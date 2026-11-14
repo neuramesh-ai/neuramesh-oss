@@ -61,11 +61,11 @@
      status row; the panel ladder lifts one step so the sheet floats on it. */
   --win: #0d0d0d; --bg: #141414; --panel: #161616; --panel2: #1a1a1a; --panel3: #262626;
   --border: #262626; --border2: #3a3a3a;
-  --text: #cbcbcb; --body: #a6a6a6; --muted: #848484; --dim: #6a6a6a;
+  --text: #a6a6a6; --body: #a6a6a6; --muted: #848484; --dim: #6a6a6a;
   --link: #d19a72; --accent: var(--text); --accent-ink: #101010; --accent-soft: var(--panel3); --teal: var(--text); --orch: #9793d2;
   /* identity constants — the Porch mark keeps oak on graphite (the one warm object here) */
   --brand: #834a2b; --brand-ink: #fff7ee;
-  --btn: #232323; --btn-fg: #efefef; --btn-hover: #2f2f2f;
+  --btn: #232323; --btn-fg: #a6a6a6; --btn-hover: #2f2f2f;
   --green: #77ac8d; --green-soft: #16241a; --warm: var(--body); --warm-soft: color-mix(in srgb, var(--text) 10%, transparent); --blue: var(--body); --blue-soft: color-mix(in srgb, var(--text) 10%, transparent); --violet: #a89ccf; --violet-soft: #1c1936;
   --todo: #949494; --prog: #8ba0c0; --review: #a89ccf; --done: #77ac8d; --acc: #6fb0ab; --ship: #7cb0bd; --shiprev: #a89ccf; --rel: #74b19c; --verif: #6fb3a4; --closed: #727272; --blocked: #9ca0a8; --warn: #c9a15e; --plan: #7fa5ab; --planrev: #a89ccf; --design: #cc8fb9; --designrev: #b78bd8; --backlog: #8f9aa6;
   /* agent identity — cool, distinct, safe (no amber) */
@@ -117,10 +117,10 @@
 [data-theme='soft-dark'] {
   --win: #1d1d1d; --bg: #262626; --panel: #2a2a2a; --panel2: #313131; --panel3: #3b3b3b;
   --border: #363636; --border2: #454545;
-  --text: #d2d2d2; --body: #b0b0b0; --muted: #8f8f8f; --dim: #747474;
+  --text: #a6a6a6; --body: #a6a6a6; --muted: #8f8f8f; --dim: #747474;
   --link: #d3a07a; --accent: var(--text); --accent-ink: #141414; --accent-soft: var(--panel3); --teal: var(--text); --orch: #a29ed9;
   --brand: #834a2b; --brand-ink: #fff7ee;
-  --btn: #383838; --btn-fg: #f0f0f0; --btn-hover: #444444;
+  --btn: #383838; --btn-fg: #a6a6a6; --btn-hover: #3b3b3b;
   --green: #7fb495; --green-soft: #243026; --warm: var(--body); --warm-soft: color-mix(in srgb, var(--text) 10%, transparent); --blue: var(--body); --blue-soft: color-mix(in srgb, var(--text) 10%, transparent); --violet: #aaa0d2; --violet-soft: #282240;
   --todo: #9c9c9c; --prog: #94aacb; --review: #aaa0d2; --done: #7fb495; --acc: #74b6b1; --ship: #86b8c4; --shiprev: #aaa0d2; --rel: #7fb8a3; --verif: #79baab; --closed: #707070; --blocked: #a4a8b0; --warn: #cda765; --plan: #86adb3; --planrev: #aaa0d2; --design: #cf99c1; --designrev: #bd96da; --backlog: #97a1ac;
   --role-orch: #a29ed9; --role-arch: #aaa0d2; --role-dev: #7fb495; --role-rev: #86aacc; --role-design: #cf99c1; --role-cur: #74b6b1; --role-ship: #86b8c4; --role-mkt: #cf9a9a; --role-tone: 17%;
@@ -208,10 +208,10 @@
   --diff-add: #86ba9b; --diff-add-bg: #22302a; --diff-del: #d89494; --diff-del-bg: #352424; --snapshot-filter: invert(93%) hue-rotate(180deg);
   --win: #212121; --bg: #212121; --panel: #212121; --panel2: #282828; --panel3: #2e2e2e;
   --border: #313131; --border2: #4a4a4a;
-  --text: #d9d9d9; --body: #b8b8b8; --muted: #a6a6a6; --dim: #959595;
+  --text: #a6a6a6; --body: #a6a6a6; --muted: #a6a6a6; --dim: #959595;
   --link: var(--text); --accent: var(--text); --accent-ink: #212121; --accent-soft: var(--panel3); --teal: var(--text); --orch: #9793d2;
   --brand: #834a2b; --brand-ink: #fff7ee;
-  --btn: #212121; --btn-fg: #d9d9d9; --btn-hover: #282828;
+  --btn: #212121; --btn-fg: #a6a6a6; --btn-hover: #282828;
   --green: #77ac8d; --green-soft: #1f2b23; --warm: var(--body); --warm-soft: color-mix(in srgb, var(--text) 10%, transparent); --blue: var(--body); --blue-soft: color-mix(in srgb, var(--text) 10%, transparent); --violet: #a89ccf; --violet-soft: #26233a;
   --todo: #949494; --prog: #8ba0c0; --review: #a89ccf; --done: #77ac8d; --acc: #6fb0ab; --ship: #7cb0bd; --shiprev: #a89ccf; --rel: #74b19c; --verif: #6fb3a4; --closed: #7a7a7a; --blocked: #9ca0a8; --warn: #d0a862; --plan: #7fa5ab; --planrev: #a89ccf; --design: #cc8fb9; --designrev: #b78bd8; --backlog: #8f9aa6;
   --role-orch: #9793d2; --role-arch: #a89ccf; --role-dev: #77ac8d; --role-rev: #7ba1c4; --role-design: #cc8fb9; --role-cur: #6fb0ab; --role-ship: #7cb0bd; --role-mkt: #c98f8f; --role-tone: 17%;
@@ -1972,9 +1972,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* isolation: the bar below is the one element here with a z-index, and a session panel that opens over the
    destination has none, so without a stacking context of its own the bar painted THROUGH the thread (George,
    on v0.134.0). The view is its own context now: nothing inside it can outrank a later sibling. */
-.mkosview { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 18px 40px; scrollbar-width: none; isolation: isolate; }
+.mkosview { flex: 1; min-height: 0; overflow-y: auto; padding: 36px 40px 40px; scrollbar-width: none; isolation: isolate; }
 .mkosview::-webkit-scrollbar { width: 0; height: 0; }
-.mkosview > * { max-width: 980px; margin-left: auto; margin-right: auto; }
+.mkosview > * { max-width: 960px; margin-left: auto; margin-right: auto; }
 .mkosview > .scopebar { margin-bottom: 8px; }
 .pgk { display: flex; align-items: baseline; gap: 8px; font: 500 9.5px var(--fmono);
   letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); margin: 18px auto 8px; }
@@ -2388,21 +2388,21 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* awake and serving */
 .cpill.online { color: var(--green); }
 /* asleep stays the quietest thing on the bar: nothing is wrong, and nothing is asked of you */
-.cpill.asleep { color: var(--dim); }
+.cpill.asleep, .cpill.sleeping { color: var(--dim); }
 /* starting up: AMBER, so the trip to green is a visible progression rather than a colour that
    only changes at the end (George, 2026-08-29). It also moves, which is what separates it from
    the two warn states that are waiting on YOU: those hold still and carry an overlay glyph. */
 .cpill.waking { color: var(--warn); animation: nm-breathe 1.6s var(--ease) infinite; }
 @keyframes nm-breathe { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
 /* the two that want something from you */
-.cpill.capped, .cpill.unreachable, .cpill.stopped { color: var(--warn); }
+.cpill.capped, .cpill.held, .cpill.no_credits, .cpill.unreachable, .cpill.stopped { color: var(--warn); }
 .cpill.capped { background: color-mix(in srgb, var(--warn) 12%, transparent); }
 @media (prefers-reduced-motion: reduce) { .cpill.waking { animation: none; opacity: .9 } }
 /* the cloud machine's row in Compute (cloud-cap round): the derived state, its reason, the day
    meter, and the one action that can change it. A LOCAL machine keeps its online/offline reading. */
-.cmpmstate { font: 600 11.5px var(--fbody); text-transform: capitalize; color: var(--muted); }
+.cmpmstate { font: 600 11.5px var(--fbody); color: var(--muted); }
 .cmpmstate.online { color: var(--green); }
-.cmpmstate.capped, .cmpmstate.unreachable, .cmpmstate.stopped { color: var(--warn); }
+.cmpmstate.capped, .cmpmstate.held, .cmpmstate.no_credits, .cmpmstate.unreachable, .cmpmstate.stopped { color: var(--warn); }
 .cmpmstate.waking { color: var(--body); }
 .cmpcloud { display: grid; gap: 8px; margin-top: 9px; }
 .cmpwhy { font-size: 12.5px; color: var(--body); }
@@ -3132,7 +3132,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .fometa { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-bottom: 10px; font: 600 11px var(--fmono); color: var(--dim); }
 .forevert { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 11px; margin-bottom: 11px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font: inherit; }
 .forevert:hover { border-color: var(--hover-border); }
-.forevck { flex: none; width: 17px; height: 17px; border-radius: 3px; border: 1.5px solid var(--ring); display: grid; place-items: center; font-size: 11px; color: #fff; background: var(--card); }
+.forevck { flex: none; width: 17px; height: 17px; border-radius: 3px; border: 1.5px solid var(--ring); display: grid; place-items: center; font-size: 11px; color: var(--body); background: var(--card); }
 .forevert.on .forevck { background: var(--role-orch); border-color: var(--role-orch); }
 .forevtxt { font-size: 12px; color: var(--body); } .forevtxt b { color: var(--text); font-weight: 500; }
 .fonote { margin-bottom: 11px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel2); font-size: 12px; color: var(--muted); }
@@ -3638,10 +3638,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .achipname { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .achipsub { font-size: 10px; color: var(--dim); }
 .aremove { position: absolute; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; opacity: 0; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.atile .aremove { top: 3px; right: 3px; color: #fff; background: color-mix(in srgb, #000 50%, transparent); }
+.atile .aremove { top: 3px; right: 3px; color: #a6a6a6; background: color-mix(in srgb, #000 80%, transparent); }
 .achip .aremove { top: 50%; right: 5px; transform: translateY(-50%); color: var(--dim); }
 .atile:hover .aremove, .achip:hover .aremove, .aremove:focus-visible { opacity: 1; }
-.aremove:hover { background: color-mix(in srgb, var(--blocked) 85%, transparent); color: #fff; }
+.aremove:hover { background: #252525; color: #a6a6a6; }
 .aprog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--text) 12%, transparent); }
 .aprog > span { display: block; height: 100%; background: var(--accent); transition: width .12s linear; }
 .aerr { border-color: color-mix(in srgb, var(--blocked) 55%, transparent); }
@@ -3688,8 +3688,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .alightboximg { max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 8px; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
 .alightboxfile { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 64px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); }
 .alightboxname { font-size: 14px; font-weight: 600; color: var(--text); }
-.alightboxbar { font-size: 12px; color: #e8ddcf; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.alightboxclose { position: fixed; top: 18px; right: 20px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; color: #fff; background: color-mix(in srgb, #fff 12%, transparent); transition: background var(--dur-fast) var(--ease); }
+.alightboxbar { font-size: 12px; color: #a6a6a6; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alightboxclose { position: fixed; top: 18px; right: 20px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; color: #a6a6a6; background: #252525; transition: background var(--dur-fast) var(--ease); }
 .alightboxclose:hover { background: color-mix(in srgb, #fff 22%, transparent); }
 
 /* channel artifact screen — "shared in chat" gallery */
@@ -3882,7 +3882,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* the veil steps aside for a modal that is a MENU (2026-08-17) — see .popsurf's note. It keeps
    the grid centring and the click-catching; it just stops dimming and blurring the room. */
 .overlay.bare { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-.modal { width: 420px; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; background: var(--overlay, var(--panel)); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 30px 70px -24px var(--shadow); animation: nm-pop var(--dur) var(--ease); }
+.modal { width: 420px; max-width: calc(100vw - 24px); box-sizing: border-box; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; background: var(--overlay, var(--panel)); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 30px 70px -24px var(--shadow); animation: nm-pop var(--dur) var(--ease); }
 /* pivot modals — anchored to the control that launched them (Modal sets transform-origin
    inline to that point): grow out of the pill on open, collapse back into it on dismissal.
    Budget: open .15s · close .13s (motion ≤150ms). */
@@ -4871,6 +4871,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .ghostchev { flex: none; color: var(--dim); font-size: 9px; margin-left: 1px; transition: transform var(--dur-fast) var(--ease); }
 .ghoststep[aria-expanded="true"] .ghostchev { transform: rotate(90deg); }
 .ghostact { background: none; border: 0; padding: 2px 0; color: var(--dim); font-size: 11px; cursor: pointer; flex: none; }
+.ghostrow.reply-failed { align-items: flex-start; flex-direction: column; gap: 5px; }
+.ghostrow.reply-failed .liveact-txt { white-space: normal; overflow-wrap: anywhere; animation: none; background: none; -webkit-text-fill-color: currentColor; color: var(--text); }
+.ghostrow.reply-failed .ghostact { color: var(--accent); }
 .ghostact:hover { color: var(--muted); }
 .typist .orb { vertical-align: -5px; margin: 0 1px; }
 @media (prefers-reduced-motion: reduce) { .tcaret { animation: none; } }
@@ -5957,7 +5960,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .packstep.active { color: var(--text); }
 .packstep.active .packdot { border-color: var(--prog); color: var(--prog); box-shadow: 0 0 0 3px color-mix(in srgb, var(--prog) 16%, transparent); }
 .packstep.fail { color: var(--blocked); }
-.packstep.fail .packdot { background: color-mix(in srgb, var(--blocked) 82%, transparent); border-color: transparent; color: #fff; }
+.packstep.fail .packdot { background: color-mix(in srgb, var(--blocked) 82%, transparent); border-color: transparent; color: var(--body); }
 .packprogbar { height: 5px; border-radius: 3px; background: var(--panel3); overflow: hidden; }
 .packprogfill { height: 100%; border-radius: 3px; background: var(--prog); transition: width var(--dur) var(--ease); }
 .packprog.err .packprogfill { background: var(--blocked); }
@@ -6666,7 +6669,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .codingthread .codingbox .trow { flex-wrap: wrap; gap: 6px 9px; align-items: center; }
 .codingthread .codingbox .trow > * { flex: none; min-width: 0; }
 .codingthread .codingbox .codingknobs { display: flex; align-items: center; gap: 9px; margin-left: auto; flex: none; }
-.codingthread .codingbox .codingseg { flex: none; }
 .codingthread .codingbox .codingperm { position: relative; }
 .codingthread .codingbox .engpermtrigger { max-width: 260px; }
 .codingthread .codingbox .engpermtrigger .lbl { white-space: nowrap; max-width: 220px; }
@@ -6675,6 +6677,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* the code face in the side panel (the side-panel round, 2026-10-03): the coding thread's own tabs are
    the panel's strip, so the pane holds the editor on the picked tab, and the branch in the foot */
 .codepane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.coding-inline-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.coding-inline-panel > .btn { flex: none; align-self: flex-start; margin: 6px 12px; }
 .codepane .codeface { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .codepane .codeface > .engeditor { flex: 1; min-height: 0; }
 .codepane .codeface .engeditor .engworktabs { display: none; }
@@ -7152,13 +7156,13 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .agprompt { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); overflow: hidden; }
 .agpblock + .agpblock { border-top: 1px solid var(--border); }
 .agpkey { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 12px; background: none; border: 0;
-  color: var(--body); font: 500 12.5px/1 var(--mono); letter-spacing: -.02em; cursor: pointer; text-align: left; }
-.agpkey:hover { background: var(--hover); }
+  color: var(--body); font: 500 12.5px/1 var(--fcode); letter-spacing: -.02em; cursor: pointer; text-align: left; }
+.agpkey:hover { background: var(--hover-bg); }
 .agpchev { font-style: normal; color: var(--dim); font-size: 10px; width: 10px; }
 .agpsize { margin-left: auto; color: var(--dim); font-size: 11px; font-weight: 400; }
-.agpblock.open .agpkey { color: var(--head); }
+.agpblock.open .agpkey { color: var(--text); }
 .agpbody { margin: 0; padding: 10px 12px 12px 29px; max-height: 300px; overflow: auto; white-space: pre-wrap;
-  color: var(--muted); font: 400 12px/1.6 var(--mono); border-top: 1px dashed var(--border); }
+  color: var(--muted); font: 400 12px/1.6 var(--fcode); border-top: 1px dashed var(--border); }
 /* editing: elevated + ringed — the composer idiom, so a text field always looks like one place */
 .agtxt { width: 100%; border: 1px solid var(--ring); border-radius: var(--r-md); background: var(--card); color: var(--text);
   font: 400 12px/1.6 var(--fbody); padding: 10px 12px; resize: vertical; outline: none; box-shadow: var(--shadow-card); }
@@ -8290,11 +8294,19 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .wfchips .n { font: 400 11px var(--fmono); opacity: .7; margin-left: 5px; }
 
 .wftable { border: 1px solid var(--card-border); border-radius: var(--r-lg); background: var(--card);
-  overflow: hidden; box-shadow: var(--shadow-card); flex: none; }
+  overflow: hidden; box-shadow: var(--shadow-card); flex: none; container: wftable / inline-size; }
 /* the name column is the only elastic one — minmax(0,…) lets it shrink so no meta column is
    ever crushed, and meta cells never wrap, so a row is exactly one line tall */
 .wfthd, .wftr { display: grid; grid-template-columns: 30px minmax(0, 1fr) 74px 78px 118px 92px 58px 26px;
   align-items: center; gap: 10px; padding: 0 14px; }
+/* the meta columns are fixed at about 550px, so in a pane narrower than about 720px the name
+   column shrank to nothing and a row showed every fact about a file except which file it was
+   (the Cloud Run feature suite, 2026-11-02). There the type, size and date step aside: the name
+   and its room are what tell rows apart, and the open preview carries the rest */
+@container wftable (max-width: 720px) {
+  .wfthd, .wftr { grid-template-columns: 30px minmax(0, 1fr) 118px 58px 26px; }
+  .wftr > .wftype, .wftr > .wfmeta, .wfthd > span:nth-child(3), .wfthd > span:nth-child(4), .wfthd > span:nth-child(6) { display: none; }
+}
 .wfthd { height: 34px; border-bottom: 1px solid var(--border); background: var(--panel2); }
 .wfthd span { font: 400 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
 .wftr { height: 46px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
@@ -8734,7 +8746,7 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .engmodelrow { width: 100%; min-height: 44px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--body); text-align: left; cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .engmodelrow:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
 .engmodelrow.on { background: var(--sel-bg); color: var(--text); }
-.engmodelrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
+.engmodelrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ring); }
 .engmodelrow:disabled { opacity: .48; cursor: not-allowed; }
 .engmodeldefault { margin-bottom: 4px; border-bottom: 1px solid var(--border); border-radius: var(--r-sm) var(--r-sm) 0 0; }
 .engmodelmark { width: 24px; height: 24px; display: grid; place-items: center; color: var(--muted); }
@@ -9307,3 +9319,29 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .stagemark .pk-lookg { animation: pk-look 1.15s var(--ease) .6s both, lsg-glance 9s var(--ease) 4s infinite; }
 .stagemark.still .pk-lookg { animation: none; }
 @media (prefers-reduced-motion: reduce) { .stagemark .pk-lookg { animation: none; } }
+
+/* Coding work stays within the task tab when opened beside Agent Desk. */
+.coding-task-tabs { display:flex; flex:none; gap:4px; overflow-x:auto; padding:6px 12px; border-bottom:1px solid var(--border); }
+.coding-task-tabs button { flex:none; border:0; border-radius:4px; background:transparent; color:var(--muted); font:inherit; font-size:11px; padding:5px 8px; cursor:pointer; }
+.coding-task-tabs button[aria-selected="true"] { color:var(--text); background:var(--hover-bg); }
+.task-approval-card { border:1px solid var(--border); border-radius:8px; padding:12px; display:grid; gap:10px; min-width:0; }
+.task-approval-card > b { font-size:12px; }
+.task-approval-card > p { margin:0; color:var(--muted); font-size:12px; line-height:1.6; white-space:pre-line; overflow-wrap:anywhere; }
+
+/* Ordinary labels and project names share the reading ink. Status and code keep their own colors. */
+.navgrprow .navgrpname { color: var(--body); }
+.navitemtrail { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.navitemfact { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; max-width: 100px; }
+
+/* Primary action labels use the same gray as ordinary text; identity artwork retains brand ink. */
+:root:not([data-theme]), :root[data-theme='dark'], :root[data-theme='soft-dark'], :root[data-theme='paper-dark'] {
+  --btn-primary: var(--btn); --btn-primary-ink: var(--body);
+}
+:root:is([data-theme='dark'], [data-theme='soft-dark'], [data-theme='paper-dark']) :is(.mkdocapprove, .bpapply, .packmini.primary, .agentcard .agextcta, .archundo button, .hsend, .ftnewmain, .ftnewcaret, .wfupload, .engapprovalactions .primary, .credv-cgo) {
+  background: var(--btn-primary); color: var(--btn-primary-ink); border-color: var(--border2);
+}
+.navrowmenu[aria-label='More destinations'] { width: 210px; }
+
+@media(max-width:700px){.mkosview{padding:24px 18px 40px}}
+
+@media(max-width:700px){.modalfoot{flex-wrap:wrap}.modalfoot .btn{max-width:100%;white-space:normal}}

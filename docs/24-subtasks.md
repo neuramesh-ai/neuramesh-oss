@@ -1,5 +1,7 @@
 # 24 — Subtasks + the Phase Spectrum (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** v1 shipped 2026-07-15 (desktop v0.35.0). Born from the first live ship-gate run:
 > a human ask made the orchestrator mint a full peer task (#1018) for work that only existed in
 > service of #1017 — board clutter, split context. **Subtasks** give companion work a

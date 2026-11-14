@@ -107,13 +107,15 @@ function dispatchPlanning(t: PlanTask) {
   // architect here would take the task away from its owner mid-flow, which is the delegation this
   // model replaced. Without this branch an owned task entering `planning` sat there: the owner was
   // not woken, and the architect could not claim what it did not hold.
-  const owner = t.assignee_id ? agents.get(t.assignee_id) : undefined;
+  const ownerId = t.assignee_id ?? t.offered_agent_id;
+  const owner = ownerId ? agents.get(ownerId) : undefined;
+  if (ownerId && !owner) return; // another machine hosts the selected owner
   if (owner?.role === 'orchestrator') {
     planned.add(t.id);
     execQueue.run({ key: `plan:${t.id}`, kind: 'own', cause: 'board', agentId: owner.id, subject: { kind: 'task', number: t.number } }, () => ownFlow(owner, t));
     return;
   }
-  const arch = [...agents.values()].find((a) => a.role === 'architect' && a.channels.has(t.channel_id));
+  const arch = owner ?? [...agents.values()].find((a) => a.role === 'architect' && a.channels.has(t.channel_id));
   if (!arch) { void surfacePlanningStaffing(t); return; }
   planned.add(t.id);
   execQueue.run({ key: `plan:${t.id}`, kind: 'plan', cause: 'board', agentId: arch.id, subject: { kind: 'task', number: t.number } }, () => architectFlow(arch, t));
@@ -196,7 +198,7 @@ async function reconcileBoard() {
     designNotified.add(t.id);
     void orchDesignNotify(orch, t);
   }
-  const planningRows = await db.getAll<PlanTask>(`select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id from tasks where state = 'planning'`).catch(() => [] as PlanTask[]);
+  const planningRows = await db.getAll<PlanTask>(`select id, number, title, description, channel_id, requirements, repo_id, base_ref, assignee_id, offered_agent_id from tasks where state = 'planning'`).catch(() => [] as PlanTask[]);
   for (const t of planningRows) {
     dispatchPlanning(t);
   }

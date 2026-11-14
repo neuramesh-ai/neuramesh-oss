@@ -1,3 +1,4 @@
+import { hydratePath } from './harness/hydration';
 // EXECUTION PLUMBING — where an agent's work happens and what comes back off the disk.
 //
 // Three functions split out of agents.ts: `worktreeRun` prepares the task's git worktree and
@@ -11,8 +12,11 @@
 // submit so review/acceptance never depends on this machine (docs/03 §9).
 // A machine uses its own git credentials (BYO git). A login-less cloud machine
 // uses the GitHub App's token for the one repository instead (host/repocred.ts).
+import { join } from 'node:path';
+import { CodingEvidenceBlocked, prValidationSection } from './host/coding-validation-files';
 import type { LogFn } from './agentlog';
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, planEvidenceBudget, sweepEvidenceImages } from './evidence';
+import { depCache } from './cloudrun/depcache';
 import { cachePath } from './harness/brain';
 import { hydrateFromDonor, stashDonor } from './harness/donors';
 import { ghPrCreate, git, repoSlug } from './host/gh';
@@ -27,11 +31,11 @@ import type { ExecTask, HostedAgent, SkillRef } from './agents';
 export async function worktreeRun(
   t: ExecTask & { repo_id: string },
   repo: { clone_url: string; default_branch: string },
-  work: (dir: string) => Promise<void>,
+  work: (dir: string) => Promise<string[] | void>,
   autoOpenPr = true,
   repoCred?: RepoCred,
 ): Promise<{ sha: string; branch: string; diff: string; prUrl?: string; prNumber?: number; prNote?: string }> {
-  const { existsSync, mkdirSync, rmSync } = await import('node:fs');
+  const { existsSync, mkdirSync, rmSync, readFileSync, realpathSync, writeFileSync } = await import('node:fs');
   const slug = repoSlug(repo.clone_url);
   // the clone, the push and the PR run on the machine's own login, or on a login-less cloud
   // machine on the App's token for this one repository. No credential fails before any work.
@@ -44,6 +48,9 @@ export async function worktreeRun(
   const cloneDir = cachePath('repos', t.repo_id);
   const wtDir = cachePath('worktrees', `nm-${t.number}`);
 
+  await hydratePath(wtDir);
+  await hydratePath(cloneDir);
+  const pending = cachePath('worktrees', `.pending-validation-${t.id}`);
   const baseSha = await withRepoLock(t.repo_id, async () => {
     if (!existsSync(cloneDir)) {
       mkdirSync(cachePath('repos'), { recursive: true });
@@ -53,6 +60,18 @@ export async function worktreeRun(
       // (lease checks against a branch the remote no longer has)
       await git(['fetch', 'origin', '--prune'], cloneDir, cred.env);
     }
+    if (existsSync(pending) && existsSync(wtDir)) {
+      const [base, savedHead = base] = readFileSync(pending, 'utf8').trim().split('\n');
+      if (!base || !/^[0-9a-f]{40}$/.test(base)) throw new CodingEvidenceBlocked('The retained checkout has an invalid baseline. Inspect the task worktree before retrying.');
+      const common = await git(['rev-parse','--path-format=absolute','--git-common-dir'],wtDir);
+      if (realpathSync(common) !== realpathSync(join(cloneDir,'.git')) || await git(['branch','--show-current'],wtDir) !== branch ||
+          await git(['rev-parse','HEAD'],wtDir) !== savedHead) throw new CodingEvidenceBlocked('The saved validation checkout changed. Inspect the task terminal and restore the expected checkout before retrying.');
+      await git(['merge-base', '--is-ancestor', base, savedHead!], wtDir).catch(() => {
+        throw new CodingEvidenceBlocked('The retained checkout no longer contains its original baseline. Inspect the task terminal before retrying.');
+      });
+      return base;
+    }
+    rmSync(pending,{force:true});
     rmSync(wtDir, { recursive: true, force: true }); // crashed-run leftovers
     await git(['worktree', 'prune'], cloneDir);
     // A REWORK continues from the prior attempt's pushed branch — the submitted work IS the
@@ -71,10 +90,19 @@ export async function worktreeRun(
     else if (hyd?.action === 'skipped' && hyd.reason === 'not-ignored') console.log(`donor_hydrate nm-${t.number}: undone — repo does not gitignore node_modules`);
     return git(['rev-parse', 'HEAD'], wtDir);
   });
+  // the dependency cache (cloudrun/depcache.ts, NM_DEPCACHE=1 on Cloud Run): where the donor could not
+  // copy-on-write (gVisor), the trees come from GCS. Outside the repo lock, because a download must
+  // not hold up the repository's other worktrees. It skips a worktree a donor already filled.
+  const dc = depCache();
+  if (dc) {
+    const dep = await dc.hydrate(wtDir).catch((e: unknown) => { console.log(`depcache_hydrate nm-${t.number}: failed ${e instanceof Error ? e.message : String(e)}`); return null; });
+    if (dep) console.log(`depcache_hydrate nm-${t.number}: ${dep.action === 'skipped' ? `skipped ${dep.reason}` : `${dep.action} ${dep.key}`}`);
+  }
   try {
-    await work(wtDir);
-    if (await git(['status', '--porcelain'], wtDir)) {
+    const captures = await work(wtDir) ?? [];
+    if (captures.length || await git(['status', '--porcelain'], wtDir)) {
       await git(['add', '-A'], wtDir);
+      if (captures.length) await git(['add','-f','--',...captures.map(name => `.nm-artifacts/${name}`)],wtDir);
       await git(['commit', '-m', `nm #${t.number}: ${t.title}`], wtDir, cred.env); // the App lane carries the committer identity
     }
     const sha = await git(['rev-parse', 'HEAD'], wtDir);
@@ -91,24 +119,35 @@ export async function worktreeRun(
     // serialized with clone-dir ops, and never allowed to fail the submit it rides on
     const stash = await withRepoLock(t.repo_id, () => stashDonor(wtDir, cachePath('donors', t.repo_id))).catch(() => null);
     if (stash?.action === 'stashed') console.log(`donor_stash nm-${t.number}: ${stash.relPaths.length} tree(s), ${Math.round(stash.apparentBytes / 1e6)}MB apparent, ${stash.ms}ms`);
+    // the agent installed in the box (it has egress), so the trees it left are this lockfile's cache
+    // for every later worktree. Not awaited: an upload must never slow or fail the submit it rides on.
+    if (dc) void dc.remember(wtDir).then((n) => console.log(`depcache_save nm-${t.number}: ${n.action === 'skipped' ? `skipped ${n.reason}` : `${n.action} ${n.key}`}`), (e: unknown) => console.log(`depcache_save nm-${t.number}: failed ${e instanceof Error ? e.message : String(e)}`));
     const CAP = 200_000;
     if (diff.length > CAP) diff = `${diff.slice(0, CAP)}\n… diff truncated at 200KB — fetch ${branch} for the rest`;
     // open (or reuse) a PULL REQUEST for the branch — the change is merged on the
     // human's accept, never committed straight to main. Uses the credential above;
     // if gh is absent/unauthed we fall back to push-only (clear thread note).
     const pr = slug && autoOpenPr
-      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}; merged on acceptance.`, cred.env)
+      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}.` + prValidationSection(slug, sha, captures), cred.env)
       : null;
     const prNote = !autoOpenPr
       ? `Pushed \`${branch}\` — auto-open-PR is off for this project. Review proceeds on the diff; open a PR manually to enable the CI gate + merge-on-accept.`
       : slug
-      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\` — merges on acceptance.`
+      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\`.`
         : cred.lane === 'app' ? `Pushed \`${branch}\`, but the neuramesh GitHub App could not open a pull request. Review proceeds on the diff. Open a pull request to turn on the CI gate and the merge on accept.`
         : `Pushed \`${branch}\` but could not open a PR (is \`gh\` installed and authed? \`gh auth login\`). Review proceeds on the diff; open a PR to enable the CI gate + merge-on-accept.`)
       : '';
+    rmSync(pending,{force:true});
     return { sha, branch, diff, ...(pr ? { prUrl: pr.url, prNumber: pr.number } : {}), prNote };
   } catch (err) {
-    // a failed run leaves nothing useful to review — reclaim it
+    // A missing capture is recoverable. Keep the checkout and its original base outside
+    // the agent's filesystem boundary so a later unblock can verify the same implementation.
+    if (err instanceof CodingEvidenceBlocked) {
+      const head = await git(['rev-parse', 'HEAD'], wtDir);
+      writeFileSync(pending, `${baseSha}\n${head}`, { mode: 0o600 });
+    }
+    if (existsSync(pending)) throw err;
+    // Other first-attempt failures reclaim their worktree.
     await withRepoLock(t.repo_id, () => git(['worktree', 'remove', '--force', wtDir], cloneDir)).catch(() => {});
     throw err;
   }
