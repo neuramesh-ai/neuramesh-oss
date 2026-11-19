@@ -45,7 +45,7 @@ export async function localUserIdForBearer(store: Pick<LocalAuthStore, 'userIdFo
   return store.userIdForLocalTokenHash(hashLocalToken(bearer));
 }
 
-export type TokenLane = { actor: Actor } | { status: 401 | 403; code: 'AUTH_FAILED' | 'FORBIDDEN'; error: string };
+export type TokenLane = { actor: Actor; memberId?:string; machine?: { id:string; workspaceId:string; kind:string } } | { status: 401 | 403; code: 'AUTH_FAILED' | 'FORBIDDEN'; error: string };
 
 /**
  * the two TOKEN lanes of /v1 auth, one dispatcher: `nmm_` (the machine, resolveMachineActor —
@@ -57,12 +57,12 @@ export async function resolveTokenLane(store: LocalAuthStore, bearer: string, ra
   if (bearer.startsWith('nmm_')) {
     const header = ActorSchema.safeParse(safeJson(rawHeader ?? 'null'));
     const resolved = await resolveMachineActor(store, bearer, header.success ? header.data : null);
-    return resolved ? { actor: resolved.actor } : { status: 401, code: 'AUTH_FAILED', error: 'unknown machine token' };
+    return resolved ? resolved : { status: 401, code: 'AUTH_FAILED', error: 'unknown machine token' };
   }
   const userId = await localUserIdForBearer(store, bearer);
   if (!userId) return { status: 401, code: 'AUTH_FAILED', error: 'unknown local token' };
   const actor = await resolveBearerActor(store, userId, rawHeader);
-  return actor ? { actor } : { status: 403, code: 'FORBIDDEN', error: 'this account cannot act as that agent' };
+  return actor ? { actor, memberId:userId } : { status: 403, code: 'FORBIDDEN', error: 'this account cannot act as that agent' };
 }
 
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString('base64url');

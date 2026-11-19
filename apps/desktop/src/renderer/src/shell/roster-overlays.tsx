@@ -2,23 +2,22 @@
 // A room is an agent's ACL boundary, so this is a permission change wearing a friendly face.
 // Extracted from App.tsx (track A4).
 import { AgentAvatar } from '../components/AgentAvatar';
-import { IconClose, IconSearch } from '../ui/icons';
-import { Popover } from '../ui/Popover';
-import { anchorPoint } from '../ui/anchor';
+import { RosterPopover } from '../ui/RosterPopover';
 import { agentFocus } from '../lib/presence';
 import { agentInChannel } from '@neuramesh/shared';
 import { selfLabel } from '../lib/self';
 import { type AgentRow, type MemberRow } from '../bridge/rows-crew';
 import { type ChannelRow } from '../bridge/rows-rooms';
 import { type TaskRow } from '../bridge/rows-board';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 // The searchable roster overlay — opened from the rail's "+N more" row. A flat, filterable
 // directory of every active agent; picking one opens its AgentDetails. Read-only by design
 // (adding an agent to a channel stays on the rail rows, where the channel context lives).
-export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove, onCreate, onConnectRemote, onClose }: {
+export function AddAgentsOverlay({ agents, channel, projectName, scopedTasks, onAdd, onRemove, onCreate, onConnectRemote, onClose }: {
   agents: AgentRow[];
   channel: ChannelRow;
+  projectName: string;
   scopedTasks: TaskRow[];
   onAdd: (a: AgentRow) => Promise<void>;
   onRemove: (a: AgentRow) => Promise<void>;
@@ -48,16 +47,11 @@ export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove
   const out = useMemo(() => matches.filter((a) => !inRoom(a)), [matches, channel.id]);
   const here = useMemo(() => matches.filter((a) => inRoom(a)), [matches, channel.id]);
   const shown: Array<[string, AgentRow[]]> =
-    tab === 'out' ? [['Not in this room', out]]
+    tab === 'out' ? [['Not in this project', out]]
       : tab === 'in' ? [['Already here', here]]
-        : [['Not in this room', out], ['Already here', here]];
+        : [['Not in this project', out], ['Already here', here]];
   const total = shown.reduce((n, [, rows]) => n + rows.length, 0);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const run = async (a: AgentRow, fn: (a: AgentRow) => Promise<void>) => {
     setBusyIds((s) => new Set(s).add(a.id));
@@ -80,12 +74,12 @@ export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove
         {here_ ? (
           <span className="aain">
             {removable
-              ? <button className="aaremove" disabled={pending} onClick={() => void run(a, onRemove)} title={`Remove @${a.name} from #${channel.slug}`}>{pending ? '…' : 'Remove'}</button>
+              ? <button className="aaremove" disabled={pending} onClick={() => void run(a, onRemove)} title={`Remove @${a.name} from ${projectName}`}>{pending ? '…' : 'Remove'}</button>
               : null}
-            <span className="aainlbl">✓ In channel</span>
+            <span className="aainlbl">✓ In project</span>
           </span>
         ) : (
-          <button className="aaadd" disabled={pending} onClick={() => void run(a, onAdd)} title={`Add @${a.name} to #${channel.slug}`}>
+          <button className="aaadd" disabled={pending} onClick={() => void run(a, onAdd)} title={`Add @${a.name} to ${projectName}`}>
             {pending ? '…' : '+ Add'}
           </button>
         )}
@@ -94,29 +88,14 @@ export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove
   };
 
   return (
-    <Popover label={`Add agents to #${channel.slug}`} anchor={anchorPoint()} width={460} align="end" onClose={onClose} className="rosterovl aaovl">
-      <>
-        <div className="rosterhd">
-          <b>Add agents</b>
-          <span className="aachan"><span className="h">#</span>{channel.slug}</span>
-          <button className="rosterx" aria-label="Close" onClick={onClose}><IconClose s={14} /></button>
-        </div>
-        <div className="rostersearch">
-          <IconSearch s={15} />
-          <input autoFocus placeholder="Search by name, role, or specialty…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <div className="rosterfilters">
-          <button className={`rosterchip aatab${tab === 'all' ? ' on' : ''}`} onClick={() => setTab('all')}>All<span className="aan">{agents.length}</span></button>
-          <button className={`rosterchip aatab${tab === 'in' ? ' on' : ''}`} onClick={() => setTab('in')}>In #{channel.slug}<span className="aan">{here.length}</span></button>
-          <button className={`rosterchip aatab${tab === 'out' ? ' on' : ''}`} onClick={() => setTab('out')}>Not in #{channel.slug}<span className="aan">{out.length}</span></button>
-        </div>
+    <RosterPopover title="Add agents" scope={projectName} query={q} onQuery={setQ} selected={tab} onSelect={setTab} onClose={onClose} tabs={[{id:'all',label:'All',count:agents.length},{id:'in',label:'In project',count:here.length},{id:'out',label:'Not in project',count:out.length}]}>
         <div className="rosterlist aalist">
           {total === 0 ? (
             <div className="rosterempty">
               {q.trim()
                 ? <>No agent matches “{q.trim()}”.<div className="aaempties">Nobody in this workspace covers that yet.</div>
                   <button className="btn sm aahire" onClick={() => onCreate(q.trim())}>+ Hire an agent called “{q.trim()}”</button></>
-                : tab === 'out' ? <>Everyone in this workspace is already in <b>#{channel.slug}</b>.</> : <>No agents yet.</>}
+                : tab === 'out' ? <>Everyone in this workspace is already in <b>{projectName}</b>.</> : <>No agents yet.</>}
             </div>
           ) : shown.map(([group, rows]) => rows.length === 0 ? null : (
             <div key={group}>
@@ -126,11 +105,10 @@ export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove
           ))}
         </div>
         <div className="aafoot">
-          <button onClick={() => onCreate('')}><span className="aafic">+</span>Create a new agent<small>hire for this channel</small></button>
+          <button onClick={() => onCreate('')}><span className="aafic">+</span>Create a new agent<small>hire for this project</small></button>
           <button onClick={onConnectRemote}><span className="aafic">⇄</span>Connect a remote agent<small>another machine</small></button>
         </div>
-      </>
-    </Popover>
+    </RosterPopover>
   );
 }
 
@@ -138,10 +116,10 @@ export function AddAgentsOverlay({ agents, channel, scopedTasks, onAdd, onRemove
 // "+"s behave identically. Scoped to people ALREADY in the workspace: this is a roster
 // move, not an invite, so it costs no seat and grants no access. Inviting someone new
 // still lives in the footer, where it routes to the seat-consuming email flow.
-export function AddPeopleOverlay({ members, inRoomIds, channel, meId, selfEmail, onAdd, onRemove, onInvite, onClose }: {
+export function AddPeopleOverlay({ members, inRoomIds, projectName, meId, selfEmail, onAdd, onRemove, onInvite, onClose }: {
   members: MemberRow[];
   inRoomIds: Set<string>;
-  channel: ChannelRow;
+  projectName: string;
   meId: string | null;
   selfEmail: string | null | undefined;
   onAdd: (m: MemberRow) => Promise<void>;
@@ -161,16 +139,11 @@ export function AddPeopleOverlay({ members, inRoomIds, channel, meId, selfEmail,
   const out = useMemo(() => matches.filter((m) => !inRoomIds.has(m.user_id)), [matches, inRoomIds]);
   const here = useMemo(() => matches.filter((m) => inRoomIds.has(m.user_id)), [matches, inRoomIds]);
   const shown: Array<[string, MemberRow[]]> =
-    tab === 'out' ? [['Not in this room', out]]
+    tab === 'out' ? [['Not in this project', out]]
       : tab === 'in' ? [['Already here', here]]
-        : [['Not in this room', out], ['Already here', here]];
+        : [['Not in this project', out], ['Already here', here]];
   const total = shown.reduce((n, [, rows]) => n + rows.length, 0);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const run = async (m: MemberRow, fn: (m: MemberRow) => Promise<void>) => {
     setBusyIds((s) => new Set(s).add(m.user_id));
@@ -192,12 +165,12 @@ export function AddPeopleOverlay({ members, inRoomIds, channel, meId, selfEmail,
         {here_ ? (
           <span className="aain">
             {removable
-              ? <button className="aaremove" disabled={pending} onClick={() => void run(m, onRemove)} title={`Remove ${label(m)} from #${channel.slug}`}>{pending ? '…' : 'Remove'}</button>
+              ? <button className="aaremove" disabled={pending} onClick={() => void run(m, onRemove)} title={`Remove ${label(m)} from ${projectName}`}>{pending ? '…' : 'Remove'}</button>
               : null}
-            <span className="aainlbl">✓ In channel</span>
+            <span className="aainlbl">✓ In project</span>
           </span>
         ) : (
-          <button className="aaadd" disabled={pending} onClick={() => void run(m, onAdd)} title={`Add ${label(m)} to #${channel.slug}`}>
+          <button className="aaadd" disabled={pending} onClick={() => void run(m, onAdd)} title={`Add ${label(m)} to ${projectName}`}>
             {pending ? '…' : '+ Add'}
           </button>
         )}
@@ -206,28 +179,13 @@ export function AddPeopleOverlay({ members, inRoomIds, channel, meId, selfEmail,
   };
 
   return (
-    <Popover label={`Add people to #${channel.slug}`} anchor={anchorPoint()} width={460} align="end" onClose={onClose} className="rosterovl aaovl">
-      <>
-        <div className="rosterhd">
-          <b>Add people</b>
-          <span className="aachan"><span className="h">#</span>{channel.slug}</span>
-          <button className="rosterx" aria-label="Close" onClick={onClose}><IconClose s={14} /></button>
-        </div>
-        <div className="rostersearch">
-          <IconSearch s={15} />
-          <input autoFocus placeholder="Search teammates by name or role…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <div className="rosterfilters">
-          <button className={`rosterchip aatab${tab === 'all' ? ' on' : ''}`} onClick={() => setTab('all')}>All<span className="aan">{members.length}</span></button>
-          <button className={`rosterchip aatab${tab === 'in' ? ' on' : ''}`} onClick={() => setTab('in')}>In #{channel.slug}<span className="aan">{here.length}</span></button>
-          <button className={`rosterchip aatab${tab === 'out' ? ' on' : ''}`} onClick={() => setTab('out')}>Not in #{channel.slug}<span className="aan">{out.length}</span></button>
-        </div>
+    <RosterPopover title="Add people" scope={projectName} query={q} onQuery={setQ} selected={tab} onSelect={setTab} onClose={onClose} tabs={[{id:'all',label:'All',count:members.length},{id:'in',label:'In project',count:here.length},{id:'out',label:'Not in project',count:out.length}]}>
         <div className="rosterlist aalist">
           {total === 0 ? (
             <div className="rosterempty">
               {q.trim()
                 ? <>Nobody in this workspace matches “{q.trim()}”.</>
-                : tab === 'out' ? <>Everyone in this workspace is already in <b>#{channel.slug}</b>.</> : <>No teammates yet.</>}
+                : tab === 'out' ? <>Everyone in this workspace is already in <b>{projectName}</b>.</> : <>No teammates yet.</>}
             </div>
           ) : shown.map(([group, rows]) => rows.length === 0 ? null : (
             <div key={group}>
@@ -239,7 +197,6 @@ export function AddPeopleOverlay({ members, inRoomIds, channel, meId, selfEmail,
         <div className="aafoot">
           <button onClick={onInvite}><span className="aafic">✉</span>Invite someone new<small>by email · uses a seat</small></button>
         </div>
-      </>
-    </Popover>
+    </RosterPopover>
   );
 }

@@ -93,6 +93,13 @@ describe('accept on the human\'s word', () => {
     expect((await j(ok)).task.state).toBe('accepted');
   });
 
+  it('does not interpret questions or a later hold as human release approval', async () => {
+    const t = await throughReview('pause before merge');
+    await say(george, t.id, 'Merge it');
+    await say(george, t.id, 'Wait, do not merge yet.');
+    expect((await send(rex, {type:'task.accept', taskId:t.id})).status).toBe(403);
+  });
+
   it('an AGENT\'s message is not the human\'s word', async () => {
     const t = await throughReview('agent chatter');
     await say(patch, t.id, 'merge it');

@@ -84,7 +84,10 @@ export abstract class SQLiteStore {
       if (previous && previous !== key) throw new Error('Cannot import a cache into another account');
       await this.setMeta('owner', key);
       if (!(await this.meta('cursor'))) for (const row of source.rows) await this.applyChange(row);
-      for (const entry of source.pending) await this.driver.query('insert into nm_outbox(table_name,row_id,operation,row_data,owner) values (?,?,?,?,?)', [entry.table, entry.id, entry.op, JSON.stringify(entry.opData ?? {}), key]);
+      // ONLY THIS PERSON'S QUEUED WRITES (R10 NM-120): the legacy file is the browser's, not the account's,
+      // so whoever signed in first after the upgrade inherited the previous person's unsent messages and
+      // uploaded them under their own credentials. A write whose author is not the owner is dropped.
+      for (const entry of source.pending.filter((e) => legacyAuthor(e.opData) === owner.id)) await this.driver.query('insert into nm_outbox(table_name,row_id,operation,row_data,owner) values (?,?,?,?,?)', [entry.table, entry.id, entry.op, JSON.stringify(entry.opData ?? {}), key]);
       const allowed = new Set(JSON.parse((await this.meta('workspaces')) ?? '[]') as string[]);
       await this.overlay(key, allowed);
       await this.setMeta(marker, '1');
@@ -163,4 +166,10 @@ export abstract class SQLiteStore {
   }
   protected async meta(key: string): Promise<string | undefined> { return (await this.driver.query('select value from nm_sync_meta where key=?', [key])).rows[0]?.['value'] as string | undefined; }
   protected async setMeta(key: string, value: string): Promise<void> { await this.driver.query('insert into nm_sync_meta values (?,?) on conflict(key) do update set value=excluded.value', [key, value]); }
+}
+
+/** who wrote a queued legacy row: messages carry author_id, artifacts and whiteboards created_by */
+function legacyAuthor(data: Record<string, unknown> | undefined): string | null {
+  const v = data?.['author_id'] ?? data?.['created_by'];
+  return typeof v === 'string' ? v : null;
 }

@@ -5,7 +5,7 @@
 // Run from apps/desktop: pnpm exec tsx --test src/main/host/drawdraft.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeDraw, NO_IMAGE_KEY } from './drawdraft';
+import { makeDraw, NO_IMAGE_KEY, undrawableText } from './drawdraft';
 
 const ORIGINAL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9D8AAAAASUVORK5CYII=', 'base64');
 const CH = { id: 'ch-1', slug: 'marketing', workspace_id: 'ws-1' };
@@ -13,7 +13,7 @@ const agentOf = (role: string, id: string) => ({ id, name: id, role, runtime: 'c
 
 function rig(opts: { media?: Record<string, unknown> | null; cred?: boolean; paint?: Record<string, unknown>; brief?: string; rewrite?: string; failUpload?: boolean; missingReceipt?: boolean; missingDraft?: boolean } = {}) {
   const sent: Array<{ actor: string; cmd: Record<string, unknown> }> = [];
-  const row = { platform: 'x', media: opts.media === undefined ? null : JSON.stringify(opts.media), body: 'Tired but wired. flowe fixes the gap.', channel_id: CH.id, slug: CH.slug, workspace_id: CH.workspace_id };
+  const row = { platform: 'x', media: opts.media === undefined ? null : JSON.stringify(opts.media), body: 'Tired but wired. flowe fixes the gap.', status: 'draft', channel_id: CH.id, slug: CH.slug, workspace_id: CH.workspace_id };
   const draw = makeDraw({
     agents: new Map([['m', agentOf('marketer', 'plume')], ['o', agentOf('orchestrator', 'rex')]]) as never,
     db: { getAll: async <T,>(sql: string) => (sql.includes('from content_items') && !opts.missingDraft ? [row] : []) as T[] },
@@ -108,4 +108,57 @@ test('typed draft success carries the acknowledged original media ID', async () 
   const out = await draw.generateDraftImage(agentOf('marketer', 'plume') as never, CH, 'item-1');
   assert.equal(out.ok, true);
   if (out.ok) assert.equal(out.mediaId, 'original-media');
+});
+
+// THE DESK THREAD (George, 2026-11-17): the Marketing desk starts its threads in the project's room,
+// and a draw answered "scheduled, published or deleted" for a draft on the card. The lookup reads
+// the draft by its id and its room or its conversation, and the reply names a status only when the
+// row is there with it.
+function lookupRig(row: { channel_id: string; thread_id: string | null; status: string } | null) {
+  const sent: string[] = [];
+  const draw = makeDraw({
+    agents: new Map([['o', agentOf('orchestrator', 'rex')]]) as never,
+    db: { getAll: async <T,>(sql: string, params: unknown[] = []) => {
+      if (!sql.includes('from content_items') || !row) return [] as T[];
+      if (/channel_id = \? or thread_id = \?/.test(sql) && row.channel_id !== params[1] && row.thread_id !== params[2]) return [] as T[];
+      return [{ platform: 'x', media: JSON.stringify({ brief: 'a lamp' }), body: 'A post.', ...row }] as T[];
+    } },
+    post: (async (_path: string, _actor: unknown, cmd: unknown) => { sent.push((cmd as { type: string }).type); return Response.json({ mediaId: 'm' }); }),
+    imageCred: async () => ({ provider: 'openai' as const, key: 'k' }),
+    brandOf: async () => ({ tokens: { palette: [], fonts: [] }, product: 'flowe' }) as never,
+    paint: (async () => ({ thumb: 'data:image/png;base64,T', bytes: ORIGINAL, mime: 'image/png', model: 'gpt-image-2' })) as never,
+    complete: (async () => '') as never,
+  });
+  return { draw, sent };
+}
+
+test('a desk thread draws its own draft, found by the conversation that holds it', async () => {
+  const { draw, sent } = lookupRig({ channel_id: 'ch-project', thread_id: 'th-desk', status: 'draft' });
+  const reply = await draw.drawOnAsk(agentOf('orchestrator', 'rex') as never, CH, 'item-1', 'th-desk');
+  assert.match(reply, /^I drew the image/);
+  assert.deepEqual(sent, ['content.attach_media', 'content.revise']);
+});
+
+test('a draft in another room and another conversation is not drawn', async () => {
+  const { draw, sent } = lookupRig({ channel_id: 'ch-other', thread_id: 'th-other', status: 'draft' });
+  const reply = await draw.drawOnAsk(agentOf('orchestrator', 'rex') as never, CH, 'item-1', 'th-desk');
+  assert.equal(reply, undrawableText(null));
+  assert.deepEqual(sent, [], 'nothing is written to a draft this conversation cannot see');
+});
+
+test('a draft the agent cannot see says so, and never claims a status', async () => {
+  const { draw } = lookupRig(null);
+  const reply = await draw.drawOnAsk(agentOf('orchestrator', 'rex') as never, CH, 'item-1', 'th-desk');
+  assert.match(reply, /^I cannot find that draft in this conversation\./);
+  assert.doesNotMatch(reply, /scheduled|published/);
+});
+
+test('a status names itself only when the row has it', async () => {
+  for (const status of ['scheduled', 'published', 'failed'] as const) {
+    const { draw, sent } = lookupRig({ channel_id: CH.id, thread_id: 'th-desk', status });
+    const reply = await draw.drawOnAsk(agentOf('orchestrator', 'rex') as never, CH, 'item-1', 'th-desk');
+    assert.equal(reply, undrawableText(status));
+    assert.ok(reply.includes(status), `${status}: ${reply}`);
+    assert.deepEqual(sent, []);
+  }
 });

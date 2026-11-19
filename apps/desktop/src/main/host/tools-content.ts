@@ -14,8 +14,7 @@ import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
 import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { productOrchTools } from './chattools-product';
-import { ungrounded } from './grounding';
-import { draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
+import { draftGround, draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
 import { draftsOrchTools, unreadRevision } from './chattools-drafts';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
@@ -90,7 +89,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       const anchor = thread ? { task: thread.id } : convoThreadId ? { thread: convoThreadId } : null;
       if (!anchor) return 'draft_posts needs a thread to deliver into — reply inside the conversation and draft there.';
       // the grounding gate (host/grounding.ts): a marketing room's brand docs are read before a draft is written
-      const gate = await ungrounded(db, ch.id, grounding, { threadId: convoThreadId, taskId: thread?.id });
+      const gate = await draftGround(db, ch.id, grounding, { threadId: convoThreadId, taskId: thread?.id });
       if (gate) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: the brand docs were not read this turn' }); return gate; }
       // the angle gate (host/ugcflow.ts): a VIDEO post is the UGC playbook's, and it drafts only after the human picked an angle
       if (input.posts.some((p) => p.script)) {

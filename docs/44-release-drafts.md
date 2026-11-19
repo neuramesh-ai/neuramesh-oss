@@ -1,5 +1,7 @@
 # 44 · Release drafts: the repository is a marketing source
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 **Status:** built 2026-09-17 (design: [docs/design/release-drafts-2026-09/plan.md](design/release-drafts-2026-09/plan.md), canvas boards beside it). **Registry:** the `release` playbook in `packages/shared/src/playbooks-registry.ts`, the fifth marketing setup step in `packages/shared/src/setupflows.ts`. **Pure halves:** `packages/shared/src/releasescan.ts` (the scan, the digest, the cursor merge), `packages/shared/src/releasebrief.ts` (the brief's shape, the `‹brief:id›` marker).
 
 ## The one sentence

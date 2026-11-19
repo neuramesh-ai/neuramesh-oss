@@ -11,7 +11,13 @@
 //     be visible to a human (announcing a merge twice, reclaiming a berth twice).
 // `claimed` must never become durable: making it so strands every in-flight task forever
 // (docs/harness/05 §2.1). adoption.test.ts guards that, and reads this file.
-import { DurableSet, type durableStore } from '../harness/hostqueue';
+//
+// On Cloud Run the durable store is SHARED (harness/facts.ts: Postgres is the authority, the local
+// harness.db a cache), because every sleep is a restart there: a guard that was "once per session"
+// would re-post the same hire card or re-spend a reply's bounded retries on every wake. So two more
+// guards become durable facts there, keeping their Set/Map types: hireProposed and wakeGaveUp.
+import { DurableSet, isSharedFacts, type durableStore } from '../harness/hostqueue';
+import { DurableCountMap, DurableStringSet } from '../harness/facts';
 import type { Recommendation, CustomModelPack } from '@neuramesh/shared';
 import type { ParkRecord } from '../harness/park';
 import type { ExecTask, HostedAgent } from '../agents';
@@ -145,13 +151,14 @@ export interface HostGuards {
 
 /** Build the registry. `hostGuards` is the durable store the DurableSets write through. */
 export function makeHostGuards(hostGuards: DurableStore): HostGuards {
+  const shared = isSharedFacts(hostGuards);
   return {
     processed: new Set<string>(),
     firstSeen: new Map<string, number>(),
-    wakeGaveUp: new Map<string, number>(),
+    wakeGaveUp: shared ? new DurableCountMap(hostGuards, 'wake-gave-up') : new Map<string, number>(),
     claimedIds: new Set<string>(),
     reviewed: new Set<string>(),
-    hireProposed: new Set<string>(),
+    hireProposed: shared ? new DurableStringSet(hostGuards, 'hire-proposed') : new Set<string>(),
     markedOnline: new Set<string>(),
     claimFailNoticed: new Set<string>(),
     bootstrapAuthCardPosted: new Set<string>(),

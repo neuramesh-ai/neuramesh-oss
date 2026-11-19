@@ -16,7 +16,7 @@
 // Subscribers are NOT sessions: they never count toward the machine's activity meter. A browser
 // tab left open must not keep a machine awake and billing (machined.ts busyNow).
 import {
-  LIVE_HEARTBEAT_MS, LIVE_MAX_CHARS, LIVE_MIN_FRAME_MS, liveDelta, type LiveFrame, type ImageGenerationProgress,
+  LIVE_HEARTBEAT_MS, LIVE_MAX_CHARS, LIVE_MIN_FRAME_MS, liveDelta, sameProgress, type LiveFrame, type ImageGenerationProgress,
 } from '@neuramesh/shared';
 
 export interface LiveSubscriber {
@@ -53,6 +53,9 @@ interface KeyState {
   sentThinking: string;
   imageGeneration: ImageGenerationProgress | null;
   sentImageGeneration: ImageGenerationProgress | null;
+  /** the newest progress lines, and the lines the last flush described (round 9 live narration) */
+  progress: string[];
+  sentProgress: string[];
   lastFlushAt: number;
   timer: unknown;
 }
@@ -78,27 +81,30 @@ export function createLiveStreams(opts: LiveStreamsOptions = {}) {
     if (st.timer !== null) { clearTimer(st.timer); st.timer = null; }
     // the very first flush of an epoch goes out even when empty: that frame IS the presence the
     // desktop gets from emitStream('', false) — "an agent works here, no tokens yet"
-    if (st.seq > 0 && st.text === st.sent && st.thinking === st.sentThinking && JSON.stringify(st.imageGeneration) === JSON.stringify(st.sentImageGeneration)) return;
+    if (st.seq > 0 && st.text === st.sent && st.thinking === st.sentThinking && sameProgress(st.progress, st.sentProgress) && JSON.stringify(st.imageGeneration) === JSON.stringify(st.sentImageGeneration)) return;
     const { keep, add } = liveDelta(st.sent, st.text);
     // the thoughts ride the same frame as their own delta, and only when they changed
     const th = st.thinking !== st.sentThinking ? liveDelta(st.sentThinking, st.thinking) : null;
     const imageChanged = JSON.stringify(st.imageGeneration) !== JSON.stringify(st.sentImageGeneration);
+    // the progress list rides whole, and only when it changed
+    const pg = sameProgress(st.progress, st.sentProgress) ? null : st.progress;
     st.seq += 1;
     st.sent = st.text;
     st.sentThinking = st.thinking;
     st.sentImageGeneration = st.imageGeneration;
+    st.sentProgress = st.progress;
     st.lastFlushAt = now();
-    opts.trace?.(`flush k=${key} s=${st.seq} keep=${keep} add=${add.length} len=${st.text.length}${th ? ` th=${st.thinking.length}` : ''}`);
-    toAll(key, { t: 'd', k: key, a: st.agent, e: st.epoch, s: st.seq, keep, add, ...(th ? { tk: th.keep, ta: th.add } : {}), ...(imageChanged ? { imageGeneration: st.sentImageGeneration } : {}), at: st.lastFlushAt });
+    opts.trace?.(`flush k=${key} s=${st.seq} keep=${keep} add=${add.length} len=${st.text.length}${th ? ` th=${st.thinking.length}` : ''}${pg ? ` pg=${pg.length}` : ''}`);
+    toAll(key, { t: 'd', k: key, a: st.agent, e: st.epoch, s: st.seq, keep, add, ...(th ? { tk: th.keep, ta: th.add } : {}), ...(pg ? { pg } : {}), ...(imageChanged ? { imageGeneration: st.sentImageGeneration } : {}), at: st.lastFlushAt });
   };
 
   const snapOf = (key: string, st: KeyState): LiveFrame =>
-    ({ t: 'snap', k: key, a: st.agent, e: st.epoch, s: st.seq, text: st.sent, ...(st.sentThinking ? { th: st.sentThinking } : {}), ...(st.sentImageGeneration ? { imageGeneration: st.sentImageGeneration } : {}), at: now() });
+    ({ t: 'snap', k: key, a: st.agent, e: st.epoch, s: st.seq, text: st.sent, ...(st.sentThinking ? { th: st.sentThinking } : {}), ...(st.sentProgress.length ? { pg: st.sentProgress } : {}), ...(st.sentImageGeneration ? { imageGeneration: st.sentImageGeneration } : {}), at: now() });
 
   return {
-    /** emitStream's second consumer. Same arguments, same meaning: the whole visible text so far, and
-     *  the turn's thoughts so far (absent = unchanged) */
-    publish(key: string, agent: string, text: string, done: boolean, thinking?: string, imageGeneration?: ImageGenerationProgress | null): void {
+    /** emitStream's second consumer. Same arguments, same meaning: the whole visible text so far, the
+     *  turn's thoughts so far (absent = unchanged) and its progress lines so far (absent = unchanged) */
+    publish(key: string, agent: string, text: string, done: boolean, thinking?: string, imageGeneration?: ImageGenerationProgress | null, progress?: readonly string[]): void {
       let st = keys.get(key);
       if (done) {
         if (!st) return; // the second clear from a wake's `finally`: already ended
@@ -112,7 +118,7 @@ export function createLiveStreams(opts: LiveStreamsOptions = {}) {
       // {agent, text} per key already does
       if (!st || st.agent !== agent) {
         if (st?.timer) clearTimer(st.timer);
-        st = { agent, epoch: mintEpoch(), seq: 0, text: '', sent: '', thinking: '', sentThinking: '', imageGeneration: null, sentImageGeneration: null, lastFlushAt: 0, timer: null };
+        st = { agent, epoch: mintEpoch(), seq: 0, text: '', sent: '', thinking: '', sentThinking: '', imageGeneration: null, sentImageGeneration: null, progress: [], sentProgress: [], lastFlushAt: 0, timer: null };
         keys.set(key, st);
         opts.trace?.(`open k=${key} a=${agent}`);
       }
@@ -121,6 +127,7 @@ export function createLiveStreams(opts: LiveStreamsOptions = {}) {
       st.text = text;
       if (imageGeneration !== undefined) st.imageGeneration = imageGeneration;
       if (thinking !== undefined && thinking.length <= maxChars) st.thinking = thinking;
+      if (progress !== undefined && !sameProgress(progress, st.progress)) st.progress = [...progress];
       if (!subs.size) return; // nobody listening: keep the text for a late `snap`, cut no frames
       const wait = st.lastFlushAt + minFrameMs - now();
       if (st.seq === 0 || wait <= 0) { flush(key, st); return; }
@@ -133,7 +140,7 @@ export function createLiveStreams(opts: LiveStreamsOptions = {}) {
     /** a relay `stream` channel opened: everything live now, then deltas as they happen */
     subscribe(sub: LiveSubscriber): () => void {
       for (const [key, st] of keys) {
-        if (st.seq === 0 || st.text !== st.sent || st.thinking !== st.sentThinking || JSON.stringify(st.imageGeneration) !== JSON.stringify(st.sentImageGeneration)) flush(key, st); // bring every holder to one seq first
+        if (st.seq === 0 || st.text !== st.sent || st.thinking !== st.sentThinking || !sameProgress(st.progress, st.sentProgress) || JSON.stringify(st.imageGeneration) !== JSON.stringify(st.sentImageGeneration)) flush(key, st); // bring every holder to one seq first
       }
       const beat = setInterval(() => sub.send({ t: 'hb', at: now() }), opts.heartbeatMs ?? LIVE_HEARTBEAT_MS);
       (beat as { unref?: () => void }).unref?.();

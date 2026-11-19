@@ -125,7 +125,7 @@ function pathGlobToRe(glob: string): RegExp {
   return new RegExp('^' + re + '$');
 }
 export function matchPathGlob(path: string, glob: string): boolean {
-  return pathGlobToRe(glob).test(path);
+  return pathGlobToRe(glob).test(path) || (glob.startsWith('**/') && pathGlobToRe(glob.slice(3)).test(path));
 }
 export function canonicalPolicyHost(value: string): string | null {
   const trimmed = trimEndChars(value.trim(), '.');
@@ -301,6 +301,15 @@ function ruleSig(r: PolicyRule): string {
 export function mergePolicies(base: readonly PolicyRule[], overrides: readonly PolicyRule[]): PolicyRule[] {
   const bySig = new Map<string, PolicyRule>();
   for (const r of base) bySig.set(ruleSig(r), r);
-  for (const o of overrides) bySig.set(ruleSig(o), o);
+  for (const o of overrides) {
+    const key = ruleSig(o);
+    const prior = bySig.get(key);
+    if (prior?.locked && !canTighten(prior.verdict, o.verdict)) continue;
+    if (prior && prior.scope !== o.scope) {
+      bySig.set(o.scope + ':' + key, o);
+    } else {
+      bySig.set(key, prior?.locked ? { ...o, locked: true } : o);
+    }
+  }
   return [...bySig.values()];
 }

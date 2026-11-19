@@ -9,7 +9,7 @@
 //   · trialReminder sends the email the form promises, 3 days before the first charge.
 import type { Env, Hono } from 'hono';
 import { PRO_SEAT_USD, PRO_TRIAL_DAYS, renderTrialEnding, type Actor } from '@neuramesh/shared';
-import { billingPublishableKey, createTrialSession, planPatchFromEvent, trialReminderFromEvent, trialSessionState } from './billing';
+import { billingEnabled, billingPublishableKey, createTrialSession, planPatchFromEvent, trialReminderFromEvent, trialSessionState } from './billing';
 import { billingCaller, sqlOf } from './credits';
 import { LIFECYCLE_LINKS } from './lifecycle';
 import { HQ_URL } from './mail';
@@ -37,6 +37,12 @@ export function trialReturnBase(origin: string | undefined): string {
 export const trialDate = (iso: string): string => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function trialRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store): void {
+  // what billing can do on this stack, before anyone asks it to (round 5). hq read the answer off
+  // the trial's own 404 where billing is off: every wizard on the sandbox logged a failed POST for a
+  // step that then passed itself on. Now it asks here once, and the step and the Pro sheet stay away
+  // without a request. No workspace and no keys: the publishable key rides the trial's answer only.
+  app.get('/v1/billing/config', (c) => c.json({ checkout: billingEnabled(), trial: billingEnabled() && !!billingPublishableKey() }));
+
   app.post('/v1/billing/trial', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { workspace?: string };
     const actor = c.get('actor');

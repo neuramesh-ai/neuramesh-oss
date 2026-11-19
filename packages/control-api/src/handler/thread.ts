@@ -33,6 +33,7 @@ import { DomainError } from '../errors';
 
 
 import { type Store } from '../store';
+import { bindCodingWorkspace } from '../store/coding-workspace';
 
 
 
@@ -88,13 +89,19 @@ export async function threadCommands(store: Store, actor: Actor, cmd: Command): 
     if (!(actor.kind === 'human' || actor.role === 'orchestrator')) {
       throw new DomainError('NOT_PERMITTED', 'a conversation becomes coding by a human or the orchestrator');
     }
+    // round 9 (0177): a named workspace goes through the one gate the intake service uses too. Scratch
+    // needs no repository. A thread back to chat clears its workspace mode
+    if (cmd.kind === 'coding' && cmd.codeWorkspace) {
+      const bound = await bindCodingWorkspace(store, { workspace: cmd.workspace, threadId: cmd.threadId, mode: cmd.codeWorkspace, repoId: cmd.repoId ?? null });
+      return { ok: true, ...bound } as never;
+    }
     const subject = await store.threadFiling(cmd.workspace, cmd.threadId);
     if (!subject) throw new DomainError('NOT_FOUND', `thread ${cmd.threadId} not found`);
     if (subject.taskId) throw new DomainError('TASK_THREAD', 'a task thread is already the code path — its unit carries the worktree and the pull request');
     if (cmd.kind === 'coding' && !(await store.announcements?.repoForChannel(subject.channelId))) {
       throw new DomainError('REPO_REQUIRED', 'connect a repository to this project before code work can start here');
     }
-    await store.setThreadKind(cmd.workspace, cmd.threadId, cmd.kind);
+    await store.setThreadKind(cmd.workspace, cmd.threadId, cmd.kind, cmd.kind === 'chat' ? null : undefined);
     return { ok: true, threadId: cmd.threadId, kind: cmd.kind } as never;
   }
   // Auto-filing (0109): move a conversation into the room it belongs in. The rules are one pure

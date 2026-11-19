@@ -73,9 +73,9 @@ export const BRAIN_PROVIDERS: Array<{ id: 'anthropic' | 'openai' | 'gemini'; nam
   { id: 'gemini', name: 'Gemini', sub: 'Sign in with your Google account (Antigravity)', place: 'AIza… (API key)', pkg: 'antigravity-cli', login: 'agy' },
 ];
 
-// role → identity dot for the brain pickers (sales has no role token — muted)
+// role → identity dot for the brain pickers (sales and finance have no role token — muted)
 export const ROLE_DOT: Record<AgentRole, string> = {
   orchestrator: 'var(--role-orch)', architect: 'var(--role-arch)', developer: 'var(--role-dev)', worker: 'var(--role-dev)',
   reviewer: 'var(--role-rev)', designer: 'var(--role-design)', sales: 'var(--muted)', curator: 'var(--role-cur)',
-  shipper: 'var(--role-ship)', marketer: 'var(--role-mkt)',
+  shipper: 'var(--role-ship)', marketer: 'var(--role-mkt)', finance: 'var(--muted)',
 };

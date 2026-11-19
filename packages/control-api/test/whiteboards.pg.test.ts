@@ -66,8 +66,20 @@ describe.skipIf(!DB)('whiteboards on postgres — jsonb columns hold OBJECTS, ne
 
     // and the API read round-trips to a PARSEABLE OBJECT — the exact thing the renderer does;
     // under the scalar bug this parse yields a STRING and every remote replica shows an empty board
-    const detail = await j(await app!.request(`/v1/whiteboards/${whiteboardId}`, { headers: hdr(sol) }));
+    // read as george, a member: the fixture agent sol has no agents row, and a board answers only
+    // its workspace's members and agents (workspace reads answer members only)
+    const detail = await j(await app!.request(`/v1/whiteboards/${whiteboardId}`, { headers: hdr(george) }));
     const scene = JSON.parse(detail.whiteboard.scene) as { elements?: unknown[] };
     expect(Array.isArray(scene.elements)).toBe(true);
+    // a signed-in stranger who holds the ids reads nothing: by id the board is missing, by channel refused
+    const stranger: Actor = { kind: 'human', id: '00000000-0000-0000-0000-0000000000ff' };
+    expect((await app!.request(`/v1/whiteboards/${whiteboardId}`, { headers: hdr(stranger) })).status).toBe(404);
+    expect((await app!.request(`/v1/whiteboards?channel=${ch}`, { headers: hdr(stranger) })).status).toBe(403);
+    expect((await app!.request(`/v1/whiteboards?workspace=${WS}`, { headers: hdr(stranger) })).status).toBe(403);
+    expect((await app!.request(`/v1/whiteboards?channel=${ch}`, { headers: hdr(george) })).status).toBe(200);
+    // nor writes: a stranger's patch answers as a missing board, and the board keeps its rev
+    expect((await app!.request(`/v1/whiteboards/${whiteboardId}`, { method: 'PATCH', headers: hdr(stranger), body: JSON.stringify({ rev: 99, title: 'taken' }) })).status).toBe(404);
+    const [kept] = await sql!`select rev, title from whiteboards where id = ${whiteboardId}::uuid`;
+    expect(kept!['title']).toBe('pg jsonb probe');
   });
 });

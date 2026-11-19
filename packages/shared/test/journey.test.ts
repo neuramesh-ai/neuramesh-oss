@@ -113,3 +113,10 @@ describe('the execution leg is named by what the work IS (2026-08-19)', () => {
     expect(legacy.find((l) => l.key === 'build')!.label).toBe('Build');
   });
 });
+
+it('planning keeps the assigned developer or marketer instead of inferring the architect', () => {
+  for (const assigneeName of ['custom-developer', 'plume']) {
+    const legs=journeyFor({state:'planning',hasDesignRound:false,hasPlanDoc:true,repoBacked:true,shipGate:false,assigneeName},roster);
+    expect(legs.find(leg=>leg.key==='plan')?.owner).toBe(assigneeName);
+  }
+});

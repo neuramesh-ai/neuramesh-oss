@@ -13,7 +13,7 @@ import { type RunHandle } from './runs';
 import { type SubjectRef } from '../harness/brain';
 import { withTimeout } from './turnkit';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
-import type { PromptOverride } from '../runtime/adapter';
+import type { PermissionGate, PromptOverride } from '../runtime/adapter';
 import type { Seat } from './lookups';
 import type { makeRuns } from './runs';
 import type { makeLookups } from './lookups';
@@ -26,10 +26,10 @@ export function makeTurnContext(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   apiUrl: string;
   blockFor: ReturnType<typeof makeBlock>['blockFor'];
-  brainBriefing: (subject: SubjectRef | null, dir: string) => string;
+  brainBriefing: (subject: SubjectRef | null, dir: string) => string | Promise<string>;
   db: ReplicaDatabase;
   designerOverride: (a: { ch: { id: string; slug: string; workspace_id: string }; taskId: string | null; label: string; brief: string; dir: string; brainSubject: SubjectRef | null }) => Promise<PromptOverride>;
-  ensureChatWorkspace: (threadId: string) => string;
+  ensureChatWorkspace: (threadId: string) => string | Promise<string>;
   legSummary: (out: string) => string;
   narrate: ReturnType<typeof makeRuns>['narrate'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
@@ -42,6 +42,9 @@ export function makeTurnContext(ctx: HostCtx & {
   /** the room's repository reader (host/reporead.ts): a spawned leg reads the code like a worker leg */
   repoFor: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => RepoReader;
   workspace: string;
+  /** the leg's runtime and credential: the module functions, replaced only in a test */
+  runtimeFor?: typeof runtimeFor;
+  resolveToken?: typeof resolveToken;
 }) {
 const { alog, apiUrl, blockFor, brainBriefing, db, designerOverride, ensureChatWorkspace, legSummary, narrate, openRun, ownerActorId, post, recordLegResult, resolveSeat, seatLabel, taskOf } = ctx;
 
@@ -70,7 +73,7 @@ async function threadTranscript(agent: HostedAgent, t: ThreadTask): Promise<stri
   const block = await blockFor(t.channel_id);
   const cutoff = rows.length - THREAD_FULL_RECENT;
   return (
-    (block ? `[channel summary block]\n${block}\n\n` : '') +
+    (block ? `[project memory block]\n${block}\n\n` : '') +
     `[task #${t.number}: ${t.title}]\nstate: ${t.state}${t.description ? `\ndescription: ${t.description}` : ''}\n\n[thread]\n` +
     rows
       .map((r, i) => {
@@ -106,6 +109,9 @@ function orchSpawnFor(
   // work (25m/72k) where a routing turn funds a question (4m/24k). Passing the wrong one here is
   // how a three-way design round quietly becomes a one-way one.
   kind: TurnKind = 'triage',
+  // the conversation's permission gate, built for the seated agent and the leg's run. A safe
+  // spawn hands down no approval: each action of the leg passes this gate on its own.
+  gateFor?: (seated: HostedAgent, run: RunHandle) => PermissionGate,
 ): (i: { role: string; prompt: string; label?: string }) => Promise<{ ok: boolean; summary?: string; error?: string }> {
   let remaining = { ...TURN_BUDGETS[kind] };
   const subtree = new Subtree(parentRun.id || ch.id);
@@ -128,9 +134,9 @@ function orchSpawnFor(
     // the conversation's OWN brain workspace — legs of one thread share it, and it is the same
     // directory the thread's notes and result envelopes live beside (docs/harness/01 §3.2)
     const brainSubject: SubjectRef | null = threadId ? { kind: 'thread', id: threadId } : null;
-    const dir = ensureChatWorkspace(threadId ?? ch.id);
+    const dir = await ensureChatWorkspace(threadId ?? ch.id);
     try {
-      const cred = await resolveToken(apiUrl, ch.workspace_id, seated, ownerActorId);
+      const cred = await (ctx.resolveToken ?? resolveToken)(apiUrl, ch.workspace_id, seated, ownerActorId);
       // a synthetic subject: promptOverride bypasses buildCodingPrompt entirely, so the leg needs
       // only enough of an ExecTask shape to be carried through the adapter seam
       const subject = { id: ch.id, number: 0, title: label, channel_id: ch.id, requirements: null, repo_id: null, base_ref: null, branch: null } as unknown as ExecTask;
@@ -146,7 +152,7 @@ function orchSpawnFor(
       // `claudeDesign` flag that is the ONLY thing unlocking `mcp__claude-design__*`.
       const override = i.role === 'designer'
         ? await designerOverride({ ch, taskId: await taskOf(threadId), label, brief: i.prompt, dir, brainSubject })
-        : { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger question for ${orch.name}, the orchestrator of #${ch.slug}. Do exactly this piece, then report what you found and how you know. You cannot create, offer or route board work — your parent owns this and reports for you.${brainBriefing(brainSubject, dir)}` };
+        : { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger question for ${orch.name}, the orchestrator of #${ch.slug}. Do exactly this piece, then report what you found and how you know. You cannot create, offer or route board work — your parent owns this and reports for you.${await brainBriefing(brainSubject, dir)}` };
       // the Claude Design project URL arrives in a TOOL RESULT, before the model's summary —
       // caught here and announced by the OWNER, since the leg has no board identity to post with
       const projectWatch = claudeDesignProjectWatch();
@@ -158,10 +164,10 @@ function orchSpawnFor(
         if (url) projectUrl = url;
       };
       const out = await withTimeout(
-        runtimeFor(seated.runtime).runQuery(
+        (ctx.runtimeFor ?? runtimeFor)(seated.runtime).runQuery(
           seated, subject, dir, cred.token ?? '', null, false, undefined, watchedLog,
           undefined, undefined, undefined, undefined, undefined, undefined,
-          override, undefined, undefined, undefined, undefined,
+          override, undefined, undefined, gateFor?.(seated, run), undefined,
           // the leg reads the room's repository like a worker leg does (docs/design/repo-connect-2026-10):
           // without it a subagent asked about the code had nothing to read but an empty workspace
           { turnKind: i.role === 'designer' ? 'design' : 'leg', repo: ctx.repoFor({ kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, ch) },

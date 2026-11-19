@@ -10,7 +10,8 @@
 // desktop default's Mac — so a forecast of "Cloud" never pins a session to a machine that fell
 // asleep between the reading and the send.
 import { useRef, useState } from 'react';
-import { machineOnline, type SessionOrigin } from '@neuramesh/shared';
+import { machineOnline, machineState, MACHINE_STATUS_LABEL, type MachineStatus, type SessionOrigin } from '@neuramesh/shared';
+import { useMachineIntents } from './useCompute';
 import type { MachineRow, MemberRow } from '../bridge/rows-crew';
 import { choosableMachines, forecastMachine, type ChoiceMachine } from './machine-choice';
 import { parseComputePrefs } from './prefs';
@@ -68,6 +69,7 @@ export function MachineChip({ machines, members, selfUserId, selfMachineName, or
   const current = forecast.machineId ? rows.find((m) => m.id === forecast.machineId) ?? null : null;
   const online = (m: ChoiceMachine) => machineOnline({ machineId: m.id, ownerUserId: '', runtimes: [], lastSeenAt: m.lastSeenAt }, now);
   const isCloud = (m: ChoiceMachine) => m.kind === 'runner' || m.kind === 'member';
+  const intents = useMachineIntents(true);
   // the kind is an SVG from the icon set, the same weight as the pill's (George, 2026-09-05: the text
   // glyphs drew a bold cloud beside a hairline house); a cloud machine is a plain cloud HERE — the
   // rows are a list of places, so "cloud" alone reads — while the status pill draws the badged
@@ -79,10 +81,15 @@ export function MachineChip({ machines, members, selfUserId, selfMachineName, or
   // the state is an ICON at the row's right, its word in the tooltip: a cloud machine has an intent as
   // well as a heartbeat (the pill's derivation); a laptop has only the heartbeat
   const stateOf = (m: ChoiceMachine): { icon: string; word: string; tone: 'on' | 'waking' | 'sleep' | 'off' } => {
-    if (m.kind === 'runner' && cloud) {
-      if (cloud.status === 'online') return { icon: '●', word: 'awake', tone: 'on' };
-      if (cloud.status === 'waking') return { icon: '●', word: 'waking', tone: 'waking' };
-      if (cloud.status === 'asleep') return { icon: '☾', word: 'asleep · wakes on send', tone: 'sleep' };
+    // a cloud machine's state is its intent (shared machineState), never the heartbeat alone: a
+    // parked machine was seen seconds ago because it just drained
+    const intent = isCloud(m) && m.kind !== 'runner' ? intents.find((x) => x.id === m.id) : undefined;
+    const status = (m.kind === 'runner' ? cloud?.status : intent ? machineState(intent, null, now).status : undefined) as MachineStatus | undefined;
+    if (status) {
+      if (status === 'online') return { icon: '●', word: 'awake', tone: 'on' };
+      if (status === 'waking') return { icon: '●', word: 'waking', tone: 'waking' };
+      if (status === 'asleep') return { icon: '☾', word: 'asleep · wakes on send', tone: 'sleep' };
+      return { icon: '☾', word: MACHINE_STATUS_LABEL[status].toLowerCase(), tone: status === 'sleeping' || status === 'held' ? 'sleep' : 'off' };
     }
     return online(m) ? { icon: '●', word: 'online', tone: 'on' } : { icon: '○', word: 'offline', tone: 'off' };
   };

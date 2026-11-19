@@ -312,7 +312,7 @@ describe('custom brains (user-authored packs)', () => {
 describe('picker preview roles', () => {
   it('previews the six working roles — designer (docs/14) and marketer (marketing-channel plan) seated, support roles separate', () => {
     expect(PACK_PREVIEW_ROLES).toEqual(['orchestrator', 'architect', 'developer', 'reviewer', 'designer', 'marketer']);
-    expect(PACK_SUPPORT_ROLES).toEqual(['shipper', 'sales', 'curator']);
+    expect(PACK_SUPPORT_ROLES).toEqual(['shipper', 'sales', 'curator', 'finance']);
     // worker never previews — it aliases developer
     expect(PACK_PREVIEW_ROLES).not.toContain('worker');
     expect([...PACK_PREVIEW_ROLES, ...PACK_SUPPORT_ROLES, 'worker'].sort()).toEqual([...AGENT_ROLES].sort());

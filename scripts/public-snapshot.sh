@@ -21,8 +21,8 @@
 # documents named in PUBLIC_DOCS ship). From a clean clone of HEAD (so uncommitted work never rides
 # along) this script removes every path in PUBLIC_EXCLUDE, every document not named in PUBLIC_DOCS
 # and every workflow not in PUBLIC_WORKFLOWS, places the public repository's own files from PUBLIC_OWN
-# (its pull request template and the workflow that enforces it), one line each so the log is the
-# evidence. Then it runs scripts/public-scan.sh on the result (with the founder's .public-scan.local
+# (its pull request template and the workflow that enforces it) and puts each stub of PUBLIC_STUBS
+# over its private entry, one line each so the log is the evidence. Then it runs scripts/public-scan.sh on the result (with the founder's .public-scan.local
 # when the source checkout has one), fetches the public main, and commits the scrubbed tree on top
 # of it. With no public main yet (the first publish) it makes the orphan commit instead. The pull
 # request's body has the sections of that template, so the check that gates every public pull
@@ -83,6 +83,24 @@ for f in "${PRIVATE[@]}"; do
   echo "· removed $f"
 done
 
+# ── the public stubs ─────────────────────────────────────────────────────────────────────────
+# Each stub replaces its private entry. A stub whose entry is gone, or was removed above as a
+# private path, stops the publish: the entry moved, and the stub must move with it.
+echo "· the public stubs"
+while IFS= read -r f; do
+  dest="${f#"$PUBLIC_STUBS/"}"
+  if ! git ls-files --error-unmatch "$dest" >/dev/null 2>&1; then
+    echo "public-snapshot: the stub $f replaces $dest, which is not in the tree that ships" >&2
+    exit 1
+  fi
+  git rm -q --cached "$dest"
+  mv -f "$f" "$dest"
+  git add "$dest"
+  printf '  %-56s stubbed, from %s\n' "$dest" "$f"
+done < <(git ls-files "$PUBLIC_STUBS")
+git rm -r -q --cached --ignore-unmatch "$PUBLIC_STUBS"
+rm -rf "$PUBLIC_STUBS"
+
 # ── the public repository's own files ────────────────────────────────────────────────────────
 echo "· the public repository's own files"
 while IFS= read -r f; do
@@ -110,6 +128,37 @@ for f in .github/workflows/*.yml; do
     printf '  %-24s removed: a private pipeline\n' "$name"
   fi
 done
+
+# ── bundles: only public source ──────────────────────────────────────────────────────────────
+# esbuild marks each module it bundles with a `// <path>` line, relative to the directory it ran
+# in: the bundle's package, or the repository root. A bundle that names a source this tree does not
+# hold carries a private module in full, whatever PUBLIC_EXCLUDE says (packages/control-api/index.js
+# held the Cloud Run lane and Finance, 2026-11-13). Node resolves the paths, because the realpath of
+# macOS has no -m or --relative-to. A bundle that cannot be read stops the publish.
+echo "· bundles"
+tracked="$out.tracked"
+git ls-files > "$tracked"
+while IFS= read -r f; do
+  missing=$(node -e '
+    const fs = require("node:fs"), path = require("node:path").posix;
+    const [f, list] = process.argv.slice(1);
+    const tracked = new Set(fs.readFileSync(list, "utf8").split("\n"));
+    const miss = new Set();
+    for (const [, m] of fs.readFileSync(f, "utf8").matchAll(/^\/\/ ([^ ]+\.(?:ts|tsx|mts|js|mjs|cjs))$/gm)) {
+      if (m.includes("node_modules/")) continue;
+      const local = path.normalize(path.join(path.dirname(f), m)), root = path.normalize(m);
+      if (!tracked.has(local) && !tracked.has(root)) miss.add(local);
+    }
+    process.stdout.write([...miss].sort().join("\n"));
+  ' "$f" "$tracked") || { echo "public-snapshot: cannot read the modules that $f bundles" >&2; exit 1; }
+  if [ -n "$missing" ]; then
+    echo "public-snapshot: $f bundles source that does not ship:" >&2
+    printf '%s\n' "$missing" | sed -n '1,20s/^/  /p' >&2
+    exit 1
+  fi
+  printf '  %-36s bundles public source only\n' "$f"
+done < <(git grep -l -E '^// [^ ]+\.(ts|tsx|mts|js|mjs|cjs)$' -- '*.js' '*.cjs' '*.mjs' || true)
+rm -f "$tracked"
 
 if [ -f "$src/.public-scan.local" ]; then
   cp "$src/.public-scan.local" .public-scan.local
@@ -224,7 +273,7 @@ $scan_line
 
 $moved_block
 
-The public CI runs on this pull request first: CI, the control-api bundle, the local stack smoke when its paths moved, and the template check. The image is built from the tag, after the merge.
+The public CI runs on this pull request first: ci, ci · local stack when its paths moved, and the template check. The image is built from the tag, after the merge.
 
 ## Deploy notes
 

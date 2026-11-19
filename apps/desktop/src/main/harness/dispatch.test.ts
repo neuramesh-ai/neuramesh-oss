@@ -26,6 +26,28 @@ const trig = (over: Partial<Trigger> = {}): Trigger => ({
   ...over,
 });
 
+test('an approved build can use an idle approval slot and extra waiting builds stay bounded', () => {
+  const caps = {slots: 2, perAgent: 2};
+  const paused = {triggerId: 'qa', agentId: 'qa-agent', kind: 'work' as const, awaitingApproval: true};
+  const chat = {triggerId: 'compact', agentId: 'patch', kind: 'chat' as const};
+  const ordinary = trig({cause: 'board'});
+  const approved = trig({cause: 'approval', agentId: 'patch'});
+  assert.equal(nextTurn([ordinary, approved], [chat, paused], caps, new Set()), approved);
+  const otherPaused = [paused, {...paused, triggerId: 'two'}, {...paused, triggerId: 'three'}];
+  assert.equal(nextTurn([ordinary, approved], otherPaused, caps, new Set()), null);
+  const message = trig({cause: 'message', kind: 'chat'});
+  assert.equal(nextTurn([approved, message], otherPaused, caps, new Set()), message);
+});
+
+test('a requested release checklist uses a paused approval slot while background shipping waits', () => {
+  const paused = [{triggerId:'waiting', agentId:'other', kind:'work' as const, awaitingApproval:true}];
+  const checklist=trig({id:'draft', kind:'ship', cause:'approval'});
+  const automatic=trig({id:'background', kind:'ship', cause:'board'});
+  const caps={slots:1,perAgent:1};
+  assert.equal(nextTurn([automatic,checklist],paused,caps,new Set()),checklist);
+  assert.equal(nextTurn([checklist],[{...paused[0]!,awaitingApproval:false}],caps,new Set()),null);
+});
+
 test('priority puts a human ahead of the board, and the board ahead of a sweep', () => {
   assert.equal(priorityOf({ cause: 'message', kind: 'chat' }), 1);
   assert.equal(priorityOf({ cause: 'park', kind: 'work' }), 2);

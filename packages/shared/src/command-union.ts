@@ -31,16 +31,20 @@ const customPackId = z.string().refine((p) => isCustomPackId(p), { message: 'not
 // A custom brain's role→model map: every agent role seated with a routable model, worker
 // mirroring developer (it is a legacy alias — one seat, not two). `satisfies` keeps the key
 // set compile-locked to AgentRole, so a new role can't silently ship unseated.
+// finance is optional on the wire: a desktop that predates the seat saves a brain without it, and
+// the seat then follows the orchestrator.
 const packRoles = z.object({
   worker: modelId, developer: modelId, reviewer: modelId, orchestrator: modelId,
   designer: modelId, sales: modelId, architect: modelId, curator: modelId, shipper: modelId, marketer: modelId,
-} satisfies Record<import('./index').AgentRole, typeof modelId>)
-  .refine((r) => r.worker === r.developer, { message: 'worker aliases developer — their models must match' });
+  finance: modelId.optional(),
+} satisfies Record<import('./index').AgentRole, z.ZodTypeAny>)
+  .refine((r) => r.worker === r.developer, { message: 'worker aliases developer — their models must match' })
+  .transform((r) => ({ ...r, finance: r.finance ?? r.orchestrator }));
 
 export const ActorSchema = z.object({
   kind: z.enum(['human', 'agent']),
   id: z.string().min(1),
-  role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer']).optional(),
+  role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer', 'finance']).optional(),
 });
 
 const taskId = z.string().min(1);
@@ -162,6 +166,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
+  z.object({ type: z.literal('task.request_release_checklist'), taskId }),
   z.object({ type: z.literal('task.claim_ship'), taskId }),
   z.object({
     type: z.literal('task.propose_ship_plan'),
@@ -265,7 +270,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     workspace: z.string().min(1),
     machineId: z.string().min(1),
     name: z.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-    role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer']).default('developer'),
+    role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer', 'finance']).default('developer'),
     model: modelId.default('claude-opus-4-8'),
     runtime: z.enum(['claude-code', 'codex', 'gemini']).default('claude-code'),
     emoji: z.string().min(1).max(8).optional(), // persona face; omitted → client derives from name
@@ -321,7 +326,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     type: z.literal('memory.refresh_block'),
     workspace: z.string().min(1),
     channel: z.string().min(1),
-    kind: z.enum(['channel_summary', 'project_brief']).default('channel_summary'),
+    // project_summary (D15): the project memory block. `channel` names any channel of the project
+    kind: z.enum(['channel_summary', 'project_brief', 'project_summary']).default('channel_summary'),
     content: z.string().min(1).max(4000),
     basisCount: z.number().int().nonnegative().default(0),
   }),

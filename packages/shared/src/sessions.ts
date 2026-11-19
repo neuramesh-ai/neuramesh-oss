@@ -25,6 +25,8 @@ export interface HistoryThread {
   schedule_id?: string | null;
   /** 0144: `coding` = the coding runtime works on a repository in this thread (absent reads as chat) */
   kind?: string | null;
+  /** 0177: the intake decision as jsonb text. `intakeOf` reads it */
+  intake?: string | null;
 }
 
 /**

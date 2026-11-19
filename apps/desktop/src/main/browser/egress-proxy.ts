@@ -29,7 +29,7 @@ export function splitHostPort(target: string): { host: string; port: number } | 
   return m && port > 0 && port < 65536 ? { host: m[1]!, port } : null;
 }
 
-export async function startEgressProxy(opts: { resolve?: (host: string) => Promise<Resolved>; log?: (line: string) => void } = {}): Promise<EgressProxy> {
+export async function startEgressProxy(opts: { resolve?: (host: string) => Promise<Resolved>; log?: (line: string) => void; host?: string } = {}): Promise<EgressProxy> {
   const resolve = opts.resolve ?? ((host: string) => resolveAllowed(host));
   const cache = new Map<string, { at: number; verdict: Resolved }>();
   let refusal: { host: string; reason: string; at: number } | null = null;
@@ -93,7 +93,10 @@ export async function startEgressProxy(opts: { resolve?: (host: string) => Promi
   const server = createServer((req, res) => void plain(req, res));
   server.on('connect', (req: IncomingMessage, client: Socket, head: Buffer) => void tunnel(req, client, head));
   server.on('connection', (s: Socket) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
-  await new Promise<void>((ok, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', () => ok()); });
+  // 127.0.0.1 for the supervisor's browser. The box's browser reaches it on the veth IP
+  // (cloudrun/box-browser.ts): it needs no bearer there, because it only ever opens the public web the
+  // box could reach anyway, through the same guard
+  await new Promise<void>((ok, fail) => { server.once('error', fail); server.listen(0, opts.host ?? '127.0.0.1', () => ok()); });
   const address = server.address();
   return {
     port: typeof address === 'object' && address ? address.port : 0,

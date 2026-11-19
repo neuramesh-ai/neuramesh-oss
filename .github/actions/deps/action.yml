@@ -1,0 +1,65 @@
+# One dependency cache per lockfile. A job restores the whole node_modules tree (the root and every
+# workspace package) instead of the pnpm store, so a hit needs no download and no relink. The key holds
+# every input that changes the tree: the lockfile, the workspace file (its built-dependency list and
+# patches), the manifest hook, the patches, the exact Node (better-sqlite3, node-pty and onnxruntime-node
+# build against its ABI), the runner and whether the job skips the electron binary.
+# A hit still runs pnpm install --offline, which fails on any gap, and then the job installs for real.
+# A miss installs from the registry and saves the tree before the job runs anything that writes in it.
+name: dependencies
+description: Set up pnpm and Node and install the workspace from one node_modules cache per lockfile
+inputs:
+  node-version:
+    description: The Node version for actions/setup-node
+    required: true
+  directory:
+    description: The workspace root that holds pnpm-lock.yaml
+    default: .
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: Key the dependency cache
+      id: key
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        set -euo pipefail
+        files=(pnpm-lock.yaml)
+        for f in pnpm-workspace.yaml .pnpmfile.cjs .npmrc; do
+          if [ -f "$f" ]; then files+=("$f"); fi
+        done
+        if [ -d patches ]; then
+          while IFS= read -r f; do files+=("$f"); done < <(find patches -type f | LC_ALL=C sort)
+        fi
+        inputs=$(sha256sum "${files[@]}" | sha256sum | cut -c1-40)
+        echo "key=deps-v1-$RUNNER_OS-$RUNNER_ARCH-${ImageOS:-unknown}-node$(node --version)-pnpm$(pnpm --version)-electron${ELECTRON_SKIP_BINARY_DOWNLOAD:-0}-$inputs" >> "$GITHUB_OUTPUT"
+        root=$(pwd)
+        { echo 'paths<<EOF'; printf '%s\n' "$root/node_modules" "$root/apps/*/node_modules" "$root/packages/*/node_modules"; echo EOF; } >> "$GITHUB_OUTPUT"
+    - name: Restore node_modules
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.key.outputs.paths }}
+        key: ${{ steps.key.outputs.key }}
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        HIT: ${{ steps.restore.outputs.cache-hit }}
+      run: |
+        if [ "$HIT" = "true" ]; then
+          pnpm install --frozen-lockfile --offline && exit 0
+          echo "::warning title=dependency cache::The cached node_modules did not install offline. The job installs from the registry."
+        fi
+        pnpm install --frozen-lockfile
+    - name: Save node_modules
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.key.outputs.paths }}
+        key: ${{ steps.key.outputs.key }}

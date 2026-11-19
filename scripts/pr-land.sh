@@ -33,6 +33,7 @@ echo "repo: $repo (from $repo_from)"
 
 read -r head base state merged < <(gh api "repos/$repo/pulls/$pr" \
   --jq '[.head.ref, .base.ref, .mergeable_state, .merged] | @tsv')
+title=$(gh api "repos/$repo/pulls/$pr" --jq .title)
 
 if [ "$merged" = "true" ]; then
   echo "PR #$pr is already merged — cleaning up only."
@@ -48,8 +49,10 @@ else
     dirty|blocked|draft) echo "refusing: PR #$pr is '$state'. Check: gh pr checks $pr" >&2; exit 1 ;;
   esac
 
-  # Ask the head commit what its checks actually concluded.
-  runs=$(gh api "repos/$repo/commits/$(gh api "repos/$repo/pulls/$pr" --jq .head.sha)/check-runs"            --jq '.check_runs[] | "\(.status)|\(.conclusion // "-")|\(.name)"')
+  # Ask the head commit what its checks actually concluded. A check that ran again keeps only its
+  # newest run: a concurrency group cancels the older run of the same check (2026-11-18, #870, #874).
+  runs=$(gh api "repos/$repo/commits/$(gh api "repos/$repo/pulls/$pr" --jq .head.sha)/check-runs?per_page=100" \
+    --jq '[.check_runs[]] | group_by(.name) | map(max_by(.id))[] | "\(.status)|\(.conclusion // "-")|\(.name)"')
   pending=$(echo "$runs" | grep -v '^completed|' | grep -v '^$' || true)
   failed=$(echo "$runs"  | grep -E '^completed\|(failure|cancelled|timed_out|action_required)\|' || true)
   gate=$(echo "$runs"    | grep -E '^completed\|success\|.*(typecheck|test|build)' || true)
@@ -66,7 +69,14 @@ else
     echo "  it and that index.js is byte-identical, then re-run with: --allow-no-ci" >&2
     exit 1
   fi
-  gh pr merge "$pr" --repo "$repo" --squash   # NOT --delete-branch — see above
+  # Main records the title as the name of the commit, so a title that is not a conventional name
+  # stops here. A checkout from before the checker has no scripts/commit-name.mjs: it lands as before.
+  if [ -f scripts/commit-name.mjs ] && ! node scripts/commit-name.mjs "$title"; then
+    echo "refusing: give #$pr a conventional title, then land it again:" >&2
+    echo "  gh pr edit $pr --repo $repo --title 'type(scope): subject'" >&2
+    exit 1
+  fi
+  gh pr merge "$pr" --repo "$repo" --squash --subject "$title (#$pr)"   # NOT --delete-branch — see above
 fi
 
 # THE ANSWER, from the API rather than from $?.

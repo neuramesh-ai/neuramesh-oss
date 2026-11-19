@@ -138,18 +138,19 @@ describe('POST /auth/local/token', () => {
 });
 
 describe('GET /.well-known/nm-config', () => {
-  it('local: mode, powersyncUrl, version, schemaVersion, the floor — and nothing else (no ids)', async () => {
+  // boardsUrl (2026-11-13, message-boards plan §7.5): where Message boards is. An address, never an id, and null here
+  it('local: mode, powersyncUrl, version, schemaVersion, the floor, boardsUrl — and nothing else (no ids)', async () => {
     await localStack();
     const body = await j(await app.request('/.well-known/nm-config'));
-    expect(Object.keys(body).sort()).toEqual(['minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
-    expect(body).toMatchObject({ mode: 'local', powersyncUrl: 'http://127.0.0.1:58081', schemaVersion: null, minDesktopVersion: MIN_DESKTOP_VERSION });
+    expect(Object.keys(body).sort()).toEqual(['boardsUrl', 'minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
+    expect(body).toMatchObject({ mode: 'local', powersyncUrl: 'http://127.0.0.1:58081', schemaVersion: null, minDesktopVersion: MIN_DESKTOP_VERSION, boardsUrl: null });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('cloud: the same shape with mode cloud', async () => {
     const body = await j(await app.request('/.well-known/nm-config'));
     expect(body.mode).toBe('cloud');
-    expect(Object.keys(body).sort()).toEqual(['minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
+    expect(Object.keys(body).sort()).toEqual(['boardsUrl', 'minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
     expect(body.minDesktopVersion).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });

@@ -12,6 +12,11 @@ export const keyBytes = (): Buffer => createHash('sha256').update(String(process
 export const mediaSig = (itemId: string): string =>
   createHmac('sha256', keyBytes()).update(`media:${itemId}`).digest('base64url');
 
+/** A Finance recommendation's stored id: an HMAC of its key, per Kinshi session. The key names merchants and
+ *  categories, so the table never holds it. */
+export const recommendationId = (session: string, key: string): string =>
+  createHmac('sha256', keyBytes()).update(`finance-recommendation:${session}:${key}`).digest('base64url');
+
 export const verifyMediaSig = (itemId: string, sig: string): boolean => {
   const want = Buffer.from(mediaSig(itemId));
   const got = Buffer.from(sig);

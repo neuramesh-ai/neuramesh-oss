@@ -65,6 +65,9 @@ export const taskCreateCommand = z.object({
   // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
   // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
   originThread: z.string().uuid().optional(),
+  permissionRunId: z.string().uuid().optional(),
+  /** Agent Desk's explicit implementation handoff; home ownership is checked by the server. */
+  codingHandoff: z.object({ requestId: z.string().uuid(), taskId: z.string().uuid().optional(), visualEvidence: z.boolean().optional(), prepareRelease: z.boolean().optional() }).optional(),
 });
 
 // The human gates + edits (the whole point of the mobile companion).

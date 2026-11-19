@@ -64,7 +64,7 @@ async function routineSession(store: Store, actor: Actor, workspace: string, cha
   };
 }
 
-export async function scheduleCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | undefined> {
+export async function scheduleCommands(store: Store, actor: Actor, cmd: Command, machineWorkspace?: string): Promise<CommandOutcome | undefined> {
   if (cmd.type === 'schedule.create') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'schedules are armed by a human — agents propose, humans arm');
     // no plan gate (George, 2026-10-03: "allow routines on the trial"). a routine runs on every
@@ -130,7 +130,7 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
   }
   if (cmd.type === 'schedule.claim_run') {
     // the daemon's CAS — any authenticated teammate may claim; the counter is the dedupe
-    const { claimed } = await store.claimScheduleRun(
+    const claim = await store.claimScheduleRun(
       cmd.schedule, cmd.runCount, cmd.nextRunAt,
       (ws) => createEvent({
         type: 'schedule.run_claimed',
@@ -138,9 +138,9 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
         target: formatAddress({ kind: 'resource', type: 'schedule', id: cmd.schedule }),
         workspace: ws,
         payload: { schedule: cmd.schedule, runCount: cmd.runCount, nextRunAt: cmd.nextRunAt },
-      }),
+      }), { actor, machineWorkspace },
     );
-    return { ok: true, claimed } as never;
+    return { ok: true, ...claim } as never;
   }
   if (cmd.type === 'schedule.run_now') {
     // Run now (routine sessions, 2026-09-28): a person fires the routine into its session. The row turns

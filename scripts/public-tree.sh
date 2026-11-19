@@ -17,8 +17,11 @@ PUBLIC_EXCLUDE=(
   apps/web                                     # the site and the cloud web app (neuramesh.app)
   apps/hq                                      # hq, the browser client (hq.neuramesh.app), split from the desktop renderer 2026-09-26
   apps/mobile                                  # the phone app: Pro only, built and shipped from the Expo account
+  apps/boards                                  # the Message boards web app (boards.neuramesh.app): Pro only
   infra                                        # the cloud platform: Pulumi, the cluster, the machine, fleet and relay images
   packages/fleet                               # the cluster operator that runs the cloud machines
+  packages/boards-api                          # the Message boards service, hosted only
+  packages/boards-shared                       # the contract between that service and its web app
   packages/bench/suite                         # the held-out task set (docs/decisions.md D4)
   scripts/fleet-e2e.sh                         # the operator's k3d proving ground
   scripts/fleet-local.sh                       # the operator against a local cluster
@@ -33,8 +36,59 @@ PUBLIC_EXCLUDE=(
   scripts/build-mobile-terminal.mjs            # the phone app's terminal page
   scripts/web-boot-e2e.mjs                     # boots the browser client (hq); only the private surface-e2e runs it
   scripts/web-boot-e2e.test.mjs                # its test
+  scripts/ci-deepen.sh                         # deepens a shallow checkout; only private workflows run it
   scripts/perf/web                             # the browser client's performance lab
   scripts/dev-web-engineering.sh               # the browser client's Code dev stack
+  scripts/e2e-cloudrun                         # the hosted Cloud Run end-to-end suite: sandbox project ids, service accounts and hosts
+  evals/intake                                 # the intake eval set, run only by that suite and the private Cloud Build jobs
+  packages/control-api/Dockerfile.cloudrun     # the hosted control-api image; the Local image is packages/control-api/Dockerfile
+  packages/control-api/Dockerfile.cloudrun.dockerignore # its build context
+  packages/control-api/cloudrun-entrypoint.sh  # its entry: the service, the migrate job and the database bootstrap
+  .gcloudignore                                # the Cloud Build source upload
+  .easignore                                   # the phone app's Expo build upload
+  apps/desktop/src/main/cloudrun               # the hosted Cloud Run machine runtime; machined takes it through main/private.ts
+  apps/desktop/src/main/machined-e2e.ts        # that runtime's end-to-end witnesses
+  apps/desktop/src/main/machined-e2e.test.ts   # their test
+  apps/desktop/scripts/cold-start-qa.ts        # the local cold-start qualification of that runtime
+  'packages/control-api/src/fleet-cloudrun*'  # the control-api's Cloud Run machine lane: the public modules take it through src/private.ts
+  'packages/control-api/src/fleet-prewake*'   # the speculative wake (the idle rule it shared is public, src/fleet-idle.ts)
+  'packages/control-api/src/fleet-wake-wait*' # the wait a person sees on a Cloud Run wake
+  'packages/control-api/src/machine-park*'    # the durable approval parks and their routes
+  'packages/control-api/src/machine-facts*'   # a Cloud Run machine's durable facts
+  'packages/control-api/src/machine-snapshots*' # its snapshot URLs
+  'packages/control-api/src/machine-vault*'   # its login vault
+  'packages/control-api/src/vault-crypto*'    # the vault's envelope encryption
+  'packages/control-api/src/machine-always-on*' # the Always on add-on
+  'packages/control-api/src/repo-bundles*'    # repository bundles, stored in the snapshot bucket
+  'packages/control-api/src/gcs-sign*'        # the GCS signed URLs
+  'packages/control-api/src/e2e-*'            # the Cloud Run end-to-end doors
+  packages/control-api/scripts/bootstrap-db.mjs # the Cloud Run runtime role bootstrap (the Cloud SQL connector is a stub, PUBLIC_STUBS)
+  packages/control-api/test/always-on-billing.pg.test.ts # the tests of the lane above
+  packages/control-api/test/always-on.pg.test.ts
+  packages/control-api/test/boot-breaker.pg.test.ts
+  packages/control-api/test/cloudrun-lifecycle-doors.pg.test.ts
+  packages/control-api/test/cloudrun-machines.pg.test.ts
+  packages/control-api/test/machine-parks-facts.pg.test.ts
+  packages/control-api/test/machine-readiness.pg.test.ts
+  packages/control-api/test/machine-last-wake.pg.test.ts
+  packages/control-api/test/machine-vault.pg.test.ts
+  packages/control-api/test/prewake.pg.test.ts
+  packages/control-api/test/machine-feed.pg.test.ts # drives the feed through the e2e doors
+  packages/control-api/test/project-memory.pg.test.ts # drives the refresh through the e2e doors
+  apps/desktop/src/main/finance                # Finance, until its desktop release (George, 2026-11-13): main takes it through the private-finance entries
+  apps/desktop/src/main/sync/ipc/finance.ts    # its IPC handlers
+  apps/desktop/src/preload/finance.ts          # its bridge
+  apps/desktop/src/renderer/src/finance        # its destination
+  'packages/control-api/src/finance*'          # the Finance routes, gateway, model and runtime: control-api takes them through src/private-finance.ts
+  packages/control-api/src/store/finance.ts    # its stores (the migrations stay public: Local mode runs every one in order)
+  packages/control-api/test/destination-finance.test.ts # the tests of Finance
+  'packages/control-api/test/finance*'         # every Finance test, a new one too (finance-stream.test.ts arrived with #829)
+  packages/finance-ui/src/analysis.ts          # the Finance canvas and its prompt: the package stays as a shell (PUBLIC_STUBS), so the lockfile and the Local image still build
+  packages/finance-ui/src/catalog.ts
+  packages/finance-ui/src/months.ts
+  packages/finance-ui/src/prompt.ts
+  packages/finance-ui/src/reply.ts
+  packages/finance-ui/test
   'docs/design/*/evidence/*'                   # every design round's evidence: screenshots and logs with dev data (George, 2026-09-19)
   docs/design/cloud-first-2026-08/rollout.md   # the live rollout log of the production project
   docs/design/oss-release-2026-09/cutover.md   # the publish runbook
@@ -166,11 +220,19 @@ PUBLIC_DOCS=(
 # into place, and a file placed replaces this repository's file of the same path.
 PUBLIC_OWN=.github/public
 
+# The public stubs (docs/design/oss-private-seam-2026-11/plan.md): a file at PUBLIC_STUBS/<path>
+# replaces the private file at <path> in the snapshot. Each stub is the public face of one private
+# entry, the one file of its package that imports a private module: it exports the same names with
+# the same types, and each value is null or does nothing. The private file must exist, and must
+# not sit under a private path, so a stub never outlives its entry. public-build.yml builds the
+# tree with the stubs in place on every pull request, so a stub that drifts fails there.
+PUBLIC_STUBS=public-stubs
+
 # The workflows that run in the public repository. Every other .github/workflows/*.yml is removed
 # from the snapshot: it deploys, signs, or publishes with a secret or an identity only this
 # repository holds. A new workflow is private until it is named here. pr-template arrives from
 # PUBLIC_OWN, so it exists in the public tree only.
-PUBLIC_WORKFLOWS=(ci control-api-bundle control-api-image local-stack-smoke pr-template)
+PUBLIC_WORKFLOWS=(ci control-api-image local-stack-smoke pr-template)
 
 # The documents that stay private: every entry of docs/ that PUBLIC_DOCS does not name, one per
 # line. An entry is a top-level file or folder, and docs/design is opened one level so that each
@@ -198,10 +260,18 @@ public_private_paths() {
   public_docs_private
 }
 
+# The private files a stub replaces, one per line: what the snapshot puts in their place ships,
+# and the stub itself is scanned where it lies.
+public_stubbed_paths() {
+  local f
+  git ls-files "$PUBLIC_STUBS" | while IFS= read -r f; do printf '%s\n' "${f#"$PUBLIC_STUBS/"}"; done
+}
+
 # The git pathspec that leaves all of the above out of `git grep` and `git ls-files`.
 public_exclude_pathspec() {
   local p f
   for p in "${PUBLIC_EXCLUDE[@]}"; do printf ':!%s\n' "$p"; done
+  while IFS= read -r p; do printf ':!%s\n' "$p"; done < <(public_stubbed_paths)
   while IFS= read -r p; do printf ':!%s\n' "$p"; done < <(public_docs_private)
   for f in .github/workflows/*.yml; do
     [ -e "$f" ] || continue
@@ -258,13 +328,22 @@ self_test() {
     got=$(public_docs_private)
     want=$(printf '%s\n' docs/a.md docs/b.md docs/design/loose.md docs/design/r2 docs/evidence)
     expect "allowlist names are literal paths, not regular expressions" "$got" "$want"
+    # a stub: the file it replaces leaves the scan, the stub itself stays in it
+    mkdir -p public-stubs/src && : > src.ts && : > public-stubs/src.ts
+    git add src.ts public-stubs/src.ts
+    got=$(public_stubbed_paths)
+    expect "a stub names the private file it replaces" "$got" "src.ts"
+    spec=()
+    while IFS= read -r p; do spec+=("$p"); done < <(public_exclude_pathspec)
+    got=$(git ls-files -- '*.ts' "${spec[@]}")
+    expect "the scan reads the stub, never the file it replaces" "$got" "public-stubs/src.ts"
     exit "$bad"
   ) || bad=1
   # this repository: every named document exists in git, or the list holds a typo
   for e in "${PUBLIC_DOCS[@]}"; do git ls-files --error-unmatch "$e" >/dev/null 2>&1 || missing="$missing $e"; done
   if [ -z "$missing" ]; then printf '✓ self-test: every entry of PUBLIC_DOCS names a tracked document (%s)\n' "${#PUBLIC_DOCS[@]}"; else bad=1; printf '✗ self-test: PUBLIC_DOCS names nothing in git:%s\n' "$missing"; fi
   if [ "$bad" -ne 0 ]; then echo "public-tree: self-test FAILED"; exit 1; fi
-  echo "public-tree: self-test passed (7 cases)"
+  echo "public-tree: self-test passed (9 cases)"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

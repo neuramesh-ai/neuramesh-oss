@@ -14,7 +14,7 @@
 // Every post is fire-and-forget through the host's own credential (the machine bearer, or the
 // member's headers on the desktop host): a row that failed to write is a list that is one entry
 // behind, never a session that failed.
-import { codeSessionEndState, codeSessionTitle } from '@neuramesh/shared';
+import { codeSessionEndState, codeSessionTitle, isScratchRepoId } from '@neuramesh/shared';
 import type { EngineeringMachineOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import type { EngineeringMachineSession } from './engineering-host';
 
@@ -75,7 +75,8 @@ export class CodeSessionRecord {
     if (this.done) return;
     void this.rec.post({
       type: 'code_session.upsert', codeSessionId: this.meta.threadId, createdBy: this.meta.actorId,
-      projectId: this.meta.projectId ?? null, repoId: this.meta.repoId, repoName: this.meta.repoName, branch: this.meta.branch,
+      // a scratch workspace (round 9) has no repos row: the synced row names none
+      projectId: this.meta.projectId ?? null, repoId: isScratchRepoId(this.meta.repoId) ? null : this.meta.repoId, repoName: this.meta.repoName, branch: this.meta.branch,
       mode: this.meta.mode, machineId: this.rec.machineId, state: 'idle',
     });
   }
@@ -92,6 +93,8 @@ export class CodeSessionRecord {
       command: (value) => { this.command(value); session.command(value); },
       close: () => { this.closed(); return session.close(); },
       get busy() { return session.busy ?? false; },
+      get working() { return session.working ?? false; },
+      ...(session.continueParked ? { continueParked: (park: Parameters<NonNullable<EngineeringMachineSession['continueParked']>>[0], onSettled?: () => void) => session.continueParked!(park, onSettled) } : {}),
       ...(session.flush ? { flush: () => session.flush!() } : {}),
     };
   }

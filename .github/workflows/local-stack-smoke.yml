@@ -4,13 +4,15 @@
 # nm-config, the seeded human, /v1/me, authenticated Local replica bootstrap/deltas, and
 # the schema the runner built. Then a SECOND stack whose Postgres holds the pg lane's fixtures at
 # the 0001 schema is migrated forward by the image's own runner, and the pg suite runs against it.
-name: local stack smoke
+name: ci · local stack
 
 on:
   pull_request:
     paths:
       - packages/control-api/**
       - packages/shared/**
+      - packages/canvas-kit/**
+      - packages/finance-ui/**
       - supabase/migrations/**
       - supabase/validate/**
       - dev/stack/init/**
@@ -23,6 +25,8 @@ on:
     paths:
       - packages/control-api/**
       - packages/shared/**
+      - packages/canvas-kit/**
+      - packages/finance-ui/**
       - supabase/migrations/**
       - supabase/validate/**
       - dev/stack/init/**
@@ -47,11 +51,16 @@ env:
 
 jobs:
   smoke:
-    name: compose up from the image · asserts · pg lane on its Postgres
+    name: local stack · pg lane
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 5
+
+      - name: Record the tested tree
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/tested-tree
 
       - name: Build the control-api image
         run: docker build -f packages/control-api/Dockerfile -t "$IMAGE:$TAG" .
@@ -85,19 +94,10 @@ jobs:
         run: docker compose --env-file "$RUNNER_TEMP/local.env" -f "$COMPOSE" -p nm-local-smoke down || true
 
       # ── the pg lane, against a Postgres the image's runner migrated ──────────────────────────
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.8.1
-
-      - name: Install Node
-        uses: actions/setup-node@v4
+      - name: Install dependencies
+        uses: ./.github/actions/deps
         with:
           node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 

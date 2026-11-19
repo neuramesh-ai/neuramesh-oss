@@ -10,7 +10,8 @@
 #
 #   1. a secret, by gitleaks: the tracked files, then the history. .gitleaks.toml allowlists the
 #      fixtures by name, each with its reason.
-#   2. a personal email domain, a Supabase project ref, a /Users/<name> machine path. Patterns,
+#   2. a personal email domain, a Supabase project ref, a /Users/<name> machine path, a Cloud Run
+#      service host with its project hash, a GCP service account of a real project id. Patterns,
 #      not a list of paths, so the next launch.json cannot slip through (review F10).
 #   3. every pattern in .public-scan.local, one extended regex per line, case-insensitive. That
 #      file is gitignored: it holds the founder's handles and the exact infra ids, so this script
@@ -85,6 +86,9 @@ scan() { # $1 label, $2 extended regex, $3 extra git-grep flags (optional)
 scan "personal email domains" '@(gmail\.com|googlemail\.com|icloud\.com|me\.com|hotmail\.[a-z]+|outlook\.[a-z]+|live\.[a-z]+|yahoo\.[a-z.]+|proton\.me|protonmail\.com|alonge\.dev)'
 scan "Supabase project refs" '[a-z]{20}\.supabase\.(co|in)|supabase\.com/dashboard/project/[a-z]{20}'
 scan "/Users/<name> machine paths" '/Users/[A-Za-z0-9._-]+'
+scan "Cloud Run service hosts" '[a-z0-9-]+-[a-z0-9]{10}-[a-z]{2}\.a\.run\.app|[a-z0-9-]+-[0-9]{6,}\.[a-z]+-[a-z]+[0-9]\.run\.app'
+scan "GCP service account emails" '[a-z0-9-]+@[a-z][a-z0-9-]{5,29}\.iam\.gserviceaccount\.com|[0-9]+-compute@developer\.gserviceaccount\.com|[0-9]+@cloudbuild\.gserviceaccount\.com|[a-z0-9-]+@appspot\.gserviceaccount\.com'
+scan "GCP project numbers" 'projects/[0-9]{10,}'
 
 # ── 3. the private pattern file ──────────────────────────────────────────────────────────────
 if [ -f .public-scan.local ]; then

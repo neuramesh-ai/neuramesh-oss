@@ -26,6 +26,12 @@ import type { HostGuards } from './guards';
 import type { makeOrchTools } from './orchtools';
 import type { makeRoutineResume } from './routineresume';
 
+/** the fact key of one sweep tick: the orchestrator, the channel, the cadence and the wall-clock bucket.
+ *  Machines tick on their own boot clocks, so the bucket (not the tick) is what they agree on */
+export function sweepTickKey(orchId: string, channelId: string, mode: 'full' | 'watchdog', nowMs: number, periodMs: number): string {
+  return `orch-sweep:${orchId}/${channelId}/${mode}/${Math.floor(nowMs / periodMs)}`;
+}
+
 export function makeOrchSweeps(ctx: {
   db: ReplicaDatabase;
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
@@ -48,6 +54,14 @@ export function makeOrchSweeps(ctx: {
   arun: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null) => { log: LogFn; runId: string };
   /** the routine resume (host/routineresume.ts) — deterministic, rides both cadences */
   resumeStrandedRoutines: ReturnType<typeof makeRoutineResume>['resumeStrandedRoutines'];
+  /** ONE SWEEPER PER TICK. Shared compute (0114) hosts every agent on every machine of the workspace,
+   *  so after a team reshape three machines ran the same stall triage and each flagged the same task.
+   *  When the guard store is shared (Cloud Run: Postgres insert-if-absent), each machine claims the tick
+   *  for an orchestrator and channel before it spends anything, and only the winner sweeps. Unset (the
+   *  desktop and GKE local store), every host sweeps as before */
+  claimTick?: (key: string) => Promise<boolean>;
+  /** the cadences' periods, which size the tick buckets */
+  tickMs?: { full: number; watchdog: number };
 }) {
   const { db, post, agents, claimed, guards, apiUrl, ownerActorId, startedAt, buildOrchestratorTools,
           SUMMARY_MARKER, sweepPeriod,
@@ -226,6 +240,12 @@ export function makeOrchSweeps(ctx: {
         [orch.id],
       );
       for (const ch of chans) {
+        if (ctx.claimTick) {
+          const key = sweepTickKey(orch.id, ch.id, mode, now.getTime(), ctx.tickMs?.[mode] ?? (mode === 'full' ? 15 : 5) * 60_000);
+          // a claim that cannot be read (the API down) sweeps: a duplicate note beats a silent watchdog
+          const mine = await ctx.claimTick(key).catch((err: unknown) => { console.warn(`orch_sweep claim failed (${err instanceof Error ? err.message : String(err)}): sweeping`); return true; });
+          if (!mine) { console.log(`orch_sweep skip channel=${ch.slug} mode=${mode}: another machine of this workspace has this tick`); continue; }
+        }
         if (period) {
           const key = `${ch.id}:${period}:${day}`;
           // Attempt a summary only for a channel with an open task — an empty board just stands down,

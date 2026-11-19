@@ -1,3 +1,5 @@
+import { desktopFinance } from './sync/private-finance';
+import { registerDestinations } from './sync/ipc/destinations';
 import { controlApiRequestUrl } from '@neuramesh/shared';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { initHouseStyle } from './housestyle';
@@ -365,6 +367,8 @@ async function registerIpc({ agentLog, ptys, killTaskPtys }: { agentLog: AgentLo
   registerContent({ db, ws });
   registerProjects({ db, ws });
   registerSettings({ db, ws });
+  registerDestinations();
+  desktopFinance?.registerIpc(); // Finance reaches the desktop app on its own release (finance-release.ts)
   registerLogs({ agentLog, watchers });
 
   // Persist chat attachments as artifact rows linked to their message. Bytes are already on

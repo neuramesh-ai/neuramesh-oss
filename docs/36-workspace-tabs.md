@@ -1,5 +1,7 @@
 # 36 — Workspace tabs: one content area, many kinds (spec)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILDING (2026-07-30). Approved by George 2026-07-30 — *"your recommendation looks
 > good; lets implement in full"* — off [mockups/workspace-tabs.html](../mockups/workspace-tabs.html),
 > and **that mockup is the visual contract** (5 stops + Stop 1b's code survey and Stop 4b's

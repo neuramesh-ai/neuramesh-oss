@@ -262,6 +262,9 @@ Per-theme, defined in `tokens.css` and mirrored in `client-core` THEMES (CI-enfo
 | `--shadow-sheet/card/lift/pop` | elevation ramp | |
 | `--viz-berths` / `--viz-donors` / `--viz-clones` | **chart-series identity** (worktree-berths round, 2026-08-11) — categorical, fixed order, one hue per entity across every mark (bars, bands, dots, meters) | dark `#5b93d8/#3aa183/#8a7bd9` · light `#2f6fc2/#1b8f68/#5c4ab8` |
 | `--viz-score` | **the report score's one hue** (marketing-os round, 2026-08-20) — the ReportCard's dial, dimension bars and trend marks, plus every score chip. Same calibrated blue as `--viz-berths` (pre-validated on the card surface); its own token so score surfaces can diverge without re-skinning a chart series. Never a status hue, never `--accent` | dark `#5b93d8` · light `#2f6fc2` |
+| `--viz-out` / `--viz-in` | **Finance money out and money in** (finance-canvas round, 2026-11-14): the two series of the Finance canvas charts, in that fixed order. Validated with the dataviz six checks on the card of all seven palettes. Text beside a mark keeps the text tokens | dark `#c87a45/#2aa0c8` · light `#a8582a/#0f7fa8` |
+| `--fin-over` | **a Finance budget over its limit** (finance-budget-analytics round, 2026-11-17): the third budget tone, after `--green` (under 80% of the limit) and `--warn` (80% to 100%). It fills the bar, the ring and the dot of an over budget, and it colors the line that says how much over. A status hue, never a chart series. Each palette holds 4.5:1 or more on its card | dark `#d77a6a` · soft-dark `#dc8372` · paper-dark `#d98270` · light `#b4432e` · cream-oak `#b2452f` · paper-light `#a63e2a` · paper-cream-oak `#a03c27` |
+| `--fin-in-ink` / `--fin-out-ink` | **Finance money ink** (finance-overview round, 2026-11-18, [the mockup](design/finance-overview-2026-11/mockups/finance-overview.html)): the amount of money in and money out on a row, a day total, a tile and a labeled bar. Money in is `--green` and money out is `--warn` (George: amber finds outflows at a glance), each mixed with `--text` (70% and 92%) so the amount holds 4.5:1 on the card. Plain `--green` is 3.3:1 on the cream-oak card. Defined on the Finance canvas (`finance-overview.css`), no new hex. Charts keep `--viz-out` for spending. A transfer and a pending amount stay `--muted` | derived from `--green` / `--warn` |
 | `--term-black` … `--term-bright-white` | **the terminal's ANSI-16 ramp** (terminal-colors round, 2026-08-26) — resolved into xterm's theme per ground: chromatics from the status family, neutrals from the theme's own ink ladder (darks stay soft-status; papers go ink-weight). Desktop-only, so *not* mirrored into client-core THEMES. The terminal also enforces a **4.5:1 contrast floor** (xterm `minimumContrastRatio`): a guest CLI styles for the theme *it* believes in — dark-assuming dim/24-bit output must stay readable on paper, and no palette entry can reach truecolor | ink hues on cream · soft-status hues on graphite |
 
 Rules of use:
@@ -502,11 +505,19 @@ real work — if it is decoration, drop it and keep the pill.
   ▸ **Amended 2026-10-03:** the Design Studio and the task peek, the two columns this rule was
   written for, retired into the side panel. No column of the sheet changes hands now. The rule
   stays for the next one.
+  ▸ **Amended 2026-11-14:** the Finance split is the next one. The canvas `flex-basis` opens from
+  0 to 69% once, when the first analysis starts, and the canvas content keeps its final width
+  through container units (`finance-canvas.css`). Later answers rise in place with no hand-off.
 - **Exits are guarded:** `animationend` handlers must check `e.target === el` (bubbled child
   animation events kill exits otherwise), and exit paths need a ~220ms timeout fallback so
   reduced-motion never strands an overlay.
 - **Constant motion is rationed:** typing dots (`nm-dot`), the step ring's orbiting halo — one
   heartbeat per surface, always stilled by `prefers-reduced-motion`.
+  ▸ **The live placeholder is bounded text change, not a heartbeat** (the home-quality round, George,
+  2026-11-19). Home's composer types its suggestions in and out, but it runs through the list two times
+  and then rests on the first suggestion, whole. So after about 30 seconds the stage keeps one heartbeat
+  (Porch). Each step changes text only, so no step is a blocking transition. Reduced motion shows each
+  label whole and fades the next one in over 150 ms, with the same two-loop limit.
 - **Active thread titles share the glassy text sweep** (George, 2026-10-24). In the web project
   rail, automation list and history search, `in_progress` titles use the same 2.3-second gradient
   as agent status text. Selection does not control the effect. Needs-you and settled titles stay
@@ -556,6 +567,19 @@ real work — if it is decoration, drop it and keep the pill.
   takes the same slot in the same frame and does not rise in again (`.msg[data-landed]`). The
   bubble wears the role chip that the ghost before it and the message after it wear. The caret
   does not blink under reduced motion.
+- **A machine start shows a count, and the plan is a receipt** (thread-wait-and-plan round, George,
+  2026-11-17, [mockups](design/thread-wait-and-plan-2026-11/mockups/thread-wait-and-plan.html)). Each
+  surface that shows a machine start (the thread's wait row, the boot pane, the pill's hover, the
+  composer chip) shows one count from the shared `machine-wait.ts`: "Ready in about m:ss", from the
+  machine's last measured wake, else 60 s. Past the estimate the count goes up as "Taking longer than
+  usual · m:ss" in `--warn`. The count uses tabular figures in `--dim` (`.waiteta`). Under a machine
+  wait that is not stalled, one quiet card (`.waitoffer`: `--card` on a `--card-border` hairline,
+  480px wide at most) makes one offer: the real Always on switch for a Pro member who may change the
+  machine, or Upgrade to Pro (`--brand`) on the free hosted plan. A person with no move gets no card.
+  The × hides the card in that browser. The intake plan is a receipt row (`.intakeplan`, the
+  `.codereceipt` idiom): "Outlined the plan · N steps" and a chevron that opens the steps under the
+  same left rule. Before the intake lands, the same place shows "Outlining the plan…" with the
+  `.liveact-txt` sheen. No new tokens.
 - **The launch moment (Porch):** full Peek (~3s) once on first open, the short wake (~0.9s)
   every launch after (`LaunchPeek`, replayable from Appearance). It plays over the frame on
   `--win`, `pointer-events: none` — the animation may never gate input — and reduced motion
@@ -612,7 +636,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   George: B, `--term-red`, no foot line, the mark back, "NeuraMesh is starting up…" — visual
   contract `docs/design/first-run-stack-2026-09/`, evidence beside it). The picker's radio column
   becomes the status column: one 18px node per container in BOOT order (Postgres, then the API,
-  then PowerSync — the order `depends_on` runs, which the old list did not follow, so a person
+  then the API replica — the current local stack does not run PowerSync; this follows the order `depends_on` runs, which the old list did not follow, so a person
   watched the middle row wait for a container that was never asked to start), name · one fact on
   ONE line (`.lsgcname`), and a 1px segment that lights `--green` once the node above it is ready.
   Four node states and no words but one: ready = `--green` filled with a check · starting = an
@@ -628,7 +652,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   glances left and right every 9 s while the person waits (`lsg-glance`, no fill so it stays
   silent until the first look has played).
   ▸ **The failure card has three parts, or one.** The cause in plain words (`.lsgcause`, 14px
-  `--text`: "PowerSync stopped 3 times.", "Port 58081 is in use by another program."), the
+  `--text`: "The local API stopped 3 times.", "Port 58081 is in use by another program."), the
   container's own last line in a warm well (`.lsgwell`, `--panel2`, mono 11, three lines then a
   clip, selectable), and the remedy (`.lsgremedy`, 13px `--muted`: what Try again will do). `COPY
   DETAILS` puts the three lines on the clipboard, as a quiet button at the right of Try again ·
@@ -922,6 +946,27 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   (`settings/connectors.ts`, tested) shared with the room's Connections list, read for the room the
   composer targets; the connect step is ONE component (`settings/ConnectPanel.tsx`) rendered by both.
   Only Home wears the foot. The thread composer, the launcher and the phone do not.
+  ▸ **Amended 2026-11-19 (the home-quality round, George, [docs/design/home-quality-2026-11](design/home-quality-2026-11/plan.md)):
+  the foot belongs to the connectors.** The pills leave it, and in their place one plain line says what a mark
+  does: **Connect a network for your agents.** (`.cfootline`, 12 px, `--muted`, `composer/foot-line.ts`). The
+  line stays while the person types, so `.cfoot.drafting` and its reserved seat retire. It goes when all
+  four marks are connected. A narrow box wraps it onto two lines, never under the marks. The suggestions
+  moved into the placeholder:
+  ▸ **The live placeholder** (`composer/ghost-cycle.ts` is the pure timeline, `useGhostCycle.ts` the clock,
+  `GhostLine.tsx` the layer). Over the empty box, a ghost layer (`.cghost`) in the composer's own grid cell,
+  with the textarea's metrics and the placeholder's `--dim` ink, types each suggestion's label (32 ms a
+  character), holds it whole (2.4 s), erases it (14 ms a character), rests (360 ms), then types the next.
+  It draws no caret of its own. A project with no suggestions cycles fixed examples, each with a full
+  prompt. A whole label wears the **Tab** keycap (`.cghostkey`, the kbd idiom: 9.5 px mono, `--dim`, a
+  `--border2` hairline, in 120 ms). Tab in the empty box puts the suggestion's full prompt in, whole or
+  still typing. In the rest, with Shift, or with text in the box, Tab keeps its meaning. A touch screen
+  (`pointer: coarse`) gets a **Use** button (`.cghostuse`, 24 px tall, a 44 px hit area) at the right end
+  of the first line. Any text stops the cycle in the same frame, and it goes on at the next suggestion
+  after the box stays empty for 2 s. A pointer over the box holds a whole label. Focus does not pause it,
+  because Home often opens focused and Tab needs focus. The typing is `aria-hidden`: the textarea keeps its
+  static placeholder, and `aria-describedby` reads a hidden line (`.cghostdesc`) that changes only when a
+  new label is whole. The cap over the box carries the @ and / hint ("or type / to use a skill"). With no
+  cap, the cycle ends on the static placeholder.
 - **Chips & pickers** — pill chips (`.cchip`) open upward `chippop` menus; time inputs are styled
   chips (`::-webkit-datetime-edit` styled, width-pinned). No raw `<select>` in user-facing rows.
 - **The machine chip** (desktop Code bridge, 2026-09-04 — rule D9; visual contract
@@ -1833,6 +1878,13 @@ same compact control at the bottom right. This replaces the expanded card/pill b
      again. Every composer menu opens upward again (`roomOn` measures above). The stage scrolls once a short
      window cannot hold it: auto margins centre the column, so its top stays reachable (the cards made the
      stage taller than a 660 px window).
+     ▸ **Amended 2026-11-19 (the home-quality round): the Finance row.** When this person may open Finance
+     and its Kinshi connection is `connected` (`destinationAccess('finance')` and `financeStatus()`, server
+     truth, `views/finance-cards.ts`), a third row of three cards sits under the six, after the stage's
+     eyebrow idiom (`.stagekick`, with the Finance wallet). A Finance card opens a NEW Finance chat with its
+     prompt in the Finance composer, because only the Finance turn has the Kinshi data and its cards. The
+     row rises in with `nm-rise` once both reads answer. The rail's Finance row wears the same wallet
+     (`IconWallet`).
   Plus the frame ruling recorded in §2 (the dock strip's retirement) and one structural fix:
   **the main section's top-right is ONE rail** — the room's crew clusters and views burger slot
   into the workspace strip's right end (`WTabStrip aux`) before the file-pane toggle, one flex
@@ -2114,6 +2166,71 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   Task and chat status belongs in the overview; task assignment, description, subtasks, review history
   and marketing brand doors live there too. These doors open the existing details tab. Task editing
   remains beside the title. Task peeks retain their compact facts because they have no floating card.
+
+- **A door out of hq** (Message boards, 2026-11-13, [the plan](design/message-boards-2026-11/plan.md), artboard D1): a row
+  that opens a different app is the last row of the More menu. It keeps the row anatomy (a 13px icon, the label), and its
+  trail has the count in `.navitembadge` and then `IconArrowNE` at 12px. The mark says that the row opens a new tab. The
+  row never wears the selected fill, because the place is not a view of hq. While the menu is closed, the More row
+  carries the sum of the counts of its rows. The row exists only when the server gives an address (`boardsUrl` in
+  nm-config), so a Local connection has no row. In Needs you the same door is ONE row in the anatomy of the one-row
+  card (`.refic`, `.reftx`, `.refgo`): the title is the count in words, the second line is the app and the board, and
+  the action is `Open` with the same mark at 10px. Its messages are in the count of the bell. It is not a decision and
+  nothing settles it. The name in hq is always `Message boards`, because `Board` alone is the task board.
+
+- **Message boards is a second app on the same tokens** (`apps/boards`, 2026-11-13): its `src/styles/tokens.css` holds
+  the values of `apps/hq/src/tokens.css`, and `tokens.test.ts` fails when one of them differs. The app adds no token.
+  It has three rules of its own. Color marks one thing, a message that waits for a person (`--warn`). The author type
+  is a shape and a word: a circle is a person, a tinted square is a NeuraMesh agent, and an outline square is an
+  outside agent. There is no right panel: the roster cluster shows who has access, and one click opens the list.
+
+- **The canvas swap** (`.mk-swap`, the one-canvas round, 2026-11-18, [the mockup](design/marketing-one-canvas-2026-11/mockups/marketing-one-canvas.html)):
+  one tab can hold two views of one place. Marketing's Canvas tab holds the overview and the open thread's drafts. The
+  tab's first line is the swap line: on the left a `.fin-eyebrow` names what shows (the date, or the project and the
+  draft count), and on the right the agenda's Today | Tomorrow segmented control (`.mag-days`) reads `Overview | Drafts N`.
+  The line owns the eyebrow, so each view hides its own one. The control shows only while there is a second view to
+  show, and it stays at the same place in both views, so the way back is where the person left it. A view that arrives
+  while the person types does not take the tab: the segment wears a 5px `--link` dot (`.new`) until the person opens it.
+  The swap is a crossfade: the leaving view fades out on `--dur-exit` under the arriving one, which fades in with an
+  8px rise on `--dur`, and the arriving cards follow in a 20ms stagger on `--dur`. Reduced motion swaps at once. The
+  rules for which view shows are pure (`marketing/canvas-view.ts`), never a timestamp test.
+  ▸ **Finance uses it too** (finance-overview round, 2026-11-18): `Overview | Answers N`. Finance opens on the
+  overview, and an answer that the person asks for takes the tab, because the person asked for it.
+- **The money direction mark** (`.fin-dir`, `finance/FinanceTransactions.tsx`, the finance-overview round, 2026-11-18):
+  a 28px tile leads each transaction row. An up arrow on a 15% `--green` wash means money in, a down arrow on a 15%
+  `--warn` wash means money out, and a swap glyph on the neutral wash means a transfer, which counts in no total. A
+  pending row keeps its arrow inside an outline (no wash) and its amount in `--muted`. The amount wears the money ink of
+  its direction (§4) with a sign: `+` in, `−` out, none for a transfer. The arrow carries the direction, so color is
+  never its only sign. The 16px form (`data-size=sm`) labels a tile or a bar. Rows group by day, and each day header
+  says its money in and money out: money out from the server's daily spending, so a day split across two pages still
+  shows its whole total.
+- **Finance recommendations** (`.frecs`, `finance/FinanceRecommendations.tsx`, the finance-overview round, 2026-11-18):
+  one card under the Canvas tiles, a row per recommendation: the priority (High wears `--fin-over`, a status hue with
+  its word), the kind, a title with the real number, one sentence, and the rows behind it as chips that carry the
+  money-out ink. Each row offers Ask Finance (the text goes to the composer, the person sends it) and Mark as
+  addressed, and a `×` dismisses. A marked row folds to one line with Undo. The footer's tally opens the history,
+  which says who and when, with Restore for a dismissed one. Transactions gets a one-line strip with a pager and a
+  Flagged filter, and a flagged row wears a small bulb. The detectors are code and the words are a template, so no
+  model writes a recommendation.
+- **The category cell is a button** (`.fin-catbtn`, `finance/FinanceTransactions.tsx`, the finance-recategorize round,
+  2026-11-19, [the mockup](design/finance-recategorize-2026-11/mockups/finance-recategorize.html)): for the workspace
+  owner, a Transactions row's category cell keeps its look at rest, so the list stays calm. Row hover shows a chevron,
+  cell hover adds the `--hover-bg` wash (never a border swap, trap 3), and keyboard focus adds the `--focus-glow` ring.
+  On the phone the cell sits under the name and always shows its chevron, because touch has no hover. A member who
+  cannot manage Finance sees plain text. The cell opens a `ui/Popover` picker (`.fin-catpick`): search first, the
+  `.nmsel` list anatomy under Kinshi's groups, the CmdK keys, Esc gives focus back to the cell. On the phone the
+  picker is a bottom sheet. A save washes the changed rows in `--green` at 9% (150ms in, a 1.2s hold, 150ms out).
+- **The choice option** (`.fin-cp-opt`, `finance/CategoryPicker.tsx`, the same round): a full-width button on the card
+  stratum inside a popover, with a bold label, a muted second line and an arrow on the right. One click acts, so the
+  choice has no second Save button. Hover lifts it with `--shadow-lift`, focus wears the `--focus-glow` ring, a save
+  spins its arrow and disables the other option. A rule that the choice saves wears a small `Rule` tag beside the label.
+  The agent's proposal card (`CategoryChange`, `.fc-cat`) reuses the `BudgetChange` card anatomy with Dismiss and
+  Approve.
+- **The inline draft link to the canvas** (`marketing/CanvasDoor.tsx`, the same round): a draft in the chat keeps its
+  full card and every action. The strip of cards gains one door to the same drafts on the canvas: Finance's
+  `On the canvas · N drafts` tok (`.fin-tok.fin-canvastok`, `.on` while the canvas shows them) beside the split, and on
+  the phone Finance's answer card (`.fin-ansref`, `Open the canvas`), which opens the canvas sheet. The sheet never opens
+  by itself, because it covers the chat. A click on a card's body, away from its controls, opens Drafts with that card
+  in view and a `--ring` box shadow for one second. A unit's drafts get no door, because they live on the unit.
 
 ## 9. The traps (etched — check these in review)
 

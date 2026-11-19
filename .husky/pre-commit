@@ -1,7 +1,21 @@
-# Block the commit unless the whole workspace typechecks and every test passes.
-# Mirrors CI's gate. loop.pg.test.ts auto-skips without DATABASE_URL, so this stays
-# fast and infra-free locally; CI runs it against a Postgres service.
+# Block the commit unless the whole workspace typechecks and lints, and every test outside the
+# desktop app passes. loop.pg.test.ts auto-skips without DATABASE_URL, so this stays fast and
+# infra-free locally; CI runs it against a Postgres service.
+# The desktop tests run in CI only (George, 2026-11-15): CI's `test (desktop)` lane installs the
+# Linux Code sandbox they need, and a machine without it fails them for no fault of the commit.
 # Git exports repository-local variables to hooks. Fixture repositories must use their own
 # cwd, never this commit's index or Git directory. Keep the cleanup inside the hook process.
+
+# A COMMIT THAT CHANGES ONLY docs/ SKIPS THE CHECKS (George, 2026-11-17). No typecheck, lint rule
+# or test reads that folder, so a screenshot or a design note passes or fails the same either way,
+# and the full run costs about 15 minutes. One staged path outside docs/ runs everything.
+# Read the staged list BEFORE the unset: a partial commit (git commit <path>, git commit -a) stages
+# into a temporary index that only GIT_INDEX_FILE names.
+staged=$(git diff --cached --name-only --no-renames)
+if [ -n "$staged" ] && [ -z "$(printf '%s\n' "$staged" | grep -v '^docs/')" ]; then
+  echo "pre-commit: only docs/ changed, so typecheck, lint and tests are skipped."
+  exit 0
+fi
+
 unset $(git rev-parse --local-env-vars)
-pnpm check
+pnpm typecheck && pnpm lint && pnpm -r --filter '!@neuramesh/desktop' test

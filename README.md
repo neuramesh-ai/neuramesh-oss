@@ -98,7 +98,8 @@ The second command starts the dev stack in Docker (Postgres), starts the control
 
 | Where to read | What it holds |
 |---|---|
-| [docs/09-system-architecture.md](docs/09-system-architecture.md) | How the parts run end to end: sync, the command handler, the agent daemon, releases |
+| [docs/09-system-architecture.md](docs/09-system-architecture.md) | Current Cloud Run/Cloud SQL architecture, client replica, commands and machine lifecycle |
+| [infra/README.md](infra/README.md) | Pulumi ownership, controlled production releases, retirement and recovery |
 | [docs/03-protocol-and-memory.md](docs/03-protocol-and-memory.md) | The A2A agent contract, the board FSM, and the memory spine |
 | [docs/33-design-system.md](docs/33-design-system.md) | The design system: tokens, motion, and the two themes |
 | [docs/05-engineering-philosophy.md](docs/05-engineering-philosophy.md) | The doctrine this repo is built on |

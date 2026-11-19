@@ -1,3 +1,5 @@
+import { hydratedDeliverablePath } from './deliverable-workspace';
+import { runTaskCoding } from './coding-task-run';
 // THE ROLE FLOWS — what each teammate actually does when it holds a task (track B2).
 //
 // architect → designer → developer → reviewer → shipper, plus the claim/own/resume paths and
@@ -14,8 +16,10 @@
 // under it. The turn-inputs block above it moved out instead (host/workerturn.ts) precisely
 // because it crosses the boundary in one direction only.
 import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
-import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, imageDataUri, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun, type ExecTask, type HostedAgent, type OfferedTask, type SkillRef } from '../agents';
-import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, evidenceDropNote, planEvidenceBudget, sweepEvidenceImages } from '../evidence';
+import { CodingEvidenceBlocked, codingValidationFiles, legacyTaskScreenshots, reportBlockedEvidence, taskCaptureReceipts } from './coding-validation-files';
+import { recordedCodingDelivery } from '@neuramesh/shared';
+import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun, type ExecTask, type HostedAgent, type OfferedTask, type SkillRef } from '../agents';
+import { EVIDENCE_IMAGE_BUDGET, evidenceDropNote } from '../evidence';
 import { approvedPlanNote } from './planinject';
 import { FINISH_NOW_NOTE, claimsPendingWork, shouldBlockEcho } from '../runtime/honesty';
 import { claimWorkspace, PACKS, STATIC_CHECKLIST, TURN_BUDGETS, UNBLOCK_MARKER, type DraftedPost, type ClaimVerdict } from '@neuramesh/shared';
@@ -23,11 +27,10 @@ import { claimWorkspace, PACKS, STATIC_CHECKLIST, TURN_BUDGETS, UNBLOCK_MARKER, 
 
 
 import { generateBeatPlan } from './plan';
-import { deliverablePath, type SubjectRef } from '../harness/brain';
 import { classifyExecError, planWallOutcome } from '../execpolicy';
 
 
-import { git, localRepoRemote } from './gh';
+import { bundleKeyOf, localRepoRemote } from './gh';
 import { draftPostsFromWorkspace } from '../content-producer';
 
 
@@ -35,7 +38,7 @@ import { providerFor, type BeatsFn } from '../runtime/adapter';
 import { parkStepLine } from '../harness/park';
 import { contractDeliverables, finishLeanUnit, postSubtaskAcceptance, taskFlowMeta } from './leanunits';
 import { pickImageProvider } from '../imagegen';
-import { prepareScratchWorkspace } from '../rework'; import { workerWeb } from './webshot';
+import { prepareScratchWorkspace } from '../rework'; import { workerWeb } from './webshot'; import { messageBoardsFor } from './messageboards';
 
 import { type BeatStatusW } from './beats';
 import { type LogFn } from '../agentlog';
@@ -43,7 +46,7 @@ import { type RunTerminal } from './runs';
 
 import type { HostCtx } from './ctx';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
-import type { Brain } from '../harness/brain';
+import type { Brain, SubjectRef } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
 import type { ParkBook } from '../harness/park';
@@ -64,9 +67,9 @@ import { makeWorkerTurn } from './workerturn';
 export const workspaceFor = (t: ExecTask): string => claimWorkspace({ repo: !!t.repo_id, branch: t.branch });
 
 /** the shape the ship + verify flows read a task in — shared with host/releasedocs.ts */
-export type ShipTask = { id: string; number: number; title: string; channel_id: string; pr_number: number | null; ship_plan: string | null };
+export type ShipTask = { id: string; number: number; title: string; channel_id: string; pr_number: number | null; ship_plan: string | null; coding_owner?: string | null };
 
-export function makeFlows(ctx: HostCtx & { repoCred: import('./repocred').RepoCred } & {
+export function makeFlows(ctx: HostCtx & { engineering?: () => import('../relay/engineering-host').EngineeringMachineHost; repoCred: import('./repocred').RepoCred } & {
   db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
@@ -125,7 +128,7 @@ const {
 
 // Split-out neighbours: the same ctx, so they are built here and their results keep the names
 // the flows below already call them by (host/block.ts · host/skillimport.ts · host/releasedocs.ts).
-const { blockFor, refreshChannelBlock, sleepTimeTick } = makeBlock(ctx);
+const { blockFor, refreshProjectBlock, sleepTimeTick } = makeBlock(ctx);
 const { walkSkillMd, curatorImport } = makeSkillImport(ctx);
 const { releaseDocsNote } = makeReleaseDocs(ctx);
 const { buildWorkerTurn } = makeWorkerTurn(ctx);
@@ -177,7 +180,7 @@ async function resumeFlow(agent: HostedAgent, t: ExecTask & { requirements_confi
         workspace: ch.workspace_id,
         channel: ch.id,
         taskId: t.id,
-        body: `Auto-blocked #${t.number} after ${fails} failed execution attempts — not retrying on restart anymore.\n\n**Likely cause:** ${why || 'execution kept failing'}\n\nCheck @${agent.name}'s Anthropic key/quota (Agents → key), then **Unblock** to retry, or **Close** the task.`,
+        body: `Auto-blocked #${t.number} after ${fails} failed execution attempts — not retrying on restart anymore.\n\n**Likely cause:** ${why || 'execution kept failing'}\n\nResolve the reported blocker, then **Unblock** to retry, or reply here to discuss the next step.`,
       }).catch(() => {});
       console.warn(`agent_resume agent=${agent.name} task=${t.number} auto-blocked after ${fails} failures (block ${blk.status})`);
       return; // claimed releases when the guard watch observes 'blocked'
@@ -291,6 +294,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     let diffText = '';
     let prUrl: string | null = null;
     let prNumber: number | null = null;
+    let prCaptures: string[] = [];
     let files: Array<{ kind: 'file' | 'screenshot'; name: string; content: string }> = [];
     // evidence images that did NOT attach (over budget / unreadable) — named in the
     // submit note so the worker, reviewer, and human all see the gap (never silent)
@@ -312,7 +316,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     // the three commands it may issue, the permission gate, the sandbox's protected paths, and
     // the memory injected into its prompt. `log` is passed by VALUE — it was rebound to the
     // run-narrating wrapper on the line above, and that wrapper is what the injections log to.
-    const { skills, proposeSkill, recordLesson, addBacklogItem, permissionGate, sandboxProtectedPaths, memoryNote } =
+    const { skills, proposeSkill, recordLesson, addBacklogItem, permissionGate, sandboxProtectedPaths, memoryNote, permissionRules } =
       await buildWorkerTurn({ t, ch, agent, actor, mode, adapter, token, log });
     // The worker's own plan → beats (docs/17). Two mechanisms, one per runtime family:
     //  · Claude — its native TodoWrite list is mirrored live as the beat set (in claudeCode).
@@ -320,7 +324,8 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     //    the same model) produces the ordered plan up front; the daemon declares it here,
     //    injects it into the run, and settles it on a clean finish.
     let planNote = ''; // the non-Claude plan carried into the coding prompt
-    if (!isAnthropic && mode === 'claude') {
+    const nativeCoding = (await db.getAll("select id from threads where task_id=? and kind='coding'", [t.id])).length > 0;
+    if (!nativeCoding && !isAnthropic && mode === 'claude') {
       coarsePlan = await generateBeatPlan(adapter, agent.model, token, t);
       if (coarsePlan.length) {
         await beatsFns.declare(coarsePlan);
@@ -345,10 +350,24 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       // A locally-attached repo can have an empty clone_url while its checkout has a real git remote —
       // auto-detect it so the normal clone → push → PR flow runs against the repo's origin.
       if (!repo.clone_url && repo.local_path) repo.clone_url = await localRepoRemote(repo.local_path);
-      if (!repo.clone_url) throw new Error(`repo ${t.repo_id} has no clone_url and no git remote at its local path (${repo.local_path ?? 'none'}) — add a remote (\`git remote add origin <github-url>\`) so tasks can open PRs`);
+      // a repository bundle (control-api repo-bundles.ts) has no remote to push to and no pull request, so
+      // the task lane cannot submit from it. Said now, before the agent works, instead of as git's
+      // "unable to find remote helper" at the clone.
+      const bundled = !!repo.clone_url && !!bundleKeyOf(repo.clone_url);
+      if (!repo.clone_url || bundled) {
+        const reason = bundled
+          ? 'The assigned repository is an uploaded repository bundle. A task pushes a branch and opens a pull request, and a bundle has no remote for either. Work on it in a Code session, or attach a GitHub repository for tasks. No changes were made in this run.'
+          : 'The assigned repository has no Git remote accessible on this machine. Connect the repository’s remote before retrying. No changes were made in this run.';
+        const blocked = await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason });
+        if (!blocked.ok) throw new Error(`Could not block the task after repository lookup failed (HTTP ${blocked.status}).`);
+        log({ kind: 'exec', phase: 'blocked', summary: reason, level: 'error' });
+        await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: reason }).catch(() => {});
+        return;
+      }
       let note = '';
       const policy = await projectPolicy(db, t.channel_id); // project's auto-open-PR / CI flags
       const pushed = await worktreeRun(t as ExecTask & { repo_id: string }, repo, async (dir) => {
+        const startedAt = Date.now();
         if (mode === 'claude') {
           // a human-stopped run falls through with whatever changed in the worktree —
           // worktreeRun commits/pushes it; an untouched tree still fails
@@ -358,41 +377,18 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
           // each child takes a slice, and the slices are what terminate depth.
           const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, dir, t, TURN_BUDGETS.work, log, 0);
           const parkTurn = parkFor(agent, t, ch);
-          let run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
+          let run = await runTaskCoding({db,engineering:ctx.engineering,task:t,agent,dir,context:[attNote,reworkNotes,memoryNote].filter(Boolean).join('\n\n'),log,onProgress:workRun.step}) ?? await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { permissionRules, spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log), messageBoards: await messageBoardsFor(agent.id) });
           if (!run.stopped && claimsPendingWork(run.note)) {
             log({ kind: 'exec', phase: 'held', summary: 'turn ended still waiting on background work — one nudge to finish here', level: 'warn' });
-            run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log) });
+            run = await runTaskCoding({db,engineering:ctx.engineering,task:t,agent,dir,context:[attNote,reworkNotes,memoryNote,FINISH_NOW_NOTE].filter(Boolean).join('\n\n'),log,onProgress:workRun.step}) ?? await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { permissionRules, spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, dir, log), messageBoards: await messageBoardsFor(agent.id) });
             if (!run.stopped && claimsPendingWork(run.note)) heldReason = run.note.replace(/\s+/g, ' ').trim().slice(0, 400);
           }
           note = run.stopped ? stoppedNote : run.note;
-          // Lift the worker's evidence images into artifacts so the reviewer's evidence gate + the
-          // human's cockpit surface them — pooled budget, in-tree captures first (explicit DoD
-          // evidence, e.g. running-app routes from the screenshot tool), then the recursive
-          // .nm-evidence sweep, newest first (evidence.ts — the #1015 review loop: a flat readdir
-          // missed captures/ subfolders and a shared cap of 8 silently dropped the tail forever).
-          // Scan only the worker's CHANGES (git status) for in-tree images, and remove EVERY one
-          // from the tree — attached or dropped — so binaries never ride the commit (review happens
-          // on the artifacts, not the PR blob). .nm-evidence/ is git-excluded (structural — see
-          // worktreeRun), so its images never show in status; the sweep walks it directly.
-          const { join } = await import('node:path');
-          const { rm } = await import('node:fs/promises');
-          const changed = (await git(['status', '--porcelain', '--untracked-files=all'], dir).catch(() => ''))
-            .split('\n').map((l) => l.slice(3).trim()).filter((p) => p && IMAGE_EXT.test(p));
-          const evRels = await sweepEvidenceImages(join(dir, '.nm-evidence'));
-          const pool = planEvidenceBudget([
-            ...changed.map((rel) => ({ path: join(dir, rel), name: rel.split('/').pop() ?? rel, inTree: true })),
-            ...evRels.map((rel) => ({ path: join(dir, '.nm-evidence', rel), name: rel, inTree: false })),
-          ], EVIDENCE_IMAGE_BUDGET);
-          for (const img of pool.take) {
-            const uri = imageDataUri(img.path);
-            if (uri) files.push({ kind: 'screenshot', name: img.name, content: uri });
-            else droppedEvidence.push(`${img.name} (unreadable/oversize)`);
-          }
-          droppedEvidence.push(...pool.dropped.map((img) => img.name));
-          for (const img of [...pool.take, ...pool.dropped]) {
-            if (img.inTree) await rm(img.path, { force: true }).catch(() => {});
-          }
-          if (droppedEvidence.length) log({ kind: 'exec', phase: 'evidence', summary: `evidence: ${files.filter((f) => f.kind === 'screenshot').length} image(s) attached, ${droppedEvidence.length} dropped: ${droppedEvidence.slice(0, 6).join(', ')}${droppedEvidence.length > 6 ? ' …' : ''}`, level: 'warn' });
+          const [coding] = await db.getAll<{work_plan:string|null;thread_id:string}>("select t.work_plan,th.id as thread_id from tasks t join threads th on th.task_id=t.id and th.kind='coding' where t.id=?", [t.id]);
+          const images = coding ? await codingValidationFiles(dir, recordedCodingDelivery(coding.work_plan)?.visualEvidence ?? false, startedAt, () => taskCaptureReceipts(apiUrl,ch.workspace_id,coding.thread_id,ownerActorId)) : await legacyTaskScreenshots(dir,droppedEvidence);
+          files.push(...images);
+          if (coding) prCaptures = images.map(img => img.name);
+          if (coding && images.length) note += '\n\nValidation artifacts\n' + images.map(img => `- [${img.name}](.nm-artifacts/${img.name})`).join('\n');
         } else {
           note = `[echo · ${agent.name}] Executed #${t.number} “${t.title}”: stub result — validation note attached as RESULT.md.`;
           const { writeFile } = await import('node:fs/promises');
@@ -401,6 +397,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
         }
         // stopped mid-run → don't commit/push/open a PR for abandoned work
         if (stoppedTasks.has(t.id)) throw new Error('__stopped__');
+        return prCaptures;
       }, policy.autoOpenPr, ctx.repoCred);
       sha = pushed.sha;
       diffText = pushed.diff;
@@ -414,7 +411,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       // open a terminal here; the retention watch removes it on accept/close.
       // prepareScratchWorkspace decides fresh (first attempt) vs retain+rehydrate
       // (a review bounce: the prior submission's files ARE the starting point).
-      const scratch = deliverablePath(t.number);
+      const scratch = await hydratedDeliverablePath(t.number);
       const priorNote = await prepareScratchWorkspace(db, t.id, scratch);
       if (priorNote) log({ kind: 'exec', phase: 'started', summary: 'rework: prior deliverables restored to the workspace — editing, not redoing' });
       const attNote = (await stageTaskAttachments(db, t.id, scratch, false)) + (await stageApprovedDesigns(db, t.id, scratch, false)) + (await stageBrandContext(db, t.channel_id, scratch, { taskId: t.id })) + (await stageConnections(db, t.channel_id, { taskId: t.id })) + (t.kind === 'content' ? CONTENT_OUTPUT_CONTRACT : t.kind === 'research' ? RESEARCH_OUTPUT_CONTRACT : '') + planNote + priorNote;
@@ -422,12 +419,12 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       // deliverable dir — same budget root, same ownership rules, different working directory
       const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, scratch, t, TURN_BUDGETS.work, log, 0);
       const parkTurn = parkFor(agent, t, ch);
-      let run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), draftReplies: replyDraft(actor, ch, { taskId: t.id }), searchX: searchXFor(actor, ch), repo: repoFor(actor, ch), web: workerWeb(agent.name, scratch, log) });
+      let run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { permissionRules, spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), draftReplies: replyDraft(actor, ch, { taskId: t.id }), searchX: searchXFor(actor, ch), repo: repoFor(actor, ch), web: workerWeb(agent.name, scratch, log), messageBoards: await messageBoardsFor(agent.id) });
       // the #1032 case: the summary WAS "waiting for the background research agents…" and it
       // got submitted as result.md. Retry in the SAME workspace so the work so far survives.
       if (!run.stopped && claimsPendingWork(run.note)) {
         log({ kind: 'exec', phase: 'held', summary: 'turn ended still waiting on background work — one nudge to finish here', level: 'warn' });
-        run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, scratch, log) });
+        run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { permissionRules, spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch), web: workerWeb(agent.name, scratch, log), messageBoards: await messageBoardsFor(agent.id) });
         if (!run.stopped && claimsPendingWork(run.note)) heldReason = run.note.replace(/\s+/g, ' ').trim().slice(0, 400);
       }
       const collected = await collectFiles(scratch); // salvage whether the run finished or was stopped
@@ -493,7 +490,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       // retention + the reviewer terminal are exercised hermetically
       const { mkdir, rm, writeFile } = await import('node:fs/promises');
       const { join } = await import('node:path');
-      const ws = deliverablePath(t.number);
+      const ws = await hydratedDeliverablePath(t.number);
       await rm(ws, { recursive: true, force: true }).catch(() => {});
       await mkdir(ws, { recursive: true });
       if (t.kind === 'content') {
@@ -621,6 +618,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       return;
     }
     console.error(`agent_submit agent=${agent.name} task=${t.number} failed:`, err);
+    if (err instanceof CodingEvidenceBlocked) return await reportBlockedEvidence(post,actor,t.id,ch,err);
     // classify on the FULL message (not the truncated reason) so a usage cap / refusal phrase
     // isn't sliced off before it's seen (docs/22 §9).
     const fullReason = err instanceof Error ? err.message : 'unknown error';
@@ -682,13 +680,13 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
 // in their channels. First approve wins; the server blocks self-review and
 // non-reviewers regardless of what happens here.
 db.watch(
-  `select id, number, title, channel_id, assignee_id from tasks where state = 'in_review'`,
+  `select id, number, title, channel_id, assignee_id, json_type(work_plan, '$.codingDelivery') as owned_coding from tasks where state = 'in_review'`,
   [],
   {
     onResult: (r) => {
-      for (const t of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; channel_id: string; assignee_id: string | null }>) {
+      for (const t of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; channel_id: string; assignee_id: string | null; owned_coding: string | null }>) {
         if (reviewed.has(t.id)) continue;
-        const reviewer = [...agents.values()].find(
+        const reviewer = t.owned_coding ? agents.get(t.assignee_id ?? '') : [...agents.values()].find(
           (a) => a.role === 'reviewer' && a.channels.has(t.channel_id) && a.id !== t.assignee_id,
         );
         if (!reviewer) continue;
@@ -702,5 +700,5 @@ db.watch(
   },
 );
 
-  return { architectFlow, blockFor, checklistFor, claimFlow, curatorImport, designerFlow, estimateFor, executeFlow, offerPlanToWorker, orchDesignNotify, orchPlanDecision, ownFlow, ownerHandle, owningContext, refreshChannelBlock, releaseDocsNote, remoteDelegate, resumeFlow, reviewFlow, shipperFlow, sleepTimeTick, walkSkillMd };
+  return { architectFlow, blockFor, checklistFor, claimFlow, curatorImport, designerFlow, estimateFor, executeFlow, offerPlanToWorker, orchDesignNotify, orchPlanDecision, ownFlow, ownerHandle, owningContext, refreshProjectBlock, releaseDocsNote, remoteDelegate, resumeFlow, reviewFlow, shipperFlow, sleepTimeTick, walkSkillMd };
 }

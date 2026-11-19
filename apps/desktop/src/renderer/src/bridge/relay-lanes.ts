@@ -10,7 +10,7 @@
 // and a build with one gets a real shell. The feature is therefore additive: nothing
 // regresses if the relay is down, unreachable, or simply not deployed to this environment.
 import { ensureMachine, openRelayJsonChannel, openRelayPty, type RelayConfig } from '@neuramesh/relay-client';
-import { machineState, type MachineCap } from '@neuramesh/shared';
+import { CODE_COMMAND_MAY_BE_LOST, CODE_RECONNECTING, codeReconnected, createCommandGapWatch, machineState, relayNotice, type MachineCap } from '@neuramesh/shared';
 
 /** what the relay bridge needs from its HOST. The browser hands its config plus its auth
  *  headers (main.tsx); the desktop hands what its main process answers over three IPC calls
@@ -29,6 +29,8 @@ import type { EngineeringCommand } from '@neuramesh/shared';
 interface MachineRow {
   id: string; name: string; desiredReplicas: number;
   lastSeenAt: string | null; lastWakeAt: string | null; lifecycle: string | null;
+  /** the run's start, the stop and the breaker: machineState reads them (shared compute.ts) */
+  startedAt?: string | null; drainState?: string | null; drainReason?: string | null; bootLoopAt?: string | null; parkedAt?: string | null;
 }
 interface UsageReply {
   machines?: MachineRow[]; minutes?: number; capMinutes?: number | null; plan?: string;
@@ -151,7 +153,7 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
       ? null
       : { minutes: u.minutes ?? 0, capMinutes: u.capMinutes };
     return machineState(
-      { desiredReplicas: m.desiredReplicas, lastSeenAt: m.lastSeenAt, lastWakeAt: m.lastWakeAt, lifecycle: m.lifecycle },
+      m,
       cap,
       Date.now(),
     ).status;
@@ -205,9 +207,15 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
       // id, so the choice is stripped from the meta the machine sees (it means nothing there)
       const { machineId: named, ...rest } = meta;
       const target: RelayConfig = named ? { ...relay, machineId: async () => named } : relay;
+      // THE RECONNECT LINES hq's Code pane says (apps/hq/web/webnm-relay.ts, round 6): the session runs
+      // on at the machine while the socket is down, and the thread hears it as a notice, never an error,
+      // which would end the turn on screen. A command sent in the instant after a cut has no id to resend
+      // by, so the pane says it may not have arrived (@neuramesh/shared engineering/relay-resume.ts)
+      const gap = createCommandGapWatch();
       const channel = openRelayJsonChannel(target, {
         lane: 'engineering', meta: rest as unknown as Record<string, unknown>,
         onMessage: (message) => {
+          gap.received();
           const event = message as Parameters<typeof onEvent>[0];
           if (event.type === 'attachment_ack') {
             acknowledgements.resolve(`${event.id}:${event.index}`);
@@ -217,11 +225,15 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
         },
         onExit: () => { acknowledgements.rejectAll(new Error('The Engineering relay closed during upload.')); onExit(); },
         onError: (message) => onEvent({ type: 'error', message }),
+        onReconnecting: () => onEvent(relayNotice(CODE_RECONNECTING)),
+        onReconnected: (lost) => onEvent(relayNotice(codeReconnected(lost))),
+        onResumed: () => { if (gap.resumed()) onEvent(relayNotice(CODE_COMMAND_MAY_BE_LOST)); },
         onDisconnect: (message) => onEvent({ type: 'disconnected', message }),
       });
       const acknowledgementKey = (command: EngineeringCommand): string | null => command.type === 'attachment_start'
         ? `${command.id}:-1` : command.type === 'attachment_chunk' ? `${command.id}:${command.index}` : command.type === 'attachment_end' ? `${command.id}:-2` : null;
       return { subId: channel.subId, send: async (command) => {
+        gap.sent(command);
         const key = acknowledgementKey(command);
         if (!key) { await channel.send(command); return; }
         const acknowledged = acknowledgements.wait(key);

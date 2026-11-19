@@ -56,6 +56,8 @@ export interface ServiceOpts {
   /** seams for the tests: a fake launcher and a fake proxy */
   launch?: (o: LaunchOpts) => Promise<Chromium>;
   proxy?: () => Promise<EgressProxy>;
+  /** where the egress proxy listens (default 127.0.0.1). The box's browser needs the veth IP */
+  proxyHost?: string;
   openPage?: (chromium: Chromium, tab: BrowserTab, size: { width: number; height: number }) => Promise<BrowserPage>;
 }
 
@@ -78,7 +80,7 @@ export function createBrowserService(o: ServiceOpts): BrowserService {
   let proxyLive: EgressProxy | null = null;
   const watchers = new Set<(page: BrowserPage | null, agent: string | null) => void>();
 
-  const ensureProxy = (): Promise<EgressProxy> => (proxy ??= (o.proxy ?? (() => startEgressProxy({ resolve, log: (l) => log(`egress ${l}`) })))().then((p) => (proxyLive = p)));
+  const ensureProxy = (): Promise<EgressProxy> => (proxy ??= (o.proxy ?? (() => startEgressProxy({ resolve, log: (l) => log(`egress ${l}`), ...(o.proxyHost ? { host: o.proxyHost } : {}) })))().then((p) => (proxyLive = p)));
 
   const start = (tab: BrowserTab, profileDir: string, size: { width: number; height: number }, temp: string | null): Entry => {
     const entry: Entry = { holds: 0, lastUse: Date.now(), temp, ready: (async () => {

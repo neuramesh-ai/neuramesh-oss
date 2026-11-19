@@ -14,10 +14,8 @@ export interface SkillsDeps {
 export function registerSkills({ db, ws, watchers }: SkillsDeps): void {
 // Agent Skills (W11): channel + global active skills sync to the replica;
 // the screen watches them, the host's agents read them for load_skill.
-// channelId null = WORKSPACE-WIDE (the Skills destination). A channel id keeps the old
-// behaviour — that room's skills plus the workspace-scoped ones — which is what the composer's
-// `/` picker wants, since a picker offering skills from a room you are not in is a picker of
-// things that will not run here.
+// Null reads all workspace skills for composers. Explicit room filters remain available
+// to the library's organization views.
 ipcMain.handle('nm:watch-skills', (event, { subId, channelId }: { subId: string; channelId: string | null }) => {
   const ac = new AbortController();
   watchers.set(subId, ac);
@@ -37,14 +35,14 @@ ipcMain.handle('nm:watch-skills', (event, { subId, channelId }: { subId: string;
   );
 });
 // skill packs for the channel — drives the Skills-tab pack sections
-ipcMain.handle('nm:watch-skill-packs', (event, { subId, channelId }: { subId: string; channelId: string }) => {
+ipcMain.handle('nm:watch-skill-packs', (event, { subId, channelId }: { subId: string; channelId: string | null }) => {
   const ac = new AbortController();
   watchers.set(subId, ac);
   const sender: WebContents = event.sender;
   db().watch(
     `select id, name, description, source_url, source_ref, version, origin, enabled, status, step, progress, error, updated_at
-     from skill_packs where workspace_id = ? and channel_id = ? order by origin = 'bundled' desc, name`,
-    [ws(), channelId],
+     from skill_packs where workspace_id = ? and (? is null or channel_id = ?) order by origin = 'bundled' desc, name`,
+    [ws(), channelId, channelId],
     {
       onResult: (r) => { if (!sender.isDestroyed()) sender.send('nm:skill-packs', { subId, rows: (r.rows?._array ?? []) as unknown[] }); },
       onError: watchFailed,

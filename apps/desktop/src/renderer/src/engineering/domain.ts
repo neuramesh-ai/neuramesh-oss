@@ -2,7 +2,7 @@
 // S5.1): the phone renders the same session model. Re-exported so the view keeps its door.
 export {
   continueEngineeringInAct, createEngineeringSession, dismissEngineeringModeHandoff, effectivePermission,
-  OPEN_ENGINEERING_POLICY, PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, resolveEngineeringApproval,
+  OPEN_ENGINEERING_POLICY, PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, REVIEW_ENGINEERING_PERMISSIONS, resolveEngineeringApproval,
   setEngineeringBrainPack, setEngineeringMachine, setEngineeringMode, setEngineeringModel, setEngineeringPermission,
   setEngineeringPolicy, submitEngineeringPrompt,
 } from '@neuramesh/shared';

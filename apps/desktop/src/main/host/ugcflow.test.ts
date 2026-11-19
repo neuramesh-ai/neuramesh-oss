@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseQuestions } from '@neuramesh/shared';
-import { angleAnswer, angleCard, angleGate, connectedPlatforms, draftSeconds, pickedLength, pickedPlatforms, unpicked, videoLengths } from './ugcflow';
+import { angleAnswer, angleCard, angleGate, anglePickNote, angleTurnNote, connectedPlatforms, draftGround, draftSeconds, pickedLength, pickedPlatforms, unpicked, videoLengths } from './ugcflow';
 import { newGrounding } from './grounding';
 
 const ANGLES = { product: 'Flowe AI', angles: [{ title: 'The 2am spiral', why: 'the weekly plan from a founder\'s notes' }, { title: 'Before and after', why: 'one place instead of 14 tabs' }] };
@@ -83,4 +83,36 @@ test('propose_angles is refused before the research, and with a choice of one', 
   assert.match((await angleGate(db, 'ch', g, { ...ANGLES, angles: ANGLES.angles.slice(0, 1) })) ?? '', /two to five angles/);
   assert.equal(await angleGate(db, 'ch', g, ANGLES), null);
   assert.deepEqual(await connectedPlatforms(db, 'ch'), ['x']);
+});
+
+// ── the answer turn, worked out in code (2026-11-17: "platforms: none picked" and rex stopped) ──
+
+test('the pick note: the picked platforms, else the connected accounts, else a question', () => {
+  const picked = anglePickNote('The nervous system reset · platforms: tiktok, instagram · length: 8 s', ['x']);
+  assert.match(picked, /the platforms the human picked \(TikTok, Instagram\)/);
+  assert.match(picked, /8 seconds/);
+  assert.match(picked, /call draft_posts/);
+  const none = anglePickNote('The nervous system reset · platforms: none picked · length: 8 s', ['x', 'linkedin']);
+  assert.match(none, /the connected accounts, because the human picked no platform \(X, LinkedIn\)/);
+  const nothing = anglePickNote('The nervous system reset · platforms: none picked · length: 8 s', []);
+  assert.match(nothing, /Ask the human which platforms/);
+  assert.doesNotMatch(nothing, /call draft_posts/);
+  assert.doesNotMatch(anglePickNote('Before and after · platforms: x', []), /seconds/, 'no length picked, no length said');
+});
+
+test('the pick note rides only the turn the answer itself wakes', async () => {
+  const card = { author_kind: 'agent', body: angleCard(ANGLES, ['x']) };
+  const answer = 'The 2am spiral · platforms: none picked · length: 8 s';
+  const db = fakeDb({ conns: [{ provider: 'x', handle: '@joinflowe' }], msgs: [card, { author_kind: 'human', body: answer }] });
+  assert.match(await angleTurnNote(db, 'c1', { threadId: 't' }, answer), /connected accounts, because the human picked no platform \(X\)/);
+  assert.equal(await angleTurnNote(db, 'c1', { threadId: 't' }, 'something else'), '');
+  assert.equal(await angleTurnNote(fakeDb({ msgs: [] }), 'c1', { threadId: 't' }, answer), '');
+});
+
+test('an answered angle card counts as the shelf read: the answer turn drafts without a second read', async () => {
+  const docs = [{ name: 'business-profile.md', inline_content: '# Flowe' }];
+  const card = { author_kind: 'agent', body: angleCard(ANGLES, ['x']) };
+  assert.match((await draftGround(fakeDb({ docs, msgs: [] }), 'c1', newGrounding(), { threadId: 't' })) ?? '', /read this project's brand docs/);
+  assert.match((await draftGround(fakeDb({ docs, msgs: [card] }), 'c1', newGrounding(), { threadId: 't' })) ?? '', /read this project's brand docs/, 'an unanswered card is no pass');
+  assert.equal(await draftGround(fakeDb({ docs, msgs: [card, { author_kind: 'human', body: 'The 2am spiral · platforms: x' }] }), 'c1', newGrounding(), { threadId: 't' }), null);
 });

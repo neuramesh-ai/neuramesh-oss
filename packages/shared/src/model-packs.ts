@@ -119,7 +119,7 @@ export interface CustomModelPack {
  * docs/14, made designer one of them; sales/curator stay a compact support line). */
 export const PACK_PREVIEW_ROLES: readonly AgentRole[] = ['orchestrator', 'architect', 'developer', 'reviewer', 'designer', 'marketer'];
 /** Light roles shown as the secondary "support" line (worker stays hidden — it aliases developer). */
-export const PACK_SUPPORT_ROLES: readonly AgentRole[] = ['shipper', 'sales', 'curator'];
+export const PACK_SUPPORT_ROLES: readonly AgentRole[] = ['shipper', 'sales', 'curator', 'finance'];
 
 // Six curated packs plus the platform floor. Reasoning grounded in daemon role load: architect
 // runs the mixture-of-agents plan pipeline, developer runs real code, and designer studies a
@@ -175,14 +175,14 @@ export const PACKS: Record<string, ModelPack> = {
     id: 'ultracode', name: 'Ultracode', tagline: 'Best-in-market brain per role, mixing providers',
     roles: {
       orchestrator: 'gpt-5.6-sol', architect: 'gpt-6-astra', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
-      reviewer: 'gpt-6-astra', designer: 'claude-opus-5-5', shipper: 'claude-fable-5-1', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-opus-5-5',
+      reviewer: 'gpt-6-astra', designer: 'claude-opus-5-5', shipper: 'claude-fable-5-1', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-opus-5-5', finance: 'gpt-5.6-sol',
     },
   },
   balanced: {
     id: 'balanced', name: 'Balanced', tagline: 'Cost + performance across providers',
     roles: {
       orchestrator: 'claude-sonnet-5-5', architect: 'gemini-3.8-flash', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
-      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5-5', shipper: 'claude-sonnet-5-5', sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
+      reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5-5', shipper: 'claude-sonnet-5-5', sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5', finance: 'claude-sonnet-5-5',
     },
   },
   fast: {
@@ -191,7 +191,7 @@ export const PACKS: Record<string, ModelPack> = {
       orchestrator: 'gemini-3.8-flash', architect: 'gemini-3.8-flash',
       developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
       reviewer: 'gemini-3.8-flash', designer: 'claude-sonnet-5-5', shipper: 'claude-sonnet-5-5',
-      sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
+      sales: 'claude-haiku-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5', finance: 'gemini-3.8-flash',
     },
     latency: {
       orchestrator: '5.4s', architect: '15.0s', reviewer: '2.5s',
@@ -201,21 +201,21 @@ export const PACKS: Record<string, ModelPack> = {
     id: 'claude-core', name: 'Claude Core', tagline: 'Best per role on Anthropic',
     roles: {
       orchestrator: 'claude-sonnet-5-5', architect: 'claude-fable-5-1', developer: 'claude-sonnet-5-5', worker: 'claude-sonnet-5-5',
-      reviewer: 'claude-fable-5-1', designer: 'claude-sonnet-5-5', shipper: 'claude-opus-5-5', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5',
+      reviewer: 'claude-fable-5-1', designer: 'claude-sonnet-5-5', shipper: 'claude-opus-5-5', sales: 'claude-sonnet-5-5', curator: 'claude-haiku-5-5', marketer: 'claude-sonnet-5-5', finance: 'claude-sonnet-5-5',
     },
   },
   'openai-core': {
     id: 'openai-core', name: 'OpenAI Core', tagline: 'Best per role on OpenAI',
     roles: {
       orchestrator: 'gpt-5.6-sol', architect: 'gpt-6-astra', developer: 'gpt-5.6-terra', worker: 'gpt-5.6-terra',
-      reviewer: 'gpt-6-astra', designer: 'gpt-5.6-sol', shipper: 'gpt-5.6-sol', sales: 'gpt-5.4-mini', curator: 'gpt-5.4-mini', marketer: 'gpt-5.6-sol',
+      reviewer: 'gpt-6-astra', designer: 'gpt-5.6-sol', shipper: 'gpt-5.6-sol', sales: 'gpt-5.4-mini', curator: 'gpt-5.4-mini', marketer: 'gpt-5.6-sol', finance: 'gpt-5.6-sol',
     },
   },
   'gemini-core': {
     id: 'gemini-core', name: 'Gemini Core', tagline: 'Best per role on Gemini',
     roles: {
       orchestrator: 'gemini-3.8-flash', architect: 'gemini-3.8-flash', developer: 'gemini-3.1-pro-preview', worker: 'gemini-3.1-pro-preview',
-      reviewer: 'gemini-3.1-pro-preview', designer: 'gemini-3.8-flash', shipper: 'gemini-3.1-pro-preview', sales: 'gemini-3.1-flash-lite', curator: 'gemini-3.1-flash-lite', marketer: 'gemini-3.8-flash',
+      reviewer: 'gemini-3.1-pro-preview', designer: 'gemini-3.8-flash', shipper: 'gemini-3.1-pro-preview', sales: 'gemini-3.1-flash-lite', curator: 'gemini-3.1-flash-lite', marketer: 'gemini-3.8-flash', finance: 'gemini-3.8-flash',
     },
   },
   // The house brain (starter-brain round, 2026-08-28). The pack a workspace runs on before it
@@ -239,7 +239,7 @@ export const PACKS: Record<string, ModelPack> = {
     platform: true,
     roles: {
       orchestrator: STARTER_MODEL, architect: STARTER_MODEL, developer: STARTER_MODEL, worker: STARTER_MODEL,
-      reviewer: STARTER_MODEL, designer: STARTER_MODEL, shipper: STARTER_MODEL, sales: STARTER_MODEL, curator: STARTER_MODEL, marketer: STARTER_MODEL,
+      reviewer: STARTER_MODEL, designer: STARTER_MODEL, shipper: STARTER_MODEL, sales: STARTER_MODEL, curator: STARTER_MODEL, marketer: STARTER_MODEL, finance: STARTER_MODEL,
     },
   },
 };

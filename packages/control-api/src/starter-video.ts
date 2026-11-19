@@ -1,3 +1,4 @@
+import { cronAuthorized } from './cron-auth';
 // The video rung's door and its cron (docs/design/video-rung-2026-09, issue #539): a video post's
 // hook filmed on the platform's fal.ai key, metered on cloud credits. The Starter brain's twin, in
 // the same order of guards: member gate, the balance FIRST, then price, debit, submit, a films row,
@@ -105,8 +106,7 @@ export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor }
 /** the minute cron's door, the announce cron's shape: `authorization: Bearer $CRON_SECRET`, outside /v1 */
 export function filmsCronRoute<E extends Env>(app: Hono<E>, store: Store, opts: { ledger?: Ledger | null; env?: NodeJS.ProcessEnv; fetchFn?: FalFetch } = {}): void {
   app.get('/internal/films-due', async (c) => {
-    const secret = (opts.env ?? process.env)['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization'), opts.env ?? process.env))) return c.json({ error: 'forbidden' }, 403);
     const results = await filmsDue(store, opts);
     return c.json({ processed: results.length, results });
   });

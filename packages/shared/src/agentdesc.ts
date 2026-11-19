@@ -36,6 +36,8 @@ export const ROLE_DESCRIPTION: Record<AgentRole, string> = {
     'Keeps the team’s skill library: promotes what works, retires what does not. Route skill and convention curation here.',
   sales:
     'Outbound, prospect research and customer-facing follow-up. Route pipeline and account work here.',
+  finance:
+    'Answers questions about the workspace’s shared money in Finance: spending, budgets and trends from the connected accounts. Pick it in the Finance composer.',
 };
 
 /** The default description for a role, or null for a role we have nothing useful to say about. */

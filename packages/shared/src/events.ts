@@ -32,6 +32,7 @@ export const EVENT_TYPES = [
   'task.design_proposed',
   'task.design_revising',
   'task.design_approved',
+  'task.release_checklist_requested',
   'task.ship_claimed',
   'task.ship_plan_proposed',
   'task.ship_plan_revising',
@@ -63,6 +64,8 @@ export const EVENT_TYPES = [
   'agent.online',
   'agent.offline',
   'machine.registered',
+  // a person switched Always on for a cloud machine (control-api machine-always-on.ts)
+  'machine.always_on_set',
   'member.invited',
   'workspace.created',
   'workspace.updated',

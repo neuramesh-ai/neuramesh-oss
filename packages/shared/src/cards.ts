@@ -1,3 +1,5 @@
+import { authCardNotification, authWorkOf } from './auth-notice';
+export { authNoticeCopy, authDecisionQuestion } from './auth-notice';
 // Decision cards embedded in agent messages. An agent asks the human by posting a
 // message whose body carries a fenced block: ```nmq (a question / plan-approval /
 // add-agent / project-confirm card) or ```nmauth (a reconnect card). Answering is
@@ -52,6 +54,8 @@ export interface CardNotification {
 export function cardNotification(body: string, where: string): CardNotification | null {
   const card = parseCard(body);
   if (!card) return null;
+  const auth = card.kind === 'nmauth' ? parseAuthCard(body) : null;
+  if (auth) return authCardNotification(auth, where);
   const q = card.kind === 'nmq' ? parseQuestions(body)[0] : undefined;
   const title = q?.kind === 'permission' ? `Approval needed · ${where}` : cardTitle(card.kind, where);
   const line = q?.kind === 'permission' ? preview(q.question) : preview(body);
@@ -396,6 +400,8 @@ export interface NmAuth {
   /** true when the seat ALREADY moved to the Starter brain by itself (a routine's conversation): the
    *  card records the switch and asks nothing — no decision row, no button, the reconnect only */
   switched?: boolean;
+  /** The turn that could not use its configured provider. Older cards have no context. */
+  work?: { kind: 'routine' | 'task' | 'conversation'; title?: string };
 }
 
 const NMAUTH_ONE = /```nmauth[ \t]*\n([\s\S]*?)```/;
@@ -403,15 +409,6 @@ const NMAUTH_ONE = /```nmauth[ \t]*\n([\s\S]*?)```/;
 /** the fenced block the daemon posts — one serializer, so what the door writes is what parseAuthCard reads */
 export function authCardBlock(card: NmAuth): string {
   return `\`\`\`nmauth\n${JSON.stringify(card)}\n\`\`\``;
-}
-
-/** the needs-you row an auth card mints (docs/12): what the person reads in the queue, the bell, the
- *  thread pill. A question in form only — the answer is a reconnect or a switch, not a word. */
-export function authDecisionQuestion(card: NmAuth): string {
-  const who = card.agent ? `@${card.agent}` : 'An agent';
-  const label = AUTH_LABEL[card.provider] ?? card.provider;
-  const why = card.why ?? (card.reason === 'expired' ? `The ${label} login on this machine expired.` : `This machine has no ${label} login.`);
-  return `${who} cannot run here. ${why} Sign in again, or switch this conversation to the NeuraMesh brain, on credits.`.slice(0, 400);
 }
 
 export const AUTH_LABEL: Record<string, string> = { anthropic: 'Claude', openai: 'OpenAI / Codex', gemini: 'Gemini' };
@@ -430,6 +427,7 @@ export function parseAuthCard(body: string): NmAuth | null {
     if (!provider) return null;
     const reason = o['reason'];
     const scope = o['scope'] as { threadId?: unknown; role?: unknown } | undefined;
+    const work = authWorkOf(o['work']);
     return {
       provider,
       ...(reason === 'expired' || reason === 'unavailable' ? { reason } : {}),
@@ -440,6 +438,7 @@ export function parseAuthCard(body: string): NmAuth | null {
       ...(typeof o['starter'] === 'boolean' ? { starter: o['starter'] } : {}),
       ...(scope && typeof scope.threadId === 'string' && typeof scope.role === 'string' ? { scope: { threadId: scope.threadId, role: scope.role } } : {}),
       ...(o['switched'] === true ? { switched: true } : {}),
+      ...(work ? { work } : {}),
     };
   } catch {
     return null;

@@ -1,3 +1,4 @@
+import { replyFailureText, replyRowsAfterPermission } from '../src/waiting';
 // The words and the deadline three clients share. A wait ghost that promises an answer forever is
 // the same lie as one that never appears, so this is where "how long" has its single answer.
 import { expect, test } from 'vitest';
@@ -50,4 +51,19 @@ test('the copy obeys the house rules', () => {
 test('the tick is finer than the copy it drives, so a minute never shows late', () => {
   expect(WAIT_TICK_MS).toBeLessThan(60_000);
   expect(WAIT_TICK_MS).toBeLessThan(WAIT_LIMIT_MS);
+});
+
+test('gives saved Gemini startup failures a way to recover without displaying old CLI help', () => {
+  expect(replyFailureText('agy orchestrator exited 2: le models plugin Manage plugins ...')).toMatch(/Gemini could not start.*Retry/);
+  expect(replyFailureText('Service temporarily unavailable.')).toBe('Service temporarily unavailable.');
+});
+
+test('approved permissions keep the original request as the retry target until a real reply arrives', () => {
+  const request = {id:'h',author_kind:'human',body:'What shipped?'};
+  const permission = {id:'p',author_kind:'agent',body:'```nmq\n{"kind":"permission","question":"Allow?","options":[{"label":"Approve"},{"label":"Deny"}]}\n```'};
+  const decision = {message_id:'p',question:'Allow?',status:'answered'};
+  expect(replyRowsAfterPermission([request,permission],[decision])).toEqual([request]);
+  expect(replyRowsAfterPermission([request,permission],[{...decision,status:'open'}])).toHaveLength(2);
+  const reply = {id:'a',author_kind:'agent',body:'The release is ready.'};
+  expect(replyRowsAfterPermission([request,permission,reply],[decision]).at(-1)).toBe(reply);
 });
