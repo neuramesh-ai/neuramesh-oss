@@ -1,7 +1,7 @@
 // The compute intro (docs/compute-choice) — the one-time explanation of whose machine
 // answers. Extracted from App.tsx (track A4).
 import { Modal } from '../ui/Modal';
-import { availableMachines, type MachineCapability } from '@neuramesh/shared';
+import { availableMachines, hostsAgent, type MachineCapability } from '@neuramesh/shared';
 import { nm as nmBridge } from '../bridge/nm';
 import { parseComputePrefs } from './prefs';
 import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-crew';
@@ -31,7 +31,8 @@ export function ComputeIntro({ workspaceName, machines, members, agents, selfUse
   const nameOf = (userId?: string | null): string =>
     members.find((x) => x.user_id === userId)?.display_name?.trim() || (userId === selfUserId ? 'yours' : 'a teammate');
   const placeable = agents.filter((a) => !a.retired_at && a.kind !== 'remote');
-  const serves = (m: MachineRow): number => placeable.filter((a) => runtimesOf(m).includes(a.runtime ?? 'claude-code')).length;
+  // a house-brain agent needs no runtime, so any machine serves it (shared compute-hosts.ts)
+  const serves = (m: MachineRow): number => placeable.filter((a) => hostsAgent(runtimesOf(m), a)).length;
   const [pick, setPick] = useState<string | null>(machines.find((m) => m.name === selfMachineName)?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [asked, setAsked] = useState<string | null>(null);

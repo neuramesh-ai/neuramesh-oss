@@ -2,7 +2,7 @@
 #
 # Build context is the REPO ROOT (Dockerfile.dockerignore beside this file scopes it; the root
 # .dockerignore belongs to the machine image and excludes supabase/ and dev/, which this image
-# needs). Ordinary cloud API routes use Vercel; --target brain builds the isolated GKE ingress.
+# needs). Hosted production uses Dockerfile.cloudrun; --target brain is the retained legacy ingress.
 # The default final target retains Local mode for existing compose and release pipelines.
 #
 #   docker build -f packages/control-api/Dockerfile -t neuramesh-control-api .
@@ -13,7 +13,7 @@
 #   final  — node, the bundle, the migration runner, the SQL it applies
 #
 # fastembed (semantic recall, optional) is left out: its onnxruntime is hundreds of MB and the
-# local stack reads with FTS exactly as Vercel does (NM_EMBED unset). A later round may add it.
+# local stack uses FTS when NM_EMBED is unset. A later round may add semantic recall.
 
 # ── stage 1: bundle ─────────────────────────────────────────────────────────────────────────────
 FROM node:22-slim AS build
@@ -23,6 +23,8 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs tsconfig.base.json ./
 COPY patches ./patches
 COPY packages/shared ./packages/shared
+COPY packages/canvas-kit ./packages/canvas-kit
+COPY packages/finance-ui ./packages/finance-ui
 COPY packages/client-core ./packages/client-core
 COPY packages/control-api ./packages/control-api
 RUN pnpm install --filter @neuramesh/control-api... --frozen-lockfile --no-optional
@@ -36,6 +38,8 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs ./
 COPY patches ./patches
 COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/canvas-kit/package.json ./packages/canvas-kit/package.json
+COPY packages/finance-ui/package.json ./packages/finance-ui/package.json
 COPY packages/client-core/package.json ./packages/client-core/package.json
 COPY packages/control-api/package.json ./packages/control-api/package.json
 # --ignore-scripts: the root's `prepare` runs husky, a dev dependency a --prod install does not
@@ -51,10 +55,12 @@ COPY package.json ./package.json
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/control-api/node_modules ./packages/control-api/node_modules
 COPY --from=deps /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=deps /app/packages/canvas-kit/package.json ./packages/canvas-kit/package.json
+COPY --from=deps /app/packages/finance-ui/package.json ./packages/finance-ui/package.json
 COPY --from=deps /app/packages/client-core/package.json ./packages/client-core/package.json
 COPY packages/control-api/package.json ./packages/control-api/package.json
 COPY --from=build /app/packages/control-api/dist ./packages/control-api/dist
-COPY packages/control-api/scripts/migrate.mjs ./packages/control-api/scripts/migrate.mjs
+COPY packages/control-api/scripts/migrate.mjs packages/control-api/scripts/cloudsql.mjs packages/control-api/scripts/db-runtime.mjs ./packages/control-api/scripts/
 COPY packages/control-api/docker-entrypoint.sh ./packages/control-api/docker-entrypoint.sh
 # the schema the runner applies from empty, the auth shim a plain Postgres needs, and the
 # Historical migrations remain intact; no sync-service storage or role is provisioned.

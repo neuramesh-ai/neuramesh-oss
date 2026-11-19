@@ -23,9 +23,10 @@ LAST=$(ls supabase/migrations/*.sql | xargs -n1 basename | sort | tail -1)
 [ "$(json mode <<<"$CFG")" = local ] || fail "mode is local"
 [ "$(json schemaVersion <<<"$CFG")" = "$LAST" ] || fail "schemaVersion is $LAST"
 [ "$(json version <<<"$CFG")" = "$(node -p "require('./package.json').version")" ] || fail "version is the root package.json version"
-[ "$(node -e "console.log(Object.keys(JSON.parse(process.argv[1])).sort().join(','))" "$CFG")" = "minDesktopVersion,mode,powersyncUrl,schemaVersion,version" ] || fail "nm-config carries exactly five fields, no ids"
+[ "$(node -e "console.log(Object.keys(JSON.parse(process.argv[1])).sort().join(','))" "$CFG")" = "boardsUrl,minDesktopVersion,mode,powersyncUrl,schemaVersion,version" ] || fail "nm-config carries exactly six fields, no ids"
 [[ "$(json minDesktopVersion <<<"$CFG")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "minDesktopVersion is a version (docs/46)"
 [ "$(json powersyncUrl <<<"$CFG")" = null ] || fail "Local does not advertise a PowerSync endpoint"
+[ "$(json boardsUrl <<<"$CFG")" = null ] || fail "Local has no Message boards address"
 ok "mode local · version $(json version <<<"$CFG") · schemaVersion $LAST · floor $(json minDesktopVersion <<<"$CFG") · no ids"
 
 echo "── the seeded human, and nothing else"

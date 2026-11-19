@@ -26,7 +26,7 @@ export const MACHINE_COMMANDS = [
   // while it sleeps (member-machines plan §4).
   // daemonVersion: the same reason — a cloud machine's image names its commit (NM_IMAGE_SHA) and
   // the beat is the only place it can say so. Optional: an older machine beats without it.
-  z.object({ type: z.literal('machine.heartbeat'), machineId: z.string().min(1), activeSeconds: z.number().int().min(0).max(3600).optional(), busy: z.boolean().optional(), runtimes, daemonVersion: z.string().min(1).max(64).optional() }),
+  z.object({ type: z.literal('machine.heartbeat'), machineId: z.string().min(1), activeSeconds: z.number().int().min(0).max(3600).optional(), busy: z.boolean().optional(), runtimes, permissionVersion: z.literal(1).optional(), daemonVersion: z.string().min(1).max(64).optional() }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
   z.object({ type: z.literal('machine.provision'), workspace: z.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC

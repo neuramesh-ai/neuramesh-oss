@@ -26,6 +26,16 @@ test('the server, the phone, the machine image and the fleet each name their own
   assert.deepEqual(on(classify(['packages/fleet/src/reconcile.ts'])), ['cloud']);
 });
 
+test('message boards: the app is the web, the service is the api, and their contract is both', () => {
+  assert.deepEqual(on(classify(['apps/boards/src/App.tsx'])), ['web']);
+  assert.deepEqual(on(classify(['packages/boards-api/src/app.ts'])), ['api']);
+  assert.deepEqual(on(classify(['packages/boards-shared/src/schemas.ts'])), ['web', 'api']);
+  assert.deepEqual(on(classify(['apps/boards/src/App.tsx', 'packages/boards-api/src/app.ts'])), ['web', 'api']);
+  // a test file of either stays inert, and a sibling folder is not the app
+  assert.deepEqual(on(classify(['apps/boards/src/api.test.ts', 'packages/boards-api/test/perm.test.ts'])), []);
+  assert.deepEqual(on(classify(['apps/boardsx/src/App.tsx'])), []);
+});
+
 test('docs, evidence, tests and the memory never implicate a surface, and an empty diff touches none', () => {
   const r = classify(['docs/10-model-packs.md', 'CLAUDE.md', 'docs/design/x/evidence/shot.png', 'apps/desktop/src/main/host/brandnote.test.ts', '.claude/launch.json']);
   assert.deepEqual(on(r), []);

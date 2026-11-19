@@ -1,0 +1,15 @@
+.destination-roster{display:flex;align-items:center;justify-content:center;gap:8px;flex:none}
+.destination-roster .clutile{flex:none}
+.destination-restricted{padding:80px 40px;color:var(--body)}
+.destination-restricted h1{font-size:24px;font-weight:500}
+.destination-restricted p{color:var(--muted);font-size:13px}
+.destination-access-note{padding:14px 16px;color:var(--muted);font-size:11px;line-height:1.6}
+.destination-picker-error{margin:10px 16px;color:var(--red);font-size:12px}
+.destination-marketing-header{position:relative;padding-right:210px!important;gap:14px}
+.destination-marketing-header>.destination-roster{position:absolute;left:50%;transform:translateX(-50%)}
+@media(max-width:900px){.destination-marketing-header .desc{display:none}}
+@media(max-width:700px){
+ .destination-marketing-header{height:auto!important;min-height:104px;padding:56px 18px 16px!important;align-items:center;flex-wrap:wrap}
+ .destination-marketing-header>.destination-roster{position:static;transform:none;margin-left:auto}
+ .destination-restricted{padding:70px 24px}
+}

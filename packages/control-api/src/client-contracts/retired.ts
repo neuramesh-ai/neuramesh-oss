@@ -22,6 +22,9 @@ export const RETIRED: readonly string[] = [
   'route POST /auth/local/token',
   'route POST /v1/machines/sync-token',
   'route GET /v1/sync-jwks',
+  // the R10 security lane (NM-011): a social connect starts with the signed-in
+  // POST /v1/connect/:provider/start. the public GET answers 410 until both supported desktops moved.
+  'route GET /connect/:provider/start',
 ];
 
 type Apply = (s: ContractSnapshot, m: RegExpExecArray) => void;

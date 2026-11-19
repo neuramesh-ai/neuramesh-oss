@@ -2,6 +2,9 @@ import { publishConversationArtifact, withConversationBrain } from '../harness/b
 import { z, type ZodRawShape } from 'zod';
 import { brainApiBaseUrl, DEFAULT_ENGINEERING_AGENT, type EngineeringAgent } from '@neuramesh/shared';
 import { allToolDefs } from '../harness/toolbus';
+import { EVIDENCE_INTEGRITY } from '@neuramesh/shared';
+import { validationCaptureTool } from './engineering-validation-capture';
+import type { PolicyRule } from '@neuramesh/shared';
 import { jsonSchemaFor } from '../harness/toolschema';
 import { articleChatTool, imagesChatTool } from '../host/chattools-share';
 import { makeWbClosures } from '../host/wbclosures';
@@ -27,6 +30,8 @@ export function engineeringDisplayTools(o: {
   context?: EngineeringDisplayContext | null;
   conversation?: EngineeringConversation;
   fetchImpl?: typeof fetch;
+  capturePolicy?: readonly PolicyRule[];
+  taskBaseRef?: string;
 }, selected?: EngineeringAgent): EngineeringDisplayTool[] {
   const agent = selected ?? DEFAULT_ENGINEERING_AGENT;
   const tools: EngineeringDisplayTool[] = [];
@@ -41,6 +46,7 @@ export function engineeringDisplayTools(o: {
       return { saved: true, ...artifact, markdown: `[${artifact.name.replace(/[\[\]\\]/g, '\\$&')}](.nm-artifacts/${href})` };
     },
   });
+  if (o.capturePolicy && o.conversation) tools.push(validationCaptureTool(o.cwd, o.capturePolicy, o.conversation, o.taskBaseRef));
   if (!o.context) return tools;
   tools.push(...o.context.projectTools?.() ?? []);
   const actor = { kind: 'agent', id: agent.id, role: agent.role };
@@ -72,6 +78,8 @@ export function engineeringDisplayTools(o: {
   return tools;
 }
 
-export const ENGINEERING_DISPLAY_PROMPT = `The active project's files, brand docs and repositories are available through list_library, read_library_doc and list_repos in every thread. Check these before claiming context is missing; use the repo id to read another repository. Coding mode does not restrict project reads.
+export const ENGINEERING_DISPLAY_PROMPT = `${EVIDENCE_INTEGRITY}
+For web screenshots use capture_task_view with the actual page or deployment preview when that tool is available. Raw browser launches in the Code shell have restricted sockets. Report capture failures without substituting a drawing.
+The active project's files, brand docs and repositories are available through list_library, read_library_doc and list_repos in every thread. Check these before claiming context is missing; use the repo id to read another repository. Coding mode does not restrict project reads.
 Use NeuraMesh's display tools for deliverables: show_artifact publishes a file and returns its actual clickable Markdown link; draft_article delivers a reading card; create_whiteboard delivers an editable diagram; share_images generates and displays image attachments. Use existing read/update tools to revise a whiteboard. These are the same NeuraMesh surfaces used in other conversations. Never invent artifact IDs or claim a display tool succeeded when it failed.
 Save portable output files under .nm-artifacts/. Keep installed dependencies, caches and intermediate frames outside that folder. Each saved file must be at most 16 MB; compress or split larger deliverables and explain any remaining limitation. Call show_artifact for each final deliverable and include its returned link in your reply. No extra server is needed for local media or documents. Web preview cards are for actual running web URLs, not local file paths.`;

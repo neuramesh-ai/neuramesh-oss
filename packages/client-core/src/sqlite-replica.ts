@@ -1,6 +1,6 @@
 import { isUnrecoverableUploadError } from './api';
 import { uploadCrudEntry, type UploadIdentity } from './crud-upload';
-import type { ReplicaBatch, ReplicaDatabase, ReplicaResult, ReplicaStatus } from './replica';
+import { SYNC_LONG_POLL_S, type ReplicaBatch, type ReplicaDatabase, type ReplicaResult, type ReplicaStatus } from './replica';
 import { SQLiteStore, type SQLiteDriver, type SQLiteResult } from './sqlite-store';
 export type { SQLiteDriver, SQLiteResult } from './sqlite-store';
 export { quoteIdentifier } from './sqlite-store';
@@ -32,6 +32,14 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
   private generation = 0;
   private failures = 0;
   private refreshCredentials = false;
+  /** the server's long-poll capability, from its last batch (ReplicaBatch.wait): 0 means poll every pollMs */
+  private longPollS = 0;
+  /** the loop's owner: schedule() moves it, and a chain holding an older one stops */
+  private ticket = 0;
+  /** ends the long-poll in flight: a local write, a reconnect or a disconnect pulls it */
+  private newsAbort?: AbortController;
+  /** a local write since the current pass began: the loop must not start waiting */
+  private dirty = false;
   private readonly closeWaiters = new Set<() => void>();
   private readonly rejectedRows = new Set<string>();
 
@@ -43,7 +51,7 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
   async execute(sql: string, params: unknown[] = []): Promise<ReplicaResult> {
     const value = await this.run(() => this.transaction(() => this.driver.query(sql, params)));
     this.notifyWatches();
-    this.schedule(0);
+    this.kick();
     return result(value);
   }
   watch(sql: string, params: unknown[], handlers: Watch['handlers'], options?: { signal?: AbortSignal }): void {
@@ -108,6 +116,7 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
   }
   async disconnect(): Promise<void> {
     this.connection = undefined; this.generation++; this.abort?.abort();
+    this.newsAbort?.abort(); this.newsAbort = undefined;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     await this.inflight?.catch(() => {});
@@ -142,6 +151,9 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
   }
   private async sync(connection: ReplicaConnection, generation: number, signal: AbortSignal): Promise<void> {
     if (generation !== this.generation) return;
+    // this pass reads the outbox after its first download: a write before that read rides this pass,
+    // and a write after it sets the flag again, so the loop runs another pass instead of a long-poll
+    this.dirty = false;
     const identity = await connection.identity(this.refreshCredentials);
     this.refreshCredentials = false;
     const owner = JSON.stringify(identity.defaultActor);
@@ -172,6 +184,7 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
         const batch = response.batch!;
         if (generation !== this.generation) return;
         await this.applyBatch(batch, bootstrap);
+        this.longPollS = typeof batch.wait === 'number' && batch.wait > 0 ? batch.wait : 0;
         again = batch.hasMore;
       }
     };
@@ -228,14 +241,101 @@ export class SQLiteReplica extends SQLiteStore implements ReplicaDatabase {
   }
   private schedule(delay: number): void {
     if (!this.connection || this.closed) return;
+    // a newer schedule owns the loop: an older chain (a wait cut short, a pass that was already running)
+    // sees its ticket go stale and never schedules again, so one connection has one loop
+    const ticket = ++this.ticket;
+    this.newsAbort?.abort();
+    this.newsAbort = undefined;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.syncNow().then(() => { this.failures = 0; }).catch(e => {
-        this.failures++; this.setStatus({ connected: false, dataFlowStatus: { downloading: false, uploading: false } });
-        if (!this.abort?.signal.aborted) console.error('replica_sync_failed', errorOf(e).message);
-      }).finally(() => this.schedule(Math.min(30_000, (this.connection?.pollMs ?? 1000) * 2 ** Math.min(this.failures, 5))));
+      void this.syncNow().then(() => { this.failures = 0; return this.pause(ticket); }, (e: unknown) => this.failed(e))
+        .catch((e: unknown) => this.failed(e))
+        .then((next) => { if (ticket === this.ticket) this.schedule(next); });
     }, delay);
     this.timer.unref?.();
+  }
+  /** a failed pass or long-poll: report it and back off, pollMs doubling up to 30 s */
+  private failed(e: unknown): number {
+    this.failures++; this.setStatus({ connected: false, dataFlowStatus: { downloading: false, uploading: false } });
+    if (!this.abort?.signal.aborted) console.error('replica_sync_failed', errorOf(e).message);
+    return Math.min(30_000, (this.connection?.pollMs ?? 1000) * 2 ** Math.min(this.failures, 5));
+  }
+  /** a local write wants its pass now: end the current wait or sleep */
+  private kick(): void {
+    this.dirty = true;
+    this.schedule(0);
+  }
+  /** The delay before the next pass. Against a server that holds long-polls (ReplicaBatch.wait), one
+   *  long-poll instead of a pollMs sleep. A local write since the pass began means no wait at all. */
+  private async pause(ticket: number): Promise<number> {
+    const pollMs = this.connection?.pollMs ?? 1000;
+    if (this.dirty) return 0;
+    if (!(this.longPollS > 0)) return pollMs;
+    return this.waitForNews(ticket, pollMs);
+  }
+  /**
+   * THE LONG-POLL (Cloud Run round 6, design §10.2). GET changes?cursor=…&wait=25: the server answers at
+   * once when anything is newer, else holds the request until a commit's NOTIFY or the wait ends. It
+   * returns the delay before the next pass: 0 when something is newer (or a local write came), the
+   * server's retryMs when it already holds as many waits as it may, pollMs when the "wait" came back
+   * at once (a server that does not really hold one must not make this spin). News is applied here
+   * only when no pass is running, the cursor is still the one asked with, and no exclusiveSync lock
+   * guards the passes (browser tabs): otherwise the next pass reads it, one request later.
+   * Hermes: no AbortSignal.any or AbortSignal.timeout, so the signals are linked by hand.
+   */
+  private async waitForNews(ticket: number, pollMs: number): Promise<number> {
+    const connection = this.connection, generation = this.generation, outer = this.abort?.signal;
+    if (!connection || !outer) return pollMs;
+    const fetchImpl = connection.fetchImpl ?? fetch;
+    for (;;) {
+      if (ticket !== this.ticket || generation !== this.generation || this.dirty || this.refreshCredentials) return 0;
+      const cursor = await this.run(() => this.meta('cursor'));
+      if (!cursor) return 0;
+      const identity = await connection.identity(false);
+      // checked again after the awaits, with nothing async between here and arming the abort: a write
+      // that came meanwhile must not wait behind a 25 s request
+      if (ticket !== this.ticket || generation !== this.generation || this.dirty) return 0;
+      const wait = Math.min(SYNC_LONG_POLL_S, this.longPollS);
+      const headers = { ...(identity.authHeaders ?? {}), 'x-nm-actor': JSON.stringify(identity.defaultActor) };
+      const stop = new AbortController();
+      const cancel = () => stop.abort();
+      this.newsAbort = stop;
+      outer.addEventListener('abort', cancel, { once: true });
+      const timeout = setTimeout(cancel, (wait + 15) * 1000);
+      timeout.unref?.();
+      const started = Date.now();
+      let status: number, batch: ReplicaBatch | null;
+      try {
+        if (outer.aborted) cancel();
+        const response = await fetchImpl(controlApiRequestUrl(connection.apiUrl, `/v1/brain/replica/changes?cursor=${encodeURIComponent(cursor)}&wait=${wait}`), { headers, signal: stop.signal });
+        status = response.status;
+        batch = response.ok ? await response.json() as ReplicaBatch : null;
+      } catch (error) {
+        if (stop.signal.aborted) return 0;
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        outer.removeEventListener('abort', cancel);
+        if (this.newsAbort === stop) this.newsAbort = undefined;
+      }
+      if (stop.signal.aborted || ticket !== this.ticket || generation !== this.generation) return 0;
+      // a reset is the pass's to handle (it bootstraps), and so is a credential refresh
+      if (status === 409) return 0;
+      if (status === 401) { this.refreshCredentials = true; return 0; }
+      if (!batch) throw new Error(`Sync wait failed (${status})`);
+      this.longPollS = typeof batch.wait === 'number' && batch.wait > 0 ? batch.wait : 0;
+      if (batch.cursor !== cursor || batch.hasMore || batch.changes.length) {
+        if (batch.hasMore || this.inflight || connection.exclusiveSync || this.dirty) return 0;
+        if (await this.run(() => this.meta('cursor')) !== cursor) return 0;
+        await this.applyBatch(batch, false);
+        const stamp = new Date();
+        await this.run(() => this.setMeta('lastSyncedAt', stamp.toISOString()));
+        this.setStatus({ connected: true, error: undefined, lastSyncedAt: stamp });
+        continue;
+      }
+      if (typeof batch.retryMs === 'number' && batch.retryMs > 0) return batch.retryMs;
+      if (!this.longPollS || Date.now() - started < 1000) return pollMs;
+    }
   }
 }

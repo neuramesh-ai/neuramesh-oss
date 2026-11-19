@@ -34,3 +34,38 @@ description = "Paper validation records the SHA-256 of tokens.css at 24db9fe5, n
 condition = "AND"
 paths = ['''^docs/design/paper-look-2026-10/evidence/web/validation-summary\.json$''']
 regexes = ['''^f3ea328f3165b63aad09530a2cff7d6fae29960dfc99d82ddb70a9674e2388b4$''']
+
+[[allowlists]]
+description = "Synthetic MCP secret in the fake sandbox argv/config secret-hiding test; exact fixture line only."
+condition = "AND"
+regexTarget = "line"
+paths = ["apps/desktop/src/main/cloudrun/box\\.test\\.ts$"]
+regexes = ["^\\s*const\\ config\\ =\\ 'mcp_servers\\.nm\\.env\\.NM_ORCH_SECRET=\"0123456789abcdef\"';$"]
+
+[[allowlists]]
+description = "Constant object-storage bundle key in the repository bundle tests; exact fixture line only."
+condition = "AND"
+regexTarget = "line"
+paths = ["packages/control\\-api/src/repo\\-bundles\\.test\\.ts$"]
+regexes = ["^\\s*const\\ key\\ =\\ 'fixture\\-a1b2c3d4';$"]
+
+[[allowlists]]
+description = "Pulumi KMS-wrapped state encryption keys in the named production Cloud Run stacks. Application secrets remain encrypted under secure entries."
+condition = "AND"
+regexTarget = "match"
+paths = ['''^infra/cloudrun/(configuration|edge|foundation|jobs|runtime|schedules|source|restore|restore-payload|qualification|runtime-guard|recovery|connector-key|connector-reconnect|filesystem-rehearsal|pitr-rehearsal|object-rehearsal|workspace-rehearsal|monitoring|monitoring-delivery-test|legacy-retirement|finance)/Pulumi\.prd\.yaml$''']
+regexes = ['''^encryptedkey: [A-Za-z0-9+/=]+$''']
+
+[[allowlists]]
+description = "Two recorded public Cloud Run API revision names; exact non-credential resource identifiers only."
+condition = "AND"
+regexTarget = "line"
+paths = ['^docs/design/cloud-run-production-2026-11/evidence/(final-canary-target-guard|prewindow-target-guard)-20261109\.json$']
+regexes = ['"apiRevision": "nm-cr-api-(00017-gzw|00016-98w)"']
+
+[[allowlists]]
+description = "Public Cloud Run API revision in the November 11 terminal verification receipt; exact non-credential identifier only."
+condition = "AND"
+regexTarget = "line"
+paths = ['^docs/design/cloud-run-production-2026-11/evidence/project-terminal-20261111/verification\.json$']
+regexes = ['"api": "nm-cr-api-00021-fq7"']

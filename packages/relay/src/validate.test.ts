@@ -20,7 +20,8 @@ function stubApi(status: number, payload: unknown): Promise<{ url: string; seen:
     req.on('data', (c: Buffer) => (raw += c.toString('utf8')));
     req.on('end', () => {
       seen.push({ path: req.url ?? '', auth: req.headers.authorization, body: JSON.parse(raw) });
-      res.writeHead(status, { 'content-type': 'application/json' });
+      // Each fixture owns a new server. Do not pool a connection across recycled ports.
+      res.writeHead(status, { 'content-type': 'application/json', connection: 'close' });
       res.end(JSON.stringify(payload));
     });
   });
@@ -32,10 +33,17 @@ function stubApi(status: number, payload: unknown): Promise<{ url: string; seen:
   });
 }
 
-afterEach(() => {
-  server?.close();
+async function closeApi(): Promise<void> {
+  const active = server;
   server = null;
-});
+  if (!active) return;
+  await new Promise<void>((resolve, reject) => {
+    active.close((error) => error ? reject(error) : resolve());
+    active.closeAllConnections();
+  });
+}
+
+afterEach(closeApi);
 
 describe('makeValidators', () => {
   it('validate-machine sends the secret bearer + token body and returns the identity', async () => {
@@ -50,7 +58,7 @@ describe('makeValidators', () => {
   it('validate-machine maps 401 to null (unknown token), other failures throw', async () => {
     const a = await stubApi(401, { error: 'unknown machine token' });
     expect(await makeValidators({ apiUrl: a.url, secret: 's' }).validateMachine('nmm_x')).toBeNull();
-    server?.close();
+    await closeApi();
     const b = await stubApi(500, { error: 'boom' });
     await expect(makeValidators({ apiUrl: b.url, secret: 's' }).validateMachine('nmm_x')).rejects.toThrow(
       'validate-machine 500',

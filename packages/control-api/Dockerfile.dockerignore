@@ -9,6 +9,8 @@
 !tsconfig.base.json
 !patches/**
 !packages/shared/**
+!packages/canvas-kit/**
+!packages/finance-ui/**
 !packages/client-core/**
 !packages/control-api/**
 !supabase/migrations/**
@@ -16,8 +18,6 @@
 # never the installed trees, the bundles, or the tests
 **/node_modules
 **/dist
-packages/control-api/index.js
-packages/control-api/api
 packages/control-api/test
 packages/control-api/.fastembed-cache
 packages/**/*.test.ts

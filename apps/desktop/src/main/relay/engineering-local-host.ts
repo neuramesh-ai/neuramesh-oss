@@ -1,4 +1,4 @@
-import { resolveEngineeringDisplayContext } from './engineering-display-context';
+import { resolveAuthorizedEngineeringDisplayContext } from './engineering-display-context';
 // THE DESKTOP'S OWN CODE HOST (the desktop Code bridge, slice B1, 2026-09-04) — pure, so it is
 // tested with a fake coding core the way the machine daemon's host is.
 //
@@ -11,6 +11,7 @@ import { resolveEngineeringDisplayContext } from './engineering-display-context'
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { EngineeringMachineOpenMeta, EngineeringOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { resolveEngineeringBrain } from './engineering-brain';
+import { resolveBrainWithIntake } from './engineering-intake';
 import { createClineEngineeringHost, type ClineEngineeringHostOptions, type EngineeringMachineHost, type EngineeringMachineSession } from './engineering-host';
 import { createCodeSessionRecorder } from './engineering-record';
 import { loadEngineeringPolicyRules } from './engineering-policy';
@@ -37,10 +38,12 @@ export interface LocalEngineeringHostOptions {
 export function createLocalEngineeringHost(o: LocalEngineeringHostOptions): EngineeringMachineHost {
   const auth = { apiUrl: o.apiUrl, machineToken: '', authHeaders: o.authHeaders, workspaceId: o.workspaceId, ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}) };
   return createClineEngineeringHost({
+    threadPermissions: true,
     ...auth,
     resolveCwd: o.resolveCwd ?? ((meta) => ensureEngineeringWorkspace(o.db, o.workspaceId, meta, { preferLocal: true })),
-    resolveDisplayContext: meta => resolveEngineeringDisplayContext(o.db, o.apiUrl, o.workspaceId, meta),
-    resolveBrain: o.resolveBrain ?? ((meta) => resolveEngineeringBrain(o.db, auth, meta)),
+    isTaskThread: async meta => { const [task] = await o.db.getAll<{state:string}>("select k.state from threads t join tasks k on k.id=t.task_id where t.id=? and t.workspace_id=? and t.kind='coding'", [meta.threadId, o.workspaceId]); return task?.state === 'planning' || task?.state === 'in_progress' ? task.state : !!task; },
+    resolveDisplayContext: (meta, cwd) => resolveAuthorizedEngineeringDisplayContext(o.db, o.apiUrl, o.workspaceId, meta, cwd,{fetchImpl:o.fetchImpl,headers:async()=>({...await o.authHeaders(),'x-nm-actor':JSON.stringify({kind:'agent',id:meta.agentId})})}),
+    resolveBrain: o.resolveBrain ?? resolveBrainWithIntake(o.db, o.workspaceId, (meta) => resolveEngineeringBrain(o.db, auth, meta)),
     resolvePolicyRules: (meta) => loadEngineeringPolicyRules(o.db, o.workspaceId, meta.projectId ?? null),
     // the session's synced row (0135), written as the member this host speaks for
     recorder: createCodeSessionRecorder({ apiUrl: o.apiUrl, headers: o.authHeaders, workspaceId: o.workspaceId, machineId: o.machineId ?? null, ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}), ...(o.log ? { log: o.log } : {}) }),
@@ -48,6 +51,15 @@ export function createLocalEngineeringHost(o: LocalEngineeringHostOptions): Engi
     ...(o.createCore ? { createCore: o.createCore } : {}),
     ...(o.createDefaultExecutors ? { createDefaultExecutors: o.createDefaultExecutors } : {}),
   });
+}
+
+// The task dispatcher and renderer must attach to the same host, including background work.
+const localHosts = new Map<string, EngineeringMachineHost>();
+export function sharedLocalEngineeringHost(o: LocalEngineeringHostOptions): EngineeringMachineHost {
+  const key = JSON.stringify([o.apiUrl,o.workspaceId,o.machineId]);
+  let host = localHosts.get(key);
+  if (!host) { host = createLocalEngineeringHost(o); localHosts.set(key,host); }
+  return host;
 }
 
 /** the open sessions of the local lane, by the renderer's subId */

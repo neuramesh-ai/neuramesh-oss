@@ -35,6 +35,8 @@ import { routineTools } from './tools-routine';
 import { playbookTools } from './tools-playbooks';
 import { repoTools } from './tools-repo';
 import { webTools } from './tools-web';
+import { messageBoardTools } from './tools-messageboards';
+import { messageBoardsFor, type MessageBoardTools } from './messageboards';
 import { scheduleOfThread } from './runwindow';
 import type { RepoReader } from './reporead';
 
@@ -43,6 +45,7 @@ import type { RepoReader } from './reporead';
  *  over a previous turn's seat or thread would spend the wrong credential or answer in the wrong
  *  place, which is why every group takes this rather than reaching for a module-level value. */
 export interface ToolCtx {
+  permissionRunId?: string;
   /** what this turn has read from the shelf (host/grounding.ts): draft_posts asks it before it writes */
   grounding: Grounding;
   z: typeof import('zod')['z'];
@@ -80,21 +83,24 @@ export interface ToolCtx {
   codeDoor: { repo: { id: string; org_name: string; name: string; local_path: string | null } } | null;
   /** a schedule's session: the server names it after the schedule, so the title tool is not offered */
   namedBySchedule: boolean;
+  /** Message boards (host/messageboards.ts): this agent's tools when a person gave it access to a board,
+   *  else null. Resolved before the turn, so the PRESENCE of the four tools is the gate. */
+  messageBoards: MessageBoardTools | null;
   wbReads: OrchTool[];
   wbWrites: OrchTool[];
   agents: Map<string, HostedAgent>;
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   brain: Brain;
   buildScheduleCard: (action: 'schedule' | 'unschedule', items: Array<{ item: string; letter: string; platform: string; slot?: string; preview: string }>, question: string) => string;
-  ensureChatWorkspace: (threadId: string) => string;
+  ensureChatWorkspace: (threadId: string) => string | Promise<string>;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
   libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace', at?: import('./project-context').ProjectAnchor, name?: string, offset?: number) => Promise<LibDoc[]>;
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
-  workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }>;
-  workspaceRead: (subject: SubjectRef, name: string, cap?: number) => { ok: true; body: string } | { ok: false; error: string };
+  workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }> | Promise<Array<{ name: string; bytes: number; modified: string }>>;
+  workspaceRead: (subject: SubjectRef, name: string, cap?: number) => { ok: true; body: string } | { ok: false; error: string } | Promise<{ ok: true; body: string } | { ok: false; error: string }>;
 }
 
 
@@ -141,7 +147,7 @@ export function makeOrchTools(ctx: HostCtx & {
   brain: Brain;
   buildScheduleCard: (action: 'schedule' | 'unschedule', items: Array<{ item: string; letter: string; platform: string; slot?: string; preview: string }>, question: string) => string;
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
-  ensureChatWorkspace: (threadId: string) => string;
+  ensureChatWorkspace: (threadId: string) => string | Promise<string>;
   executeHire: (orch: HostedAgent, channelId: string, input: { name: string; role: string; description?: string | null; brief?: string | null }) => Promise<{ ok: boolean; rehired: boolean; degradedToAdd: boolean; model?: string; runtime?: string; detail: string }>;
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
@@ -149,13 +155,17 @@ export function makeOrchTools(ctx: HostCtx & {
   startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
-  workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }>;
-  workspaceRead: (subject: SubjectRef, name: string, cap?: number) => { ok: true; body: string } | { ok: false; error: string };
+  workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }> | Promise<Array<{ name: string; bytes: number; modified: string }>>;
+  workspaceRead: (subject: SubjectRef, name: string, cap?: number) => { ok: true; body: string } | { ok: false; error: string } | Promise<{ ok: true; body: string } | { ok: false; error: string }>;
+  /** who has access to a message board: the daemon's own answer (host/messageboards.ts) unless a test hands one */
+  messageBoardsFor?: (agentId: string) => Promise<MessageBoardTools | null>;
 }) {
+const boardsFor = ctx.messageBoardsFor ?? messageBoardsFor;
 const { post, db, agents, apiGet, brain, buildScheduleCard, draftsForAnchor, ensureChatWorkspace, executeHire,
         generateDraftImage, generateShareImage, libraryDocs, startDeepWork, subjectFor, whiteboardClosures, workspaceListing, workspaceRead } = ctx;
 
 async function buildOrchestratorTools(ctx: {
+  permissionRunId?: string;
   ch: { id: string; slug: string; workspace_id: string };
   agent: HostedAgent;
   actor: { kind: string; id: string; role?: string };
@@ -341,17 +351,20 @@ async function buildOrchestratorTools(ctx: {
     return {};
   };
 
+  // Message boards: asked here, once, so the four tools exist only for an agent with access to a
+  // board. a sweep never carries them, so it never asks
+  const messageBoards = kind === 'sweep' ? null : await boardsFor(agent.id);
   // The registry, by domain (tools-*.ts). It is ONE list to both transports; the split is for
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
-  const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
-    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, namedBySchedule, wbReads, wbWrites,
+  const tc: ToolCtx = { permissionRunId:ctx.permissionRunId, grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
+    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, namedBySchedule, messageBoards, wbReads, wbWrites,
     agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs: (id, limit, scope, _at, name, offset) => libraryDocs(id, limit, scope, { threadId: convoThreadId, taskId: thread?.id }, name, offset),
     startDeepWork, subjectFor, workspaceListing, workspaceRead };
   // Whiteboards ride kind-gated from the shared catalogue — the #272 domain split dropped this
   // spread and the orchestrator spent five days commanded to draw with no drawing tool
   // (promptbudget/orchregistry tests now assert the BUILT registry, so a lost spread fails CI).
   const wbTools = [...wbWrites, ...wbReads].filter((t) => toolAvailable(t.name as NmTool, kind));
-  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...routineTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...repoTools(tc), ...webTools(tc), ...wbTools];
+  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...routineTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...repoTools(tc), ...webTools(tc), ...messageBoardTools(tc), ...wbTools];
   if (kind !== 'sweep') return all;
   const scoped = new Set(SWEEP_TOOLSETS[ctx.sweepScope ?? 'monitor']);
   return all.filter((t) => scoped.has(t.name));

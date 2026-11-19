@@ -17,10 +17,11 @@
 // NEW one on purpose: the leaked session lock on the old key may still be held by a pooled
 // backend, and this runner must never queue behind it again.
 //
-// Where it runs: the control-api's Vercel **production** deploy (vercel.json buildCommand) —
-// so the schema is migrated *before* the new code serves traffic. Preview deploys are gated
-// off (VERCEL_ENV !== 'production') and never touch the prod DB. Also runnable by hand:
-//   SUPABASE_DB_URL=... node scripts/migrate.mjs --force
+// Current hosted releases run this through an explicitly reviewed Cloud Run migration job,
+// before Pulumi promotes dependent application images. Local bootstrap uses the same runner.
+// The VERCEL_ENV gate remains for legacy compatibility, not automatic production deployment.
+// --force opts into execution outside that gate; use only the intended isolated/job DB role.
+// See packages/control-api/README.md and infra/README.md for current release procedures.
 //
 // Adopting tracking on an already-migrated DB: when schema_migrations is empty but the DB is
 // established (the `tasks` table exists), every migration through ADOPTION_BASELINE is marked
@@ -30,6 +31,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { startCloudSql } from './cloudsql.mjs';
+import { grantRuntimeData } from './db-runtime.mjs';
 
 // Overridable so the dev stack can adopt at its own latest (scripts/dev-migrate.sh); prod keeps 0046.
 const ADOPTION_BASELINE = process.env.MIGRATE_ADOPTION_BASELINE || '0046_desktop_auth_sessions.sql';
@@ -78,7 +81,9 @@ if (!url) {
   skip('no MIGRATE_DATABASE_URL / SUPABASE_DB_URL / DATABASE_URL set — skipping.');
 }
 
+const cloudSql = await startCloudSql();
 const sql = postgres(url, {
+  ...(cloudSql.path ? { path: cloudSql.path } : {}),
   max: 1,
   idle_timeout: 5,
   connect_timeout: 30,
@@ -150,16 +155,31 @@ try {
     // applied-but-untracked (or vice versa), and the lock never outlives the transaction. The
     // guard is what makes two racing deploys safe: the loser waits on the lock, then sees the
     // winner's tracking row and raises a signal this runner treats as "skip", not as failure.
-    const batch = [
+    //
+    // PENDING TRIGGER EVENTS (round 7). The sync feed's `sync_change` trigger (0159) is a constraint
+    // trigger DEFERRED to COMMIT. A migration that writes a synced table and then ALTERs it (or
+    // creates or drops one of its indexes) in the same transaction fails with "cannot ALTER TABLE ...
+    // because it has pending trigger events". Such a file is run once more with SET CONSTRAINTS ALL
+    // IMMEDIATE, so each statement records its changes as it ends. Only that file pays for it: the
+    // deferred mode takes the workspaces' feed locks in one order at COMMIT, and live writers rely on that.
+    const batch = (immediate) => [
       'begin;',
       `select pg_advisory_xact_lock(hashtext('${LOCK_KEY}')::bigint);`,
       `do $nm_guard$ begin if exists (select 1 from schema_migrations where name = '${safeName}') then raise exception '${ALREADY_APPLIED}'; end if; end $nm_guard$;`,
+      ...(immediate ? ['set constraints all immediate;'] : []),
       ddl,
       `insert into schema_migrations (name) values ('${safeName}');`,
       'commit;',
     ].join('\n');
     try {
-      await sql.unsafe(batch);
+      try {
+        await sql.unsafe(batch(false));
+      } catch (e) {
+        if (!/pending trigger events/i.test(String(e.message))) throw e;
+        await sql.unsafe('rollback;').catch(() => {});
+        console.log(`[migrate] ${f} met pending trigger events: running it again with immediate constraints`);
+        await sql.unsafe(batch(true));
+      }
     } catch (e) {
       await sql.unsafe('rollback;').catch(() => {});
       if (String(e.message).includes(ALREADY_APPLIED)) {
@@ -173,6 +193,10 @@ try {
   }
 
 
+  if (process.env.NM_RUNTIME_DB_ROLE) {
+    await grantRuntimeData(sql, process.env.NM_RUNTIME_DB_ROLE);
+    console.log('[migrate] refreshed the API runtime data grants and backend RLS policies');
+  }
   console.log(
     `[migrate] done — ${ran} applied, ${baselined} baselined, ${files.length} total (env=${env}).`,
   );
@@ -186,4 +210,5 @@ try {
   process.exitCode = 1;
 } finally {
   await sql.end({ timeout: 5 }).catch(() => {});
+  await cloudSql.close();
 }

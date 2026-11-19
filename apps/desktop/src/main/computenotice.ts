@@ -9,6 +9,7 @@
 // this machine expired, or there never was one — and the person can act on that in ten seconds.
 // "No machine available" stays for the case the probe cannot explain.
 import type { AuthResolution } from './runtime/authpolicy';
+import { TURN_FAILED_MARKER } from '@neuramesh/shared';
 
 export type NoComputeReason = 'expired' | 'missing' | null;
 
@@ -44,11 +45,23 @@ export function sleeperNotice(whose: string, runtime: string): string {
   return `Waking ${whose}. It holds the ${runtime} login this needs. Your message is answered once it is up, usually within a couple of minutes.`;
 }
 
-/** true for the no-compute notice (any wording), the sleeper notice, and the auth-blocked card */
+/** a wake that failed (2026-10-27): the machine's own reason, and the one move that has ever fixed it.
+ *  host/wakefail.ts posts it, as the reply to the message it could not answer. The reason reads as a
+ *  sentence: an error's first letter is raised, and it ends in a full stop. The marker after it types
+ *  the notice (2026-11-17), so a client shows its retry row in place of a plain agent reply */
+export function turnFailedNotice(reason: string): string {
+  const why = reason.replace(/\s+/g, ' ').trim().slice(0, 300);
+  const sentence = why ? `${why[0]!.toUpperCase()}${why.slice(1)}` : '';
+  const said = sentence ? ` ${/[.!?]$/.test(sentence) ? sentence : `${sentence}.`}` : '';
+  return `I can't reply now.${said} Send your message again. ${TURN_FAILED_MARKER}`;
+}
+
+/** true for the no-compute notice (any wording), the sleeper notice, the two "I can't reply now"
+ *  notices (no credits, a turn that could not start) and the auth-blocked card */
 export function isComputeNotice(body: string | null | undefined): boolean {
   if (!body) return false;
   return /^I can't run this/.test(body)
-    || /^I can't reply now\. This workspace is out of credits/.test(body)
+    || /^I can't reply now\./.test(body)
     || /^Waking (?:your|a teammate's) cloud machine/.test(body)
     || /```nmauth\b/.test(body);
 }

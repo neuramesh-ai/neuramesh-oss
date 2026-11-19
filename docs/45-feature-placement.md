@@ -31,21 +31,17 @@ and how a release reaches an installed app. [docs/07](07-billing-and-plans.md) i
   side, Free is the local app), and **the plan** (`workspaces.plan`, `'free' | 'cloud'`, server
   truth, enforced in `handler.ts`) says whether a hosted feature is paid. Never in a prompt or a menu.
 - **The browser client is its own app (since 2026-09-26).** `hq.neuramesh.app` is `apps/hq`: the
-  App in `apps/hq/src` on the web bridge in `apps/hq/web`, built by `apps/hq/vercel.json` (the
-  Vercel project's root directory). hq is private. The desktop app keeps its own copy of the renderer (`apps/desktop/src/renderer/src`) on
+  App in `apps/hq/src` on the web bridge in `apps/hq/web`, built into the
+  Cloud Run container by `infra/images/hq/Dockerfile.production`. hq is private. The desktop app keeps its own copy of the renderer (`apps/desktop/src/renderer/src`) on
   the Electron bridge. `apps/web` is the site alone. So a feature with a screen on the web is a
   change to hq, and it reaches the desktop only when someone ports it. Until 2026-09-26 the two
   were one renderer, and older rounds in `docs/` say so.
-- **The lanes have different speeds.** The API and the web deploy on merge to `main`. The phone gets
-  a JS update on merge (`mobile.yml`, its own paths) and a store build on a `mobile-v*` tag. The
-  cloud machines roll on a fleet tag that George cuts (`fleet-vN`,
-  [docs/11 §2a](11-releases.md#2a--cloud-machine-release-the-fleet)), never on the desktop tag. The desktop
-  needs a version bump, the public publish merged, the public tag for the image, the private tag,
-  and a human who publishes the draft ([docs/43 §5](43-public-repository.md#5-two-release-lanes)).
-- **The public tree carries some code of Pro features.** `packages/control-api` and `packages/shared`
-  are public, and so is the desktop's renderer. hq is private since 2026-09-26. The license keeps the hosted service ours, the local app has no
-  cloud to talk to, and the plan checks keep a `cloud`-only feature inert on a `free` plan. Hiding
-  code is not the goal. Not cutting a desktop release for every feature is.
+- **The lanes have different release gates.** API, HQ, relay and cloud machines use explicit
+  Cloud Build/Pulumi promotion after CI; merging main does not deploy them. The phone has its
+  EAS update/native build lane, but its backend must be verified live first. Cloud machines use
+  a qualified digest and safe drain, independently of desktop tags ([docs/11 §2a](11-releases.md#2a--cloud-machine-release-the-fleet)).
+  Desktop still needs a version bump, the public publish/image tag, the private tag and human
+  draft publication ([docs/43 §5](43-public-repository.md#5-two-release-lanes)).
 
 ## 1. The tier, then the plan
 
@@ -54,9 +50,9 @@ with no account.
 
 | Tier | It is | It ships |
 |---|---|---|
-| **Pro** (the default) | Lives on the hosted side: needs another member, a cloud machine, the hosted API alone (Stripe, credits, the starter brain, push, email, connectors that publish), the browser client, or the phone | On merge, to the web and the API. To the phone on its lane. To the desktop's Cloud connection on the next desktop release, when one is cut |
+| **Pro** (the default) | Lives on the hosted side: needs another member, a cloud machine, the hosted API alone (Stripe, credits, the starter brain, push, email, connectors that publish), the browser client, or the phone | After explicit Cloud Run promotion, to the web and the API. To the phone on its lane. To the desktop's Cloud connection on the next desktop release, when one is cut |
 | **Free** | Changes what the local app does with no account: the local stack, the wizard, the local agents, the desktop shell, the machine on this Mac | With a desktop release, and a public publish, and the image tag when `control-api` moved. It is desktop work by definition, so it is asked for, never assumed |
-| **Both** (the substrate) | The schema, the FSM, the shared types, the command handler, the sync rules, `client-core` | On merge to the hosted API. Into the local stack's image at the next desktop version. It must stay compatible with the newest **published** desktop ([docs/11 §0](11-releases.md#0--the-golden-rule-backend-before-desktop)) |
+| **Both** (the substrate) | The schema, the FSM, the shared types, the command handler, the replica schema, `client-core` | After explicit hosted API/schema promotion. Into the local stack's image at the next desktop version. It must stay compatible with the newest **published** desktop ([docs/11 §0](11-releases.md#0--the-golden-rule-backend-before-desktop)) |
 
 A Free feature is the only tier that forces the desktop lane. A Pro feature never does.
 
@@ -76,10 +72,10 @@ local stack).
 
 For a Pro feature the order is:
 
-1. **web**, the browser client. It is the Pro product's front door and it deploys on merge.
+1. **web**, the browser client. It is the Pro product's front door and uses explicit Cloud Run promotion.
 2. **mobile**, the phone. Every human gate, every card, every list the phone shows.
 3. **api** and **cloud**, as the feature needs them. A daemon change reaches the cloud machines at
-   the next fleet tag, so it never waits for a desktop release.
+   a qualified Cloud Run digest promotion, so it never waits for a desktop release.
 4. **desktop**, as needed (§4).
 
 A feature is not done on a surface it was placed on until that surface has its proof (§5). A
@@ -129,7 +125,7 @@ A desktop release is cut when one of these is true, and not otherwise:
    that sends the new one is published (docs/11 §0). Check the shipped build, not the branch.
 4. **A parity catch-up.** The ledger's open rows are worth a release. One release closes many rows.
 
-A daemon change the cloud machines need is not a reason. A fleet tag rolls it
+A daemon change the cloud machines need is not a reason. A qualified Cloud Run digest promotion rolls it
 ([docs/11 §2a](11-releases.md#2a--cloud-machine-release-the-fleet)).
 
 The lane is unchanged ([docs/43 §5](43-public-repository.md#5-two-release-lanes),
@@ -155,7 +151,7 @@ not done.
 | **web** | `node scripts/web-boot-e2e.mjs` (the built client boots in Chrome). Units: `pnpm --filter @neuramesh/hq test` covers hq, `pnpm --filter @neuramesh/web test` covers the site | Screenshots of the browser client against the dev stack (the `browser-client-rw` launch entry, or `browser-client-release`), both themes, at desktop width and at phone width when the screen is responsive |
 | **mobile** | `pnpm --filter @neuramesh/mobile typecheck && pnpm --filter @neuramesh/mobile test` | Simulator screenshots of the screen the change touches, both themes (the theme is pinned in SecureStore, Settings → Theme) |
 | **api** | `ci.yml`, the pg lane (`*.pg.test.ts` on the real schema) and the handler tests | The test output. A route: the call against the dev stack with its answer. A migration: `migrate.mjs` on the dev stack |
-| **cloud** | `surface-e2e.yml` says on the run that the change reaches the machines at the next fleet tag, and the machine image builds. The fleet tag boots the image on the cluster before it pins it | The k3d harness (CLAUDE.md, "The web + cloud harness"): the pod's own `agent_logs` lines or the daemon log for the run |
+| **cloud** | Surface classifier and image-input guards; build the reviewed source/image through the controlled Cloud Build lane | Boot the exact digest on an isolated fixture; inspect agent/terminal, restore/drain/wake and real-provider results before Pulumi promotion. Local k3d coverage alone does not qualify Cloud Run |
 | **desktop** | `pnpm --filter @neuramesh/desktop test` and `local-stack-smoke.yml` (its own paths) | Screenshots of the live app (a `desktop-live*` launch entry over CDP) or the preview harness, both themes |
 
 Run the classifier by hand before you open the PR: `node scripts/impact.mjs origin/main`.

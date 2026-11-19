@@ -8,20 +8,12 @@ import { report } from './report.mjs';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { capture, turnSettled, confirmTurn, requireApprovals } from './flow.mjs';
 
-test('eval permissions require approvals under cloud and legacy defaults without toggling asks on',async()=>{
-  for(const initial of [true,false]) {
-    const values={'Edit files':initial,'Execute commands':initial};
-    const page={
-      click:async selector=>{for(const label of Object.keys(values)) if(selector.includes(label)) values[label]=!values[label];},
-      evaluate:async(_fn,label)=>String(values[label]),
-      waitForSelector:async selector=>{if(selector.includes('aria-checked="false"')) {
-        const label=Object.keys(values).find(name=>selector.includes(name));assert.equal(values[label],false);
-      }},
-      keyboard:{press:async key=>assert.equal(key,'Escape')},
-    };
-    await requireApprovals(page);
-    assert.deepEqual(values,{'Edit files':false,'Execute commands':false});
-  }
+test('eval requires the persisted Request Review mode before switching to Act', async()=>{
+  const clicks=[], waits=[];
+  await requireApprovals({click: async selector=>clicks.push(selector),waitForSelector:async selector=>waits.push(selector)});
+  assert.equal(clicks.length,2);
+  assert.match(clicks[1],/Request Review/);
+  assert.ok(waits.some(selector=>selector.includes('Permissions: Request Review')));
 });
 
 test('evidence capture retries transient snapshot races without replaying UI actions', async () => {

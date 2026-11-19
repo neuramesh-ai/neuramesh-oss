@@ -6,7 +6,7 @@
 // (apps/desktop/src/main/sync/ipc/terminals.ts is the frame source being re-homed:
 // open carries cols/rows, data is the pty byte stream, close reaps).
 import WebSocket from 'ws';
-import { fromB64, isChannelFrame, parseMessage, toB64, type ChannelFrame, type ChannelLane } from './protocol.js';
+import { fromB64, isChannelFrame, parseMessage, toB64, type ChannelFrame, type MachineLane } from './protocol.js';
 
 export interface MachineClientOptions {
   /** the relay origin, e.g. wss://relay.neuramesh.app */
@@ -15,8 +15,8 @@ export interface MachineClientOptions {
   token: string;
   /** must match what the token resolves to — the relay refuses a mismatched hello */
   machineId: string;
-  /** the lanes the hello announces (tests); absent = an older daemon's hello */
-  lanes?: ChannelLane[];
+  /** the lanes (and capabilities) the hello announces (tests); absent = an older daemon's hello */
+  lanes?: MachineLane[];
   log?(line: string): void;
 }
 

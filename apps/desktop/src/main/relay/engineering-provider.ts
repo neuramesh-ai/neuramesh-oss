@@ -35,7 +35,7 @@ export interface EngineeringProviderOptions {
 
 /** the identity the host speaks to control-api with: the member's headers, else the machine's bearer */
 export async function engineeringAuthHeaders(opts: Pick<EngineeringProviderOptions, 'machineToken' | 'authHeaders'>): Promise<Record<string, string>> {
-  return opts.authHeaders ? opts.authHeaders() : { authorization: `Bearer ${opts.machineToken}` };
+  return opts.authHeaders ? opts.authHeaders() : { authorization: `Bearer ${opts.machineToken}`, 'x-nm-agent-scopes':'1' };
 }
 
 const API_PROVIDER: Record<Provider, string> = {
@@ -134,6 +134,18 @@ export async function resolveEngineeringProvider(
   env: NodeJS.ProcessEnv = process.env,
   probe: MachineAuthProbe = machineAuthProbe,
 ): Promise<EngineeringProviderResolution> {
+  // QA can explicitly prohibit all metered paths. Evaluate this before reading
+  // any local key, Cline settings, workspace credential or Starter configuration.
+  if (env['NM_ENGINEERING_SUBSCRIPTION_ONLY'] === '1') {
+    const provider = providerForModel(brain.modelId);
+    if (brain.modelId !== STARTER_MODEL && provider === 'openai' && await probe.subActive(provider)) {
+      return { providerId:'openai-codex', modelId:brain.modelId, apiKey:CHATGPT_LOCAL_CREDENTIAL, runtimeFetch:createChatGPTSubscriptionFetch() };
+    }
+    if (brain.modelId !== STARTER_MODEL && provider === 'gemini' && agyModelFor(brain.modelId,null) && await probe.subActive(provider)) {
+      return { providerId:'gemini',modelId:brain.modelId,lane:'agy' };
+    }
+    throw new EngineeringModelRefused('Subscription-only testing requires a supported, active ChatGPT or Google sign-in.');
+  }
   const explicitKey = env['NM_ENGINEERING_API_KEY'];
   const explicitProvider = env['NM_ENGINEERING_PROVIDER'];
   const explicitModel = env['NM_ENGINEERING_MODEL'];

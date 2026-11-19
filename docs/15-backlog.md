@@ -1,5 +1,7 @@
 # 15 — The Backlog: parked ideas before todo (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** v1 shipped 2026-07-03 (desktop v0.14.0). Adds a **backlog** stage BEFORE `todo` —
 > the board's scratch column for ideas the team wants to remember but is **not ready to start**.
 > Any teammate (human, orchestrator, worker agent) can park an item; parked items are editable

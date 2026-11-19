@@ -245,3 +245,13 @@ export async function resolveConnector(store: Store, ctx: { workspace: string; c
   const error = await stranded(slug) ?? (repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`);
   return { ok: false, code: 'NOT_INSTALLED', error, slug, repos, hint };
 }
+
+/** may a room's GitHub connection read this repository? The one it names, or one an installation
+ *  recorded for this same workspace covers (a project's secondary repository through the grant the
+ *  workspace made). Never through another tenant's installation (R10 NM-001). */
+export async function connectionReads(ann: AnnounceStore, handle: string, slug: string, workspaceId: string): Promise<boolean> {
+  const s = slug.toLowerCase();
+  if (handle.toLowerCase() === s) return true;
+  const rows = await ann.installationsForWorkspace(workspaceId).catch(() => []);
+  return rows.some((i) => i.repos.includes(s) || (i.selection === 'all' && i.account.toLowerCase() === s.split('/')[0]));
+}

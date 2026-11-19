@@ -1,5 +1,7 @@
 # 26 — Live agent status: the ghost message (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** shipped across v0.42.3 → v0.43.1 (desktop). The reply slot is alive: from the
 > moment an agent wakes for a surface, the row where its answer will land shows *who* is
 > working and *what they're doing*, narrated from real activity — no dead air, one live

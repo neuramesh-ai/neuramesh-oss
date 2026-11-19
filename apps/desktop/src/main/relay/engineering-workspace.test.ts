@@ -82,8 +82,9 @@ test('Engineering creates and reuses a durable per-thread worktree', () => inBra
   } } as Db;
   const meta = session({ threadId: 'eng-123', projectId: undefined, repoId: 'repo-1', repoName: 'app', mode: 'act' });
   const first = await ensureEngineeringWorkspace(db, 'workspace-1', meta);
-  assert.match(queries[0]!.sql, /workspace_id = \?/);
-  assert.deepEqual(queries[0]!.params, ['repo-1', 'workspace-1', null, null]);
+  const repoQuery = queries.find(q => q.sql.includes('from repos r'))!;
+  assert.match(repoQuery.sql, /workspace_id = \?/);
+  assert.deepEqual(repoQuery.params, ['repo-1', 'workspace-1', null, null]);
   assert.equal(first.repoRoot, engineeringRepoRoot('repo-1'), 'a repository with its own clone URL is its own clone');
   assert.equal(git(['branch', '--show-current'], first.cwd), 'nm/engineering/actor-1/eng-123');
   writeFileSync(join(first.cwd, 'uncommitted.txt'), 'survives relay disconnects\n');
@@ -110,6 +111,16 @@ test('Engineering rejects a repository outside the machine workspace', async () 
   }
 });
 
+test('an inactive planning task reads its base before the implementation branch exists', () => inBrain(async root => {
+  const clone = remote(root, 'qa/plan-history');
+  const db = {get: async (sql: string) => sql.includes('join tasks')
+    ? {number:42,repo_id:'repo-plan',base_ref:'main'}
+    : {clone_url:clone,default_branch:'main'}} as Db;
+  const where = await ensureEngineeringWorkspace(db, 'workspace', session({repoId:'repo-plan',threadId:'task-plan',branch:'nm/42-not-created'}));
+  assert.equal(git(['show','HEAD:README.md'],where.cwd),'# qa/plan-history');
+  assert.equal(existsSync(join(root,'brain/cache/worktrees/nm-42')),false,'a history view cannot create the task execution worktree');
+}));
+
 test('Engineering preserves slash-delimited default branch names', () => inBrain(async (root) => {
   const source = join(root, 'source'); const remote = join(root, 'remote.git');
   mkdirSync(source); git(['init', '-b', 'release/2026'], source);
@@ -123,7 +134,7 @@ test('Engineering preserves slash-delimited default branch names', () => inBrain
 
 test('Engineering scopes a selected project to its repository on the machine', async () => {
   const calls: unknown[][] = [];
-  const db = { get: async (_sql: string, params: unknown[]) => { calls.push(params); return null; } } as Db;
+  const db = { get: async (sql: string, params: unknown[]) => { if (sql.includes('from repos r')) calls.push(params); return null; } } as Db;
   await assert.rejects(ensureEngineeringWorkspace(db, 'workspace-a', session({ threadId: 'eng-project', actorId: 'actor-a', projectId: 'project-a', repoId: 'repo-b', repoName: 'foreign' })), /foreign is not in this project on this machine/);
   assert.deepEqual(calls[0], ['repo-b', 'workspace-a', 'project-a', 'project-a']);
   // a row the machine does not hold has no twin, so nothing more is asked

@@ -157,14 +157,18 @@ export const codexSdkAdapter: RuntimeAdapter = {
   complete(system, user, token, model) {
     return reason(system, user, token, model);
   },
-  async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: unknown, _protectedPaths?: string[], opts?: TurnOpts) {
+  async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: import('./adapter').PermissionGate, _protectedPaths?: string[], opts?: TurnOpts) {
+    if (_permissionGate && opts?.permissionRules) {
+      const {starterRunQuery}=await import('./starter');
+      return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,_permissionGate,opts,{provider:'openai',token});
+    }
     // ── The tool bus (docs/harness/03) ─────────────────────────────────────────────────────────
     // Codex used to ignore proposeSkill / recordLesson / addBacklogItem entirely — they were not
     // even in this signature — so a Codex-seated worker silently could not record a lesson or park
     // a discovery, and beats depended on the model echoing NM_BEAT_DONE into stdout. The bus gives
     // it the SAME toolset a Claude worker gets, over the loopback MCP bridge.
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}), ...(opts?.messageBoards ? { messageBoards: opts.messageBoards } : {}) } },
       userDataDir(),
       log,
     );

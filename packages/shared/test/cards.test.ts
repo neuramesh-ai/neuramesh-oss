@@ -276,8 +276,8 @@ describe('parseAuthCard', () => {
 
   it('mints the needs-you row\'s question from the card, naming who, why and the way out', () => {
     expect(authDecisionQuestion({ provider: 'openai', agent: 'rex', why: 'This machine has no OpenAI / Codex login.' }))
-      .toBe('@rex cannot run here. This machine has no OpenAI / Codex login. Sign in again, or switch this conversation to the NeuraMesh brain, on credits.');
-    expect(authDecisionQuestion({ provider: 'anthropic', reason: 'expired' })).toMatch(/^An agent cannot run here\. The Claude login on this machine expired\./);
+      .toBe('Reply could not run. Codex login unavailable on this machine. Use NeuraMesh brain on credits, or reconnect the provider on a machine you own and run it there.');
+    expect(authDecisionQuestion({ provider: 'anthropic', reason: 'expired' })).toMatch(/^Reply could not run\. Claude Code login expired on this machine\./);
   });
 
   it('is null without a block, so ordinary prose is never a card', () => {

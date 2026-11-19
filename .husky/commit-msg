@@ -1,0 +1,5 @@
+# A commit name follows Conventional Commits (CONTRIBUTING.md): type(scope): subject.
+# husky reads this file from the primary clone for each worktree. A branch from before the checker
+# has no scripts/commit-name.mjs, so a missing checker passes.
+[ -f scripts/commit-name.mjs ] || exit 0
+node scripts/commit-name.mjs --file "$1"

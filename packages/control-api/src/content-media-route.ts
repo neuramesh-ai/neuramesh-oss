@@ -36,7 +36,7 @@ export function publicContentMediaRoute<E extends Env>(app: Hono<E>, store: Stor
   });
 }
 
-export function contentMediaRoute<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store): void {
+export function contentMediaRoute<E extends Env & { Variables: { actor: Actor; machine?: { id: string; workspaceId: string }; memberId?: string } }>(app: Hono<E>, store: Store): void {
   // Dedicated large-body ingress, with exactly the same command authorization as /commands.
   // Full-resolution originals can exceed a serverless control API's buffered request limit.
   app.post('/v1/brain/content-media', bodyLimit({ maxSize: 24 * 1024 * 1024 }) as MiddlewareHandler<E>, async (c: Context<E>) => {
@@ -52,7 +52,8 @@ export function contentMediaRoute<E extends Env & { Variables: { actor: Actor } 
       const registration = await sql`select 1 from agent_channels ac join agents a on a.id = ac.agent_id where ac.agent_id = ${actor.id}::uuid and ac.channel_id = ${item.channel}::uuid and a.retired_at is null`;
       if (!registration.length) return c.json({ error: 'Not your channel.', code: 'NOT_PERMITTED' }, 403);
     }
-    try { return c.json(await executeCommand(store, c.get('actor'), parsed.data)); }
+    // the lane the actor came in on rides along, so the machine fence of the scope guard holds here too
+    try { return c.json(await executeCommand(store, c.get('actor'), parsed.data, c.get('machine'), c.get('memberId'))); }
     catch (error) {
       if (error instanceof DomainError) return c.json({ error: error.message, code: error.code }, error.status as 403);
       throw error;

@@ -13,7 +13,7 @@ PORT="${NM_PG_PORT:-55434}"
 # -v: the postgres image declares a VOLUME, so a plain `rm -f` strands an anonymous volume every
 # run. 432 of them (about 67 GB) had piled up before one initdb died on "No space left on device".
 docker rm -f -v "$NAME" >/dev/null 2>&1 || true
-docker run -d --name "$NAME" -e POSTGRES_PASSWORD=nm -e POSTGRES_DB=nm -p $PORT:5432 pgvector/pgvector:pg16 >/dev/null
+docker run -d --name "$NAME" -e POSTGRES_PASSWORD=nm -e POSTGRES_DB=nm -p "127.0.0.1:$PORT:5432" pgvector/pgvector:pg16 >/dev/null
 trap 'docker rm -f -v "$NAME" >/dev/null' EXIT
 # pg_isready can pass during initdb's temp server; require a real query.
 until docker exec "$NAME" psql -U postgres -d nm -tAc "select 1" >/dev/null 2>&1; do sleep 0.4; done

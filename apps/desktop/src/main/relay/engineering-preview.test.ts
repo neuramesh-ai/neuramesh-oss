@@ -28,6 +28,33 @@ test('previews show exact per-file snapshots without writing, including delete-a
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test('whole-file replacement removes every starter line from the preview and approved execution', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'nm-review-replace-'));
+  const before = [
+    "export function migrate(data) { throw new Error('Not implemented'); }",
+    "export function addExpense(state, entry) { throw new Error('Not implemented'); }",
+    'export function visibleExpenses(state, category) { return []; }',
+    'export function totals(state) { return { totalCents: 0, byCategory: {} }; }',
+  ].join('\n') + '\n';
+  const after = 'export function migrate(data) { return data; }\n';
+  const patch = '*** Begin Patch\n*** Delete File: ledger.mjs\n*** Add File: ledger.mjs\n+' + after.trimEnd() + '\n*** End Patch';
+  try {
+    const { createApplyPatchExecutor } = await import('@cline/sdk');
+    for (const source of [before, before.trimEnd()]) {
+      // The normalized Update preserves the existing file's final-newline convention.
+      const expected = source.endsWith('\n') ? after : after.trimEnd();
+      await writeFile(join(root, 'ledger.mjs'), source);
+      const files = await previewEngineeringChanges(root, 'apply_patch', { input: patch });
+      assert.equal(files[0]?.previewError, undefined);
+      assert.equal(files[0]?.before, source);
+      assert.equal(files[0]?.after, expected);
+      assert.equal(await readFile(join(root, 'ledger.mjs'), 'utf8'), source);
+      await createApplyPatchExecutor()({ input: await preparedEngineeringPatch(root, patch) }, root, { agentId: 'test', conversationId: 'test', iteration: 0 });
+      assert.equal(await readFile(join(root, 'ledger.mjs'), 'utf8'), expected);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test('invalid patches and symlink escapes never claim a complete snapshot or leak file contents', async () => {
   const root = await mkdtemp(join(tmpdir(), 'nm-review-test-'));
   const outside = await mkdtemp(join(tmpdir(), 'nm-review-outside-'));

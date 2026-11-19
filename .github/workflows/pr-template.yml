@@ -16,11 +16,12 @@ permissions:
 
 jobs:
   body:
-    name: the template's sections, with words
+    name: template sections
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 5
 
       - name: Self-test the check
         run: bash scripts/pr-template-check.sh --self-test

@@ -7,7 +7,7 @@ import type { ToolApprovalRequest, ToolExecutors } from '@cline/sdk';
 import type { PolicyRule } from '@neuramesh/shared';
 import type { EngineeringControls, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import type { BridgeTool } from '../runtime/orchmcp';
-import { requestEngineeringApproval } from './engineering-approvals';
+import { requestEngineeringApproval, type EngineeringParkMeta } from './engineering-approvals';
 
 /** a tool the lane offers: execute takes the validated input only */
 export interface AgyLaneTool { name: string; description: string; inputSchema: Record<string, unknown>; execute(input: unknown): Promise<unknown> }
@@ -39,6 +39,10 @@ export function agyBridgeTools(o: {
   threadId: string;
   controls: () => EngineeringControls;
   policyRules: readonly PolicyRule[];
+  permissionGate?: import('../thread-permission-gate').ThreadPermissionGate;
+  /** CLOUD RUN: where an approval this lane asks parks (engineering-approvals.ts), read at each call so it
+   *  carries the session's controls as they are then. Absent = the approval waits in memory only */
+  parkMeta?: () => EngineeringParkMeta;
   pending: Map<string, (approved: boolean) => void>;
   emit: (event: EngineeringRuntimeEvent) => void;
   record: (type: string, payload: unknown) => void;
@@ -61,7 +65,7 @@ export function agyBridgeTools(o: {
           toolCallId, toolName: tool.name, input,
           policy: { enabled: true, autoApprove: false },
         };
-        const verdict = await requestEngineeringApproval(request, o.controls(), [...o.policyRules], o.pending, o.emit, o.record, o.cwd, o.isActive);
+        const verdict = await requestEngineeringApproval(request, o.controls(), [...o.policyRules], o.pending, o.emit, o.record, o.cwd, o.isActive, o.permissionGate, o.parkMeta?.());
         if (!verdict.approved) return JSON.stringify({ error: verdict.reason ?? 'Declined in Neuramesh' });
       }
       try {

@@ -222,3 +222,23 @@ test('a thoughts delta that keeps more than is held asks for a snap, and an old 
   assert.deepEqual(applyLiveFrame(held, { ...base, t: 'd', s: 4, keep: 3, add: 'd' }), { kind: 'state', state: { a: 'rex', e: 'e1', s: 4, text: 'abcd', th: 'xy' } });
   assert.deepEqual(applyLiveFrame(held, { ...base, t: 'd', s: 4, keep: 3, add: '', tk: 2, ta: 'z' }), { kind: 'state', state: { a: 'rex', e: 'e1', s: 4, text: 'abc', th: 'xyz' } });
 });
+
+test('progress lines ride the wire when they change, reach a late tab in its snap, and never repeat', () => {
+  const { streams, advance, sub } = rig();
+  const tab = sub('progress-tab');
+  streams.publish('c:t', 'rex', '', false);
+  streams.publish('c:t', 'rex', '', false, undefined, null, ['I will check the library first.']); advance(40);
+  assert.deepEqual(replay(tab.frames).get('c:t')?.pg, ['I will check the library first.']);
+  const before = tab.frames.length;
+  // the same lines again cut no frame
+  streams.publish('c:t', 'rex', '', false, undefined, null, ['I will check the library first.']); advance(40);
+  assert.equal(tab.frames.length, before);
+  // the reply types under the lines, and a frame with no pg keeps them
+  streams.publish('c:t', 'rex', 'Here is the app.', false); advance(40);
+  const held = replay(tab.frames).get('c:t');
+  assert.equal(held?.text, 'Here is the app.');
+  assert.deepEqual(held?.pg, ['I will check the library first.']);
+  const late = sub('progress-late');
+  assert.deepEqual(replay(late.frames).get('c:t')?.pg, ['I will check the library first.']);
+  tab.stop(); late.stop();
+});

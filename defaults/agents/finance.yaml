@@ -1,0 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# THE FINANCE CONTRACT
+#
+# Authoritative statement of how a Finance agent behaves. Reviewed as itself, changed deliberately.
+# Your machine's copy of `instructions` lives in <userData>/agent-instructions/ and wins; "Reset"
+# in the agent overlay rewrites it from here.
+#
+# A Finance answer is assembled by the API (finance-stream.ts): the read-only Finance prompt, the
+# Kinshi snapshot and the find_transactions tool. The agent gives the answer its name and its
+# model. It joins no room, so no room message wakes it.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+version: 1
+role: finance
+
+# Read by OTHER agents (list_agents) and published on the A2A card — synced, one value.
+description: >-
+  Answers questions about the workspace’s shared money in Finance: spending, budgets and trends from the connected accounts. Pick it in the Finance composer.
+
+# Read by this agent, on the machine it runs on. Machine-local; your copy wins.
+instructions: ""

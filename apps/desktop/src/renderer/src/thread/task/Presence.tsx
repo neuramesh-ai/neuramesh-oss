@@ -51,7 +51,7 @@ const liveLeg = spectrumLegs.find((l) => l.status === 'live') ?? null;
  * 'you' is skipped: it is the accept leg's owner, and "@you" is not a name.
  */
 const workingNow = liveLeg?.owner && liveLeg.owner !== 'you' ? liveLeg.owner : null;
-const factHolder = assignee ?? workingNow ?? null;
+const factHolder = assignee ?? offered ?? workingNow ?? null;
 const factcap =
   task.state === 'backlog' ? 'parked idea' : factHolder ? `@${factHolder}` : offered ? `offered @${offered}` : 'unassigned';
 

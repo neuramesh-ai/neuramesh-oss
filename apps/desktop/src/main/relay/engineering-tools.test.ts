@@ -48,13 +48,14 @@ test('macOS Code can run the real npm test script inside its mandatory sandbox',
   } finally { await rm(root, { recursive: true }); }
 });
 
-function seccompVerdict(filter: Buffer, arch: number, syscall: number): number {
+function seccompVerdict(filter: Buffer, arch: number, syscall: number, domain = 0, type = 1): number {
   let accumulator = 0; let cursor = 0;
   for (;;) {
     const offset = cursor * 8; const code = filter.readUInt16LE(offset);
     const jumpTrue = filter.readUInt8(offset + 2); const jumpFalse = filter.readUInt8(offset + 3);
     const value = filter.readUInt32LE(offset + 4);
-    if (code === 0x20) { accumulator = value === 4 ? arch : syscall; cursor += 1; continue; }
+    if (code === 0x20) { accumulator = value === 4 ? arch : value === 16 ? domain : value === 24 ? type : syscall; cursor += 1; continue; }
+    if (code === 0x54) { accumulator &= value; cursor += 1; continue; }
     if (code === 0x15) { cursor += (accumulator === value ? jumpTrue : jumpFalse) + 1; continue; }
     if (code === 0x45) { cursor += ((accumulator & value) !== 0 ? jumpTrue : jumpFalse) + 1; continue; }
     if (code === 0x06) return value;
@@ -77,11 +78,22 @@ test('Linux Code shell supplies a native seccomp filter for its shared outer net
   const filter = engineeringNetworkSeccompFilter();
   assert.equal(filter.length % 8, 0);
   assert.equal(filter.readUInt32LE(filter.length - 4), 0x7fff0000);
+  const arch = process.arch === 'x64' ? 0xc000003e : 0xc00000b7;
+  const socket = process.arch === 'x64' ? 41 : 198;
+  const socketpair = process.arch === 'x64' ? 53 : 199;
+  for (const domain of [1, 2, 10]) assert.equal(seccompVerdict(filter, arch, socket, domain), 0x00050001);
+  for (const flags of [0, 0x800, 0x80000, 0x80800]) assert.equal(seccompVerdict(filter, arch, socketpair, 1, 1 | flags), 0x7fff0000);
+  for (const type of [0, 2, 5, 2 | 0x80800]) assert.equal(seccompVerdict(filter, arch, socketpair, 1, type), 0x00050001);
+  for (const syscall of process.arch === 'x64' ? [42, 49, 50] : [203, 200, 201]) assert.equal(seccompVerdict(filter, arch, syscall), 0x00050001);
+  for (const domain of [0, 2, 10]) assert.equal(seccompVerdict(filter, arch, socketpair, domain), 0x00050001);
+  assert.equal(seccompVerdict(filter, arch, 425), 0x00050001);
   if (process.arch === 'x64') {
-    assert.equal(seccompVerdict(filter, 0xc000003e, 41), 0x00050001);
     assert.equal(seccompVerdict(filter, 0xc000003e, 0x40000000 | 41), 0x00050001);
     assert.equal(seccompVerdict(filter, 0xc000003e, 39), 0x7fff0000);
     assert.equal(seccompVerdict(filter, 0x40000003, 41), 0x80000000);
+  } else {
+    assert.equal(seccompVerdict(filter, arch, 172), 0x7fff0000);
+    assert.equal(seccompVerdict(filter, 0xc000003e, socketpair, 1), 0x80000000);
   }
 });
 
@@ -104,6 +116,29 @@ test('Linux Code shell enforces the real Bubblewrap boundary used by the machine
     }
     assert.match(await shell('printf inside > proof.txt; cat proof.txt', root, context), /inside/);
     assert.equal(await readFile(`${root}/proof.txt`, 'utf8'), 'inside');
+    await writeFile(`${root}/child.test.cjs`, `
+      const test = require('node:test');
+      const assert = require('node:assert/strict');
+      const { spawnSync, fork } = require('node:child_process');
+      test('nested process stdio works without network access', () => {
+        const child = spawnSync(process.execPath, ['-e', 'process.stdout.write("child-ok")'], { encoding: 'utf8' });
+        assert.equal(child.error, undefined);
+        assert.equal(child.status, 0);
+        assert.equal(child.stdout, 'child-ok');
+      });
+      test('child IPC works', async () => {
+        await new Promise((resolve, reject) => {
+          const child = fork('./ipc.cjs', [], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+          let received = false;
+          child.on('error', reject);
+          child.on('message', message => { received = message === 'ipc-ok'; });
+          child.on('exit', code => { try { assert.equal(code, 0); assert.equal(received, true); resolve(); } catch (error) { reject(error); } });
+        });
+      });
+    `);
+    await writeFile(`${root}/ipc.cjs`, 'process.send("ipc-ok", () => process.disconnect());');
+    await writeFile(`${root}/package.json`, JSON.stringify({ scripts: { test: 'node --test child.test.cjs' } }));
+    assert.match(await shell('npm test', root, context), /(?:#|ℹ) pass 2/);
     await assert.rejects(shell(`cat '${outside}'`, root, context));
     assert.notEqual((await shell('readlink /proc/self/ns/pid', root, context)).trim(), hostPidNamespace);
     const port = (server.address() as { port: number }).port;

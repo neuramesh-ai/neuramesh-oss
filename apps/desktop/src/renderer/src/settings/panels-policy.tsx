@@ -1,3 +1,4 @@
+import { PermissionPicker } from '../composer/PermissionPicker';
 // The policy gate — what a machine will run without asking, and what it must ask about.
 // Split out of settings/panels-compute.tsx.
 import { DEFAULT_PROTECTED, POLICY_GROUPS, V_COLOR, isProtectedPathRule, pathOfGlob, sameSelector, selectorLabel } from './policy';
@@ -75,6 +76,8 @@ export function PolicyPanel() {
 
   return (
     <div>
+      <div className="permission-settings"><div><b>Default thread permissions</b><small>New conversations inherit this choice.</small></div><PermissionPicker workspace /></div>
+      <details className="permission-restrictions"><summary>Workspace restrictions and protected paths</summary>
       <p className="modalhint" style={{ marginBottom: 13 }}>What agents may do here — <b>ask</b> pauses for your approval, <b>deny</b> blocks it. The sandbox makes a deny binding at the OS kernel.</p>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '11px 12px', borderRadius: 10, background: 'var(--panel2)', border: '1px solid var(--border)', marginBottom: 16 }}>
@@ -83,24 +86,24 @@ export function PolicyPanel() {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>Filesystem sandbox <span style={{ fontSize: 10, fontWeight: 500, color: on ? 'var(--green)' : 'var(--dim)' }}>· {on ? 'kernel-enforced' : 'off'}</span></div>
           <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.55 }}>
             Jails agents at the OS kernel — no reading the protected paths or other projects, even from a shell command.
-            {sbx?.envForced ? <span style={{ display: 'block', marginTop: 3, color: 'var(--dim)' }}>Pinned by <span style={{ fontFamily: 'var(--mono)' }}>NM_SANDBOX_FS</span> on this machine.</span> : null}
+            {sbx?.envForced ? <span style={{ display: 'block', marginTop: 3, color: 'var(--dim)' }}>Pinned by <span style={{ fontFamily: 'var(--fcode)' }}>NM_SANDBOX_FS</span> on this machine.</span> : null}
           </div>
         </div>
         <SandboxToggle enabled={on} disabled={!sbx || sbx.envForced} onChange={toggleSandbox} />
       </div>
 
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 5 }}>Protected paths</div>
+        <div style={{ fontFamily: 'var(--fcode)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 5 }}>Protected paths</div>
         <p className="fldhint" style={{ margin: '0 0 9px' }}>Never readable by agents. Credential stores are locked; add your own below.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
           {DEFAULT_PROTECTED.map((p) => (
-            <span key={p} style={{ fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)' }}>🔒 {p}</span>
+            <span key={p} style={{ fontFamily: 'var(--fcode)', fontSize: 11, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)' }}>🔒 {p}</span>
           ))}
           {custom.map((r) => {
             const pid = persistedId(r);
             const p = pathOfGlob(r.selector.kind === 'path' ? r.selector.glob : '');
             return (
-              <span key={r.id} style={{ fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+              <span key={r.id} style={{ fontFamily: 'var(--fcode)', fontSize: 11, background: 'var(--panel3)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                 {p}
                 {pid ? <button type="button" onClick={() => { void nm?.policyDelete(pid).then(load).catch(() => {}); }} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', padding: 0, lineHeight: 1 }} aria-label={`remove ${p}`}>×</button> : null}
               </span>
@@ -122,11 +125,11 @@ export function PolicyPanel() {
         if (!grp.length) return null;
         return (
           <div key={g.title} style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 4 }}>{g.title}</div>
+            <div style={{ fontFamily: 'var(--fcode)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 4 }}>{g.title}</div>
             {grp.map((r) => (
               <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 2px', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5 }}>{r.capability} · <span style={{ fontFamily: 'var(--mono)' }}>{selectorLabel(r.selector)}</span></div>
+                  <div style={{ fontSize: 12.5 }}>{r.capability} · <span style={{ fontFamily: 'var(--fcode)' }}>{selectorLabel(r.selector)}</span></div>
                   {r.rationale ? <div style={{ fontSize: 10.5, color: 'var(--dim)' }}>{r.rationale}</div> : null}
                 </div>
                 {r.locked ? (
@@ -144,6 +147,7 @@ export function PolicyPanel() {
         );
       })}
       <p className="fldhint" style={{ marginTop: 2 }}>Egress is allowed by default; the sandbox proxy enforces the host allowlist. Set <b>Network → ask</b> to review each host, or <b>deny</b> to cut the network.</p>
+      </details>
     </div>
   );
 }

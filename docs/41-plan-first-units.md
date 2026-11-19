@@ -1,5 +1,7 @@
 # 41 — Plan-first units: the thread owns the work, the plan opens it (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status: v1 SHIPPED to the round branch 2026-08-17** (commits `1f02f21b` · `4cc156c9` ·
 > `89922257`, worktree `subtasks-architecture-design`). Born from George's 2026-08-17 ruling on
 > the thread-owned-work design round ([docs/design/thread-owned-work-2026-08](design/thread-owned-work-2026-08/plan.md),

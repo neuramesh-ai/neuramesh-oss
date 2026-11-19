@@ -80,12 +80,15 @@ export function useWaitGhost(input: {
   return waitGhostFor({ ...input, machine, now });
 }
 
-export function WaitGhost({ found, onRetry }: {
+export function WaitGhost({ found, onRetry, needsAttachments }: {
   found: WaitGhostRow | null;
   /** send the waiting message again — the one move the deadline offers. Absent = no control. */
   onRetry?: () => void | Promise<void>;
+  needsAttachments?: boolean;
 }) {
   const [sending, setSending] = useState(false);
+  const [retryError, setRetryError] = useState(false);
+  const [sent, setSent] = useState(false);
   if (!found) return null;
   const { agent, kind, line, stalled, note } = found;
   return (
@@ -97,7 +100,7 @@ export function WaitGhost({ found, onRetry }: {
           {agent.role ? <span className="rolechip msgrole" data-role={agent.role}>{agent.role}</span> : null}
           <span className="time">now</span>
         </div>
-        <div className="ghostrow">
+        <div className={kind === 'dead' ? 'ghostrow reply-failed' : 'ghostrow'}>
           <span className="liveact ghoststep" aria-live="polite">
             {/* NO ORB WHEN NOTHING IS MOVING. A spinner is a promise that something is underway,
                 and at a zero balance — or after a wake that died, or one that never started —
@@ -118,16 +121,18 @@ export function WaitGhost({ found, onRetry }: {
           {/* The deadline's one move. It rides the ghost row rather than docking above the
               composer, because the docked slot is the contextual GATE (docs/25 §3), and a send
               nothing picked up is not a gate — it is a fact about the message already on screen. */}
-          {kind === 'timeout' && onRetry && (
-            <button type="button" className="ghostact" disabled={sending}
-              onClick={() => { setSending(true); void Promise.resolve(onRetry()).finally(() => setSending(false)); }}>
-              {sending ? 'Sending…' : WAIT_RETRY}
+          {(kind === 'timeout' || kind === 'dead') && onRetry && !needsAttachments && (
+            <button type="button" className="ghostact" disabled={sending || sent}
+              onClick={async () => { setSending(true); setRetryError(false); try { await onRetry(); setSent(true); } catch { setRetryError(true); } finally { setSending(false); } }}>
+              {sending ? 'Sending…' : sent ? 'Sent' : kind === 'dead' ? 'Retry reply' : WAIT_RETRY}
             </button>
           )}
         </div>
         {/* Only where there is reassurance worth making. The plain wait makes none: the orb and
             the agent's own name already say a reply is on its way, and a line under them
             explaining that is the subtext CLAUDE.md #11 says to delete rather than shrink. */}
+        {needsAttachments && onRetry && (kind === 'timeout' || kind === 'dead') && <div className="ghostelapsed">Reattach the original files in the composer and resend your request.</div>}
+        {retryError && <div role="alert">Couldn’t resend. Check your connection and try again.</div>}
         {note ? <div className="ghostelapsed">{note}</div> : null}
       </div>
     </div>

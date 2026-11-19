@@ -11,6 +11,7 @@
 // repository is the one the room's project connected, so the machine's workspace must be the
 // connector's. The App itself must carry those permissions (a GitHub App setting, re-approved by
 // every installation); until it does GitHub answers 422 and the route names what is missing.
+import { connectionReads } from './github-resolve';
 import type { Env, Hono } from 'hono';
 import { hashMachineToken } from './machine-auth';
 import { GitHubApiError, appSlug, githubAppConfigured, installationToken } from './github-app';
@@ -63,6 +64,8 @@ export function githubWriteRoutes<E extends Env>(app: Hono<E>, store: Store, fet
     if (repo.workspaceId !== machine.workspace_id) return c.json({ error: 'not this machine\'s workspace', code: 'NOT_PERMITTED' }, 403);
     const conn = await store.connectorWithSecret(repo.workspaceId, 'github', channel);
     if (!conn || conn.status !== 'connected') return c.json({ error: 'GitHub is not connected for this room', code: 'NOT_CONNECTED' }, 409);
+    // a write token for exactly the repository the room's connection names (R10 NM-001, github-connect.ts open())
+    if (!(await connectionReads(ann()!, conn.handle, slug, repo.workspaceId))) return c.json({ error: `GitHub is connected for ${conn.handle}, not ${slug}`, code: 'NOT_CONNECTED' }, 409);
     try {
       const inst = await installationFor(ann()!, slug, fetchFn);
       if (!inst) { await store.markConnectorReauth(conn.id); return c.json({ error: `GitHub no longer lets neuramesh reach ${slug}. A person needs to connect GitHub again from Connections.`, code: 'RECONNECT_REQUIRED' }, 409); }

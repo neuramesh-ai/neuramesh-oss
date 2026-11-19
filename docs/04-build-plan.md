@@ -1,5 +1,7 @@
 # 04 — Build Plan: 6-Week Alpha (Option A)
 
+> **Historical implementation plan.** Provider-specific milestones below record the original build. Production has since moved to Cloud Run, Cloud SQL and the API replica; use [the architecture](09-system-architecture.md) and [operations](../infra/README.md) for current deployment instructions.
+
 Solo founder + AI agents. The contract: **everything on the loop ships; everything off the loop is cut.** Weeks assume Option A (Managed Rails); add ~2–3 weeks if the week-1 spike forces the Electric fallback.
 
 ## Week-by-week

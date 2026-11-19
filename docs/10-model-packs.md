@@ -1,5 +1,7 @@
 # Model config packs — plan (for review)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 **Current catalog update, 2026-10-16:** Opus 5.5, Sonnet 5.5 and Haiku 5.5 replace their previous
 generations in offered choices and pack defaults. Gemini 4 Argon is an additional stable choice.
 Old IDs remain accepted for saved picks and conversations. The September measurements below describe

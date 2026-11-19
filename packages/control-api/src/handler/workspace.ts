@@ -68,6 +68,9 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
   }
   if (cmd.type === 'workspace.invite') {
     if (actor.kind !== 'human') throw new DomainError('NOT_PERMITTED', 'invites are human-only');
+    // owner/admin FIRST (R10 NM-159): the team shape below re-points the fleet, and it ran for any
+    // member before createInvite's own role check refused them
+    await requireInviteManager(store, cmd.workspace, actor.id, 'only workspace owners or admins invite members');
     // Free workspaces invite too, capped at FREE_SEAT_CAP (docs/27 §1e). The count includes
     // PENDING invites — counting members alone would let a free workspace issue ten invites
     // at 1/3 and wake up with eleven members when they all accept.
@@ -119,6 +122,7 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
   }
   if (cmd.type === 'workspace.revoke_invite') {
     if (actor.kind !== 'human') throw new DomainError('NOT_PERMITTED', 'invites are revoked by a human');
+    await requireInviteManager(store, cmd.workspace, actor.id, 'only workspace owners or admins revoke invitations'); // any member could revoke (R10 NM-159)
     const ok = await store.revokeInvite(cmd.invite, cmd.workspace);
     if (!ok) throw new DomainError('NOT_FOUND', 'no pending invite with that id');
     return { ok: true } as never;
@@ -185,4 +189,13 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
     return { ok: true, registered } as never;
   }
   return undefined;
+}
+
+/** only a workspace's owner or an admin issues or revokes its invitations (createInvite re-checks the
+ *  issuer in its own transaction; revokeInvite never did). The in-memory store has no roles to read. */
+async function requireInviteManager(store: Store, workspace: string, userId: string, refusal: string): Promise<void> {
+  const sql = sqlOf(store);
+  if (!sql) return;
+  const [m] = await sql`select role from workspace_members where workspace_id = ${workspace}::uuid and user_id = ${userId}::uuid`;
+  if (!m || !['owner', 'admin'].includes(m['role'] as string)) throw new DomainError('NOT_PERMITTED', refusal);
 }

@@ -183,7 +183,8 @@ describe('composeFailover — OpenAI Core (Sol on orchestrator) exhaustion', () 
     if (r.kind !== 'fall_forward') throw new Error('kind');
     expect(r.to).toBe('gpt-5.6-terra');
     expect(r.provider).toBe('openai');
-    // after the 2026-09 reseat Sol also holds designer, shipper and marketer in openai-core
-    expect([...r.roles].sort()).toEqual(['designer', 'marketer', 'orchestrator', 'shipper']);
+    // after the 2026-09 reseat Sol also holds designer, shipper and marketer in openai-core, and the
+    // finance seat follows the orchestrator (2026-11-17)
+    expect([...r.roles].sort()).toEqual(['designer', 'finance', 'marketer', 'orchestrator', 'shipper']);
   });
 });

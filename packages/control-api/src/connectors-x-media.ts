@@ -3,6 +3,7 @@
 // XReauthRequired lives here and the connector re-exports it: both modules throw it, and a value
 // import from the connector back into this one would be a real cycle.
 import { sniffImageMime, sniffVideoMime } from '@neuramesh/shared';
+import { SafeFetchError, safeFetch } from './safe-fetch';
 
 /** X's token endpoint saying the stored grant ITSELF is dead — the refresh token was revoked,
  * expired, or already spent (X's refresh tokens are single-use). Retrying can never fix it;
@@ -17,9 +18,14 @@ const X_VIDEO_MAX = 64_000_000; // a film (the video rung): X takes 512 MB, this
 /** Pull the draft's media so it can be uploaded. Works for our own hosted /media/<id> and for a
  *  URL a human pasted — X is the one network that wants BYTES rather than a link. */
 export async function fetchMediaBytes(url: string, fetchFn: typeof fetch): Promise<{ bytes: Buffer; mime: string }> {
-  const res = await fetchFn(url, { signal: AbortSignal.timeout(20_000), redirect: 'follow' });
-  if (!res.ok) throw new Error(`media url did not load (${res.status})`);
-  const bytes = Buffer.from(await res.arrayBuffer());
+  // a public https host on every hop, under a streaming cap (safe-fetch.ts, R10 NM-089): this followed
+  // redirects into the VPC and read whatever a pasted URL answered, whole, into memory
+  const res = await safeFetch(url, { fetchFn, maxBytes: X_VIDEO_MAX, timeoutMs: 20_000 }).catch((e: unknown) => {
+    if (e instanceof SafeFetchError && e.code === 'TOO_LARGE') throw new Error(`media too large for X (max ${X_VIDEO_MAX / 1_000_000}MB)`);
+    throw new Error(`media url did not load (${e instanceof Error ? e.message : String(e)})`);
+  });
+  if (res.status < 200 || res.status >= 300) throw new Error(`media url did not load (${res.status})`);
+  const bytes = res.bytes;
   if (!bytes.length) throw new Error('media url returned no bytes');
   const ct = ((res.headers.get('content-type') ?? '').split(';')[0] ?? '').toLowerCase();
   // the BYTES outrank the header: our own /media route echoes the mime the generator DECLARED,

@@ -22,6 +22,8 @@ interface MachineIntentRow {
   // the answers to "how long has it been up" and "when does it sleep". They reached the bridge
   // type and stopped there, so the API's answers never became pixels.
   startedAt?: string | null; lastActiveAt?: string | null; idleStopMin?: number | null;
+  /** the stop and the breaker: machineState reads "going to sleep" and "paused" from them */
+  drainState?: string | null; drainReason?: string | null; bootLoopAt?: string | null; parkedAt?: string | null;
 }
 interface UsageReply {
   day: string; minutes: number; capMinutes: number | null; plan: string; machines: MachineIntentRow[];
@@ -36,6 +38,8 @@ export interface ComputeView extends MachineStateOut {
   /** null while stopped — uptime is only shown when there IS a start, never guessed */
   startedAt: string | null;
   lastSeenAt: string | null;
+  /** when the last stop parked it: the "went to sleep" fact (machineSeenFact) */
+  parkedAt: string | null;
   lastActiveAt: string | null;
   /** minutes of idle before the fleet parks it; null = never auto-stop */
   idleStopMin: number | null;
@@ -86,8 +90,21 @@ export function useCompute(authed: boolean): ComputeView | null {
   return {
     ...machineState(m, cap, Date.now()),
     cap, plan: usage.plan, machineName: m.name,
-    startedAt: m.startedAt ?? null, lastSeenAt: m.lastSeenAt, lastActiveAt: m.lastActiveAt ?? null,
+    startedAt: m.startedAt ?? null, lastSeenAt: m.lastSeenAt, parkedAt: m.parkedAt ?? null, lastActiveAt: m.lastActiveAt ?? null,
     idleStopMin: m.idleStopMin ?? null,
     minutes: usage.minutes, capMinutes: usage.capMinutes,
   };
+}
+
+/** every cloud machine's intent row, runner first (machineIntent's order): each Compute row derives
+ *  its own state from it (machineState), not from the heartbeat alone */
+export function useMachineIntents(authed: boolean): MachineIntentRow[] {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (!authed) return;
+    const off = listen(() => bump((n) => n + 1));
+    refreshCompute();
+    return off;
+  }, [authed]);
+  return usage?.machines ?? [];
 }

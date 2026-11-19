@@ -1,3 +1,4 @@
+import { skillBody } from './workspace-skills';
 import { projectRepos } from './project-context';
 // The READ tools — what the orchestrator can look up before it decides (docs/harness/04).
 //
@@ -14,7 +15,7 @@ import type { OrchTool, ToolCtx } from './orchtools';
 import { searchXText } from './searchx';
 import { SEARCH_X_DESC, searchXParams } from '../harness/tooldesc';
 import { readLibraryDoc } from './grounding';
-import { makeRepoReader } from './reporead';
+import { makeRepoReader, notOnGitHub } from './reporead';
 import { postRepoNeed, repoReadable } from './reponeed';
 import { referencedTasks } from './taskrefs';
 import { docDropBody } from '@neuramesh/shared';
@@ -65,7 +66,7 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       const subject = subjectFor({ thread, convoThreadId });
       if (!subject) return 'this turn is not inside a conversation or task thread, so it has no working directory — use list_library for the room\'s documents';
       const b = brain.open(subject);
-      const files = workspaceListing(subject);
+      const files = await workspaceListing(subject);
       const notes = b.notes().map((n) => n.name);
       const results = b.messages().filter((m) => m.kind === 'result').length;
       if (!files.length && !notes.length && !results) return 'nothing here yet — this subject has produced no files, notes or subagent results';
@@ -81,7 +82,7 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
     }, run: async (input) => {
       const subject = subjectFor({ thread, convoThreadId });
       if (!subject) return 'this turn is not inside a conversation or task thread, so it has no working directory';
-      const r = workspaceRead(subject, String(input.name));
+      const r = await workspaceRead(subject, String(input.name));
       if (!r.ok) return r.error;
       log?.({ kind: 'tool', phase: 'call', summary: `read_workspace_file ${String(input.name)}` });
       return r.body;
@@ -149,11 +150,12 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       );
       return JSON.stringify(rows);
     } },
-    { name: 'recall', description: 'Search workspace memory — channel history by meaning and keywords.', schema: { query: z.string().min(2).describe('what to look for') }, run: async (input) => {
-      const res = await post('/v1/recall', actor, { workspace: ch.workspace_id, query: input.query, k: 6 });
+    // D15: recall reads this room's PROJECT (its facts, lessons and every thread), never another project
+    { name: 'recall', description: 'Search project memory: the facts, lessons and history of every thread in this project, by meaning and keywords.', schema: { query: z.string().min(2).describe('what to look for') }, run: async (input) => {
+      const res = await post('/v1/recall', actor, { workspace: ch.workspace_id, channel: ch.id, query: input.query, k: 6 });
       if (!res.ok) return `recall failed (${res.status})`;
       const { hits } = (await res.json()) as { hits: Array<{ body: string; channel: string; createdAt: string }> };
-      if (!hits.length) return 'no matches in workspace memory';
+      if (!hits.length) return 'no matches in project memory';
       return hits.map((h) => `[#${h.channel} ${h.createdAt.slice(0, 10)}] ${h.body.slice(0, 240)}`).join('\n---\n');
     } },
     // Reading X on the room's own connection (2026-08-09). The numbers this returns are the
@@ -165,11 +167,9 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       // ONE implementation (host/searchx.ts) — the chat registry and worker legs read the same
       return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input);
     } },
-    { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a skill listed for this channel looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list') }, run: async (input) => {
-      const sk = skills.find((x) => x.name === input.name);
-      if (!sk) return `no active skill named "${input.name}" — check the available-skills list`;
+    { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a workspace skill looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list'), pack: z.string().optional() }, run: async (input) => {
       log?.({ kind: 'tool', phase: 'call', summary: `load_skill ${input.name}` });
-      return `# Skill: ${sk.name}\n${sk.description}\n\n${sk.body}`;
+      return skillBody(skills, input.name, input.pack);
     } },
     { name: 'start_deep_work', description: 'Start research that OUTLIVES this reply — the only way to keep working after your turn ends. Use it when the human asks for something that genuinely needs searching and reading around (market/competitor research, "what does the evidence say", a landscape scan), and NOT for anything you can answer now or that belongs to a teammate (if a worker in this room fits the ask, create_task with offerTo instead — that gets a board card, a plan gate, beats and review). Fans out 2–6 named angles in parallel, shows every angle live in the thread while it works, and POSTS THE REPORT HERE ITSELF when done — you do not have to be alive for that. Never claim background work without calling this.', schema: {
       title: z.string().min(1).describe('what this work IS, in the human\'s words — it becomes the card they watch, e.g. "Research: how to improve Flowe"'),
@@ -185,6 +185,8 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
       // and the GitHub card instead, whose grant resumes this conversation
       if (input.reads_code) {
         const r = await repoReadable(db, here());
+        // a git or bundle repository: a GitHub card cannot help, so none goes up
+        if (!r.ok && r.notGitHub) return `error: ${notOnGitHub(r.repoName ?? 'This repository')} Do NOT start the work.`;
         if (!r.ok) {
           const place = { workspace: ch.workspace_id, channel: here(), threadId: thread ? null : convoThreadId ?? null, taskId: thread?.id ?? null };
           const up = await postRepoNeed({ db, post, actor, get: apiGet }, place, {

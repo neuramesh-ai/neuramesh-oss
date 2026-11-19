@@ -8,90 +8,9 @@
 import type postgres from 'postgres';
 import { GITHUB_NEED_PREFIX } from '@neuramesh/shared';
 
-export type AnnounceStatus = 'queued' | 'reading' | 'drafting' | 'ready' | 'failed';
-export interface AnnouncePost { platform: 'x' | 'linkedin' | 'instagram' | 'tiktok'; body: string; imageBrief?: string }
-export interface AnnouncementRow {
-  id: string;
-  repo: string;
-  tag: string | null;
-  website: string;
-  email: string;
-  status: AnnounceStatus;
-  private: boolean;
-  installationId: number | null;
-  digest: unknown;
-  brand: unknown;
-  brief: string | null;
-  posts: AnnouncePost[];
-  imageMime: string | null;
-  error: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  readyAt: string | null;
-  claimedBy: string | null;
-  claimedWorkspaceId: string | null;
-  claimedThreadId: string | null;
-}
-export interface AnnounceCreate { repo: string; tag: string | null; website: string; email: string; private: boolean; installationId: number | null; ipHash: string | null }
-export type AnnouncePatch = Partial<Pick<AnnouncementRow, 'status' | 'tag' | 'digest' | 'brand' | 'brief' | 'posts' | 'error' | 'startedAt' | 'readyAt'>>;
+export * from './announce-contract';
+import { type AnnounceStatus, type AnnouncePost, type AnnouncementRow, type AnnounceCreate, type AnnouncePatch, type AnnounceStore, type GitHubNeed, type NeedWorld, NEED_FENCE, type PrimaryRepo, type Installation, hasGitHubAddress, norm } from './announce-contract';
 
-export interface AnnounceStore {
-  /** null = the same (repo, tag, email) already exists: the caller serves that row instead */
-  create(input: AnnounceCreate): Promise<{ id: string } | null>;
-  find(input: { repo: string; tag: string; email: string }): Promise<AnnouncementRow | null>;
-  get(id: string): Promise<AnnouncementRow | null>;
-  /** queued → reading, oldest first: the cron's claim, so two ticks never draft one row twice */
-  claimQueued(limit: number): Promise<AnnouncementRow[]>;
-  update(id: string, patch: AnnouncePatch): Promise<void>;
-  setImage(id: string, bytes: Uint8Array, mime: string): Promise<void>;
-  image(id: string): Promise<{ bytes: Uint8Array; mime: string } | null>;
-  /** the caps: how many rows this email, or this address, created since `sinceIso` */
-  countSince(filter: { email?: string; ipHash?: string; sinceIso: string }): Promise<number>;
-  claim(id: string, by: { userId: string; workspaceId: string; threadId: string }): Promise<void>;
-  /** `selection: 'all'` = every repository of the account reads through it (0142); `workspaceId` names
-   *  the workspace whose member granted it, when the grant came through the app rather than the door.
-   *  A workspace given wins over the one recorded, except with `keepWorkspace` (the owner proof's
-   *  connect): then a recorded workspace stays, and only a record that names none takes the new one */
-  upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null; keepWorkspace?: boolean }): Promise<void>;
-  /** the installation that reads `owner/repo`: named in its list, or its account on an all-repositories grant.
-   *  `unrecorded`: only a grant no workspace recorded (the public door's, or a read's repair) */
-  installationForRepo(slug: string, opts?: { unrecorded?: boolean }): Promise<{ installationId: number } | null>;
-  /** a row GitHub answers 404 for is dead: forgotten, so it never wins a lookup again */
-  forgetInstallation(installationId: number): Promise<void>;
-  /** the installations a member of this workspace granted through the app: what the pick lists (plan §7) */
-  installationsForWorkspace(workspaceId: string): Promise<Installation[]>;
-  /** the connector's repository for the room's project: the one the project's GitHub row names first
-   *  while it is connected or waits for a new grant (a pick beside the primary is the one the reads
-   *  use, and the reconnect words name it too), then the one with a GitHub address (a folder attached
-   *  from a desktop is `local`, unreadable by the App), the primary among those, with the workspace
-   *  the row belongs to. A revoked row names nothing. Null when the room has none. */
-  repoForChannel(channelId: string, repoId?: string): Promise<PrimaryRepo | null>;
-  /** the open GitHub cards in the rooms of this room's project, oldest first: what the grant resumes
-   *  (github-resume.ts, docs/design/repo-connect-2026-10). A card is a row whose message holds the
-   *  nmneed block, so an agent's own question with the same prefix never resumes. The card's message
-   *  names its conversation, and a task card carries the reason of the task's last block. */
-  openGitHubNeeds(channelId: string): Promise<GitHubNeed[]>;
-}
-export interface GitHubNeed { decisionId: string; channelId: string; taskId: string | null; threadId: string | null; blockReason: string | null }
-/** what the memory twins read: the parent store's rows, lent by a closure */
-export interface NeedWorld {
-  decisions: Array<{ id: string; channel: string; taskId: string | null; messageId: string; question: string; status: string; createdAt: string }>;
-  messages: Array<{ id: string; threadId?: string | null; body: string }>;
-  channels: Array<{ id: string; workspace: string; projectId: string | null }>;
-  connectors: Array<{ workspace: string; projectId: string | null; provider: string; handle: string; status: string }>;
-  events: Array<{ type: string; target: string; workspace: string; payload: Record<string, unknown> }>;
-  tasks: ReadonlyMap<string, { workspace: string; number: number }>;
-}
-/** the GitHub card's block, as the message carries it (shared needBlock) */
-const NEED_FENCE = '```nmneed';
-export interface PrimaryRepo { workspaceId: string; projectId: string | null; repoId: string; orgName: string; name: string; cloneUrl: string | null; provider: string | null }
-export interface Installation { installationId: number; account: string; repos: string[]; selection: 'all' | 'selected' }
-/** a repository row the App could read: a clone URL, or an org that is not the desktop's `local` */
-export const hasGitHubAddress = (r: Pick<PrimaryRepo, 'orgName' | 'cloneUrl' | 'provider'>): boolean => !!r.cloneUrl || (r.orgName !== 'local' && r.provider !== 'local');
-
-const norm = (s: string): string => s.trim().toLowerCase();
-
-// ── memory ─────────────────────────────────────────────────────────────────────────────────────
 export class MemAnnounceStore implements AnnounceStore {
   constructor(private readonly world: () => NeedWorld = () => ({ decisions: [], messages: [], channels: [], connectors: [], events: [], tasks: new Map() })) {}
   rows: Array<AnnouncementRow & { ipHash: string | null; image?: { bytes: Uint8Array; mime: string } }> = [];
@@ -269,7 +188,9 @@ export class PgAnnounceStore implements AnnounceStore {
       left join connectors k on k.workspace_id = c.workspace_id and k.project_id = c.project_id and k.provider = 'github' and k.status in ('connected', 'reauth_required')
       where c.id = ${channelId}::uuid and (${repoId ?? null}::uuid is null or r.id = ${repoId ?? null}::uuid)
       order by (lower(r.org_name || '/' || r.name) = lower(k.handle)) is true desc,
-        (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
+        (r.provider = 'github' or r.clone_url ~* 'github[.]com[/:]'
+          or (r.clone_url is null and r.org_name <> 'local' and r.provider not in ('local', 'bundle'))) is true desc,
+        pr.is_primary desc, r.org_name, r.name limit 1`;
     return row ? { workspaceId: row['workspace_id'] as string, projectId: (row['project_id'] as string | null) ?? null, repoId: row['repo_id'] as string, orgName: row['org_name'] as string, name: row['name'] as string, cloneUrl: (row['clone_url'] as string | null) || null, provider: (row['provider'] as string | null) ?? null } : null;
   }
   async openGitHubNeeds(channelId: string): Promise<GitHubNeed[]> {

@@ -6,7 +6,7 @@
 // "point the human at Connections" in prose, and a deep investigation fanned out with no code.
 import { GITHUB_NEED_PREFIX, needBlock } from '@neuramesh/shared';
 import { repoSlugFor } from './gh';
-import { ghLive, githubConnected, githubGrantable, primaryRepoRow } from './reporead';
+import { ghLive, githubConnected, githubGrantable, isNotOnGitHub, primaryRepoRow } from './reporead';
 import type { ApiGetFn } from './searchx';
 export { CARD_UP } from './reporead';
 
@@ -20,9 +20,12 @@ export interface NeedPlace { workspace: string; channel: string; threadId?: stri
 export interface NeedWords { ask: string; why: string; lead: string; after: string }
 
 /** can this machine read the room's repository? the connector, or a GitHub repository and this machine's gh */
-export async function repoReadable(db: ReplicaDb, channelId: string, capable: () => Promise<boolean> = ghLive): Promise<{ ok: boolean; repoName: string | null }> {
+/** `notGitHub`: the repository is a plain git or bundle repository. No GitHub card can make it readable here */
+export async function repoReadable(db: ReplicaDb, channelId: string, capable: () => Promise<boolean> = ghLive): Promise<{ ok: boolean; repoName: string | null; notGitHub?: true }> {
+  const primary = await primaryRepoRow(db, channelId);
+  if (primary && isNotOnGitHub(primary)) return { ok: false, repoName: primary.name, notGitHub: true };
   if (await githubConnected(db, channelId)) return { ok: true, repoName: null };
-  const repo = await primaryRepoRow(db, channelId);
+  const repo = primary;
   if (!repo) return { ok: false, repoName: null };
   const slug = await repoSlugFor(repo);
   return { ok: !!slug && !slug.startsWith('local/') && await capable(), repoName: repo.name };

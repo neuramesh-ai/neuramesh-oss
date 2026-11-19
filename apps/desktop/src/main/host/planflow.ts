@@ -43,6 +43,8 @@ import { makeArchitect } from './architect';
 
 
 export function makePlanFlow(ctx: HostCtx & {
+  engineering?: () => import('../relay/engineering-host').EngineeringMachineHost;
+  repoCred: import('./repocred').RepoCred;
   db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
@@ -196,7 +198,8 @@ async function offerPlanToWorker(orch: HostedAgent, t: PlanTask, ch: { id: strin
   // marketer included (marketing-os round, found live): a playbook unit in a marketing room
   // has no worker/developer to offer — plume IS its builder, and excluding the role stranded
   // an approved plan in plan_review through five retries. Devs still win the tie in mixed rooms.
-  const [worker] = await db.getAll<{ name: string }>(
+  const [assigned] = await db.getAll<{name:string}>(`select a.name from tasks t join agents a on a.id=coalesce(t.assignee_id,t.offered_agent_id) where t.id=?`, [t.id]);
+  const [worker] = assigned ? [assigned] : await db.getAll<{ name: string }>(
     `select a.name from agents a join agent_channels ac on ac.agent_id = a.id
      where ac.channel_id = ? and a.role in ('worker', 'developer', 'marketer') and a.id != ? and a.retired_at is null
      order by case a.role when 'developer' then 0 when 'worker' then 1 else 2 end, a.name limit 1`,

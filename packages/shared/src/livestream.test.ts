@@ -100,3 +100,30 @@ describe('image-generation wire state', () => {
     if (next.kind === 'state') expect(next.state.imageGeneration).toBeUndefined();
   });
 });
+
+describe('progress lines on the wire (round 9 live narration)', () => {
+  it('a delta with pg replaces the lines, a delta without pg keeps them', () => {
+    const first = applyLiveFrame(undefined, { ...d(1, 0, ''), pg: ['I will check the library.'] });
+    expect(first.kind).toBe('state');
+    if (first.kind !== 'state') return;
+    expect(first.state.pg).toEqual(['I will check the library.']);
+    const typed = applyLiveFrame(first.state, d(2, 0, 'Here'));
+    expect(typed.kind).toBe('state');
+    if (typed.kind !== 'state') return;
+    expect(typed.state.pg).toEqual(['I will check the library.']);
+    const more = applyLiveFrame(typed.state, { ...d(3, 0, ''), pg: ['I will check the library.', 'The brief is clear. I will draft now.'] });
+    expect(more.kind === 'state' && more.state.pg?.length).toBe(2);
+  });
+  it('a snap carries the lines, and an empty list clears them', () => {
+    const snap = applyLiveFrame(undefined, { t: 'snap', k: 'c:t', a: 'rex', e: 'e1', s: 4, text: '', pg: ['a', 'b'], at: 0 });
+    expect(snap.kind === 'state' && snap.state.pg).toEqual(['a', 'b']);
+    if (snap.kind !== 'state') return;
+    const cleared = applyLiveFrame(snap.state, { ...d(5, 0, ''), pg: [] });
+    expect(cleared.kind === 'state' && cleared.state.pg).toBeUndefined();
+  });
+  it('a malformed progress list is not a frame', () => {
+    expect(liveFrameOf({ ...d(1, 0, ''), pg: 'a line' })).toBeNull();
+    expect(liveFrameOf({ ...d(1, 0, ''), pg: ['ok', 3] })).toBeNull();
+    expect(liveFrameOf({ ...d(1, 0, ''), pg: ['ok'] })).not.toBeNull();
+  });
+});

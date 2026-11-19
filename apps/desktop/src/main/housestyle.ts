@@ -5,7 +5,7 @@
 // block fails the list, the selector-audit lesson). Config rides the API settings lane
 // (workspaces aren't PowerSync-synced): fetched at boot, refreshed on a short TTL and
 // nudged by the settings IPC, so a toggle reaches the next agent turn without a restart.
-import { commRulesFrom, houseStyleBlock, withHouseStyle, type CommRules } from '@neuramesh/shared';
+import { EVIDENCE_INTEGRITY, commRulesFrom, houseStyleBlock, withHouseStyle, type CommRules } from '@neuramesh/shared';
 
 let cached: Required<CommRules> = commRulesFrom(null); // defaults-ON until the first fetch
 let fetchedAt = 0;
@@ -34,7 +34,7 @@ export function houseStyle(): string | null {
 
 /** the one wrapper every composer calls — appends LAST, which is what makes "supersedes" real */
 export function styled(system: string): string {
-  return withHouseStyle(system, houseStyle());
+  return withHouseStyle(`${system}\n\n${EVIDENCE_INTEGRITY}`, houseStyle());
 }
 
 /** test-only: pin the rules without a fetcher */
