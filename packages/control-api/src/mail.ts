@@ -1,7 +1,7 @@
 // Outbound email through Resend. Gated on RESEND_API_KEY — absent, every entry is a hard
 // no-op (OSS/local/CI/echo never send), mirroring analytics.ts and billing.ts.
 //
-// Raw fetch, no SDK: Resend's send API is one POST, and build:vercel externalizes every
+// Raw fetch, no SDK: Resend's send API is one POST, and build:server externalizes every
 // dependency by name in an esbuild flag list — a new package means touching the bundle
 // config to wrap a single HTTP call. clerk.ts sets the precedent.
 //

@@ -24,3 +24,30 @@ test('concurrent opens serialize and a live turn is never displaced', async () =
   await assert.rejects(second, /still working/);
   assert.equal(firstClosed, false);
 });
+
+test('a drain holds new sessions, counts busy ones, and closes every session', async () => {
+  const registry = new EngineeringSessionRegistry<{ busy: boolean; close(): Promise<void> }>();
+  const closed: string[] = [];
+  await registry.open('a', async () => ({ busy: true, close: async () => { closed.push('a'); } }));
+  await registry.open('b', async () => ({ busy: false, close: async () => { closed.push('b'); } }));
+  assert.equal(registry.busyCount(), 1);
+  registry.hold();
+  await assert.rejects(registry.open('c', async () => ({ busy: false, close: async () => {} })), /stops soon/);
+  await registry.closeAll();
+  assert.deepEqual(closed.sort(), ['a', 'b']);
+  assert.equal(registry.busyCount(), 0);
+});
+
+test('get finds the open session, and workingCount counts only turns that wait on nobody', async () => {
+  const registry = new EngineeringSessionRegistry<{ busy: boolean; working: boolean; close(): Promise<void> }>();
+  const running = await registry.open('a', async () => ({ busy: true, working: true, close: async () => {} }));
+  await registry.open('b', async () => ({ busy: true, working: false, close: async () => {} }));
+  await registry.open('c', async () => ({ busy: false, working: false, close: async () => {} }));
+  assert.equal(registry.get('a'), running);
+  assert.equal(registry.get('zz'), undefined);
+  assert.equal(registry.busyCount(), 2);
+  assert.equal(registry.workingCount(), 1, 'a turn held on an approval is not work');
+  await running.close();
+  assert.equal(registry.get('a'), undefined);
+  assert.equal(registry.workingCount(), 0);
+});

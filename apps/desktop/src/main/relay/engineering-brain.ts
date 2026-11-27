@@ -4,6 +4,7 @@ import {
   MODEL_ID_SET,
   STARTER_MODEL,
   isCustomPackId,
+  isScratchRepoId,
   resolvePackRoles,
   type CustomModelPack,
 } from '@neuramesh/shared';
@@ -85,7 +86,11 @@ export async function resolveEngineeringBrain(
         limit 1`,
       [opts.workspaceId, meta.agentId ?? null, meta.agentId ?? null, meta.agentId ?? null],
     ),
-    db.getAll<ProjectBrainRow>(
+    // a scratch workspace (round 9) has no repository, so no project_repos row: its project is checked
+    // on its own, in this workspace. A repository session keeps the project and repository pair check
+    isScratchRepoId(meta.repoId)
+      ? db.getAll<ProjectBrainRow>(`select p.model_pack from projects p where p.workspace_id = ? and p.id = ? limit 1`, [opts.workspaceId, meta.projectId ?? null])
+      : db.getAll<ProjectBrainRow>(
       `select p.model_pack
          from projects p
          join project_repos pr on pr.project_id = p.id

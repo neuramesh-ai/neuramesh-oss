@@ -64,6 +64,11 @@ test('a failed run closes as an error, and unknown lines map to nothing', () => 
 
 test('a NeuraMesh pick maps onto agy model ids, and a level agy lacks takes the next one up', () => {
   assert.equal(agyModelFor('gemini-4-argon', 'high'), 'gemini-4-argon-high');
+  assert.equal(agyModelFor('gemini-4-carbon', 'low'), 'gemini-4-carbon-low');
+  assert.equal(agyModelFor('gemini-4-neon', 'high'), 'gemini-4-neon-high');
+  assert.equal(agyModelFor('gemini-4-neon', 'xhigh'), 'gemini-4-neon-xhigh');
+  assert.equal(agyModelFor('gemini-4-hydrogen', 'xhigh'), 'gemini-4-hydrogen-high');
+  assert.equal(agyModelFor('gemini-4-carbon', 'xhigh'), 'gemini-4-carbon-high');
   assert.equal(agyModelFor('gemini-3.8-flash', 'low'), 'gemini-3.8-flash-low');
   assert.equal(agyModelFor('gemini-3.1-pro-preview', 'medium'), 'gemini-3.1-pro-high');
   assert.match(agyModelFor('gemini-4-argon', null) ?? '', /^gemini-4-argon-(low|medium|high)$/);

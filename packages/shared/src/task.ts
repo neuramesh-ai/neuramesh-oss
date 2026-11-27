@@ -93,7 +93,10 @@ export function shipPlanName(round: number): string {
 // repo-backed work — validateWorkPlan is the floor, checked at create AND at re-propose.
 export const WORK_PLAN_LEGS = ['design', 'build', 'review'] as const;
 export type WorkPlanLeg = (typeof WORK_PLAN_LEGS)[number];
+export const CodingDeliverySchema = z.object({ visualEvidence: z.boolean(), prepareRelease: z.boolean() });
 export const WorkPlanSchema = z.object({
+  /** Set only by the validated Agent Desk handoff. Release preparation still needs a human verdict to ship. */
+  codingDelivery: CodingDeliverySchema.optional(),
   legs: z.array(z.enum(WORK_PLAN_LEGS)).min(1).max(3),
   subtasks: z.array(z.string().min(1).max(200)).max(8).default([]),
   /** the plan prose the human reviews (markdown) — the card renders it; revisions bump version */
@@ -167,6 +170,7 @@ export const TaskSchema = z.object({
    * one origin (this inverts the legacy 1:1 threads.task_id upgrade); the create posts a
    * ‹task:id› unit card into it. Null on legacy rows and board-born tasks.
    */
+  permissionRunMessageId: z.string().uuid().nullable().optional(),
   originThreadId: z.string().nullable().default(null),
   // the authoritative, human-editable acceptance contract the reviewer gates on
   // (architect writes it into the plan; orchestrator sets it at offer otherwise).

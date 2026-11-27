@@ -26,9 +26,9 @@ export const RETIRED_FILE = 'packages/control-api/src/client-contracts/retired.t
 /** route prefixes a desktop never calls: the cron, the fleet, the relay's validation and Stripe */
 export const SERVER_ONLY_ROUTES = ['/internal/', '/webhooks/'];
 
-const importTree = (root: string, rel: string): Promise<Record<string, unknown>> => import(pathToFileURL(join(root, rel)).href);
+export const importTree = (root: string, rel: string): Promise<Record<string, unknown>> => import(pathToFileURL(join(root, rel)).href);
 // code-unit order, never the locale's: a snapshot written on any machine has the same bytes
-const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+export const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** the client schema, as table → column names: the one adapter every reader goes through */
 export async function clientSchema(root: string): Promise<Record<string, string[]>> {

@@ -37,7 +37,7 @@ export const planLabel = (plan: string | null | undefined): string => PLAN_LABEL
 
 /**
  * A HOSTED workspace's plan, in words (George, 2026-09-25): "the web plan is not really a free plan
- * anymore but a pro trial". A hosted signup gets a cloud machine and 500 credits, then buys credits
+ * anymore but a pro trial". A hosted signup gets a cloud machine and SIGNUP_GRANT_CREDITS (100), then buys credits
  * or moves to Pro, whose seats refill every month. Free is the desktop app on a Mac. So on a hosted
  * workspace the `free` id reads **Pro trial**. Use it wherever the reader is surely hosted (the
  * server's refusals, which never run on the local stack, the Credits view, the web and phone
@@ -51,6 +51,8 @@ export const TRIAL_LABEL = 'Pro trial';
  * this many days, and then Stripe charges PRO_SEAT_USD a seat each month. one trial a workspace.
  */
 export const PRO_TRIAL_DAYS = 14;
+/** the Pro trial with no card (onboarding-2026-11/trial.md, T2): "Add a card later" in the first run, and the phone */
+export const PRO_TRIAL_DAYS_NO_CARD = 7;
 /** Pro's price in dollars, a seat each month: the recurring price STRIPE_PRICE_ID names */
 export const PRO_SEAT_USD = 22;
 export const hostedPlanLabel = (plan: string | null | undefined): string =>

@@ -23,8 +23,6 @@ export default [
     ignores: [
       '**/node_modules/**', '**/dist/**', '**/out/**', '**/release/**', '**/coverage/**',
       // generated-but-committed (each auto-regenerated; see plan §2 for the audit)
-      'packages/control-api/index.js',
-      'packages/control-api/api/**',
       'packages/control-api/src/seed/skill-seed.ts', // gen-skill-seed.ts output — marketing-skill-seed.ts is hand-authored and stays linted
       // build-mobile-terminal.mjs output — the WebView's xterm page as one string (S8)
       // non-product trees

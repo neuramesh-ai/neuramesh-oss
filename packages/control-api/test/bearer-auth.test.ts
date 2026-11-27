@@ -28,11 +28,11 @@ let app: ReturnType<typeof createApp>;
 let store: MemoryStore;
 let userId: string;
 
-function postMessage(headers: Record<string, string>) {
+function postMessage(headers: Record<string, string>, workspace = 'ws_acme') {
   return app.request('/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
-    body: JSON.stringify({ workspace: 'ws_acme', channel: 'dev', body: 'hi from the phone' }),
+    body: JSON.stringify({ workspace, channel: 'dev', body: 'hi from the phone' }),
   });
 }
 
@@ -54,6 +54,15 @@ afterEach(() => {
 });
 
 describe('/v1 auth: Bearer (human) + x-nm-actor (daemon) dual-accept', () => {
+  it('nonreserved health is anonymous without opening the identity-protected API', async () => {
+    for (const path of ['/health', '/healthz']) {
+      const response = await app.request(path);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+    }
+    expect((await app.request('/v1/me')).status).toBe(401);
+  });
+
   it('a valid Clerk Bearer token resolves to the mapped human actor', async () => {
     const res = await postMessage({ authorization: 'Bearer good' });
     expect(res.status).toBe(200);
@@ -100,6 +109,30 @@ describe('/v1 auth: Bearer (human) + x-nm-actor (daemon) dual-accept', () => {
     expect(message.author).toEqual({ kind: 'agent', id: 'rex' });
   });
 
+  // THE LANE'S SECRET (the Cloud Run sandbox, 2026-10-26). nm-api there is a public URL with the lane
+  // open for its e2e driver, so the header alone was anyone-as-anyone. With NM_ACTOR_HEADER_SECRET
+  // set, the header counts only beside x-nm-actor-secret; the hq gateway and the driver hold it.
+  it('with NM_ACTOR_HEADER_SECRET set, the header needs the secret beside it', async () => {
+    process.env['NM_ALLOW_ACTOR_HEADER'] = '1';
+    const before = process.env['NM_ACTOR_HEADER_SECRET'];
+    process.env['NM_ACTOR_HEADER_SECRET'] = 's3cret-value';
+    try {
+      const actor = JSON.stringify({ kind: 'human', id: userId });
+      const refused: Array<Record<string, string>> = [{ 'x-nm-actor': actor }, { 'x-nm-actor': actor, 'x-nm-actor-secret': 'wrong' }, { 'x-nm-actor': actor, 'x-nm-actor-secret': 's3cret-valuE' }];
+      for (const headers of refused) {
+        const res = await postMessage(headers);
+        expect(res.status).toBe(401);
+        expect(await res.json()).toMatchObject({ code: 'AUTH_REQUIRED' });
+      }
+      expect(store.messages).toHaveLength(0);
+      const ok = await postMessage({ 'x-nm-actor': actor, 'x-nm-actor-secret': 's3cret-value' });
+      expect(ok.status).toBe(200);
+    } finally {
+      if (before === undefined) delete process.env['NM_ACTOR_HEADER_SECRET'];
+      else process.env['NM_ACTOR_HEADER_SECRET'] = before;
+    }
+  });
+
   // The desktop host's lane since #360: the bearer proves the member, the header names the author.
   // Until 2026-09-09 the header was discarded here, so every agent row a desktop hosted landed under
   // the signed-in human (rex's replies read as George's, woke rex again, and the room looped).
@@ -110,7 +143,9 @@ describe('/v1 auth: Bearer (human) + x-nm-actor (daemon) dual-accept', () => {
   it('Bearer + an agent claim: a member authors the row AS an agent of their workspace', async () => {
     const { workspaceId } = await store.createWorkspace({ name: 'Acme', slug: 'acme', createdBy: userId }, ev(userId));
     const rex = await agentIn(workspaceId);
-    const res = await postMessage({ authorization: 'Bearer good', 'x-nm-actor': JSON.stringify({ kind: 'agent', id: rex, role: 'orchestrator' }) });
+    // into the agent's OWN workspace: an agent writes nowhere else (handler/scope.ts, R10 NM-012). This
+    // case posted into the default 'ws_acme' until then, and passed only because agents were unchecked
+    const res = await postMessage({ authorization: 'Bearer good', 'x-nm-actor': JSON.stringify({ kind: 'agent', id: rex, role: 'orchestrator' }) }, workspaceId);
     expect(res.status).toBe(200);
     const { message } = (await res.json()) as { message: { author: { kind: string; id: string } } };
     expect(message.author).toEqual({ kind: 'agent', id: rex });

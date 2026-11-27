@@ -1,5 +1,7 @@
 # 19 — Stall watchdog: stuck work gets detected, diagnosed, and moved (as built)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-08); the scan became the daemon's **progress check** on 2026-07-29
 > (§7). Each orchestrator-owned channel is checked for work that stopped moving, and anything
 > flagged is fed to the orchestrator as a **stall-triage turn** — it unblocks what an

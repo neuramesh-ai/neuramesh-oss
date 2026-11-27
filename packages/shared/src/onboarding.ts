@@ -26,6 +26,8 @@
 // bottom would destroy that reading, so the array order is the contract and `done` only ever
 // changes how an item renders.
 
+import type { FirstRunTool } from './company-profile';
+
 /** A machine row (synced). `kind` is NOT NULL DEFAULT 'local' in the schema (0126), so a row
  *  that arrives without one is a local machine — a desktop daemon, not cloud compute. */
 export interface OnboardingMachine {
@@ -68,13 +70,17 @@ export interface OnboardingSignals {
    *  joins the roster. Per-user, not per-workspace: your phone is yours across every workspace,
    *  which is why this card can read done in a workspace you just joined. */
   devices: OnboardingDevice[] | null;
+  /** THE NEW FIRST RUN's tools (docs/design/onboarding-2026-11 O8): a workspace that answered the
+   *  company questions lists one row per tool, in the person's order, instead of the subscription and
+   *  desktop rows. Absent on every client and workspace that has no profile, which keeps today's list. */
+  tools?: { order: FirstRunTool[]; connected: FirstRunTool[] };
 }
 
 /** What a card's button does. A string, not a handler: this module is shared with the server
  *  and the daemon, and a pure derivation that closed over React callbacks would not be pure. */
-export type OnboardingAction = 'none' | 'connect-brain' | 'invite' | 'get-desktop' | 'get-mobile';
+export type OnboardingAction = 'none' | 'connect-brain' | 'invite' | 'get-desktop' | 'get-mobile' | 'connect-tool';
 
-export type OnboardingItemId = 'machine' | 'subscription' | 'team' | 'desktop' | 'mobile';
+export type OnboardingItemId = 'machine' | 'subscription' | 'team' | 'desktop' | 'mobile' | `tool-${FirstRunTool}`;
 
 export interface OnboardingItem {
   id: OnboardingItemId;
@@ -93,7 +99,24 @@ export interface OnboardingItem {
  *  card claims. A destroyed machine would still read done here; that is the known edge. */
 const isCloud = (m: OnboardingMachine): boolean => (m.kind ?? 'local') !== 'local';
 
+const TOOL_ROW: Record<FirstRunTool, { label: string; detail: string }> = {
+  mail: { label: 'Gmail and Calendar', detail: 'rex sorts your mail and drafts replies.' },
+  github: { label: 'GitHub', detail: 'rex lists what shipped and drafts the release notes.' },
+  bank: { label: 'Your bank', detail: 'ledger shows where the money goes. Read only.' },
+  social: { label: 'Social accounts', detail: 'plume drafts posts in your voice.' },
+  posthog: { label: 'PostHog', detail: 'plume sees which posts bring signups.' },
+};
+
 export function onboardingItems(s: OnboardingSignals): OnboardingItem[] {
+  const all = legacyItems(s);
+  if (!s.tools) return all;
+  // the machine leads, each tool in the person's order, then the team and the phone
+  const tools: OnboardingItem[] = s.tools.order.map((t) => ({ id: `tool-${t}` as const, ...TOOL_ROW[t], done: s.tools!.connected.includes(t), action: 'connect-tool' as const }));
+  const keep = (id: OnboardingItemId) => all.find((i) => i.id === id)!;
+  return [keep('machine'), ...tools, keep('team'), keep('mobile')];
+}
+
+function legacyItems(s: OnboardingSignals): OnboardingItem[] {
   return [
     {
       id: 'machine',

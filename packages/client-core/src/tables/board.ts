@@ -39,6 +39,8 @@ export const tasks = new Table({
   origin_thread_id: column.text,
   // subtasks (docs/24): set = this row rides that parent, rendered under it
   parent_task_id: column.text,
+  // the human's Settle on a task with no thread of its own (0192): hides its gates and cards older than it
+  settled_at: column.text,
   // lifecycle timestamps — already in every sync stream (rules `select *`);
   // declaring them here just materializes them into the client views
   created_at: column.text,

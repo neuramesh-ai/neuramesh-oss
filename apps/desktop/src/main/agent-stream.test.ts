@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgentStream } from './agent-stream';
+import { createAgentStream, visibleProgress } from './agent-stream';
 
 test('generation progress preserves streamed prose and persists until storage finishes', () => {
   const frames: unknown[][] = [];
@@ -30,4 +30,19 @@ test('late image completion cannot resurrect a finished or replaced turn', () =>
   const before = frames.length;
   image.saving(); image.finish();
   assert.equal(frames.length, before);
+});
+
+test('progress lines ride beside the reply and survive a text update that does not carry them', () => {
+  const frames: unknown[][] = [];
+  const stream = createAgentStream((...frame) => frames.push(frame));
+  stream.emit('c:t', 'rex', '', false, undefined, ['I will check the library.']);
+  assert.deepEqual(frames.at(-1)?.[6], ['I will check the library.']);
+  stream.emit('c:t', 'rex', 'Here is', false);
+  assert.equal(frames.at(-1)?.[2], 'Here is');
+  assert.deepEqual(frames.at(-1)?.[6], ['I will check the library.']);
+});
+
+test('a progress line never shows a machine fence', () => {
+  assert.deepEqual(visibleProgress(['I will ask.\n```nmq\n{"question":"x"}\n```', 'NO_REPLY']), ['I will ask.']);
+  assert.equal(visibleProgress(undefined), undefined);
 });

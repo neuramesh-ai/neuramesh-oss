@@ -60,7 +60,7 @@ export function engineeringProviderFetch(call: typeof fetch, observe: (receipt: 
     if (!response.body) { report('complete'); return response; }
     receipt.phase = 'body';
     const reader = response.body.getReader();
-    const isSse = response.headers.get('content-type')?.includes('text/event-stream');
+    let isSse = response.headers.get('content-type')?.toLowerCase().includes('text/event-stream');
     const decoder = new TextDecoder();
     let pending = '';
     let discarding = false;
@@ -95,11 +95,17 @@ export function engineeringProviderFetch(call: typeof fetch, observe: (receipt: 
     };
     const inspect = (chunk: Uint8Array) => {
       receipt.chunks++; receipt.bytes += chunk.byteLength;
-      if (!isSse) return;
+      if (isSse === false) return;
       const lines = (pending + decoder.decode(chunk, { stream: true })).split('\n');
       pending = lines.pop() ?? '';
       for (const line of lines) {
         if (discarding) { discarding = false; continue; }
+        // Subscription responses can omit Content-Type. Recognize their first SSE
+        // field even if that line was split between packets. Keep explicit MIME types authoritative.
+        if (isSse === undefined && line.trim()) {
+          isSse = /^(?:event:|data:|id:|retry:|:)/.test(line);
+          if (!isSse) { pending = ''; return; }
+        }
         if (line.length > 65_536) continue;
         let type: unknown;
         if (line.startsWith('event:')) type = line.slice(6).trim();

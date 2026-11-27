@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// write the contract of a desktop to contracts/desktop/<version>.json (docs/46).
+// write the contract of a desktop to contracts/desktop/<version>.json, or of a cloud machine release to
+// contracts/machine/<version>.json (docs/46).
 //
 //   node scripts/contract-snapshot.mjs                   # this checkout, at the version in apps/desktop/package.json
 //   node scripts/contract-snapshot.mjs --ref v0.150.0    # the code at a tag or a commit
 //   node scripts/contract-snapshot.mjs --root ../other   # another checkout, with its own dependencies installed
+//   node scripts/contract-snapshot.mjs --kind machine --version 2026.11.2   # a machine release (the tree does not name it)
 //   add --force to write over a file that exists
 //
 // the version-bump PR runs the first form (docs/11 §2), and the compat test in the control-api
-// holds every later tree to the two newest files. --ref reads a tag's own code: it extracts the
+// holds every later tree to the two newest files. a machine release PR runs the --kind machine form
+// (whats-new-upgrades plan §11), and its compat test holds every later tree to the supported releases. --ref reads a tag's own code: it extracts the
 // files a snapshot reads into a temporary folder with git archive and links this checkout's
 // installed dependencies in. that is right only when the resolved dependency versions are the
 // same, so it refuses otherwise, and --root is the way for such a tag.
@@ -27,6 +30,12 @@ const require = createRequire(new URL('../packages/control-api/package.json', im
 (await import(require.resolve('tsx/esm/api'))).register();
 require('tsx/cjs/api').register();
 const { CLIENT_SCHEMA_FILE, SYNC_RULES_FILE, snapshotTree, stringifySnapshot } = await import('../packages/control-api/src/client-contracts/snapshot.ts');
+// the machine lane is private (scripts/public-tree.sh): load it only when asked for
+const MACHINE_LANE = 'packages/control-api/src/client-contracts/machine-snapshot.ts';
+const machineLane = () => {
+  if (!existsSync(join(repo, MACHINE_LANE))) throw new Error(`this checkout has no ${MACHINE_LANE}. The machine lane is private: run --kind machine in the private repository`);
+  return import(`../${MACHINE_LANE}`);
+};
 
 // what a snapshot reads, and the root files its imports need
 const TREE = ['package.json', 'tsconfig.base.json', 'packages', 'apps/desktop/package.json', dirname(CLIENT_SCHEMA_FILE), dirname(SYNC_RULES_FILE), 'defaults/agents'];
@@ -68,18 +77,32 @@ async function main(args) {
   const rootAt = args.indexOf('--root');
   const other = rootAt >= 0 ? args[rootAt + 1] : null;
   if (rootAt >= 0 && !other) throw new Error('--root needs a folder');
+  const kind = args.includes('--kind') ? args[args.indexOf('--kind') + 1] : 'desktop';
+  if (kind !== 'desktop' && kind !== 'machine') throw new Error('--kind is desktop or machine');
+  const version = args.includes('--version') ? args[args.indexOf('--version') + 1] : null;
+  if (kind === 'machine' && !version) throw new Error('--kind machine needs --version <the release name, YYYY.MM.N>');
+  if (kind === 'desktop' && version) throw new Error('a desktop snapshot takes its version from apps/desktop/package.json');
   const tree = ref ? treeAt(ref) : { dir: other ? resolve(other) : repo, sha: null };
   try {
     // the snapshot of a version leaves out what that tree retired (docs/46, rule 3)
-    const snap = await snapshotTree(tree.dir, { retired: true });
-    const rel = `contracts/desktop/${snap.version}.json`;
+    const snap = kind === 'machine'
+      ? await (await machineLane()).machineSnapshotTree(tree.dir, version, { retired: true })
+      : await snapshotTree(tree.dir, { retired: true });
+    const rel = `contracts/${kind}/${snap.version}.json`;
     if (existsSync(join(repo, rel)) && !args.includes('--force')) {
-      throw new Error(`${rel} exists. The contract of a published desktop does not change. Pass --force only to write it again from its own tag.`);
+      throw new Error(`${rel} exists. The contract of a published ${kind === 'machine' ? 'machine release' : 'desktop'} does not change. Pass --force only to write it again from its own ${kind === 'machine' ? 'commit' : 'tag'}.`);
     }
-    mkdirSync(join(repo, 'contracts/desktop'), { recursive: true });
+    mkdirSync(join(repo, `contracts/${kind}`), { recursive: true });
     writeFileSync(join(repo, rel), `${stringifySnapshot(snap)}\n`);
     const n = (o) => Object.keys(o).length;
-    console.log(`${rel}: ${n(snap.commands)} commands, ${snap.routes.length} routes, ${n(snap.clientSchema)} client tables, ${n(snap.syncRules)} synced tables, ${snap.relay.frames.length} relay frames, ${snap.relay.lanes.length} lanes, ${snap.agents.length} agent contracts${ref ? `, from ${ref} (${tree.sha.slice(0, 8)})` : ''}`);
+    const from = ref ? `, from ${ref} (${tree.sha.slice(0, 8)})` : '';
+    const shared = `${n(snap.commands)} commands, ${snap.routes.length} routes, ${n(snap.clientSchema)} client tables`;
+    if (kind === 'machine') {
+      const b = snap.bodies;
+      console.log(`${rel}: ${shared}, ${snap.relay.frames.length} relay frames, ${snap.relay.lanes.length} lanes, boot ${n(b.boot.request)} request and ${n(b.boot.answer)} answer fields, status ${n(b.status.request)} request fields, control ${n(b.control.answer)} answer fields, ${snap.env.length} env names${from}`);
+    } else {
+      console.log(`${rel}: ${shared}, ${n(snap.syncRules)} synced tables, ${snap.relay.frames.length} relay frames, ${snap.relay.lanes.length} lanes, ${snap.agents.length} agent contracts${from}`);
+    }
   } finally {
     if (ref) rmSync(tree.dir, { recursive: true, force: true });
   }

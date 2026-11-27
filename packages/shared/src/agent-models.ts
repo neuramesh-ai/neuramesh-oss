@@ -8,9 +8,13 @@
 import { MODEL_IDS } from './model-packs';
 import { STARTER_MODEL } from './rates';
 
-export const THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+export const THINKING_LEVELS = ['low', 'medium', 'high', 'xhigh'] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
-export const THINKING_LABEL: Record<ThinkingLevel, string> = { low: 'Low', medium: 'Medium', high: 'High' };
+export const THINKING_LABEL: Record<ThinkingLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high' };
+const BASE_LEVELS: readonly ThinkingLevel[] = ['low', 'medium', 'high'];
+// Google's model pages (2026-11-23): Gemini 4 Neon and Hydrogen take xhigh. Carbon and Argon stop at
+// high. No Claude or GPT model offers it here yet
+const XHIGH_MODELS: ReadonlySet<string> = new Set(['gemini-4-neon', 'gemini-4-hydrogen']);
 /** the level a new pick starts at, when the model takes one */
 export const DEFAULT_THINKING: ThinkingLevel = 'medium';
 
@@ -33,6 +37,20 @@ export function takesThinking(model: string | null | undefined): boolean {
   return /^gemini-[3-9]/.test(model) && !/flash-lite/.test(model);
 }
 
+/** the levels a model takes, lowest first. Empty for a model that takes none */
+export function thinkingLevelsFor(model: string | null | undefined): readonly ThinkingLevel[] {
+  if (!takesThinking(model)) return [];
+  return XHIGH_MODELS.has(model!) ? THINKING_LEVELS : BASE_LEVELS;
+}
+
+/** a level the model takes: the level itself, else the model's highest, so a model switch never sends
+ *  a level the vendor refuses. null when the model takes none or no level was given */
+export function levelFor(model: string | null | undefined, level: ThinkingLevel | null | undefined): ThinkingLevel | null {
+  const levels = thinkingLevelsFor(model);
+  if (!level || !levels.length) return null;
+  return levels.includes(level) ? level : levels[levels.length - 1]!;
+}
+
 /** the synced column, read tolerantly: a jsonb object, its JSON text on a replica, or nothing. An entry
  *  with an unknown model is dropped, and a level the model does not take is dropped from its entry */
 export function parseAgentModels(raw: unknown): AgentModelPicks {
@@ -44,7 +62,7 @@ export function parseAgentModels(raw: unknown): AgentModelPicks {
     const model = (p as { model?: unknown } | null)?.model;
     if (typeof model !== 'string' || !KNOWN.has(model)) continue;
     const thinking = (p as { thinking?: unknown }).thinking;
-    out[agent] = { model, ...(isLevel(thinking) && takesThinking(model) ? { thinking } : {}) };
+    out[agent] = { model, ...(isLevel(thinking) && thinkingLevelsFor(model).includes(thinking) ? { thinking } : {}) };
   }
   return out;
 }
@@ -57,6 +75,6 @@ export function pickFor(picks: AgentModelPicks | null | undefined, agentId: stri
 /** the level a run gets: the person's level, when the pick holds the model the run takes and that
  *  model takes a level. null leaves the vendor's default in place */
 export function thinkingFor(model: string, pick: AgentModelPick | null | undefined): ThinkingLevel | null {
-  if (!takesThinking(model) || pick?.model !== model) return null;
-  return pick.thinking ?? null;
+  if (pick?.model !== model) return null;
+  return levelFor(model, pick.thinking);
 }

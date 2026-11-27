@@ -39,6 +39,7 @@ import { actorAddress } from './guards';
 
 import type { CommandOutcome } from '../handler';
 import { libraryImage } from '../store/frames';
+import { postizApprove, postizBeforeUpdate, postizDraftRoute, postizRelease, postizSetRoute, postizUndo } from '../private';
 import { productShots } from '@neuramesh/shared';
 
 /** every product shot a script names (`SHOW: <image>`, plan §9) must be on the room's shelf, the frame's rule: the daemon refused once, the command refuses again */
@@ -74,6 +75,8 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     const styled = await styledBy(store, actor, () => store.channelWorkspace(cmd.channel).then((c) => c.workspace));
     const frame = await frameName(store, cmd.channel, cmd.frame);
     await shotsOnShelf(store, cmd.channel, cmd.script);
+    // a suggested Postiz route (P12), checked against the channel's rules before anything is written
+    const route = await postizDraftRoute(store, { channel: cmd.channel, platform: cmd.platform, body: styled(cmd.body), postizChannel: cmd.postizChannel, postizSettings: cmd.postizSettings });
     const { id } = await store.createContentItem(
       { channelId: cmd.channel, frame, seconds: cmd.seconds ?? null, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
       (ws) => createEvent({
@@ -84,6 +87,7 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
         payload: { channel: cmd.channel, platform: cmd.platform },
       }),
     );
+    if (route) await store.postizContent.setRoute(id, route.channel, route.settings);
     return { ok: true, itemId: id } as never;
   }
   if (cmd.type === 'content.attach_media') {
@@ -110,6 +114,8 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && cmd.frame === undefined && cmd.seconds === undefined && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined && !cmd.videoMeta && cmd.videoErrorCode === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script, frame, length or image brief');
     const media = await store.contentItemMedia(cmd.item);
     const styled = await styledBy(store, actor, async () => media?.workspace);
+    // a revision of a scheduled post makes it a draft again (store): Postiz lets go of its copy first
+    if (cmd.body || cmd.imageBrief || cmd.script) await postizRelease(store, cmd.item, { scheduledOnly: true });
     const frame = await frameName(store, media?.channel, cmd.frame);
     await shotsOnShelf(store, media?.channel, cmd.script);
     const { id } = await store.reviseDraft(cmd.item, { frame, seconds: cmd.seconds, body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
@@ -127,6 +133,9 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
       type, source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
       payload: { item: cmd.item },
     });
+    // a post that Postiz holds: Postiz takes the new words first, or lets go of its copy (postiz-lane.ts)
+    if (cmd.type === 'content.update') await postizBeforeUpdate(store, cmd.item, cmd.body, cmd.mediaUrl === undefined ? undefined : (cmd.mediaUrl || null));
+    else await postizRelease(store, cmd.item);
     const { id } = cmd.type === 'content.update'
       ? await store.updateContentBody(cmd.item, cmd.body, cmd.mediaUrl === undefined ? undefined : (cmd.mediaUrl || null), mk('content.updated'))
       : await store.deleteContentItem(cmd.item, mk('content.deleted'));
@@ -145,13 +154,22 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     return { ok: true, itemId: id } as never;
   }
 
+  // Publish to (Postiz P5): HUMAN_ONLY, a draft only. Hosted only: the public build refuses it
+  if (cmd.type === 'content.set_route') {
+    if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'a person picks where a post goes. Agents draft');
+    return await postizSetRoute(store, actor, cmd) as never;
+  }
+
   if (cmd.type === 'content.approve' || cmd.type === 'content.unschedule') {
     // agents draft, humans publish (plan §4.7) — structurally, like approve_design
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'content is approved by a human — agents draft, humans publish');
     const approve = cmd.type === 'content.approve';
     const scheduledAt = approve ? (cmd.scheduledAt ?? new Date(Date.now() + 3600_000).toISOString()) : null;
     if (approve && new Date(scheduledAt!).getTime() <= Date.now()) throw new DomainError('INVALID_INPUT', 'scheduledAt must be in the future');
-    const { id } = await store.setContentStatus(
+    // a post with a Postiz route: Postiz schedules it before the row turns scheduled, and Unschedule
+    // deletes the Postiz post first (postiz-lane.ts). The public build has no route, so both do nothing.
+    const pz = approve ? await postizApprove(store, cmd.item, cmd.scheduledAt, scheduledAt!) : (await postizRelease(store, cmd.item), null);
+    const write = store.setContentStatus(
       cmd.item,
       approve
         // no explicit time → keep the draft's own future slot (draft-ahead); +1h is the fallback
@@ -165,6 +183,8 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
         payload: approve ? { item: cmd.item, scheduledAt } : { item: cmd.item },
       }),
     );
+    const { id } = await write.catch(async (e: unknown) => { if (pz?.created) await postizUndo(store, cmd.item, pz.postId); throw e; });
+    if (pz) await store.postizContent.setPostId(cmd.item, pz.postId);
     return { ok: true, itemId: id } as never;
   }
 

@@ -28,6 +28,12 @@ export const RULES = [
   { prefix: 'apps/desktop/src/preload/', surfaces: ['desktop'] },
   { prefix: 'apps/desktop/index.html', surfaces: ['desktop'] },
   { prefix: 'apps/web/', surfaces: ['web'] },
+  // message boards: its own web app and its own service, with one contract between them
+  { prefix: 'apps/boards/', surfaces: ['web'] },
+  { prefix: 'packages/boards-api/', surfaces: ['api'] },
+  { prefix: 'packages/boards-shared/', surfaces: ['web', 'api'] },
+  // the published files on neuramesh.page: a service of its own that serves the public
+  { prefix: 'packages/pages/', surfaces: ['api'] },
   // the daemon: the desktop app and every cloud machine run it
   { prefix: 'apps/desktop/src/main/', surfaces: ['desktop', 'cloud'] },
   { prefix: 'apps/desktop/resources/', surfaces: ['desktop'] },
@@ -41,6 +47,9 @@ export const RULES = [
   { prefix: 'packages/client-core/', surfaces: ['web', 'desktop', 'mobile', 'cloud'] },
   { prefix: 'packages/fonts/', surfaces: ['web', 'desktop'] },
   { prefix: 'packages/relay-client/', surfaces: ['web', 'desktop'] },
+  // the Finance canvas catalog: hq renders it and control-api checks and bundles it
+  { prefix: 'packages/canvas-kit/', surfaces: ['web', 'api'] },
+  { prefix: 'packages/finance-ui/', surfaces: ['web', 'api'] },
   // the phone
   { prefix: 'apps/mobile/', surfaces: ['mobile'] },
   // the server and its schema

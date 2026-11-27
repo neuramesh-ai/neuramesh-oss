@@ -3,7 +3,7 @@
 // model it runs FOR YOU (picks.ts seatView). A row picks who answers, and Send names that agent
 // (`@name`, the grammar the daemon routes on). The model on a row opens that agent's model list, the
 // same list the model chip draws, and the pick is yours alone. New agent registers one in this room.
-import { CODE_GEMINI_NOTE, AGENT_ROLES, CURRENT_MODELS, DEFAULT_THINKING, modelLabel, runtimeForModel, STARTER_MODEL, takesThinking, THINKING_LABEL, THINKING_LEVELS, type ThinkingLevel } from '@neuramesh/shared';
+import { CODE_GEMINI_NOTE, AGENT_ROLES, CURRENT_MODELS, DEFAULT_THINKING, modelLabel, runtimeForModel, STARTER_MODEL, levelFor, takesThinking, THINKING_LABEL, thinkingLevelsFor, type ThinkingLevel } from '@neuramesh/shared';
 import { useEffect, useRef, useState } from 'react';
 import { ProviderLogo } from '../brain/providers';
 import { AgentAvatar } from '../components/AgentAvatar';
@@ -123,14 +123,14 @@ function NewAgent({ back, roomSlug, states, onCancel, onCreate }: {
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true); setErr('');
-    try { await onCreate({ name: slug, description: description.trim(), role, model, thinking: takesThinking(model) ? thinking : null }); }
+    try { await onCreate({ name: slug, description: description.trim(), role, model, thinking: levelFor(model, thinking) }); }
     catch (e) { setErr(e instanceof Error ? e.message.slice(0, 160) : 'The agent was not created.'); }
     finally { setBusy(false); }
   };
   if (picking) {
     return (
       <ModelMenu head={<button type="button" className="cprojhint cmodback" onClick={() => setPicking(false)}><span aria-hidden>‹</span><b>Model</b><span>for {slug || 'the new agent'}</span></button>}
-        current={model} level={takesThinking(model) ? thinking : null} states={states} onConnect={() => setPicking(false)}
+        current={model} level={levelFor(model, thinking)} states={states} onConnect={() => setPicking(false)}
         onPick={(m, t) => { setModel(m); if (t) setThinking(t); setPicking(false); }} />
     );
   }
@@ -151,8 +151,8 @@ function NewAgent({ back, roomSlug, states, onCancel, onCreate }: {
       </div>
       {takesThinking(model) && (
         <div className="cagfld"><span>Thinking</span>
-          <span className="cagseg" role="radiogroup" aria-label="Thinking">{THINKING_LEVELS.map((l) => (
-            <button key={l} type="button" role="radio" aria-checked={thinking === l} className={thinking === l ? 'on' : ''} onClick={() => setThinking(l)}>{THINKING_LABEL[l]}</button>
+          <span className="cagseg" role="radiogroup" aria-label="Thinking">{thinkingLevelsFor(model).map((l) => (
+            <button key={l} type="button" role="radio" aria-checked={levelFor(model, thinking) === l} className={levelFor(model, thinking) === l ? 'on' : ''} onClick={() => setThinking(l)}>{THINKING_LABEL[l]}</button>
           ))}</span>
         </div>
       )}

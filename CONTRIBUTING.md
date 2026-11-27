@@ -16,6 +16,21 @@ This repository is published from a private one that holds the hosted service to
 
 Match the code around your change. The doctrine the codebase follows is in [CLAUDE.md](CLAUDE.md) and [docs/05-engineering-philosophy.md](docs/05-engineering-philosophy.md). Every word a person reads follows ASD-STE100: short sentences, active voice, simple tenses, no em dashes, no semicolons.
 
+## Commit and pull request names
+
+A commit name and a pull request title follow [Conventional Commits](https://www.conventionalcommits.org): `type(scope): subject`.
+
+- The type is one of `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` or `revert`.
+- The scope is optional. It names the part that changes, in lowercase: `fix(boards): open the hq sign-in from the door`.
+- An exclamation mark after the type or the scope marks a change that breaks a contract: `feat(api)!: remove the v0 replica route`.
+- The subject starts with a lowercase letter and has no period at the end. The name has 100 characters at most.
+
+A pull request lands as one commit, and that commit takes the title of the pull request. So the title follows the same rule. A hook checks each local commit, and you can check a name yourself:
+
+```bash
+node scripts/commit-name.mjs "fix(boards): open the hq sign-in from the door"
+```
+
 ## Run the checks
 
 You need Node 22 or later, pnpm 10 (`corepack enable`), and Docker for the database checks.

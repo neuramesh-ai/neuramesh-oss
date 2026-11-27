@@ -2,10 +2,12 @@
 // plus the two non-Clerk token mints. Extracted from app.ts, which sits at its ratchet cap.
 import { MIN_DESKTOP_VERSION, type Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
+import { boardsUrl } from './boards-guard';
 import { signDevToken } from './devtoken';
 import { LOCAL_USER, localUserIdForBearer, signLocalSyncToken } from './local-auth';
 import { localMode } from './localmode';
 import type { Store } from './store';
+import { opsUser } from './private';
 import { nmVersion } from './version';
 
 const bearerOf = (authorization: string | undefined): string | undefined => /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
@@ -41,6 +43,8 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
   // shows the Update state, never a half-working shell). No ids — F1: an id here was the one value a
   // forger needed. `schemaVersion` is the last migration the runner applied. `minDesktopVersion` is
   // the soft floor (docs/46 rule 3): a desktop below it shows one line on its update card.
+  // `boardsUrl` is where Message boards is (NM_BOARDS_URL): null when it is off, and always on the
+  // local stack, which has no hosted identity for it.
   app.get('/.well-known/nm-config', async (c) =>
     c.json({
       mode: localMode() ? 'local' : 'cloud',
@@ -48,6 +52,7 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
       version: nmVersion(),
       schemaVersion: store.schemaVersion ? await store.schemaVersion() : null,
       minDesktopVersion: MIN_DESKTOP_VERSION,
+      boardsUrl: localMode() ? null : boardsUrl(),
     }),
   );
 }
@@ -56,12 +61,14 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
 export function meRoute<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store): void {
   // The actor behind the credential and the workspaces it is a member of. This is how the desktop
   // learns its own user id on the local stack (nm-config carries none). Workspaces are MEMBERSHIPS,
-  // so an agent actor — a member of nothing — gets an empty list with its identity.
+  // so an agent actor — a member of nothing — gets an empty list with its identity. `ops: true` only for
+  // a person on NM_OPS_USER_IDS (the hosted staff page, whats-new-upgrades-2026-11 §12): absent otherwise.
   app.get('/v1/me', async (c) => {
     const actor = c.get('actor');
     const workspaces = actor.kind === 'human'
       ? (await store.listWorkspaces(actor.id)).map(({ id, name, slug }) => ({ id, name, slug }))
       : [];
-    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces, minDesktopVersion: MIN_DESKTOP_VERSION });
+    const ops = actor.kind === 'human' && opsUser(actor.id) ? { ops: true } : {};
+    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces, minDesktopVersion: MIN_DESKTOP_VERSION, ...ops });
   });
 }

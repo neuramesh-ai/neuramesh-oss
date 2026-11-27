@@ -18,7 +18,7 @@ import {
 
 
 
-  takesThinking,
+  thinkingLevelsFor,
   type Actor,
 
 
@@ -76,7 +76,7 @@ export async function memberCommands(store: Store, actor: Actor, cmd: Command): 
   if (cmd.type === 'member.set_agent_model') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'a model pick is the member\'s own — an agent cannot set it');
     if (!store.agentModels) throw new DomainError('INVALID_INPUT', 'model picks are not available on this server');
-    const pick = cmd.model ? { model: cmd.model, ...(cmd.thinking && takesThinking(cmd.model) ? { thinking: cmd.thinking } : {}) } : null;
+    const pick = cmd.model ? { model: cmd.model, ...(cmd.thinking && thinkingLevelsFor(cmd.model).includes(cmd.thinking) ? { thinking: cmd.thinking } : {}) } : null;
     await store.agentModels.set(cmd.workspace, actor.id, cmd.agent, pick);
     console.log(`member_agent_model workspace=${cmd.workspace} user=${actor.id} agent=${cmd.agent} model=${pick?.model ?? 'default'}${pick?.thinking ? ` thinking=${pick.thinking}` : ''}`);
     return { ok: true } as never;

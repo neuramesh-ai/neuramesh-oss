@@ -3,13 +3,13 @@
 import { resolveToken } from '../agents';
 import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
-import { STATIC_CHECKLIST, TURN_BUDGETS, type ClaimVerdict } from '@neuramesh/shared';
+import { STATIC_CHECKLIST, type ClaimVerdict } from '@neuramesh/shared';
 import { a2aArtifactsToSubmit, a2aSend } from './a2a';
 import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harness/assemble';
 import { type SubjectRef } from '../harness/brain';
 import { isStandDown } from '../replypolicy';
 import { type LogFn } from '../agentlog';
-import { withTimeout } from './turnkit';
+import { withIdleDeadline } from './permission-deadline';
 import type { AdmitTask, OwnedTask } from './claimflow';
 import type { HostCtx } from './ctx';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
@@ -53,7 +53,7 @@ export function makeClaimOwn(ctx: HostCtx & {
   handleExhaustion: (agent: HostedAgent, t: ExecTask | null, ch: { id: string; slug: string; workspace_id: string }) => Promise<void>;
   legSummary: (out: string) => string;
   mineLessons: (reviewer: HostedAgent, t: { id: string; number: number; title: string }, ch: { id: string; slug: string; workspace_id: string }, token: string, live: boolean, log?: LogFn) => Promise<void>;
-  orchestratorTurn: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: (t: string) => void) => Promise<string>;
+  orchestratorTurn: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: (t: string) => void, live?: import('./permission-deadline').ReplyLiveness) => Promise<string>;
   originOf: (t: OfferedTask) => string | null;
   priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>;
   readOnlyStudy: (agent: HostedAgent, dir: string, token: string, log?: LogFn) => ((system: string, user: string) => Promise<string>) | null;
@@ -133,15 +133,12 @@ async function ownFlow(orch: HostedAgent, t: OwnedTask): Promise<void> {
     });
     const skills = await discoverSkills(ch.id, ch.workspace_id);
     const transcript = await owningContext(orch, t, ch, log);
-    const reply = await withTimeout(
-      orchestratorTurn(
-        orch, ch, transcript, cred.token ?? '',
-        { id: t.id, number: t.number, title: t.title, state: 'in_progress' },
-        log, skills, [], null, run,
-      ),
-      TURN_BUDGETS.own.wallMs,
-      `the owning turn on #${t.number} timed out`,
-    );
+    // no limit on total time: the turn stops when it goes quiet (permission-deadline.ts)
+    const reply = await withIdleDeadline(idle => orchestratorTurn(
+      orch, ch, transcript, cred.token ?? '',
+      { id: t.id, number: t.number, title: t.title, state: 'in_progress' },
+      log, skills, [], null, run, undefined, idle,
+    ));
     if (reply && !isStandDown(reply)) {
       await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: reply }).catch(() => {});
     }

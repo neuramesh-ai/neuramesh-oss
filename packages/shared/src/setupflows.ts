@@ -121,3 +121,46 @@ export function setupProgressLabel(flow: SetupFlow, p: SetupProgress): string {
   const at = flow.steps.find((s) => s.id === p.next);
   return `step ${Math.min(p.done + 1, p.total)} of ${p.total}${at ? ` · ${at.label}` : ''}`;
 }
+
+// ── AREA FLOWS (docs/design/sales-onboarding-2026-11/plan.md, approved 2026-11-26) ──
+// The registry grows from a flow for each channel kind to a flow for each AREA (Sales now, Finance and Marketing
+// next). An area flow runs as a chat session in the area's room, answered by the area's agent, with one card for each
+// step. The flow stays data: the card kinds are hq's code, and each step's "done" is derived from the step's real
+// home (a profile key, a connection, a row), never stored as UI state. The run (`setup_runs`, 0210) keeps only what
+// has no other home: the steps the person skipped, the last step card posted, and the end.
+
+/** the card a step shows: one component for each kind in hq, reused by every area */
+export type AreaSetupCard = 'ask' | 'chips' | 'connect' | 'sources' | 'review' | 'draft';
+export interface AreaSetupStep { id: string; label: string; card: AreaSetupCard }
+export interface AreaSetupFlow {
+  /** versioned, stamped on the run and on each step card's marker */
+  id: string;
+  area: 'sales';
+  /** the room the session lives in, and the role of the agent that answers it */
+  room: string; role: string;
+  /** the session's title, and the agent's first line */
+  title: string; intro: string;
+  /** the run completes when each step is done or skipped and this many of the area's results exist */
+  bar: number;
+  steps: AreaSetupStep[];
+}
+
+export const SALES_SETUP_FLOW: AreaSetupFlow = {
+  id: 'sales.v1',
+  area: 'sales',
+  room: 'sales', role: 'sales',
+  title: 'Set up Sales',
+  intro: 'I set up Sales with you in six steps. At the end, you have at least 3 leads in your pipeline. You can skip a step and come back to it later.',
+  bar: 3,
+  steps: [
+    { id: 'company', label: 'Your company', card: 'ask' },
+    { id: 'customer', label: 'Your customer', card: 'chips' },
+    { id: 'gmail', label: 'Gmail', card: 'connect' },
+    { id: 'find', label: 'Find leads', card: 'sources' },
+    { id: 'review', label: 'Review leads', card: 'review' },
+    { id: 'note', label: 'First note', card: 'draft' },
+  ],
+};
+
+/** every area flow, by id */
+export const AREA_SETUP_FLOWS: Record<string, AreaSetupFlow> = { [SALES_SETUP_FLOW.id]: SALES_SETUP_FLOW };

@@ -25,13 +25,14 @@ export interface DraftRun {
   slotAt: string;
   /** the slot on the schedule's own clock, for example 09:00 */
   slotLabel: string;
+  schedulePermission?: string;
 }
 
 /** pure: the message that opens the session, and the command that saves the draft into it */
 export function draftRunWrites(run: DraftRun) {
   const { schedule: s, threadId } = run;
   return {
-    message: { workspace: s.workspace_id, channel: s.channel_id, threadId, scheduleId: s.id, body: `Scheduled draft · ${s.title} · for ${run.slotLabel}\n\n${run.reply}` },
+    message: { workspace: s.workspace_id, channel: s.channel_id, threadId, scheduleId: s.id, ...(run.schedulePermission ? { schedulePermission:run.schedulePermission } : {}), body: `Scheduled draft · ${s.title} · for ${run.slotLabel}\n\n${run.reply}` },
     draft: { type: 'content.create', channel: s.channel_id, thread: threadId, platform: 'x', body: run.reply, schedule: s.id, slotAt: run.slotAt },
   };
 }

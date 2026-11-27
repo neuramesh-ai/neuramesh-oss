@@ -61,3 +61,14 @@ export function deleteScheduleMem(rows: MemScheduleRow[], scheduleId: string): {
   if (!s) throw new DomainError('NOT_FOUND', 'schedule not found');
   return { workspace: s.workspace, rest: rows.filter((x) => x.id !== scheduleId) };
 }
+
+/** the release watch that already reads this repository in this workspace, or null: one watch per
+ *  repository, because the dedupe lock is per routine and two watches would draft each release twice */
+export async function releaseWatchForSql(sql: postgres.Sql, workspace: string, repoId: string): Promise<string | null> {
+  const [row] = await sql`select id from schedules where workspace_id = ${workspace}::uuid and status <> 'done' and cadence <> 'once' and payload->'release'->>'repo' = ${repoId} limit 1`;
+  return row ? (row['id'] as string) : null;
+}
+
+export function releaseWatchForMem(rows: Array<MemScheduleRow & { status: string; cadence: string }>, workspace: string, repoId: string): string | null {
+  return rows.find((s) => s.workspace === workspace && s.status !== 'done' && s.cadence !== 'once' && (s.payload['release'] as { repo?: unknown } | undefined)?.repo === repoId)?.id ?? null;
+}

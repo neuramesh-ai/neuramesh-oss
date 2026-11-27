@@ -8,10 +8,14 @@
 export { createHub, type Hub, type HubOptions } from './hub.js';
 export { connectEchoMachine, type MachineClient, type MachineClientOptions } from './machine-client.js';
 export {
-  CLOSE, isChannelFrame, parseMessage, toB64, fromB64, MAX_CHANNEL_DATA_B64_CHARS,
-  type ChannelFrame, type ChannelLane, type EdgeMessage, type FrameType, type RelayMessage,
+  CLOSE, CLIENT_FRAME_TYPES, isChannelFrame, parseMessage, toB64, fromB64, MAX_CHANNEL_DATA_B64_CHARS,
+  type ChannelFrame, type ChannelLane, type EdgeMessage, type FrameType, type MachineLane, type RelayCapability, type RelayMessage,
 } from './protocol.js';
 export { makeValidators } from './validate.js';
 export { admitStream, MAX_STREAM_CHANNELS_PER_CLIENT, MAX_STREAM_CHANNELS_PER_MACHINE } from './stream-lane.js';
 export { admitBrowser, MAX_BROWSER_CHANNELS_PER_CLIENT, MAX_BROWSER_CHANNELS_PER_MACHINE } from './browser-lane.js';
 export { keepAlive, KEEPALIVE_MS } from './keepalive.js';
+export {
+  WRONG_SHARD_CLOSE, parseRelayShards, parseWrongShard, shardIndexFor, shardScore, shardUrlFor, wrongShardReason, wrongShardTarget,
+  type WrongShard,
+} from './shard.js';

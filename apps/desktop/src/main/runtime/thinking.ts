@@ -4,10 +4,10 @@
 // that takes no level, the NeuraMesh brain and a Google sign-in (agy) get nothing, so the vendor's
 // own default stands. Spread into an options object: an empty level adds no key at all.
 import type { ThinkingLevel as GeminiLevel } from '@google/genai';
-import { takesThinking, type ThinkingLevel } from '@neuramesh/shared';
+import { levelFor, type ThinkingLevel } from '@neuramesh/shared';
 
 type Seat = { model: string; thinking?: ThinkingLevel | null };
-const levelOf = (s: Seat): ThinkingLevel | null => (s.thinking && takesThinking(s.model) ? s.thinking : null);
+const levelOf = (s: Seat): ThinkingLevel | null => levelFor(s.model, s.thinking);
 
 /** the Claude Agent SDK's `effort` (it lowers the level itself for a model that holds less) */
 export function claudeEffort(s: Seat): { effort?: ThinkingLevel } {
@@ -22,8 +22,21 @@ export function codexEffort(s: Seat): { modelReasoningEffort?: ThinkingLevel } {
 }
 
 /** Gemini through an API key: `thinkingConfig.thinkingLevel`. The SDK's enum values are the level's
- *  own name in upper case ('LOW'), so the type-only import keeps the enum out of the bundle */
+ *  own name in upper case ('LOW'), so the type-only import keeps the enum out of the bundle. The API
+ *  takes 'XHIGH' on Neon and Hydrogen before @google/genai 2.8.0 names it, so the cast carries it */
 export function geminiThinking(s: Seat): { thinkingConfig?: { thinkingLevel: GeminiLevel } } {
   const l = levelOf(s);
   return l ? { thinkingConfig: { thinkingLevel: l.toUpperCase() as GeminiLevel } } : {};
+}
+
+/** a routing (triage) turn thinks at most at Medium (round 9 live narration). Its job is to decide and
+ *  route. On High the model spent two silent minutes before it wrote a word. No pick stays no pick */
+export function triageThinking(level?: ThinkingLevel | null): ThinkingLevel | null {
+  return level === 'high' || level === 'xhigh' ? 'medium' : level ?? null;
+}
+
+/** the API lane's first round of a turn thinks one level below the turn's level, so the first words and
+ *  the first tool calls come sooner. Later rounds, where the answer is written, keep the level */
+export function firstRoundThinking(level?: ThinkingLevel | null): ThinkingLevel | null {
+  return level === 'xhigh' ? 'high' : level === 'high' ? 'medium' : level === 'medium' ? 'low' : level ?? null;
 }

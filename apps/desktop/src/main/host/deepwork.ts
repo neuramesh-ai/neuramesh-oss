@@ -3,7 +3,6 @@
 import { runtimeFor } from '../agents';
 import type { HostedAgent } from '../agents';
 import { MAX_LEG_CONCURRENCY, fanoutStep, mapCapped, type WorkLeg } from '../runs';
-import { TURN_BUDGETS } from '@neuramesh/shared';
 
 import { briefFileName } from '@neuramesh/client-core/library';
 
@@ -11,7 +10,8 @@ import { claudePathOption, providerEnv } from '../runtime/adapter';
 import { claudeEffort } from '../runtime/thinking';
 import { codexToolTurn } from '../runtime/codexsdk';
 import { repoClones } from '../runtime/nmtools-repo';
-import { drainQuery, withTimeout } from './turnkit';
+import { drainQuery } from './turnkit';
+import { withIdleDeadline } from './permission-deadline';
 import type { RepoReader } from './reporead';
 
 
@@ -100,7 +100,7 @@ function readOnlyStudy(agent: HostedAgent, dir: string, token: string, log?: Log
 const CODE_NOTE = 'You can read the team\'s own code: list_repo_files lists a folder, read_repo_file reads one file, and list_repo_changes shows the recent commits, pull requests and releases. Read the code before you say what it does, and name the files you read.';
 const REPO_TOOLS = ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'];
 
-async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, log?: LogFn, dir?: string | null, repo?: RepoReader | null): Promise<string> {
+async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, log?: LogFn, dir?: string | null, repo?: RepoReader | null, onEvent?: () => void): Promise<string> {
   if (agent.runtime === 'codex' && repo) {
     const os = await import('node:os');
     return codexToolTurn(agent, `${CODE_NOTE}\n\n${prompt}`, token, { kind: 'deep', host: { dir: dir ?? os.tmpdir(), ...(log ? { log } : {}), repo } }, log);
@@ -108,7 +108,7 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
   if (agent.runtime === 'codex' || agent.runtime === 'gemini') {
     // honest degradation: those adapters expose no web tools through our seam, so a leg
     // answers from what the model already knows. Weaker — never silently passed off as research.
-    return runtimeFor(agent.runtime).streamTurn(agent, '', prompt, token, log);
+    return runtimeFor(agent.runtime).streamTurn(agent, '', prompt, token, log, onEvent && (() => onEvent()));
   }
   const os = await import('node:os');
   const { query, tool, createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
@@ -140,6 +140,9 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
     }) as AsyncIterable<any>,
     '(no findings)',
     log,
+    undefined,
+    undefined,
+    { onEvent },
   );
 }
 
@@ -214,7 +217,9 @@ async function startDeepWork(
           // (docs/29). Sharing the parent's logger is what made five subagents one flat,
           // unattributed stream that no surface could split.
           const legLog = legRun.id ? alog(agent, null, ch.slug, legRun.id) : log;
-          const out = await withTimeout(deepWorkQuery(agent, leg.prompt, token, narrate(legRun, legLog), brief, opts.repo ?? null), TURN_BUDGETS.leg.wallMs, `leg "${leg.name}" timed out`);
+          // research takes as long as it takes: a leg stops only when its log goes quiet (permission-deadline.ts)
+          const lines = narrate(legRun, legLog);
+          const out = await withIdleDeadline(idle => deepWorkQuery(agent, leg.prompt, token, (rec) => { idle.pulse(); lines(rec); }, brief, opts.repo ?? null, idle.pulse));
           findings.push(`### ${leg.name}\n\n${out.trim()}`);
           await legRun.settle('done', out.trim().split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
           // the angle's findings survive the run: a note + a result envelope in the thread's
@@ -234,8 +239,8 @@ async function startDeepWork(
       });
 
       await parent.step('writes the report', legs.length);
-      const synthesis = await withTimeout(
-        deepWorkQuery(
+      // the report is long text with no tool call, so each stream event wakes its idle clock
+      const synthesis = await withIdleDeadline(idle => deepWorkQuery(
           agent,
           `You asked ${legs.length} research angles about: "${title}".\n\nHere is what came back:\n\n${findings.join('\n\n')}\n\n` +
             'Write the report for a founder who will act on it today. Open with the 3 findings that actually change what they should do, each with its evidence. ' +
@@ -243,10 +248,9 @@ async function startDeepWork(
           token,
           log,
           brief,
-        ),
-        TURN_BUDGETS.deep.wallMs / 5,
-        'synthesis timed out',
-      );
+          null,
+          idle.pulse,
+        ));
       await post('/v1/messages', { kind: 'agent', id: agent.id }, {
         workspace: ch.workspace_id, channel: ch.id,
         body: synthesis.trim(),

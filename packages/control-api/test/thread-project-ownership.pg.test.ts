@@ -140,6 +140,9 @@ describe.skipIf(!DB)('project ownership with legacy channel contracts', () => {
     await sql!.begin(async tx => {
       await tx`alter table threads disable trigger threads_project_guard`;
       for (const id of ids) await tx`insert into threads(id, workspace_id, channel_id, title) values (${id}::uuid, ${workspace}::uuid, ${channel}::uuid, 'Legacy fixture')`;
+      // the feed's sync_change trigger (0159) is DEFERRED to COMMIT, and ALTER TABLE refuses a table with
+      // pending trigger events: record the inserts' changes now, then re-enable the guard
+      await tx`set constraints all immediate`;
       await tx`alter table threads enable trigger threads_project_guard`;
     });
     const before = await sql!`select to_jsonb(t) - 'project_id' as data from threads t where id in ${sql!(ids)} order by id`;
@@ -172,7 +175,8 @@ describe.skipIf(!DB)('project ownership with legacy channel contracts', () => {
     const result = await app!.request(`/v1/memory?workspace=${workspace}&channel=project:${project}`, { headers: actorHeaders() });
     expect(result.status).toBe(200);
     expect((await result.json() as { blocks: unknown[] }).blocks).toHaveLength(2);
-    expect((await store!.channelMemory(workspace, channel)).blocks).toHaveLength(1);
+    // D15: a channel names its project, so the channel view reads the project's summaries too
+    expect((await store!.channelMemory(workspace, channel)).blocks).toHaveLength(2);
     const [a] = await sql!`select id from agents where workspace_id = ${workspace}::uuid limit 1`;
     const denied = await app!.request(`/v1/memory?workspace=${workspace}&channel=project:${project}`, { headers: { 'x-nm-actor': JSON.stringify({ kind: 'agent', id: a!['id'], role: 'orchestrator' }) } });
     expect(denied.status).toBe(403);

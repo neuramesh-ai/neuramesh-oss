@@ -3,7 +3,7 @@ import { TASK_KINDS } from './states';
 import { WORK_PLAN_LEGS } from './task';
 import { DESIGN_PROVIDERS } from './design';
 import { SHIP_ITEM_OWNERS, SHIP_ITEM_STATES } from './task';
-import { CODE_SESSION_COMMANDS } from './commands-code';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
+import { CODE_SESSION_COMMANDS } from './commands-code';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';   import { EMAIL_COMMANDS } from './command-union-email';   import { SALES_COMMANDS } from './command-union-sales';   import { SETUP_AREA_COMMANDS } from './command-union-setup';   import { workspaceSetProfileCommand } from './company-profile';
 import { AGENT_ROLES } from './states';
 
 // The human-sendable board commands. These live in @neuramesh/shared (not in the
@@ -65,6 +65,9 @@ export const taskCreateCommand = z.object({
   // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
   // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
   originThread: z.string().uuid().optional(),
+  permissionRunId: z.string().uuid().optional(),
+  /** Agent Desk's explicit implementation handoff; home ownership is checked by the server. */
+  codingHandoff: z.object({ requestId: z.string().uuid(), taskId: z.string().uuid().optional(), visualEvidence: z.boolean().optional(), prepareRelease: z.boolean().optional() }).optional(),
 });
 
 // The human gates + edits (the whole point of the mobile companion).
@@ -268,7 +271,9 @@ export const threadSetBrainCommand = z.object({ type: z.literal('thread.set_brai
 // else: no approve, no accept, no dismiss. A gate or card newer than the stamp brings the thread
 // back to Needs you (shared/threadstatus.ts). Unsettle is the undo pill's command.
 export const threadSettleCommand = z.object({ type: z.literal('thread.settle'), workspace: z.string().min(1), threadId: z.string().uuid() });
-export const threadUnsettleCommand = z.object({ type: z.literal('thread.unsettle'), workspace: z.string().min(1), threadId: z.string().uuid() });
+// …and the same stamp on a TASK (0192): for a task with no thread of its own, so its row and its cards can
+// settle. On the thread pair's lines: this file sits at the 250 bar.
+export const threadUnsettleCommand = z.object({ type: z.literal('thread.unsettle'), workspace: z.string().min(1), threadId: z.string().uuid() });   export const taskSettleCommand = z.object({ type: z.literal('task.settle'), workspace: z.string().min(1), taskId: z.string().uuid() });   export const taskUnsettleCommand = z.object({ type: z.literal('task.unsettle'), workspace: z.string().min(1), taskId: z.string().uuid() });
 // schedule.create — arming is human-only, on every plan; the phone's New routine sheet sends
 // it with `routine: true`, the launcher's flag (a routine, not a marketing drafting schedule)
 export const scheduleCreateCommand = z.object({
@@ -283,7 +288,9 @@ export const scheduleCreateCommand = z.object({
   weekday: z.number().int().min(0).max(6).optional(),
   agent: z.string().min(1).optional(),
   routine: z.boolean().optional(),
-  thread: z.string().uuid().optional(), replyGap: REPLY_GAP_FIELD.optional(), // the routine writer's session · the Replies part's gap
+  // A RELEASE WATCH (the Product page's Releases tab, 2026-11-22): the routine watches this repository of the
+  // room's project and drafts release posts for each new release, the release tick's own payload. Recurring only.
+  thread: z.string().uuid().optional(), replyGap: REPLY_GAP_FIELD.optional(), release: z.object({ repo: z.string().uuid(), slug: z.string().trim().min(3).max(200) }).optional(), // the routine writer's session · the Replies part's gap
 });
 export const scheduleSetStatusCommand = z.object({ type: z.literal('schedule.set_status'), schedule: z.string().min(1), status: z.enum(['active', 'paused']) });
 export const scheduleDeleteCommand = z.object({ type: z.literal('schedule.delete'), schedule: z.string().min(1) });
@@ -338,7 +345,7 @@ export const HumanCommandSchema = z.discriminatedUnion('type', [
   contentUpdateCommand,
   contentAnchorCommand,
   workspaceCreateCommand,
-  workspaceUpdateCommand,
+  workspaceUpdateCommand, workspaceSetProfileCommand,
   agentUpdateCommand,
   workspaceInviteCommand,
   workspaceAcceptInviteCommand,
@@ -349,7 +356,7 @@ export const HumanCommandSchema = z.discriminatedUnion('type', [
   memberSetComputeCommand,
   threadSetMachineCommand,
   threadSettleCommand,
-  threadUnsettleCommand,
+  threadUnsettleCommand, taskSettleCommand, taskUnsettleCommand,
   threadSetBrainCommand,
   scheduleCreateCommand,
   scheduleSetStatusCommand,
@@ -357,7 +364,7 @@ export const HumanCommandSchema = z.discriminatedUnion('type', [
   scheduleUpdateCommand,
   scheduleRunNowCommand,
   machineWakeCommand,
-  ...CODE_SESSION_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS,
+  ...CODE_SESSION_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS,   ...EMAIL_COMMANDS,   ...SALES_COMMANDS,   ...SETUP_AREA_COMMANDS,
 ]);
 
 export type HumanCommand = z.infer<typeof HumanCommandSchema>;

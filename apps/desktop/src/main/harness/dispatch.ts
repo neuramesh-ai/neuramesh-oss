@@ -13,7 +13,7 @@
 import type { TurnKind } from '@neuramesh/shared';
 
 // ── Triggers ──────────────────────────────────────────────────────────────────────────────────
-export type TriggerCause = 'board' | 'message' | 'timer' | 'park' | 'spawn';
+export type TriggerCause = 'board' | 'message' | 'approval' | 'timer' | 'park' | 'spawn';
 
 export interface Trigger {
   /** the DEDUPE KEY — derived from the cause so the same event cannot be handled twice */
@@ -39,14 +39,14 @@ export interface Trigger {
 export type Priority = 1 | 2 | 3 | 4;
 
 export function priorityOf(t: Pick<Trigger, 'cause' | 'kind'>): Priority {
-  if (t.cause === 'message') return 1; // a human typed it
+  if (t.cause === 'message' || t.cause === 'approval') return 1;
   if (t.cause === 'park') return 2; // the wait it was parked on has resolved — resume promptly
   if (t.cause === 'spawn') return 3;
   if (t.cause === 'timer' || t.kind === 'sweep') return 4;
   return 2; // board
 }
 
-export interface RunningTurn { triggerId: string; agentId: string; kind: TurnKind; threadId?: string | null }
+export interface RunningTurn { triggerId: string; agentId: string; kind: TurnKind; threadId?: string | null; awaitingApproval?: boolean; rearmed?: boolean }
 
 export interface Caps {
   /** total concurrent turns on this machine — a machine resource, not a per-feature constant */
@@ -84,14 +84,21 @@ export function nextTurn(
   caps: Caps,
   seen: ReadonlySet<string>,
 ): Trigger | null {
-  if (running.length >= caps.slots) return null;
+  const active = running.filter(turn => !turn.awaitingApproval);
+  if (active.length >= caps.slots) return null;
   const perAgent = new Map<string, number>();
-  for (const r of running) perAgent.set(r.agentId, (perAgent.get(r.agentId) ?? 0) + 1);
+  for (const r of active) perAgent.set(r.agentId, (perAgent.get(r.agentId) ?? 0) + 1);
   const live = new Set(running.map((r) => r.triggerId));
   const threads = new Set(running.flatMap(r => r.threadId ? [r.threadId] : []));
 
+  // Parked runtimes retain memory and their thread locks. Explicit messages
+  // can borrow idle capacity; allow one extra approved build, never an
+  // unbounded backlog of resident coding processes waiting for their reviews.
+  const openWork = running.filter(turn => turn.kind !== 'chat').length;
   const eligible = queue.filter(
-    (t) => !seen.has(t.id) && !live.has(t.id) && (perAgent.get(t.agentId) ?? 0) < caps.perAgent && (!t.subject.threadId || !threads.has(t.subject.threadId)),
+    (t) => (running.length < caps.slots || (t.kind === 'chat' && t.cause === 'message') ||
+      (t.cause === 'approval' && openWork <= caps.slots)) &&
+      !seen.has(t.id) && !live.has(t.id) && (perAgent.get(t.agentId) ?? 0) < caps.perAgent && (!t.subject.threadId || !threads.has(t.subject.threadId)),
   );
   if (!eligible.length) return null;
 
@@ -233,7 +240,8 @@ export class Dispatcher {
 
   /** Offer a trigger. Returns false when it was rejected as already-handled or already-queued. */
   offer(t: Omit<Trigger, 'seq'>): boolean {
-    if (this.seen.has(t.id) || this.queue.has(t.id) || this.running.has(t.id)) return false;
+    const active = this.running.get(t.id);
+    if (this.seen.has(t.id) || this.queue.has(t.id) || (active && !active.rearmed)) return false;
     this.queue.set(t.id, { ...t, seq: this.seq++ });
     const max = this.opts.maxQueue ?? 512;
     if (this.queue.size > max) {
@@ -256,19 +264,39 @@ export class Dispatcher {
     return t;
   }
 
+  waitForApproval(id: string): void {
+    const turn = this.running.get(id);
+    if (turn) turn.awaitingApproval = true;
+  }
+
+  /** A reviewed task must reacquire capacity before its tool or model continues. */
+  resumeAfterApproval(id: string): boolean {
+    const turn = this.running.get(id);
+    if (!turn?.awaitingApproval) return true;
+    const active = [...this.running.values()].filter(other => !other.awaitingApproval);
+    if (active.length >= this.caps.slots || active.filter(other => other.agentId === turn.agentId).length >= this.caps.perAgent) return false;
+    turn.awaitingApproval = false;
+    return true;
+  }
+
   /** Every admitted turn must land here — the accounting mirror of the lifecycle's `finally`. */
   settle(triggerId: string, outcome: SeenOutcome): void {
+    const active = this.running.get(triggerId);
     this.running.delete(triggerId);
-    this.seen.mark(triggerId, outcome);
+    // An Unblock can arrive while the failed attempt is still finishing. Its late
+    // settlement must not mark the new, explicitly requested attempt as already done.
+    if (!active?.rearmed) this.seen.mark(triggerId, outcome);
   }
 
   /** Re-arm a trigger deliberately (a review bounce, a park wake) so it may fire again. */
   rearm(triggerId: string): void {
+    const active = this.running.get(triggerId);
+    if (active) active.rearmed = true;
     this.seen.clear(triggerId);
   }
 
   stats(): { queued: number; running: number; shed: number; slots: number } {
-    return { queued: this.queue.size, running: this.running.size, shed: this.shedCount, slots: this.caps.slots };
+    return { queued: this.queue.size, running: [...this.running.values()].filter(turn => !turn.awaitingApproval).length, shed: this.shedCount, slots: this.caps.slots };
   }
 
   /** Recover after a crash: nothing this process owns can still be running. */

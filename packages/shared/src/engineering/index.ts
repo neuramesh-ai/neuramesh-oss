@@ -15,6 +15,7 @@ export * from './copy';
 export * from './remote';
 export * from './checkpoints';
 export * from './transport-state';
+export * from './relay-resume';
 export * from './activity';
 export { toolDisplayOutput } from './tool-receipts';
 export { engineeringWorkPlanMessages, engineeringWorkPlanText } from './work-plan';
@@ -27,3 +28,4 @@ export * from './recorded-plan-progress';
 
 export * from './change-review';
 export * from './brain-restore';
+export * from './scratch';

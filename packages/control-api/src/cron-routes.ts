@@ -1,3 +1,4 @@
+import { cronAuthorized } from './cron-auth';
 // the two vercel-cron passes, extracted from app.ts verbatim (the size ratchet forced the
 // move when the fleet route landed beside them; the internal-secret routes now live
 // together — these two here, fleet's in fleet.ts).
@@ -9,6 +10,8 @@ import { mailEnabled } from './mail';
 import { REVIEW_LEAD_MIN } from '@neuramesh/shared';
 import type { PushService } from './push';
 import { queueRoutineReplies, remindDueReplies } from './reply-cron';
+import { memoryRefreshRoute } from './project-memory-refresh';
+import { postizFollow } from './private';
 import type { Store } from './store';
 
 /** the reminder pass: every scheduled post landing inside the lead gets one push, ever. The window
@@ -33,11 +36,14 @@ export async function remindDuePosts(store: Store, push: PushService | undefined
 }
 
 export function cronRoutes<E extends Env>(app: Hono<E>, store: Store, push?: PushService): void {
+  // The project memory pass (D15, project-memory-refresh.ts): GET /internal/memory-refresh refreshes the
+  // memory of the projects on the starter brain, at most once per NM_MEMORY_REFRESH_MINUTES each.
+  memoryRefreshRoute(app, store);
+
   // The publish pass (plan §4.8): Vercel cron GETs this with `authorization: Bearer $CRON_SECRET`
   // (sent automatically when the env is set). Due + approved → post via the connector → receipt.
   app.get('/internal/publish-due', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     const now = new Date();
     // THE REVIEW REMINDER RIDES HERE, and it runs BEFORE the connectors gate on purpose: a post can
     // be scheduled and worth a second look on a workspace that has connected nothing yet, and the
@@ -48,15 +54,16 @@ export function cronRoutes<E extends Env>(app: Hono<E>, store: Store, push?: Pus
     const replies = await queueRoutineReplies(store, now).then(async (queued) => ({ queued, reminded: await remindDueReplies(store, push, now) })).catch(() => ({ queued: 0, reminded: 0 }));
     if (!connectorsEnabled()) return c.json({ published: 0, failed: 0, reminded, replies, note: 'connectors not configured' });
     const out = await publishDueItems(store, POSTERS, now, publicApiBase(c.req.url));
-    return c.json({ ...out, reminded, replies });
+    // the posts that Postiz holds: the tick follows each one, and Postiz publishes it (postiz-lane.ts)
+    const postiz = await postizFollow(store).catch((e: unknown) => { console.error('postiz follow failed', e); return null; });
+    return c.json({ ...out, reminded, replies, postiz });
   });
 
   // The lifecycle pass (docs/27 §3): Vercel cron GETs this with `authorization: Bearer
   // $CRON_SECRET`. Enqueues + drains due onboarding email. Safe to double-fire — the outbox's
   // UNIQUE dedupe_key turns a second run into a no-op rather than a second send.
   app.get('/internal/emails-due', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     if (!mailEnabled()) return c.json({ sent: 0, skipped: 0, failed: 0, note: 'mail not configured' });
     return c.json(await runLifecyclePass(store));
   });

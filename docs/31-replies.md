@@ -1,5 +1,7 @@
 # 31 — Replies: a thread hangs off a message (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-26). Hover any room message → **Reply** → a thread rooted at that
 > message. The message stays in the feed and grows **“3 replies · last 4m ago”**; the answers live
 > in the thread. Prototype: `mockups/home-feed-flow.html` step 8.

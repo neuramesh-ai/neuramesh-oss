@@ -197,3 +197,38 @@ describe('schedule.set_cursor — the release routine’s finish line (release-d
     expect((await send(plume, { type: 'schedule.set_cursor', schedule: scheduleId, cursor: { at: 'yesterday', tag: null } })).status).toBe(400);
   });
 });
+
+describe('schedule.create with release: the Product page arms a release watch', () => {
+  const REPO = '11111111-2222-4333-8444-555555555555';
+  const seed = (channel: string) => store.announcements.seedRepo({ channelId: channel, workspaceId: 'ws_acme', projectId: null, repoId: REPO, orgName: 'acme', name: 'app', cloneUrl: null, provider: 'github' });
+  const watch = { ...base, title: 'Release drafts · app', prompt: 'Draft release posts.', cadence: 'daily', release: { repo: REPO, slug: 'acme/app' } };
+
+  it('writes the release tick payload with a cursor that starts now and an empty ledger', async () => {
+    const channel = await makeRoom();
+    seed(channel);
+    const before = Date.now();
+    const r = await j(await send(george, { ...watch, channel }));
+    const row = schedRow(store, r.scheduleId);
+    const release = row.payload['release'] as { repo: string; slug: string; cursor: { at: string; tag: null }; log: unknown[] };
+    expect(row.payload['routine']).toBe(true);
+    expect(release).toMatchObject({ repo: REPO, slug: 'acme/app', cursor: { tag: null }, log: [] });
+    expect(Date.parse(release.cursor.at)).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it('refuses once, a repository the project lacks, and a second watch of the same repository', async () => {
+    const channel = await makeRoom();
+    expect((await j(await send(george, { ...watch, channel }))).code).toBe('INVALID_INPUT');
+    seed(channel);
+    expect((await j(await send(george, { ...watch, channel, cadence: 'once', runAt: new Date(Date.now() + 3600e3).toISOString() }))).code).toBe('INVALID_INPUT');
+    expect((await send(george, { ...watch, channel })).status).toBe(200);
+    const again = await send(george, { ...watch, channel });
+    expect(again.status).toBe(409);
+    expect((await j(again)).code).toBe('CONFLICT');
+  });
+
+  it('an agent still cannot arm one', async () => {
+    const channel = await makeRoom();
+    seed(channel);
+    expect((await send(plume, { ...watch, channel })).status).toBe(403);
+  });
+});

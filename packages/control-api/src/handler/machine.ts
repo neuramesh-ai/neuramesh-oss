@@ -11,6 +11,7 @@ import { actorInWorkspace, sqlOf } from '../credits';
 import { DomainError } from '../errors';
 import { localMode } from '../localmode';
 import { promoteMachine } from '../fleet-claims';
+import { machineUpgradeCommands } from '../private';
 import { destroyMemberMachine, fleetOn, machineReach, mayAttach, mayUse, provisionMemberMachine, wakeMachine } from '../member-machines';
 import { type Store } from '../store';
 import { actorAddress } from './guards';
@@ -19,6 +20,8 @@ import type { CommandOutcome } from '../handler';
 const NOT_SERVED = () => new DomainError('NOT_FOUND', 'cloud machines are not served by this store');
 
 export async function machineCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | { machineId: string } | undefined> {
+  // the What's new card's upgrade commands (machine-release-routes.ts, through the private entry)
+  { const r = await machineUpgradeCommands(store, actor, cmd); if (r !== undefined) return r as never; }
   if (cmd.type === 'machine.register') {
     if (actor.kind !== 'human') throw new DomainError('NOT_PERMITTED', 'machines are registered by their human owner');
     const event = createEvent({
@@ -44,6 +47,7 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const beat = await store.heartbeatMachine(cmd.machineId, actor.id, {
       activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false,
       ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}),
+      ...(cmd.permissionVersion ? { permissionVersion: cmd.permissionVersion } : {}),
       ...(cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}),
     });
     if (!beat) throw new DomainError('NOT_FOUND', 'no machine you may beat has this id');
@@ -90,7 +94,8 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const allowed = actor.kind === 'human' ? mayUse(reach, actor.id)
       : reach.kind === 'runner' || reach.shares.includes('*') || (origin !== null && mayUse(reach, origin));
     if (!allowed) throw new DomainError('NOT_PERMITTED', 'this machine is not lent to you');
-    const out = await wakeMachine(sql, cmd.machineId);
+    // a person's wake clears a tripped crash-loop breaker; an agent's does not (fleet-cloudrun-breaker.ts)
+    const out = await wakeMachine(sql, cmd.machineId, { human: actor.kind === 'human' });
     if (out.capped) throw new DomainError('PLAN_LIMIT', 'this workspace is out of credits — top up to wake its machine');
     return { ok: true, woken: out.woken } as never;
   }

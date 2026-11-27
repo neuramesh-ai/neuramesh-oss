@@ -1,23 +1,28 @@
+import {agentDataIdentity} from './host/agent-data-context';
 import { visibleStream, type ImageGenerationProgress } from '@neuramesh/shared';
 import { electron } from './electronlazy';
 import { liveStreams } from './livestreams';
 
-type Entry = { agent: string; text: string; thinking?: string; images: Map<symbol, ImageGenerationProgress> };
+/** `progress`: the turn's finished narration lines (round 9). Absent until the turn writes one */
+type Entry = { agent: string; text: string; thinking?: string; progress?: readonly string[]; images: Map<symbol, ImageGenerationProgress> };
 
 /** Preserve the reply while image tools publish progress on the same live surface. */
-export function createAgentStream(send: (key: string, agent: string, text: string, done: boolean, thinking?: string, imageGeneration?: ImageGenerationProgress | null) => void) {
+export function createAgentStream(send: (key: string, agent: string, text: string, done: boolean, thinking?: string, imageGeneration?: ImageGenerationProgress | null, progress?: readonly string[]) => void) {
   const entries = new Map<string, Entry>();
   const publish = (key: string, entry: Entry, done = false) => {
     const images = [...entry.images.values()];
     const progress = !done && images.length ? { count: images.reduce((sum, image) => sum + image.count, 0), stage: images.some(image => image.stage === 'generating') ? 'generating' as const : 'saving' as const } : null;
-    send(key, entry.agent, entry.text, done, entry.thinking, progress);
+    // the progress lines ride only once the turn has some, so a sender that predates them sees its old six arguments
+    if (entry.progress) send(key, entry.agent, entry.text, done, entry.thinking, progress, entry.progress);
+    else send(key, entry.agent, entry.text, done, entry.thinking, progress);
   };
-  const emit = (key: string, agent: string, text: string, done: boolean, thinking?: string) => {
+  const emit = (key: string, agent: string, text: string, done: boolean, thinking?: string, progress?: readonly string[]) => {
     let entry = entries.get(key);
     if (done) { entries.delete(key); send(key, agent, text, true, thinking, null); return; }
     if (!entry || entry.agent !== agent) { entry = { agent, text: '', images: new Map() }; entries.set(key, entry); }
     entry.text = text;
     if (thinking !== undefined) entry.thinking = thinking;
+    if (progress !== undefined) entry.progress = progress;
     publish(key, entry);
   };
   const image = (keys: string[], agent: string, count = 1) => {
@@ -43,16 +48,22 @@ export function createAgentStream(send: (key: string, agent: string, text: strin
   return { emit, image };
 }
 
-const stream = createAgentStream((key, agent, text, done, thinking, imageGeneration) => {
+/** the progress lines a person may see: machine fences (cards, the stand-down sentinel) never show */
+export const visibleProgress = (lines: readonly string[] | undefined): string[] | undefined =>
+  lines?.map((line) => visibleStream(line).text.trim()).filter(Boolean);
+
+const stream = createAgentStream((key, agent, text, done, thinking, imageGeneration, progress) => {
   const { text: visible, forming } = visibleStream(text);
   const body = forming ? `${visible}${visible ? '\n\n' : ''}› *${forming === 'drafts' ? 'updating the drafts' : 'question card forming'}…*` : visible;
+  const lines = visibleProgress(progress);
   for (const w of electron()?.BrowserWindow.getAllWindows() ?? []) {
-    if (!w.webContents.isDestroyed()) w.webContents.send('nm:agent-stream', { key, agent, text: body, done, thinking, imageGeneration });
+    if (!w.webContents.isDestroyed()) w.webContents.send('nm:agent-stream', { key, agent, text: body, done, thinking, imageGeneration, ...(lines ? { progress: lines } : {}) });
   }
-  liveStreams.publish(key, agent, body, done, thinking, imageGeneration);
+  liveStreams.publish(key, agent, body, done, thinking, imageGeneration, lines);
 });
-export const emitStream = stream.emit;
+export const emitStream: typeof stream.emit = (...args) => { if(agentDataIdentity.getStore()?.privateDestination!=='marketing')stream.emit(...args); };
 export function beginImageGeneration(channelId: string, agent: string, anchor: { taskId?: string | null; threadId?: string | null }, count = 1) {
+  if(agentDataIdentity.getStore()?.privateDestination==='marketing')return {saving:()=>{},finish:()=>{}};
   const subject = anchor.taskId ?? anchor.threadId;
   return stream.image([`${channelId}:`, ...(subject ? [`${channelId}:${subject}`] : [])], agent, count);
 }

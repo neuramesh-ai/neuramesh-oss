@@ -25,6 +25,11 @@ export const PRICING: Record<string, { inPer1M: number; outPer1M: number }> = {
   'claude-sonnet-5-5': { inPer1M: 2, outPer1M: 10 },
   'claude-haiku-5-5': { inPer1M: 0.1, outPer1M: 0.5 },
   'gemini-4-argon': { inPer1M: 2, outPer1M: 10 },
+  // November 23, 2026: verified on Google's pricing page. Carbon has Argon's price and doubles
+  // with it on December 1, 2026. Neon is flat across its whole 1M-token window.
+  'gemini-4-carbon': { inPer1M: 2, outPer1M: 10 },
+  'gemini-4-neon': { inPer1M: 3, outPer1M: 15 },
+  'gemini-4-hydrogen': { inPer1M: 1.5, outPer1M: 7.5 },
   'claude-fable-5-1': { inPer1M: 10, outPer1M: 50 },
   'claude-fable-5': { inPer1M: 10, outPer1M: 50 },
   'claude-opus-5': { inPer1M: 5, outPer1M: 25 },

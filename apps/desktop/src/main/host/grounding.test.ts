@@ -53,4 +53,7 @@ test('the listing names the shelf, and says where a widened scope found each doc
   assert.equal(room[0]!['room'], undefined);
   assert.match(await listLibrary(async () => [], 'ch', 'room'), /no documents in this project/);
   assert.match(await listLibrary(async () => [], 'ch', 'project'), /no documents in this project/);
+  // the id rides each row, so publish_file names a file of another room exactly
+  const project = JSON.parse(await listLibrary(async () => [{ ...doc('mockup.html', '<p>'), id: 'f-1', room: 'build' }], 'ch', 'project')) as Array<Record<string, unknown>>;
+  assert.deepEqual([project[0]!['id'], project[0]!['room']], ['f-1', 'build']);
 });

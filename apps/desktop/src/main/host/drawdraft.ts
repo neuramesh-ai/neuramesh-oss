@@ -27,6 +27,17 @@ export function drawOutcomeText(out: DrawOutcome): string {
     : `Could not redraw the image: ${out.error} Report this failure plainly; do not claim the image changed.`;
 }
 
+/** Why a draw cannot start, told true (George, 2026-11-17: a desk thread's draft read "scheduled,
+ *  published or deleted" while it was a draft the agent could not see). A status names itself only
+ *  when the row is there with it. No row: this conversation's agent cannot see the draft. */
+export function undrawableText(status: string | null): string {
+  if (status === 'scheduled') return 'That draft is scheduled, so I cannot draw it. Unschedule it on the card, then ask again.';
+  if (status === 'published') return 'That post is published, so I cannot draw it.';
+  if (status === 'failed') return 'That post failed to publish, so I cannot draw it. Make a new draft and ask again.';
+  if (status) return 'I cannot draw that draft now. Try again on the card.';
+  return 'I cannot find that draft in this conversation. It was deleted, or I have no Marketing access. Ask the workspace owner to add me to Marketing, then press Try again on the card.';
+}
+
 /** the reason a card shows when the workspace holds no image key (the one credential story) */
 export const NO_IMAGE_KEY = 'This workspace has no image key. Add one under Image generation.';
 
@@ -55,7 +66,7 @@ export function makeDraw(ctx: Pick<HostCtx, 'post'> & {
    *  `stale`: the draft carries an old reason. it goes first, so a retry that fails the same way
    *  reads as a new outcome to a surface that waits for one (the tab's modal). */
   async function drawBriefed(agent: HostedAgent, ch: Ch, itemId: string, platform: string, brief: string, stale = false): Promise<DrawOutcome> {
-    const [anchor] = await db.getAll<{ thread_id?: string; task_id?: string }>('select thread_id, task_id from content_items where id = ? and channel_id = ?', [itemId, ch.id]);
+    const [anchor] = await db.getAll<{ thread_id?: string; task_id?: string }>('select thread_id, task_id from content_items where id = ?', [itemId]);
     const progress = beginImageGeneration(ch.id, agent.name, { threadId: anchor?.thread_id, taskId: anchor?.task_id });
     try {
       const postCmd = postAs(agent);
@@ -155,13 +166,15 @@ export function makeDraw(ctx: Pick<HostCtx, 'post'> & {
   }
 
   /** the ‹gen-image:› marker's answer (host/wake.ts): the same draw as the calendar button, the
-   *  outcome in words for the thread. scoped by the room the wake is in, the ACL boundary. */
-  async function drawOnAsk(agent: HostedAgent, ch: Ch, itemId: string): Promise<string> {
-    const [d] = await db.getAll<DraftRow>(
-      `select platform, media, body from content_items where id = ? and channel_id = ? and status = 'draft'`,
-      [itemId, ch.id],
-    ).catch(() => [] as DraftRow[]);
-    if (!d) return 'That draft is not available to draw. It is scheduled, published or deleted.';
+   *  outcome in words for the thread. scoped by the room the wake is in, or the conversation that
+   *  holds the draft. the agent's replica (host/agent-data.ts) is the ACL boundary: it carries a
+   *  draft only to an agent that may see it, and the server refuses the commands otherwise. */
+  async function drawOnAsk(agent: HostedAgent, ch: Ch, itemId: string, threadId?: string | null): Promise<string> {
+    const [d] = await db.getAll<DraftRow & { status: string }>(
+      `select platform, media, body, status from content_items where id = ? and (channel_id = ? or thread_id = ?)`,
+      [itemId, ch.id, threadId ?? null],
+    ).catch(() => [] as Array<DraftRow & { status: string }>);
+    if (d?.status !== 'draft') return undrawableText(d?.status ?? null);
     const out = await drawDraft(agent, ch, itemId, d);
     if (out.ok) return `I drew the image${out.model ? ` on ${out.model}` : ''}. It is on the card now. Nothing publishes until you approve it.`;
     return out.error === NO_IMAGE_KEY

@@ -155,3 +155,24 @@ describe('the phone', () => {
     expect(onboardingComplete(onboardingItems(onlyPhone))).toBe(false);
   });
 });
+
+describe('the new first run (docs/design/onboarding-2026-11 O8)', () => {
+  const tools = { order: ['github', 'mail', 'bank'] as const, connected: ['mail'] as const };
+  const withTools = sig({ machines: [{ kind: 'runner' }], tools: { order: [...tools.order], connected: [...tools.connected] } });
+
+  it('lists the machine, each tool in the person order, the team and the phone', () => {
+    expect(onboardingItems(withTools).map((i) => i.id)).toEqual(['machine', 'tool-github', 'tool-mail', 'tool-bank', 'team', 'mobile']);
+  });
+
+  it('ticks a tool only when it is connected, and drops the subscription and desktop rows', () => {
+    const b = by(withTools);
+    expect(b['tool-mail']).toBe(true);
+    expect(b['tool-github']).toBe(false);
+    expect(b['subscription']).toBeUndefined();
+    expect(b['desktop']).toBeUndefined();
+  });
+
+  it('keeps the old list when the workspace has no tools signal', () => {
+    expect(onboardingItems(sig()).map((i) => i.id)).toEqual(['machine', 'subscription', 'team', 'desktop', 'mobile']);
+  });
+});

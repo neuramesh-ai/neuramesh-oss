@@ -1,13 +1,13 @@
+import type { ChatToolCtx } from './chat-tool-context';
 import { teamChatTools } from './chattools-team';
-import { routineTools } from './tools-routine';
+import { codingChatTools } from './chattools-coding';
+import { routineTools } from './tools-routine';   import { emailTools } from './tools-email';   import { salesTools } from './tools-sales';
 import { redrawDraftImages } from './draft-redraw';
-import type { DrawOutcome } from './drawdraft';
 // THE TOOLS A CONVERSATION GETS (docs/34).
 //
-// Everything board-shaped is absent BY CONSTRUCTION: there is no create_task here to call, so
-// "never file work uninvited" is a fact about the inventory rather than an instruction in a
-// prompt. The orchestrator alone carries the backlog trio, for the human's explicit "create the
-// task" — park-then-promote, the same sanctioned path its triage turns already walk.
+// Generic board tools remain restricted. Agent Desk homes also get a scoped coding
+// handoff: every role can delegate requested implementation without converting its
+// home into a task. The API enforces the home, project, repository and plan gate.
 //
 // Turn-scoped like the orchestrator's registry, and for the same reason: a tool that closed over
 // a previous turn's seat or thread would answer in the wrong place. Split out of host/chatturn.ts.
@@ -15,51 +15,23 @@ import type { DrawOutcome } from './drawdraft';
 
 
 
-import { type WhiteboardToolClosures } from '../harness/toolbus';
 import { SEARCH_X_DESC, WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC, searchXParams } from '../harness/tooldesc';
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import { shareChatTools } from './chattools-share';
 import { playbookCatalogText } from './tools-playbooks';
 import { searchXText, type SearchXQuery } from './searchx';
-import { newGrounding, ungrounded, type LibraryReader } from './grounding';
-import { draftSeconds, unpicked } from './ugcflow';
+import { newGrounding } from './grounding';
+import { draftGround, draftSeconds, unpicked } from './ugcflow';
 import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
-import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; import { webChatTools } from './chattools-web'; // four leaves, one line: this file sits at its cap
-
-import type { HostedAgent } from '../agents';
-import type { LogFn } from '../agentlog';
-
-import type { HostCtx } from './ctx';
-import type { DraftRow } from './orchtools';
+import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; import { webChatTools } from './chattools-web'; import { messageBoardTools } from './tools-messageboards'; import { publishTools } from './tools-publish'; import { postizTools } from './tools-postiz'; // seven leaves, one line: this file sits at its cap
 
 
-type ReplicaDatabase = import('@neuramesh/client-core/replica').ReplicaDatabase;
 
-export interface ChatToolCtx {
-  z: typeof import('zod')['z'];
-  tool: typeof import('@anthropic-ai/claude-agent-sdk')['tool'];
-  createSdkMcpServer: typeof import('@anthropic-ai/claude-agent-sdk')['createSdkMcpServer'];
-  text: (t: string) => { content: Array<{ type: 'text'; text: string }> };
-  agent: HostedAgent;
-  ch: { id: string; slug: string; workspace_id: string };
-  threadId: string;
-  log: LogFn;
-  // the host services the registry calls — passed, never closed over, so the module is a
-  // function of its turn and its dependencies and nothing else
-  db: ReplicaDatabase;
-  post: HostCtx['post'];
-  apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
-  recallFor: (workspaceId: string, channelId: string, query: string) => Promise<string>;
-  loadSkillBody: (channelId: string, workspaceId: string, name: string) => Promise<string>;
-  whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
-  draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
-  generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<DrawOutcome>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; mime?: string; error?: string }>;
-  /** the room's shelf (host/workspace.ts): the conversation had no way to read it before 2026-09-19 */
-  libraryDocs: LibraryReader;
-}
 
+
+
+export type { ChatToolCtx } from './chat-tool-context';
 export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai/claude-agent-sdk').SdkMcpToolDefinition<any>> {
   const { z, tool, text, agent, ch, threadId, log,
           db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, libraryDocs } = t;
@@ -74,22 +46,26 @@ export function chatToolDefinitions(t: ChatToolCtx): Array<import('@anthropic-ai
 // pipeline" is exactly a conversation's ask — so the four board tools ride along.
 const wb = whiteboardClosures({ kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) }, ch, { threadId });
 return [
+    ...(t.runCommand ? [tool('run_command','Run one local command in this thread’s isolated workspace. Network and credentials are unavailable.',
+      { command:z.string().min(1).max(8000) },async i => text(await t.runCommand!(i.command)))] : []),
     ...teamChatTools(t),
-    ...routineTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, here: () => ch.id, log }).map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))),
+    ...codingChatTools(t),
+    ...[...[...routineTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, here: () => ch.id, log }), ...emailTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, convoThreadId: threadId, log, draw: (brief) => t.generateShareImage(agent, ch, brief) }), ...(agent.role === 'sales' ? salesTools({ z, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, apiGet, log, convoThreadId: threadId }) : [])], ...publishTools({ z, db, post, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, anchor: () => (threadId ? { threadId } : null), log }), ...postizTools({ z, apiGet, ch, actor: { kind: 'agent', id: agent.id, role: agent.role }, log })].map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))), // the routine writer and the email drafts (tools-email.ts)
     tool(
       'recall',
       'Search this workspace\'s memory — past decisions, people, and work in this project. Use it whenever the question touches something the team has already settled, so you answer from the record instead of from guesswork.',
       { query: z.string().min(1).describe('what you are trying to remember, in plain words') },
-      async (i) => text(await recallFor(ch.workspace_id, ch.id, String(i.query))),
+      async (i) => text(await recallFor(ch.workspace_id, ch.id, String(i.query), { kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) })),
     ),
     tool(
       'load_skill',
       'Load a team skill\'s full procedure by name — how this team likes a particular kind of work done.',
-      { name: z.string().min(1) },
-      async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name))),
+      { name: z.string().min(1), pack: z.string().optional() },
+      async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name), i.pack)),
     ),
     ...libraryChatTools(t, grounding),
     ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t), ...webChatTools(t),
+    ...messageBoardTools({ z, log, kind: 'chat', messageBoards: t.messageBoards }).map(x => tool(x.name, x.description, x.schema, async i => text(await x.run(i)))), // Message boards, for an agent with access (tools-messageboards.ts)
     tool(
       'list_playbooks',
       'The marketing playbook catalog (marketing-os) joined to this project\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
@@ -214,40 +190,40 @@ return [
       'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — the platform-native preview the human approves, schedules, or asks you to change, right here. Use it for ANY "draft/write me posts / captions / a thread" ask. NEVER write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve. `body` is ONLY the text that goes on the wire: no character count, no "(draft only)" footer, no image brief inside it — that text would publish verbatim. Put art direction in `imageBrief`, and only when the post should carry a visual. A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`. Draft for the platform the ask names, else for the connected accounts.',
       {
         posts: z.array(z.object({
-          platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network: the one asked for, else a connected account'),
+          platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email', 'postiz']).describe('the network: the one asked for, else a connected account. postiz: a network only Postiz reaches, with postizChannel'),
           body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
           imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — omit for a text-only post. For a video post: the shot direction the film follows.'),
           script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…"), written to the film\'s length. The card folds it and films its first seconds. Never inside body or imageBrief.'),
-          frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this project\'s shelf (a real screenshot, see list_library). The film shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'), seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'),
+          frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this project\'s shelf (a real screenshot, see list_library). The film shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'), seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'), postizChannel: z.string().min(1).max(128).optional().describe('a channel id from postiz_channels: the post goes out through Postiz'), postizSettings: z.record(z.string(), z.unknown()).optional().describe('settings from postiz_channel_rules'),
         })).min(1).max(20),
       },
       async (i) => {
         // the grounding gate (host/grounding.ts): a marketing room's brand docs are read before a draft is written
-        const gate = await ungrounded(db, ch.id, grounding, { threadId });
+        const gate = await draftGround(db, ch.id, grounding, { threadId });
         if (gate) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: the brand docs were not read this turn' }); return text(gate); }
         // the angle gate (host/ugcflow.ts): a VIDEO post drafts only after the human picked an angle on the card
         if ((i.posts as Array<{ script?: string }>).some((p) => p.script)) {
           const pick = await unpicked(db, { threadId });
           if (pick) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: no answered angle card in this thread' }); return text(pick); }
         }
-        const posts = i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string; frame?: string; seconds?: number }>;
+        const posts = i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string; frame?: string; seconds?: number; postizChannel?: string; postizSettings?: Record<string, unknown> }>;
         // the pick's length rides every video draft (plan §8), beside the one cleaner every draft path shares (normalizeDraft)
-        const drafts = (await draftSeconds(db, { threadId }, posts)).map((sec, n) => { const d = normalizeDraft(posts[n]!); return d && { ...d, seconds: sec }; }).filter((p): p is NonNullable<typeof p> => !!p);
+        const drafts = (await draftSeconds(db, { threadId }, posts)).map((sec, n) => { const d = normalizeDraft(posts[n]!); return d && { ...d, seconds: sec, postizChannel: posts[n]!.postizChannel, postizSettings: posts[n]!.postizSettings }; }).filter((p): p is NonNullable<typeof p> => !!p);
         if (!drafts.length) return text('none of those entries were usable posts — each needs a supported platform and a body that is more than working notes');
         const frames = await framesFor(libraryDocs, ch.id, i.posts as Array<{ frame?: string }>); // the frame (host/frames.ts): checked before anything is written
         if (!frames.ok) return text(frames.why);   const shots = await productShotsFor(libraryDocs, ch.id, posts); if (shots) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a product beat names no shelf image' }); return text(shots); } // the product shots (plan §9)
-        let made = 0;
+        let made = 0; let why = '';
         for (const [n, d] of drafts.entries()) {
           const r = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.create', channel: ch.id, thread: threadId, platform: d.platform, body: d.body,
-            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(n) ? { frame: frames.names.get(n) } : {}), ...(d.seconds ? { seconds: d.seconds } : {}),
+            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(n) ? { frame: frames.names.get(n) } : {}), ...(d.seconds ? { seconds: d.seconds } : {}), ...(d.postizChannel ? { postizChannel: d.postizChannel } : {}), ...(d.postizSettings ? { postizSettings: d.postizSettings } : {}),
           }).catch(() => null);
-          if (r?.ok) made += 1;
+          if (r?.ok) made += 1; else if (r && !why) why = await Promise.resolve(r.json?.()).then((b?: { error?: string }) => b?.error ?? '').catch(() => ''); // a Postiz route is checked against the channel's rules: its words go back
         }
         log({ kind: 'tool', phase: 'call', summary: `draft_posts — ${made} draft${made === 1 ? '' : 's'}`, level: made ? 'info' : 'warn' });
-        if (!made) return text('the drafts could not be saved — say so plainly rather than pasting the posts into your reply');
+        if (!made) return text(`the drafts could not be saved${why ? `: ${why}` : ''}. Say so plainly rather than pasting the posts into your reply`);
         const letters = drafts.slice(0, made).map((_, n) => String.fromCharCode(97 + n)).join('/');
-        return text(`${made} draft${made === 1 ? '' : 's'} delivered as cards in this conversation (${letters}) — the human approves, schedules or asks for changes there. Do NOT repeat the posts in your reply: one short line naming what you drafted.`);
+        return text(`${made} draft${made === 1 ? '' : 's'} delivered as cards in this conversation (${letters}) — the human approves, schedules or asks for changes there. Do NOT repeat the posts in your reply: one short line naming what you drafted.${why ? ` ${drafts.length - made} draft${drafts.length - made === 1 ? ' was' : 's were'} refused: ${why}` : ''}`);
       },
     ),
     tool(

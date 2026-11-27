@@ -70,3 +70,26 @@ answers `releases.watch: 'plan_limit'`. The type keeps that value for the deskto
 it. Neither switch is free: a run spends credits on the NeuraMesh brain. The flow id stays
 `marketing.v1`: progress is profile-derived, a finished room reads complete through `setup_at`,
 and a room mid-wizard resumes at the new step only when it has not passed it.
+
+## Area flows (2026-11-26, Sales setup)
+
+The registry grows from a flow for each channel kind to a flow for each **area**
+([sales-onboarding-2026-11](design/sales-onboarding-2026-11/plan.md), approved 2026-11-26). Sales is the first:
+`SALES_SETUP_FLOW` (`sales.v1`) in the same file, with Finance and Marketing next.
+
+- **A session, not a task.** An area flow runs as a chat session in the area's room (`sales`), answered by the
+  area's agent (pike). The chat column opens on it while it is open, so a reload comes back to the same place.
+- **The cards are the server's.** `setup.start` births the session with the agent's first line and the first step
+  card, a marker message (`‹setup:sales.v1:company›`) that wakes no agent. After each write that can move a step,
+  the API posts the next step's marker once (`setup_runs.step` moves only on a change). The agent's work lands in the
+  session as tool cards (`propose_company`, `propose_customer`, `propose_leads`, `setupCard` on `/v1/messages`), and
+  the server drops a setup card that an agent wrote into a reply (`setupCardGuard`).
+- **Derived steps, stored skips.** A step is done when its real home holds it (the company profile's `offer` and
+  `customer`, the mail link, the run's deals, a draft for one of them, a leads card in the session). `setup_runs`
+  (0210) keeps only the skipped steps, the last marker posted, and `ended_at`, `completed_at` and `hidden_at`.
+- **A bar.** The run completes when each step is done or skipped and the area's bar holds (Sales: 3 open deals whose
+  contact has an address that is not bad). With every step passed and the bar unmet, the run goes back to the step
+  that can meet it. `setup.end` (HUMAN_ONLY) is the opt-out, the same way cancel is for a setup task.
+- **The commands** `setup.start`, `setup.answer`, `setup.skip`, `setup.end`, `setup.hide` and `setup.check` are
+  HUMAN_ONLY and in `MACHINE_REFUSED`, and they check the person's access to the area. `setup.step` and the
+  `kind = 'setup'` tasks stay for the two supported desktops (docs/46).

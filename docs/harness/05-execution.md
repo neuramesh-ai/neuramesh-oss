@@ -202,6 +202,16 @@ export interface Budget {
 }
 ```
 
+**Replies have no wall (2026-11-25).** A reply that a person waits for stops on an idle limit, not on
+`wallMs`: the orchestrator's room and thread replies, the owning turn, chat replies, subagent legs, deep
+work legs and the deep work report. `withIdleDeadline` (`host/permission-deadline.ts`) fails the turn
+when nothing new comes for 2 minutes. A stream event, a delta, a log line or a tool result counts as
+new. One tool call rests the clock and has its own 10-minute limit. A `spawn` call has none, because
+its leg has its own idle limit. When the limit fires on an orchestrator or chat turn, the abort signal
+stops the model call. A leg and a `streamTurn` reply take no signal yet, so their call runs to its end unread.
+The step cap (`ORCH_MAX_TURNS`, 50) and credits bound a loop. `wallMs` still sizes `slice()` and the
+work, plan, design, review and ship turns.
+
 `slice()` returning `null` is the recursion terminator for subagents. It is the only mechanism bounding
 depth, and it is deliberately the *only* one.
 
@@ -295,3 +305,4 @@ being true.
 |---|---|
 | 2026-07-31 | Created. Trigger normalisation, the pure `nextTurn`, durable dedupe keys, the four-tier priority, the unified lifecycle, the budget table with `slice()`, the assembler's fill order, and `park`. |
 | 2026-08-02 | Status → shipped (v0.73.0): HostQueue admission (priority + per-agent fairness + durable guards) verified live at 1/4→2/4 slots; TURN_BUDGETS at 13 call sites; turn records durable. `assemble()` adopted at 2 of 3 transcript sites (chat `limit 24` ceiling + triage `limit 14` — the budget decides what survives); the reply path's `limit 8` is the holdout. Boot invariant added after a live hang (v0.74.2): the state directory is created before either database opens, and a boot that cannot reach the API surfaces the stall on the splash (~5 failed 1.5s polls) instead of retrying silently forever. |
+| 2026-11-25 | Replies stop on a 2-minute idle limit, not on `wallMs` (§3.6). The orchestrator's step cap goes from 14 to 50. |

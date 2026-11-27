@@ -1,6 +1,7 @@
 // GitHub as a connector (docs/design/github-connector-2026-09): the in-app grant (the sealed state
 // on the two /connect/github routes), the resolve, the three reads through the App, the ACL the
 // `connectors` row IS, and the dead grant's verdict. GitHub is a fixture; the App key is a test key.
+import { readDoorState } from '../src/announce-grant';
 import type { Actor } from '@neuramesh/shared';
 import { generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,6 +82,8 @@ let channel: string;
 let other: string;
 beforeEach(async () => {
   store = new MemoryStore();
+  // This fixture's Marketing setup is performed by the workspace owner.
+  store.destinations.directory = async workspace => workspace === 'ws_acme' ? [{id:'george',kind:'human',name:'George',role:'owner',description:null,owner:true}] : [];
   calls = [];
   gone = false;
   repos555 = ['acme/site'];
@@ -113,9 +116,13 @@ describe('the doors', () => {
     expect(to.origin + to.pathname).toBe('https://github.com/apps/neuramesh/installations/new');
     expect(unseal(to.searchParams.get('state')!)).toEqual({ github: 1, workspace: 'ws_acme', channel, actor: 'george', slug: 'acme/site' });
   });
-  it('start, the public door: the slug rides as the state, unchanged', async () => {
+  // R10 NM-001: the door's state is sealed (the repository and an issue time), so its callback can tell
+  // its own install from an installation id replayed onto the route
+  it('start, the public door: the repository rides in a sealed door state', async () => {
     const r = await app.request('/connect/github/start?repo=acme/site');
-    expect(new URL(r.headers.get('location')!).searchParams.get('state')).toBe('acme/site');
+    const state = new URL(r.headers.get('location')!).searchParams.get('state')!;
+    expect(state).not.toBe('acme/site');
+    expect(readDoorState(state)).toBe('acme/site');
   });
   it('the callback with the sealed state records the installation for the workspace and nothing else: the signed-in resolve connects', async () => {
     const start = await app.request(`/connect/github/start?workspace=ws_acme&channel=${channel}&actor=george`);

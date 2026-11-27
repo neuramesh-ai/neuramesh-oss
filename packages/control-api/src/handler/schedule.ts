@@ -64,7 +64,7 @@ async function routineSession(store: Store, actor: Actor, workspace: string, cha
   };
 }
 
-export async function scheduleCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | undefined> {
+export async function scheduleCommands(store: Store, actor: Actor, cmd: Command, machineWorkspace?: string): Promise<CommandOutcome | undefined> {
   if (cmd.type === 'schedule.create') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'schedules are armed by a human — agents propose, humans arm');
     // no plan gate (George, 2026-10-03: "allow routines on the trial"). a routine runs on every
@@ -85,12 +85,23 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
       nextRunAt = next.toISOString();
     }
     const session = cmd.thread ? await routineSession(store, actor, workspace, cmd.channel, cmd.thread) : null;
+    // A RELEASE WATCH (2026-11-22): the repository must be one of the room's project's, and one watch reads
+    // a repository, because the release tick's dedupe lock is per routine. The cursor starts now, so the
+    // watch drafts what ships from here on, the marketing setup's rule.
+    let release: Record<string, unknown> | null = null;
+    if (cmd.release) {
+      if (cmd.cadence === 'once') throw new DomainError('INVALID_INPUT', 'a release watch runs on a cadence, never once');
+      const linked = await store.announcements?.repoForChannel(cmd.channel, cmd.release.repo);
+      if (!linked || linked.repoId !== cmd.release.repo) throw new DomainError('INVALID_INPUT', 'this room\'s project has no such repository');
+      if (await store.releaseWatchFor(workspace, cmd.release.repo)) throw new DomainError('CONFLICT', 'a routine already watches this repository for releases');
+      release = { repo: cmd.release.repo, slug: cmd.release.slug, cursor: { at: new Date().toISOString(), tag: null }, log: [] };
+    }
     const { id } = await store.createSchedule(
       {
         channelId: cmd.channel, title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence,
         atTime, tz, weekday: cmd.weekday ?? null, nextRunAt, agentName: cmd.agent ?? null,
         createdByKind: actor.kind, createdBy: actor.id,
-        ...(cmd.routine || session ? { payloadExtra: { routine: true, ...(cmd.replyGap ? { replyGap: cmd.replyGap } : {}) } } : {}),
+        ...(cmd.routine || session || release ? { payloadExtra: { routine: true, ...(cmd.replyGap ? { replyGap: cmd.replyGap } : {}), ...(release ? { release } : {}) } } : {}),
         session,
       },
       (ws) => createEvent({
@@ -98,7 +109,7 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
         source: actorAddress(actor),
         target: formatAddress({ kind: 'channel', slug: cmd.channel }),
         workspace: ws,
-        payload: { channel: cmd.channel, title: cmd.title, cadence: cmd.cadence, nextRunAt },
+        payload: { channel: cmd.channel, title: cmd.title, cadence: cmd.cadence, nextRunAt, ...(release ? { release: true } : {}) },
       }),
     );
     return { ok: true, scheduleId: id, nextRunAt } as never;
@@ -130,7 +141,7 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
   }
   if (cmd.type === 'schedule.claim_run') {
     // the daemon's CAS — any authenticated teammate may claim; the counter is the dedupe
-    const { claimed } = await store.claimScheduleRun(
+    const claim = await store.claimScheduleRun(
       cmd.schedule, cmd.runCount, cmd.nextRunAt,
       (ws) => createEvent({
         type: 'schedule.run_claimed',
@@ -138,9 +149,9 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
         target: formatAddress({ kind: 'resource', type: 'schedule', id: cmd.schedule }),
         workspace: ws,
         payload: { schedule: cmd.schedule, runCount: cmd.runCount, nextRunAt: cmd.nextRunAt },
-      }),
+      }), { actor, machineWorkspace },
     );
-    return { ok: true, claimed } as never;
+    return { ok: true, ...claim } as never;
   }
   if (cmd.type === 'schedule.run_now') {
     // Run now (routine sessions, 2026-09-28): a person fires the routine into its session. The row turns

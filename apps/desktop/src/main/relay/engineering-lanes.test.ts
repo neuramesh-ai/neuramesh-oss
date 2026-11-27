@@ -127,3 +127,23 @@ test('a lane that fails to open puts the old model back, so the thread keeps wor
   t.lanes.command({ type: 'prompt', prompt: 'still here' });
   assert.deepEqual(t.opened[0]?.lane.commands, [{ type: 'prompt', prompt: 'still here' }]);
 });
+
+test('the wrapper hands a parked answer and the activity meter to the lane that runs now (Cloud Run parks)', () => {
+  const lane = new FakeLane('cline') as FakeLane & { working?: boolean; continueParked?: (park: unknown, onSettled?: () => void) => boolean };
+  const lanes = new EngineeringLanes(lane, 'cline', {
+    meta: meta(), current: { provider: cline('test'), modelId: 'test', brainPack: null },
+    resolve: async () => cline('test'), open: async () => lane, emit: () => {}, log: () => {},
+  });
+  // a lane with no park support says no, and a lane with no `working` reads as busy
+  assert.equal(lanes.continueParked({ id: 'p1' } as never), false);
+  lane.busy = true;
+  assert.equal(lanes.working, true);
+  lane.working = false; // busy on an approval only: not work for the meter
+  assert.equal(lanes.working, false);
+  const taken: unknown[] = [];
+  lane.continueParked = (park, onSettled) => { taken.push(park); onSettled?.(); return true; };
+  let settled = false;
+  assert.equal(lanes.continueParked({ id: 'p2' } as never, () => { settled = true; }), true);
+  assert.deepEqual(taken, [{ id: 'p2' }]);
+  assert.equal(settled, true);
+});

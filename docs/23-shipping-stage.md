@@ -1,5 +1,7 @@
 # 23 — The Ship Stage: shipper role + release gate (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** v1 shipped 2026-07-15 (desktop v0.34.0); **v2 (release verification + linked plan)
 > shipped 2026-07-16 (desktop v0.37.0)** — see §11. Adds the missing **shipper** teammate
 > (**bosun 🦭**) and a release gate BETWEEN reviewer-approve and merge: every reviewer-approved,

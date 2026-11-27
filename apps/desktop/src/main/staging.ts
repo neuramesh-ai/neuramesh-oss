@@ -137,6 +137,8 @@ export async function openPlanningWorkspace(
   db: AttDbLike,
   t: { id: string; number: number; repo_id: string | null; base_ref: string | null },
   log?: LogFn,
+  repoCred?: import('./host/repocred').RepoCred,
+  channelId?: string,
 ): Promise<{ dir: string | null; repoBacked: boolean; note: string; cleanup: () => Promise<void> }> {
   const { join } = await import('node:path');
   const { mkdir, rm } = await import('node:fs/promises');
@@ -159,7 +161,10 @@ export async function openPlanningWorkspace(
     const ref = t.base_ref || repo?.default_branch || 'main';
     if (cloneUrl) {
       try {
-        await git(['clone', '--depth', '1', '--branch', ref, cloneUrl, join(work, 'repo')]);
+        const { repoSlug } = await import('./host/gh');
+        const cred = repoCred && channelId ? await repoCred.forRepo(repoSlug(cloneUrl), channelId) : null;
+        if (cred && !cred.ok) throw new Error(cred.error);
+        await git(['clone', '--depth', '1', '--branch', ref, cloneUrl, join(work, 'repo')], undefined, cred?.ok ? cred.env : undefined);
         dir = join(work, 'repo');
         repoBacked = true;
       } catch (err) {

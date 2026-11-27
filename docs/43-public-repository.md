@@ -31,10 +31,14 @@ private until it is named** (2026-09-19): a new page, a new folder or a new desi
 | `apps/mobile` | The phone app. It is Pro only and carries the App Store and production ids |
 | `infra`, `packages/fleet` | The cloud platform and the operator that runs the cloud machines |
 | `packages/bench/suite` | The held-out benchmark task set |
+| `apps/desktop/src/main/cloudrun`, `machined-e2e.ts` | The hosted Cloud Run machine runtime. `machined` takes it through `main/private.ts`, and the public stub has none, so a public `machined` refuses `NM_SUBSTRATE=cloudrun` (2026-11-12) |
+| The control-api Cloud Run lane: `fleet-cloudrun*`, the approval parks, the machine facts, snapshots and vault, Always on, the repository bundles and the e2e doors | The hosted machine lane. The public modules take it through `src/private.ts`, and the public stub turns the lane off and mounts none of its routes (2026-11-12) |
+| Finance: `apps/desktop/src/{main,renderer/src}/finance`, its IPC and bridge, and the control-api `finance*` routes and stores | Finance reaches the desktop app on its own release. Until then the desktop takes it through the `private-finance` entries, and the public stubs have none. The private desktop build carries it only with `NM_DESKTOP_FINANCE=1` (`src/finance-release.ts`). The Finance migrations stay public, because Local mode runs every migration in order (2026-11-13) |
+| The Cloud Run operations files: `scripts/e2e-cloudrun`, `evals/intake`, the Cloud Run image files of control-api, `.gcloudignore`, and the notes in `apps/desktop/src/main/cloudrun` | The hosted platform's tests and image. They name the sandbox project, its service accounts and its hosts (2026-11-12) |
 | Every document not named in `PUBLIC_DOCS`, every design round's `evidence/`, the rollout log, the publish runbook, the audits | Dev data in screenshots and logs, production identifiers, the adversarial review, and whatever nobody meant to publish yet |
 
-Only four workflows ship: `ci.yml`, `control-api-bundle.yml`, `control-api-image.yml`, and
-`local-stack-smoke.yml`. Every other workflow deploys, signs, or publishes with a secret or an
+Only three workflows ship: `ci.yml`, `control-api-image.yml`, and `local-stack-smoke.yml`.
+The snapshot stops on any bundle that names a source the public tree does not hold (2026-11-13). Every other workflow deploys, signs, or publishes with a secret or an
 identity only the private repository holds, and the snapshot removes it. A new workflow is private
 until it is named in `PUBLIC_WORKFLOWS`.
 
@@ -52,6 +56,9 @@ Nobody develops in the public repository. Every push to the private `main` runs
 3. Remove every path in `PUBLIC_EXCLUDE` and every workflow not in `PUBLIC_WORKFLOWS`. Place the
    public repository's own files from `.github/public`: its pull request template and the
    workflow that enforces it, `pr-template.yml`.
+   Put each stub of `public-stubs/` over its private entry (2026-11-12): a package that imports
+   private code imports it through one entry file, and the stub exports the same names with
+   values that do nothing. A stub whose entry is gone stops the publish.
 4. Scan the tree that ships with `scripts/public-scan.sh`: gitleaks, the generic patterns, and the
    private patterns the job receives from a secret. A hit fails the publish.
 5. Commit the tree as one commit on top of the public `main`, on the rolling branch `publish`,
@@ -62,11 +69,21 @@ Nobody develops in the public repository. Every push to the private `main` runs
    commit in the public history. Evidence: the scan run, and where the tree moved, one row per
    area. Deploy notes: the merge shape, and the tag a new version needs.
 
+The private workflow `public-build.yml` runs steps 1 to 5 on every pull request, without the
+push and without the private scan patterns, and then typechecks the result and builds the
+control-api server. A stub that drifts from its entry fails there, before the publish.
+
 Merging that pull request is a human act. Nothing lands on the public `main` on its own, and the
 public CI runs on the pull request first. Merge it with a merge commit, never a squash: the
 `Publish main@<sha>` commit stays in the history as pushed, and the next publish reads the newest
 one to know where the last one ended. Without the token, the job builds and scans the snapshot
 and the publish happens from a maintainer's Mac with the same script.
+
+The same scanner runs before a push. The push hook (`.husky/pre-push`) scans the commits that a
+push adds, with `.gitleaks.toml`, and stops the push when a value looks like a secret. The CI job
+reads the history of each branch, so one such commit on GitHub fails the scan of each pull
+request until the commit leaves the remote. A machine with no `gitleaks` prints one line, and the
+push continues.
 
 ```mermaid
 flowchart LR

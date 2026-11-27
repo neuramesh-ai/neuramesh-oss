@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmS
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import type { BrainCommitRequest, BrainThreadSnapshot } from '@neuramesh/shared';
-import { bindConversationCallback, ConversationBrain, conversationContext, portableBrainValue, withConversationBrain } from './brain-sync';
+import { bindConversationCallback, ConversationBrain, conversationContext, flushConversationBrains, portableBrainValue, withConversationBrain } from './brain-sync';
 import { recordRuntimeEvent } from '../runtime/brain-recording';
 
 const workspace = '11111111-1111-4111-8111-111111111111';
@@ -19,7 +19,8 @@ function service() {
     const request = JSON.parse(String(options.body)) as BrainCommitRequest;
     requests.push(request);
     if (commits.has(request.commitId)) return new Response(JSON.stringify({ ...commits.get(request.commitId), duplicate: true }));
-    if (request.expectedRevision !== head.revision) return new Response('', { status: 409 });
+    if (request.expectedRevision !== head.revision) return new Response(JSON.stringify({ code: 'BRAIN_CONFLICT' }), { status: 409 });
+    if (request.events.some((event) => head.events.some((held) => held.id === event.id))) return new Response(JSON.stringify({ code: 'BRAIN_EVENT_REUSED' }), { status: 409 });
     head = { ...head, revision: head.revision + 1, events: [...head.events, ...request.events], runtimeMessages: request.runtimeMessages ?? head.runtimeMessages, metadata: request.metadata ?? head.metadata };
     const response = { ok: true as const, revision: head.revision, commitId: request.commitId, duplicate: false, sha256: 'test-hash' };
     commits.set(request.commitId, response);
@@ -119,17 +120,67 @@ test('credential fields and provider tokens never reach the portable JSON', asyn
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('two offline branches cannot overwrite each other', async () => {
+test('two offline branches both reach the cloud, the later one after the head', async () => {
   const root = mkdtempSync('/tmp/nm-brain-conflict-');
   const server = service();
   const first = open(join(root, 'a'), server); const second = open(join(root, 'b'), server);
   try {
     first.record('user.message', { text: 'Branch A' }); second.record('user.message', { text: 'Branch B' });
     await first.close();
+    await second.flush();
+    assert.equal(second.pending(), 0);
+    assert.deepEqual(server.head().events.map((event) => (event.payload as { text: string }).text), ['Branch A', 'Branch B']);
+    assert.deepEqual(second.events().map((event) => (event.payload as { text: string }).text), ['Branch A', 'Branch B']);
+  } finally { await second.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('an event both writers recorded goes up once', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-shared-event-');
+  const server = service();
+  const first = open(join(root, 'a'), server); const second = open(join(root, 'b'), server);
+  try {
+    first.record('user.message', { text: 'Same message' }, 'message:shared'); second.record('user.message', { text: 'Same message' }, 'message:shared');
+    second.record('turn.open', { turnId: 'turn-b' });
+    await first.close();
+    await second.flush();
+    assert.deepEqual(server.head().events.map((event) => event.id).filter((id) => id === 'message:shared'), ['message:shared']);
+    assert.equal(server.head().events.length, 2);
+    assert.equal(second.pending(), 0);
+  } finally { await second.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a stale outbox request from a restored snapshot does not wedge the thread', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-stale-outbox-');
+  const server = service();
+  const old = open(join(root, 'old'), server);
+  try {
+    old.record('user.message', { text: 'Before the drain' });
+    await old.flush();
+    old.record('turn.open', { turnId: 'turn-1' });
+    // the snapshot holds a request that the old instance never sent, then the old instance moves the head
+    writeFileSync(join(old.path, 'pending.json'), JSON.stringify({ workspace, commitId: '33333333-3333-4333-8333-333333333333', expectedRevision: 1, deviceId: 'old', events: [old.events()[1]], artifactIds: [] }));
+    const other = open(join(root, 'other'), server);
+    await other.hydrate();
+    other.record('assistant.message', { text: 'From the other writer' });
+    await other.close();
+    old.record('turn.settle', { turnId: 'turn-1', state: 'done' });
+    await old.hydrate();
+    await old.flush();
+    assert.equal(existsSync(join(old.path, 'pending.json')), false);
+    assert.equal(old.pending(), 0);
+    assert.deepEqual(server.head().events.map((event) => event.type), ['user.message', 'assistant.message', 'turn.open', 'turn.settle']);
+  } finally { await old.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('two unsent runtime checkpoints keep the local branch', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-runtime-conflict-');
+  const server = service();
+  const first = open(join(root, 'a'), server); const second = open(join(root, 'b'), server);
+  try {
+    first.setRuntime([{ role: 'user', content: 'Branch A' }]); second.setRuntime([{ role: 'user', content: 'Branch B' }]);
+    await first.close();
     await assert.rejects(second.flush(), /changed on another device/);
-    assert.equal(second.pending(), 1);
-    assert.equal((second.events()[0]!.payload as { text: string }).text, 'Branch B');
-    assert.match(JSON.stringify(server.head()), /Branch A/);
+    assert.deepEqual(second.messages(), [{ role: 'user', content: 'Branch B' }]);
     assert.doesNotMatch(JSON.stringify(server.head()), /Branch B/);
   } finally { await second.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
 });
@@ -216,4 +267,54 @@ test('an artifact rollout gate explains the missing delivery and retains the upl
     await assert.rejects(brain.artifact({ name: 'cover.png', inlineContent: 'data:image/png;base64,AA==' }, { kind: 'human', id: 'member-a' }), /Artifact uploads are not enabled/);
     assert.equal(readdirSync(join(brain.path, 'uploads')).length, 1);
   } finally { await brain.close().catch(() => {}); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('flushConversationBrains publishes every open outbox without waiting for its timer', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-drain-');
+  const server = service();
+  try {
+    const brain = open(root, server);
+    brain.record('user.message', { text: 'drain me' });
+    assert.equal(server.requests.length, 0, 'the 60 s timer has not fired');
+    const result = await flushConversationBrains();
+    assert.ok(result.flushed >= 1);
+    assert.equal(server.requests.length, 1);
+    assert.equal(brain.pending(), 0);
+    await brain.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a progress event uploads within progressFlushMs while a plain event waits for the interval', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-progress-');
+  const server = service();
+  try {
+    const brain = new ConversationBrain({ root, workspace, actorId: 'member-a', threadId, apiUrl: 'https://api.test', headers: async () => ({}), fetchImpl: server.fetchImpl, intervalMs: 60_000, progressFlushMs: 20 });
+    brain.record('runtime.event', { provider: 'agy' });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(server.requests.length, 0, 'a plain event keeps the 60 s interval');
+    brain.record('assistant.message', { text: 'I will check the library first.' });
+    for (let i = 0; i < 50 && server.requests.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(server.requests.length, 1, 'the narration line went up at once, with the event queued before it');
+    await brain.flush();
+    assert.equal(brain.pending(), 0);
+    assert.equal(server.requests[0]!.events.length, 2);
+    await brain.close();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a slow or 5xx cloud brain load is tried again before the first turn after a wake fails (2026-11-17)', async () => {
+  const root = mkdtempSync('/tmp/nm-brain-hydrate-retry-');
+  try {
+    const waits: number[] = [];
+    let calls = 0;
+    const fails = [() => { throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); }, () => new Response('', { status: 503 })];
+    const brain = new ConversationBrain({ root, workspace, actorId: 'member-a', threadId, apiUrl: 'https://api.test', headers: async () => ({}), intervalMs: 60_000, sleep: async (ms) => { waits.push(ms); },
+      fetchImpl: async () => { const fail = fails[calls++]; return fail ? fail() : new Response(JSON.stringify({ workspace, threadId, revision: 0, events: [] })); } });
+    await brain.hydrate();
+    assert.equal(calls, 3);
+    assert.equal(waits.length, 2);
+    const slow = new ConversationBrain({ root: join(root, 'slow'), workspace, actorId: 'member-a', threadId, apiUrl: 'https://api.test', headers: async () => ({}), intervalMs: 60_000, sleep: async () => {},
+      fetchImpl: async () => { throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); } });
+    await assert.rejects(slow.hydrate(), (e: Error) => e.message === 'The conversation memory did not load in time.');
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -99,3 +99,57 @@ export const FINISH_NOW_NOTE =
   'That mechanism does not exist for you: YOUR TURN IS THE EXECUTION — nothing you start survives it, and nothing will call you back. ' +
   'Finish the work now, in this turn, using what you can gather here. If some part genuinely cannot be completed, deliver everything you DO have ' +
   'and state plainly which part is missing and why. Do not end this turn waiting on anything.';
+
+// ── "I will check the platforms" is not an action (2026-11-17) ───────────────────────────────
+//
+// A conversational turn ends when a model round makes no tool call. Live, 2026-11-17: George
+// answered rex's angle card, and rex replied with one line, "I will check the connected platforms
+// and deliver the posts for your chosen angle." No tool ran, the run settled `done`, and the thread
+// looked abandoned. The narration rule (packages/shared narration.ts) asks for a "what I will do"
+// line before each tool group, so a round that writes the line and stops before the calls is a
+// common shape, on every lane.
+//
+// Deliberately NARROW, like claimsPendingWork above: it reads only the reply's LAST sentence, so a
+// one-line plan that opens a finished answer never fires, and it lets through every end state that
+// waits on the human (a question, an nmq card, "once you pick", "let me know").
+const ANNOUNCE_LEAD = /^(?:(?:ok(?:ay)?|great|sure|got it|perfect|thanks|thank you|understood|noted|alright|all right|right)\b[,.!:]?\s+)?(?:(?:next|now|first|then|so)\s*,?\s+)?(?:i\s+will|i(?:'|’)ll|i\s+am\s+going\s+to|i(?:'|’)m\s+going\s+to|i\s+am\s+about\s+to|let\s+me|i\s+(?:will|am|(?:'|’)m)\s+now|i\s+now)\s+(?:now\s+|also\s+|then\s+|go\s+ahead\s+and\s+|first\s+)?([a-z]+)/i;
+// verbs that announce no action of the agent's own: waiting is a legitimate end state
+const NOT_WORK = new Set(['know', 'wait', 'be', 'stand', 'stay', 'keep', 'hold', 'leave', 'stop', 'remember', 'note', 'pause', 'await']);
+// the promise waits on the human: "once you pick", "if you want", "on your word"
+const ON_THE_HUMAN = /\b(?:if|once|when|after|as\s+soon\s+as|whenever|until)\s+(?:you|your)\b|\bon\s+your\s+(?:word|go|pick|say|approval)\b|\bif\s+(?:needed|wanted)\b/i;
+
+/** the reply's last sentence, with fenced blocks and list markers removed */
+function lastSentence(text: string): string {
+  const prose = text.replace(/```[\s\S]*?(?:```|$)/g, ' ').trim();
+  const parts = prose.split(/(?<=[.!?…])\s+|\n+/).map((s) => s.replace(/^[\s>*_#-]+|[\s*_]+$/g, '').trim()).filter(Boolean);
+  return parts.at(-1) ?? '';
+}
+
+/**
+ * Does this reply, made with no tool call in its last round, end by saying what the agent WILL do
+ * instead of doing it? True too when narrated tool calls were stripped from it (host/pseudocalls.ts):
+ * the model wrote the call as text, so nothing ran. False for a reply that waits on the human: an
+ * nmq card, a question at the end, or a promise conditional on the human ("once you pick").
+ *
+ * Pure, and pinned by honesty.test.ts with the live sentence and the finished replies it must pass.
+ */
+export function announcesWork(reply: string | null | undefined, opts: { strippedCalls?: number } = {}): boolean {
+  const s = (reply ?? '').trim();
+  if (/```nmq[ \t]*\n/.test(s)) return false; // a question card: the human acts next
+  if ((opts.strippedCalls ?? 0) > 0) return true;
+  if (!s) return false;
+  const last = lastSentence(s);
+  if (!last || /\?\s*$/.test(last)) return false;
+  const m = ANNOUNCE_LEAD.exec(last);
+  if (!m) return false;
+  if (NOT_WORK.has(m[1]!.toLowerCase())) return false;
+  return !ON_THE_HUMAN.test(last);
+}
+
+/** The note for the ONE extra round when a reply only announced its work. */
+export const ACT_NOW_NOTE =
+  'You described the action but made no tool call, so nothing happened. Call the tool now, in this reply. ' +
+  'If something blocks you, say what blocks you in one sentence, or ask the person with a question card.';
+
+/** The run's summary when the reply still only announced work after that round (host/wake.ts). */
+export const STOPPED_BEFORE_DONE = 'Stopped before it finished';

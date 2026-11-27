@@ -1,3 +1,4 @@
+export { connectorRedirectUri } from './connector-redirect';
 // Connectors (marketing-channel plan §4.8): the server-side half of "agents draft, humans
 // publish". Env-gated like billing.ts — absent envs make every entry point a hard no-op:
 //   NM_CONNECTOR_KEY  — seals tokens (AES-256-GCM; the raw key is sha256(env) so any
@@ -230,6 +231,11 @@ export const POSTERS: Record<string, Poster> = { x: xPosterImpl, linkedin: liPos
 // unrecognized" was X sniffing the truth). A *.vercel.app origin is never a base another
 // service can fetch — the canonical public origin is.
 export function publicApiBase(reqUrl: string): string {
+  // TLS ENDS BEFORE THE API ON CLOUD RUN, so the request url is http there (connector-redirect.ts).
+  // the media fetch takes only https since the security lane (safe-fetch.ts), so an http base made
+  // each X post with a hosted picture fail. the configured public https origin is the base.
+  const configured = process.env['NM_API_URL'];
+  if (configured && /^https:\/\//i.test(configured)) return new URL(configured).origin;
   const origin = new URL(reqUrl).origin;
   if (!new URL(origin).hostname.endsWith('.vercel.app')) return origin; // localhost dev, the real alias
   return process.env['NM_API_URL'] ?? 'https://api.neuramesh.app';

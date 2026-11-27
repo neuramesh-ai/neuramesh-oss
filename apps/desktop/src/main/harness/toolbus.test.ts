@@ -36,7 +36,8 @@ test('every catalogued tool has a definition, and none is duplicated', () => {
   // 19 = the original ten + the four whiteboard tools (docs/38) + search_x on legs (marketing-os)
   // + draft_replies + the three repository reads (docs/design/github-connector-2026-09)
   // + the five web tools of the agents' browser (models-and-replies round, board C3)
-  assert.equal(defs.length, 24);
+  // + the four Message boards tools (docs/design/message-boards-2026-11 §7.6, host/messageboards-registry.test.ts)
+  assert.equal(defs.length, 28);
 });
 
 test('whiteboard tools (docs/38): availability, serviceability, and the write guards', async () => {
@@ -165,7 +166,8 @@ test('jsonSchemaFor expresses every shape the catalogue actually uses', () => {
   for (const d of allToolDefs()) {
     const s = jsonSchemaFor(d.params); // throws on an unsupported type
     assert.equal(s.type, 'object');
-    assert.ok(Object.keys(s.properties).length > 0, `${d.name} advertises no params`);
+    // message_board_list is the one tool with no input: it lists what the agent's credential can use
+    assert.ok(Object.keys(s.properties).length > 0 || d.name === 'message_board_list', `${d.name} advertises no params`);
   }
 });
 

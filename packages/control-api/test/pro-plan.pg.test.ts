@@ -87,7 +87,7 @@ beforeAll(async () => {
   process.env['FLEET_AUTOPROVISION'] = 'on'; // the harness runs with the fleet off; this suite mints
   alice = await makeUser('clerk_u1a_alice', 'alice@pro-plan.test');
   bob = await makeUser('clerk_u1a_bob', 'bob@pro-plan.test');
-  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: 500 credits and a runner). the
+  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: its signup credits and a runner). the
   // suite's workspace is her second, born bare, so the bill and the flip below read as they did
   await send(alice, { type: 'workspace.create', name: 'Pro Plan Trial', slug: `u1a-trial-${Date.now().toString(36)}` });
   const made = await j(await send(alice, { type: 'workspace.create', name: 'Pro Plan', slug: `u1a-${Date.now().toString(36)}` }));

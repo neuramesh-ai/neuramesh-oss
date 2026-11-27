@@ -42,7 +42,7 @@ export interface DueItem {
  *  NULL, so this is always resolvable. */
 export async function dueContentItemsSql(sql: postgres.Sql, nowIso: string, limit: number): Promise<DueItem[]> {
   const rows = await sql`select id, workspace_id, channel_id, platform, body, media from content_items
-    where status = 'scheduled' and scheduled_at is not null and scheduled_at <= ${nowIso}
+    where status = 'scheduled' and scheduled_at is not null and scheduled_at <= ${nowIso} and postiz_channel is null
     order by scheduled_at limit ${limit}`;
   return rows.map((r) => {
     const m = r['media'] as { image_url?: string; image_id?: string; video_id?: string; video_pending?: boolean; script?: string; brief?: string; thumb?: string; image_error?: string } | null;

@@ -1,26 +1,147 @@
-name: CI
-
+# runners: on every event, a push to main too, a job runs on the gads-ci runners its class's switch
+# turns on: CI_SHARED_PLAIN set to gads-ci-plain for a job that needs no Docker, CI_SHARED_DOCKER set
+# to gads-ci-docker for one that runs containers (the tests' Postgres service). the switch writes the
+# label out, so no variable's value can name another runner, and an empty variable means GitHub's
+# ubuntu-latest. every pull request in the gads enterprise shares these runners, so no job here holds
+# a credential or a secret, and none saves a cache on them (infra/cloudrun/ci/runners.py holds all
+# three). the names are new: older commits' files name CI_RUNNER_PLAIN and CI_RUNNER_DOCKER, some with
+# a secret in the job, and those variables are gone, so an old file runs on GitHub's runners. our
+# runners are pods with GitHub's runner image and a few build tools, not the rest of GitHub's image, so
+# a job installs what it needs, and a plain runner refuses sudo.
+name: ci
 on:
   push:
     branches: [main]
   pull_request:
-
-# A newer push to the same branch supersedes an in-flight run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
-# the jobs read the tree and write nothing: the token needs no more (CodeQL actions/missing-workflow-permissions, 2026-09-18)
 permissions:
   contents: read
-
+  actions: read
+  pull-requests: read # a push to main finds the pull request that made it (scope.py)
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+  FLEET_AUTOPROVISION: "off"
 jobs:
-  check:
-    name: typecheck · test · build
-    runs-on: ubuntu-latest
+  scope:
+    name: scope
+    runs-on: ${{ vars.CI_SHARED_PLAIN == 'gads-ci-plain' && 'gads-ci-plain' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    outputs:
+      ci_only: ${{ steps.scope.outputs.ci_only }}
+      ci_static: ${{ steps.scope.outputs.ci_static }}
+      hq_only: ${{ steps.scope.outputs.hq_only }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      validation: ${{ steps.matrix.outputs.validation }}
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
+        with:
+          fetch-depth: 2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Scope the checks
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f infra/cloudrun/ci/scope.py ]; then
+            python3 infra/cloudrun/ci/scope.py
+          else
+            echo "ci_only=false" >> "$GITHUB_OUTPUT"
+            echo "ci_static=false" >> "$GITHUB_OUTPUT"
+          fi
+          hq_only=false
+          if [ "${{ github.event_name }}" = "pull_request" ] && node scripts/impact.mjs --hq-only HEAD^1 HEAD; then
+            hq_only=true
+          fi
+          echo "hq_only=$hq_only" >> "$GITHUB_OUTPUT"
+      # main runs the desktop lane that an HQ-only pull request skips, so that run records no tree
+      - name: Record the tested tree
+        if: github.event_name == 'pull_request' && steps.scope.outputs.hq_only != 'true'
+        uses: ./.github/actions/tested-tree
+      - name: Test lane coverage and aggregate failure handling
+        run: node --test scripts/ci-lanes.test.mjs
+      - name: Discover test workspaces
+        id: matrix
+        env:
+          CI_HQ_ONLY: ${{ steps.scope.outputs.hq_only }}
+          CI_ONLY: ${{ steps.scope.outputs.ci_only }}
+          CI_STATIC: ${{ steps.scope.outputs.ci_static }}
+        run: |
+          echo "matrix=$(node scripts/ci-lanes.mjs matrix)" >> "$GITHUB_OUTPUT"
+          echo "validation=$(node scripts/ci-lanes.mjs validation-matrix)" >> "$GITHUB_OUTPUT"
+      - name: Production infrastructure pipeline policy (no cloud credentials)
+        if: github.repository == 'alonge-dev/neuramesh'
+        run: |
+          python3 -m unittest discover -s infra/cloudrun/ci/tests -v
+          python3 infra/cloudrun/ci/contracts.py
+          # where each job runs, and no cache near a credential (its broken fixtures run in the tests above)
+          python3 infra/cloudrun/ci/runners.py
 
-    # The control-api integration test (loop.pg.test.ts) runs against the real schema +
-    # triggers. Same image as the dev stack so pgvector + behaviour match.
+  validation:
+    # no matrix value in the name: GitHub adds it, and a skipped job shows the plain name
+    name: validate
+    needs: scope
+    if: needs.scope.outputs.ci_only != 'true' || needs.scope.outputs.ci_static == 'true'
+    runs-on: ${{ vars.CI_SHARED_PLAIN == 'gads-ci-plain' && 'gads-ci-plain' || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.scope.outputs.validation) }}
+    env:
+      CI_HQ_ONLY: ${{ needs.scope.outputs.hq_only }}
+      CI_TASK: ${{ matrix.task }}
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
+      - name: Install dependencies
+        uses: ./.github/actions/deps
+        with:
+          node-version: 24
+      - name: Typecheck or build
+        if: matrix.task != 'static'
+        run: node scripts/ci-lanes.mjs "$CI_TASK"
+      - name: Production HQ gateway and coding eval harness
+        if: matrix.task == 'static'
+        run: |
+          if [ -f infra/images/hq/production.test.mjs ]; then
+            node --test infra/images/hq/production.test.mjs
+          fi
+          pnpm eval:coding:test
+      - name: Cloud Run migration preservation helpers
+        if: matrix.task == 'static' && github.repository == 'alonge-dev/neuramesh'
+        run: |
+          python3 -m unittest discover -s infra/cloudrun/scripts/tests -p 'test_*.py' -v
+          tests=(infra/cloudrun/scripts/tests/workspace-restore.test.mjs)
+          if [ -f infra/cloudrun/scripts/tests/finance-config.test.mjs ]; then
+            tests+=(infra/cloudrun/scripts/tests/finance-config.test.mjs)
+          fi
+          node --test "${tests[@]}"
+      - name: Lint (ratchet self-test + eslint)
+        if: matrix.task == 'static'
+        run: node scripts/lint-ratchet.mjs --self-test && pnpm lint
+      - name: Audit workspace scoping of replica queries
+        if: matrix.task == 'static'
+        run: node scripts/audit-workspace-scope.mjs --self-test
+      - name: Self-test the pull request template check
+        if: matrix.task == 'static'
+        run: bash scripts/pr-template-check.sh --self-test
+
+  tests:
+    name: test
+    needs: scope
+    if: needs.scope.outputs.ci_only != 'true'
+    runs-on: ${{ vars.CI_SHARED_DOCKER == 'gads-ci-docker' && 'gads-ci-docker' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.scope.outputs.matrix) }}
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -34,138 +155,103 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
-
     env:
       DATABASE_URL: postgresql://postgres:nm@localhost:5432/nm
-      # CI only typechecks, tests and bundles — it never launches Electron, so skip the
-      # ~100MB binary download. Native runtimes are externalised by the bundler, not run here.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
-      # FLEET_AUTOPROVISION defaults ON since the credits round: workspace.create mints the
-      # workspace's cloud runner so the first message never pays a cold start. CI has no fleet,
-      # and on the free plan that provisioned runner IS the owner's one machine — so a test doing
-      # create-then-machine.register got MACHINE_LIMIT (402), and the undefined ids that followed
-      # surfaced as 401s and UNDEFINED_VALUE three suites away. Off here, exactly as
-      # scripts/test-pg.sh sets it for the same reason.
-      # QUOTED deliberately: unquoted `off` is a YAML 1.1 boolean, would reach the process as
-      # "false", and the guard reads `!== 'off'` — so it would silently keep provisioning.
-      FLEET_AUTOPROVISION: "off"
-
+      NM_ALLOW_ACTOR_HEADER: "1"
+      CI_HQ_ONLY: ${{ needs.scope.outputs.hq_only }}
+      CI_TEST_LANE: ${{ matrix.lane }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          # a pull request's checkout is its merge commit, and its first parent is the base's tip:
-          # the scope step below diffs the two
-          fetch-depth: 2
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.8.1
-
-      - name: Install Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      # A HQ-ONLY PULL REQUEST SKIPS THE DESKTOP (the decoupling plan, phase 2 step 5): its
-      # typecheck, its suites and its Electron build. hq and the desktop are separate apps since
-      # 2026-09-26, and nothing in the desktop reads apps/hq (scripts/impact.mjs, hqOnly). Any
-      # other change, and every push to main, checks every package, so main still proves the
-      # whole tree after each merge. A diff that fails exits 2, which checks everything too.
-      - name: Scope the checks
-        id: scope
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] && node scripts/impact.mjs --hq-only HEAD^1 HEAD; then
-            echo "filter=--filter=!@neuramesh/desktop" >> "$GITHUB_OUTPUT"
-          fi
-
+        timeout-minutes: 5
+      # psql runs the database bootstrap. GitHub's image has it, and our runners' image does not
       - name: Install Linux Code sandbox
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          # Ubuntu 24.04's AppArmor default blocks unprivileged user namespaces. The disposable
-          # runner executes tests as `runner` (production workspace containers execute as root),
-          # so enable the namespace Bubblewrap needs before exercising the real sandbox boundary.
+          sudo apt-get install -y bubblewrap postgresql-client
           if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+        uses: ./.github/actions/deps
+        with:
+          node-version: 24
+      # the Code shell's sandbox mounts the system's toolchain (/usr, /usr/local), not the tool cache,
+      # and its test runs npm in there. GitHub's image has node in /usr/local, and our runners' does not
+      - name: System node for the Code sandbox (our runners)
+        if: runner.environment == 'self-hosted' && matrix.lane == 'desktop'
+        run: |
+          prefix=$(dirname "$(dirname "$(command -v node)")")
+          for d in bin include lib share; do sudo cp -a "$prefix/$d/." "/usr/local/$d/"; done
+          /usr/local/bin/node --version
+      # GitHub's image has Google Chrome. our runners' image has the libraries Chrome needs, not Chrome
+      - name: Chrome (our runners)
+        if: runner.environment == 'self-hosted'
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
       - name: Select the real browser for integration tests
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           set -euo pipefail
-          # The runner's default /usr/bin/chromium repeatedly stalled before answering CDP.
-          # Use its installed Chrome explicitly; keep the real browser checks and deadlines.
-          BROWSER=$(command -v google-chrome)
+          BROWSER=${CHROME_PATH:-$(command -v google-chrome)}
           "$BROWSER" --version
           echo "NM_CHROMIUM=$BROWSER" >> "$GITHUB_ENV"
-
-      - name: Typecheck
-        run: pnpm -r ${{ steps.scope.outputs.filter }} typecheck
-
-      # The size gate (docs/design/modularization-2026-08/plan.md §2): max-lines 250 for new
-      # files, a shrink-only per-file ratchet for today's offenders, unused-vars, hooks rules.
-      # The self-test proves the gate can still fail before trusting its pass.
-      - name: Lint (ratchet self-test + eslint)
-        run: node scripts/lint-ratchet.mjs --self-test && pnpm lint
-
-      # A person in two workspaces has BOTH sets of rows in the one replica (the sync rules are
-      # plural), so an unscoped query silently mixes them. --self-test runs first and fails the
-      # job if the checker can no longer catch a planted bad query.
-      - name: Audit workspace scoping of replica queries
-        run: node scripts/audit-workspace-scope.mjs --self-test
-
-      # The public repository fails a pull request whose body skips a section of its template
-      # (.github/public, placed by the publish). The check's fixtures prove it here first.
-      - name: Self-test the pull request template check
-        run: bash scripts/pr-template-check.sh --self-test
-
       - name: Bootstrap the test database (auth shim + schema + fixtures + publication)
         run: ./scripts/ci-db-bootstrap.sh
+      # a sharded lane (api 1/2) runs its share of the files on its own runner and its own Postgres.
+      # the shell runs the desktop lane on our runners in a container that the pool's Docker daemon
+      # starts, where bubblewrap works (scripts/ci-lane-shell.sh), and every other lane as bash
+      - name: Test assigned workspaces serially
+        shell: bash scripts/ci-lane-shell.sh {0}
+        run: node scripts/ci-lanes.mjs test
 
-      - name: Test (unit + control-api pg integration)
-        # Each package already schedules its own workers. Running several packages together
-        # oversubscribes the runner; real JPEG decoding in the API shelf test exceeded its
-        # default deadline while desktop SDK tests were also starting. Keep every assertion
-        # and timeout, and give one package at a time the runner's CPU budget.
-        run: pnpm -r --workspace-concurrency=1 ${{ steps.scope.outputs.filter }} test
-        env:
-          # The bare x-nm-actor lane is CLOSED by default (review F1, source-release round): the
-          # suites speak through it, so the gate opens here and in the package's own test script.
-          NM_ALLOW_ACTOR_HEADER: "1"
-
-      - name: Build (bundles)
-        run: pnpm -r ${{ steps.scope.outputs.filter }} build
-
-  # The public-repo gate (U4, docs/design/oss-release-2026-09/implementation-plan.md): gitleaks on
-  # the tracked files and the history, the identifier greps, and the tracked-evidence check. A hit
-  # fails the job. The founder-specific patterns ride the optional PUBLIC_SCAN_LOCAL secret, so the
-  # tree never prints them. gitleaks is pinned with its release checksum: no unpinned binary in CI.
-  public-scan:
-    name: public-scan
-    runs-on: ubuntu-latest
+  check:
+    # Stable aggregate gate for reviewers and deployment preflight. Missing/cancelled lanes fail.
+    name: typecheck · test · build
+    needs: [scope, validation, tests, public-scan]
+    if: always()
+    runs-on: ${{ vars.CI_SHARED_PLAIN == 'gads-ci-plain' && 'gads-ci-plain' || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require all selected lanes
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+          CI_ONLY: ${{ needs.scope.outputs.ci_only }}
+          CI_STATIC: ${{ needs.scope.outputs.ci_static }}
+        run: node scripts/ci-lanes.mjs gate
+  public-scan:
+    name: public scan
+    runs-on: ${{ vars.CI_SHARED_PLAIN == 'gads-ci-plain' && 'gads-ci-plain' || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
         with:
           fetch-depth: 0 # the history pass reads every commit
+      # the self-tests run node. GitHub's image has it on PATH, and our runners' image does not
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
+      # into a folder on PATH that the job owns: a plain runner refuses sudo
       - name: Install gitleaks
         run: |
-          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
-          tar -xzf gitleaks.tgz gitleaks
-          sudo mv gitleaks /usr/local/bin/gitleaks
-          rm gitleaks.tgz
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSL -o "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/bin" gitleaks
+          rm "$RUNNER_TEMP/gitleaks.tgz"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
-      - name: Private patterns (from the optional secret)
-        env:
-          PUBLIC_SCAN_LOCAL: ${{ secrets.PUBLIC_SCAN_LOCAL }}
-        run: |
-          if [ -n "$PUBLIC_SCAN_LOCAL" ]; then printf '%s\n' "$PUBLIC_SCAN_LOCAL" > .public-scan.local; fi
-
+      # the public patterns alone: the private ones are a secret, and a secret named in a job reaches its
+      # runner, these shared runners too, whatever a step's if says. the publish scans with them before
+      # anything leaves (publish-public.yml), so a private string stops the publish, not this check
       - name: Self-test the public tree list (the docs rule on a throwaway repository, then this one)
         run: bash scripts/public-tree.sh --self-test
 

@@ -1,3 +1,4 @@
+import {checkModePicker} from './mode-picker.mjs';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import { mkdir, writeFile, rename, access, readdir, cp, open, rm } from 'node:fs/promises';
@@ -130,6 +131,10 @@ export async function drive(taskSpace,config) {
         check('reload keeps completed composer progress hidden',!s.progress);
         check('reload retains applied review history',s.cards.some(c=>c.status==='applied'));
         check('reload retains agent and model',s.agent.includes('rex')&&s.model.includes(spec.followup?run.handoffModel:run.model));
+        if (spec.id === 'simple') {
+          await checkModePicker(p);
+          check('mode menu supports keyboard selection, restores focus and preserves the unsent draft', true);
+        }
         check('thread has real assistant responses',authors.length>1);
         await capture(p,dir,'solution');
         if(spec.preview) await preview(p,spec,result.cwd,dir,result);

@@ -75,7 +75,7 @@ export interface Alert {
   addCredits?: boolean;
 }
 
-const PROVIDER_LABEL: Record<string, string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', github: 'GitHub', email: 'Email' };
+const PROVIDER_LABEL: Record<string, string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', github: 'GitHub', email: 'Email', postiz: 'Postiz' };
 export const providerLabel = (p: string): string => PROVIDER_LABEL[p] ?? p;
 
 const metaOf = (projectName: string | null, channelSlug: string | null): string =>

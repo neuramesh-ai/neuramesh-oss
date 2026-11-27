@@ -2,7 +2,7 @@
 //   node --import tsx --test apps/desktop/src/main/runtime/honesty.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldBlockEcho, shouldHoldReview, claimsPendingWork } from './honesty';
+import { shouldBlockEcho, shouldHoldReview, claimsPendingWork, announcesWork } from './honesty';
 
 test('echo guard: a Claude agent with no credential BLOCKS (no silent echo fallback)', () => {
   // the regression this guard fixes — claude-code used to be exempt and would fake a RESULT
@@ -86,4 +86,53 @@ test('pending-work guard: empty/missing summaries are not a claim', () => {
   assert.equal(claimsPendingWork(''), false);
   assert.equal(claimsPendingWork(null), false);
   assert.equal(claimsPendingWork(undefined), false);
+});
+
+// ── announcesWork: a reply that says what it will do, and does not do it (2026-11-17) ──────────
+
+test('announced work: the live 2026-11-17 reply fires', () => {
+  assert.equal(announcesWork('I will check the connected platforms and deliver the posts for your chosen angle.'), true);
+});
+
+test('announced work: the other lead-ins fire, in the reply\'s last sentence', () => {
+  for (const s of [
+    "I'll draft the three posts now.",
+    'Let me read the brand docs first.',
+    'Great choice. Next I will draft the scripts for TikTok.',
+    'Got it. Now I will schedule them for Monday.',
+    "Read the profile. I'm going to write the drafts.",
+    'Then I will post the angle card',
+  ]) assert.equal(announcesWork(s), true, s);
+});
+
+test('announced work: a reply whose narrated tool calls were stripped fires, whatever its words', () => {
+  assert.equal(announcesWork('Here are the drafts.', { strippedCalls: 1 }), true);
+});
+
+test('announced work: a reply that waits on the human never fires', () => {
+  for (const s of [
+    'Which platforms should I draft for?',
+    "I'll draft them once you pick an angle.",
+    'Drafted three posts above. Let me know what to change.',
+    "I'll schedule them when you approve.",
+    "I'll wait for your pick.",
+    "I'll be here if you need more.",
+    'Pick one below.\n\n```nmq\n{"question":"Which angle?"}\n```',
+    'I will draft them on your word.',
+  ]) assert.equal(announcesWork(s), false, s);
+});
+
+test('announced work: a finished answer that opens with a one-line plan never fires', () => {
+  assert.equal(announcesWork('I will compare the two plans.\n\nPlan A costs less and ships in May. Plan B costs more and ships in March.'), false);
+  assert.equal(announcesWork('I drafted three posts for the nervous system reset angle, one for each connected account.'), false);
+  assert.equal(announcesWork(''), false);
+  assert.equal(announcesWork(null), false);
+});
+
+test('announced work: a question card beats a stripped call', () => {
+  assert.equal(announcesWork('```nmq\n{"question":"Which?"}\n```', { strippedCalls: 2 }), false);
+});
+
+test('announced work: follow-up pills after the promise do not hide it', () => {
+  assert.equal(announcesWork('I will draft the posts now.\n\n```nms\n["Shorter","Add a hook"]\n```'), true);
 });

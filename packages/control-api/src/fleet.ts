@@ -9,7 +9,11 @@ import { needsActivation } from './activation';
 import { z } from 'zod';
 import { clerkJwks } from './clerk';
 import { claimRoutes, newMachineSubstrate, type MachineSubstrate } from './fleet-claims';
+import { cloudRunRoutes, machineReleasesOn, releaseCanaryMachine, releaseForNewMachine, type SizeClass } from './private';
+import { fleetLeaseRoutes } from './fleet-lease';
+import { releaseImageFor } from './fleet-release-image';
 import { localMode } from './localmode';
+import { canaryClerkAllowed, isMigrationCanary, migrationClerkUsers } from './migration-canary';
 import { hashMachineToken, machinePublicJwk, mintMachineToken, signMachineSyncJwt } from './machine-auth';
 import type { Store } from './store';
 
@@ -25,6 +29,14 @@ export interface FleetMachine {
   cpuLimit: string;
   memoryLimit: string;
   disk: string;
+  /** cloudrun only (fleet-cloudrun.ts): the pool's size class; the restart count (rides a pool label,
+   *  never the revision env: a wake is not a revision, D12); and whether a drain finished, so the
+   *  operator may write a new template now (a held image roll) */
+  sizeClass?: SizeClass;
+  restartGen?: number;
+  templateReady?: boolean;
+  /** cloudrun only: this machine's own release image (machines.image_version, NM_MACHINE_RELEASES=1) */
+  image?: string;
 }
 
 export interface FleetWorkspace {
@@ -88,10 +100,27 @@ export interface CloudMachineRow {
   lifecycle: string | null;
   resources: Record<string, unknown>;
   substrate?: string;
+  size_class?: string | null;
+  /** bigint: postgres hands it over as a string */
+  restarts?: string | number;
+  drain_state?: string | null;
+  drain_reason?: string | null;
+  /** a stop's drain passed its deadline (computed in SQL against now()) */
+  drain_expired?: boolean;
+  /** the release image of machines.image_version and its state (the rule: fleet-release-image.ts) */
+  release_image?: string | null; release_state?: string | null;
+}
+
+/** a Cloud Run stop that missed its drain deadline scales to 0 now, ahead of the sweep's bookkeeping
+ *  (rule M12, fleet-cloudrun-sweep.ts); everything else is the row's own desired_replicas */
+function cloudRunReplicas(r: CloudMachineRow): 0 | 1 {
+  if (r.desired_replicas !== 1) return 0;
+  const stop = r.drain_state === 'draining' && (r.drain_reason === 'idle' || r.drain_reason === 'cap');
+  return stop && r.drain_expired ? 0 : 1;
 }
 
 /** pure mapper — rows in, the operator's contract out. unit-tested; the query stays thin. */
-export function rowsToDesired(rows: CloudMachineRow[]): FleetDesired {
+export function rowsToDesired(rows: CloudMachineRow[], canary: string | null = null): FleetDesired {
   const byWorkspace = new Map<string, FleetWorkspace>();
   for (const r of rows) {
     if (r.kind !== 'member' && r.kind !== 'runner') continue;
@@ -118,6 +147,7 @@ export function rowsToDesired(rows: CloudMachineRow[]): FleetDesired {
       if (typeof v === 'string' && v.length > 0) return v;
       return planDefaults[key] ?? DEFAULTS[key];
     };
+    const image = releaseImageFor(r, canary);
     ws.machines.push({
       id: r.id,
       kind: r.kind,
@@ -125,7 +155,13 @@ export function rowsToDesired(rows: CloudMachineRow[]): FleetDesired {
       // (machined refuses to boot without one; the live roll proved it)
       ...(r.owner_user_id ? { ownerUserId: r.owner_user_id } : {}),
       ...(r.substrate === 'claim' ? { substrate: 'claim' as const } : {}),
-      replicas: !needsActivation(r.workspace_plan) && r.desired_replicas === 1 ? 1 : 0,
+      ...(r.substrate === 'cloudrun' ? {
+        substrate: 'cloudrun' as const, sizeClass: (r.size_class ?? 'S') as SizeClass, restartGen: Number(r.restarts ?? 0),
+        templateReady: r.drain_state === 'resizing',
+        ...(image && machineReleasesOn() ? { image } : {}),
+      } : {}),
+      // the trial activation gate (activation.ts, NM_REQUIRE_TRIAL_ACTIVATION=1 only) holds every substrate at 0
+      replicas: needsActivation(r.workspace_plan) ? 0 : r.substrate === 'cloudrun' ? cloudRunReplicas(r) : r.desired_replicas === 1 ? 1 : 0,
       cpu: str('cpu'),
       memory: str('memory'),
       cpuLimit: str('cpuLimit'),
@@ -157,6 +193,8 @@ export function fleetRoutes<E extends Env>(app: Hono<E>, store: Store): void {
     return Boolean(secret) && auth === `Bearer ${secret}`;
   };
   claimRoutes(app, store); // the bind and the bootstrap (fleet-claims.ts), same trust lanes as the routes below
+  cloudRunRoutes(app, store); // boot credential, boot, token renew, roll, status and control (fleet-cloudrun-routes.ts)
+  fleetLeaseRoutes(app, store); // the fleet's single-writer lease for pool writes (fleet-lease.ts, 0157)
 
   app.get('/internal/fleet-desired', async (c) => {
     if (!fleetSecretOk(c.req.header('authorization'))) return c.json({ error: 'forbidden' }, 403);
@@ -202,6 +240,7 @@ export function fleetRoutes<E extends Env>(app: Hono<E>, store: Store): void {
   // JWT out. sub = the machine's owner (member machines sync as their member; runners as
   // the workspace owner who provisioned them — workspace-scoped by the sync rules).
   app.post('/v1/machines/sync-token', async (c) => {
+    if (process.env['NM_DEPLOYMENT'] === 'production') return c.json({ error: 'Use the authenticated API replica.', code: 'SYNC_RETIRED' }, 410);
     const auth = c.req.header('authorization') ?? '';
     if (!auth.startsWith('Bearer nmm_')) return c.json({ error: 'unauthorized' }, 401);
     if (!store.machineByTokenHash) return c.json({ error: 'fleet not served by this store' }, 501);
@@ -220,6 +259,7 @@ export function fleetRoutes<E extends Env>(app: Hono<E>, store: Store): void {
   // carries clerk's live keys plus the machine issuer's — resolution is by kid. public by
   // nature (JWKS are). point the PowerSync instance's jwks_uri here (deploy note).
   app.get('/v1/sync-jwks', async (c) => {
+    if (process.env['NM_DEPLOYMENT'] === 'production') return c.json({ error: 'Use the authenticated API replica.', code: 'SYNC_RETIRED' }, 410);
     // the local stack has no Clerk and no egress for this: its PowerSync points here for the
     // machine issuer's key alone (dev/stack/powersync/powersync.yaml, PS_NM_JWKS_URI)
     const keys: Record<string, unknown>[] = localMode() ? [] : [...(await clerkJwks())];
@@ -258,10 +298,12 @@ export async function createCloudMachine(sql: postgres.Sql, m: CloudMachineCreat
   // with a missing stamp as 1970 (#396), so a row with neither was parked by the first sweep
   // after its mint (prod, 2026-09-21: a claim runner adopted a spare, bootstrapped, and was
   // scaled to 0 three minutes later, the spare destroyed with it). Born asleep stays blank.
+  // a new Cloud Run machine starts on the newest published release (null: the fleet's own image)
+  const release = substrate === 'cloudrun' ? await releaseForNewMachine(sql) : null;
   const [row] = await sql<{ id: string }[]>`
-    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at)
+    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at, image_version, last_good_version)
     values (${m.workspaceId}::uuid, ${m.ownerUserId}::uuid, ${m.name}, 'linux', ${m.kind}, 'provisioning', ${replicas}, ${m.tokenHash}, ${substrate},
-            case when ${replicas} = 1 then now() end, case when ${replicas} = 1 then now() end)
+            case when ${replicas} = 1 then now() end, case when ${replicas} = 1 then now() end, ${release}, ${release})
     returning id`;
   return { id: row!.id };
 }
@@ -280,17 +322,27 @@ export async function machineByTokenHash(sql: postgres.Sql, hash: string): Promi
       from machines m
       left join nm_users u on u.id = m.owner_user_id
      where m.token_hash = ${hash} and m.kind <> 'local' and (m.lifecycle is null or m.lifecycle <> 'destroyed')
+       -- a Cloud Run token is bound to its epoch and expires (D12, fleet-cloudrun-boot.ts): once the
+       -- epoch moves, no lane takes it, so a replaced instance cannot sync, relay or write
+       and (m.substrate <> 'cloudrun' or (m.token_epoch = m.epoch and m.token_expires_at > now()))
      limit 1`;
-  return row ?? null;
+  return row && canaryClerkAllowed(row.owner_clerk_id) ? row : null;
 }
 
 export async function computeFleetDesired(sql: postgres.Sql): Promise<FleetDesired> {
+  const canary = isMigrationCanary();
+  const subjects = migrationClerkUsers();
+  const canaryId = await releaseCanaryMachine(sql);
   const rows = await sql<CloudMachineRow[]>`
     select m.id, m.workspace_id, w.plan as workspace_plan, m.kind, m.owner_user_id,
-           m.desired_replicas, m.lifecycle, m.resources, m.substrate
+           m.desired_replicas, m.lifecycle, m.resources, m.substrate, m.size_class, m.restarts,
+           m.drain_state, m.drain_reason, coalesce(m.drain_deadline < now(), false) as drain_expired, r.image as release_image, r.state as release_state
       from machines m
       join workspaces w on w.id = m.workspace_id
+      left join machine_releases r on r.version = m.image_version
+       and (r.state in ('published', 'withdrawn') or (m.id = ${canaryId}::uuid and r.state in ('candidate', 'qualified')))
      where m.kind <> 'local'
+       and (${!canary} or m.owner_user_id in (select id from nm_users where clerk_user_id = any(${subjects}::text[])))
      order by m.workspace_id, m.created_at`;
-  return rowsToDesired(rows);
+  return rowsToDesired(rows, canaryId);
 }

@@ -4,6 +4,7 @@ import { combinedDiff, restoreEngineeringCheckpoint } from '../src/engineering/c
 import {
   continueEngineeringInAct,
   createEngineeringSession,
+  REVIEW_ENGINEERING_PERMISSIONS,
   dismissEngineeringModeHandoff,
   effectivePermission,
   resolveEngineeringApproval,
@@ -18,12 +19,12 @@ import {
 
 const repo: EngineeringRepo = { id: 'r1', name: 'neuramesh', owner: 'acme', branch: 'main', root: '/code/neuramesh' };
 
-test('recommended defaults auto-approve reads and ask before every side effect', () => {
+test('new coding threads allow edits and commands in Act', () => {
   const session = createEngineeringSession(repo);
-  assert.deepEqual(session.permissions, { read: true, edit: false, command: false, web: false, mcp: false });
+  assert.deepEqual(session.permissions, { read: true, edit: true, command: true, web: false, mcp: false });
   assert.equal(effectivePermission('plan', 'read', session.permissions, session.policy), 'auto');
-  assert.equal(effectivePermission('act', 'edit', session.permissions, session.policy), 'ask');
-  assert.equal(effectivePermission('act', 'command', session.permissions, session.policy), 'ask');
+  assert.equal(effectivePermission('act', 'edit', session.permissions, session.policy), 'auto');
+  assert.equal(effectivePermission('act', 'command', session.permissions, session.policy), 'auto');
 });
 
 test('Plan is structurally read-only even when stale session toggles say otherwise', () => {
@@ -49,8 +50,8 @@ test('the Plan handoff switches to Act and submits the continuation in one actio
   session = continueEngineeringInAct(session);
   assert.equal(session.mode, 'act');
   assert.equal(session.pendingModeHandoff, null);
-  assert.equal(session.state, 'awaiting_approval');
-  assert.equal(session.pendingApproval?.category, 'edit');
+  assert.equal(session.state, 'completed');
+  assert.equal(session.pendingApproval, null);
   assert.equal(session.messages.some((item) => item.role === 'user' && item.body === prompt), true);
 });
 
@@ -63,7 +64,7 @@ test('the Plan handoff can be dismissed without changing modes or submitting wor
 });
 
 test('Act exposes the complete patch before edit approval, then separately gates commands', () => {
-  let session = setEngineeringMode(createEngineeringSession(repo), 'act');
+  let session = setEngineeringMode(createEngineeringSession(repo, 'Review edits', null, null, REVIEW_ENGINEERING_PERMISSIONS), 'act');
   session = submitEngineeringPrompt(session, 'Fix the auth callback race and add tests');
   assert.equal(session.state, 'awaiting_approval');
   assert.equal(session.pendingApproval?.category, 'edit');
@@ -132,7 +133,7 @@ test('an idle Code thread selects one model directly and clears a legacy pack se
 });
 
 test('declining an approval is resumable and checkpoints restore files independently', () => {
-  let session = setEngineeringMode(createEngineeringSession(repo), 'act');
+  let session = setEngineeringMode(createEngineeringSession(repo, 'Review edits', null, null, REVIEW_ENGINEERING_PERMISSIONS), 'act');
   session = submitEngineeringPrompt(session, 'Fix it');
   session = resolveEngineeringApproval(session, false);
   assert.equal(session.state, 'resumable');

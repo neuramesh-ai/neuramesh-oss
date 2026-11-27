@@ -2,7 +2,7 @@
 // rides only a model that takes one, and seatModel puts the requester's pick below the conversation's
 // own word and above every workspace-wide default.
 import { describe, expect, it } from 'vitest';
-import { parseAgentModels, pickFor, takesThinking, thinkingFor } from '../src/agent-models';
+import { levelFor, parseAgentModels, pickFor, takesThinking, thinkingFor, thinkingLevelsFor } from '../src/agent-models';
 import { PACKS, seatModel } from '../src/model-packs';
 import { STARTER_MODEL } from '../src/rates';
 
@@ -11,11 +11,33 @@ describe('takesThinking', () => {
     expect(takesThinking('claude-sonnet-5')).toBe(true);
     expect(takesThinking('gpt-5.6-terra')).toBe(true);
     expect(takesThinking('gemini-3.8-flash')).toBe(true);
+    expect(takesThinking('gemini-4-carbon')).toBe(true);
+    expect(takesThinking('gemini-4-neon')).toBe(true);
+    expect(takesThinking('gemini-4-hydrogen')).toBe(true);
     expect(takesThinking('gemini-3.1-pro-preview')).toBe(true);
     expect(takesThinking('gemini-3.1-flash-lite')).toBe(false);
     expect(takesThinking('gemini-2.5-pro')).toBe(false);
     expect(takesThinking(STARTER_MODEL)).toBe(false);
     expect(takesThinking(null)).toBe(false);
+  });
+});
+
+describe('thinkingLevelsFor', () => {
+  it('Neon and Hydrogen add Extra high, every other model that thinks stops at High', () => {
+    expect(thinkingLevelsFor('gemini-4-neon')).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(thinkingLevelsFor('gemini-4-hydrogen')).toEqual(['low', 'medium', 'high', 'xhigh']);
+    for (const m of ['gemini-4-carbon', 'gemini-4-argon', 'gemini-3.8-flash', 'claude-opus-5-5', 'gpt-6-astra']) {
+      expect(thinkingLevelsFor(m), m).toEqual(['low', 'medium', 'high']);
+    }
+    expect(thinkingLevelsFor('gemini-3.1-flash-lite')).toEqual([]);
+    expect(thinkingLevelsFor(STARTER_MODEL)).toEqual([]);
+  });
+  it('levelFor keeps a level the model takes and lowers Extra high to the model\'s top level', () => {
+    expect(levelFor('gemini-4-neon', 'xhigh')).toBe('xhigh');
+    expect(levelFor('gemini-4-carbon', 'xhigh')).toBe('high');
+    expect(levelFor('gemini-4-carbon', 'low')).toBe('low');
+    expect(levelFor(STARTER_MODEL, 'high')).toBeNull();
+    expect(levelFor('gemini-4-neon', null)).toBeNull();
   });
 });
 
@@ -32,6 +54,10 @@ describe('parseAgentModels', () => {
       a3: { model: STARTER_MODEL, thinking: 'high' },
       a4: 'claude-opus-5',
     })).toEqual({ a2: { model: 'claude-opus-5' }, a3: { model: STARTER_MODEL } });
+  });
+  it('keeps Extra high on a model that takes it and drops it on one that does not', () => {
+    expect(parseAgentModels({ a1: { model: 'gemini-4-neon', thinking: 'xhigh' }, a2: { model: 'gemini-4-carbon', thinking: 'xhigh' } }))
+      .toEqual({ a1: { model: 'gemini-4-neon', thinking: 'xhigh' }, a2: { model: 'gemini-4-carbon' } });
   });
   it('nothing, garbage and an array all read as no pick', () => {
     expect(parseAgentModels(null)).toEqual({});

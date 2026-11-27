@@ -14,12 +14,13 @@ import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
 import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { productOrchTools } from './chattools-product';
-import { ungrounded } from './grounding';
-import { draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
+import { draftGround, draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
 import { draftsOrchTools, unreadRevision } from './chattools-drafts';
+import { publishTools } from './tools-publish';
+import { postizTools } from './tools-postiz';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
-  const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
+  const { z, db, post, apiGet, ch, agent, actor, thread, convoThreadId, log,
           draftsHere, grounding, libraryDocs,
           buildScheduleCard, generateDraftImage, generateShareImage } = tc;
   // the message a deliverable anchors to: a task thread's ride the TASK, a conversation's the
@@ -60,6 +61,9 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     } },
   ];
   return [...shareTools,
+    // the publish card (plan I14): an agent asks, and only a person publishes (POST /v1/publish is HUMAN_ONLY)
+    ...publishTools({ z, db, post, ch, actor, anchor: msgAnchor, log }),
+    ...postizTools({ z, apiGet, ch, actor, log }),
     // ── Social drafts: write them, then schedule them ───────────────────────────────────────
     // NOT gated on the room's kind any more (founder, 2026-08-08). The gate was never a data
     // constraint: a post publishes through the connector its channel's PROJECT owns (0106,
@@ -75,22 +79,24 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     ...productOrchTools(tc),
     { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`; never the script in the body. Draft for the platform the ask names, else for the connected accounts. Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
       posts: z.array(z.object({
-        platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for: the one asked for, else a connected account'),
+        platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email', 'postiz']).describe('the network this post is for: the one asked for, else a connected account. postiz: a network only Postiz reaches, with postizChannel'),
         body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
         imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — subject, composition, light, mood, on-brand look. For a video post: the shot direction the film follows. Omit for a text-only post.'),
         mediaUrl: z.string().max(2000).optional().describe('a genuinely real public image URL, if you have one. Never invent one.'),
         script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…", CAPTION: …), written to the film\'s length. The card folds it and films its first seconds.'),
         frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this room\'s shelf (a real screenshot, see list_library). The film then shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'),
         seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'),
+        postizChannel: z.string().min(1).max(128).optional().describe('a channel id from postiz_channels: the post goes out through Postiz'),
+        postizSettings: z.record(z.string(), z.unknown()).optional().describe('settings from postiz_channel_rules'),
       })).min(1).max(20).describe('one entry per post, in the order they should read'),
-    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string; frame?: string; seconds?: number }> }) => {
+    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string; frame?: string; seconds?: number; postizChannel?: string; postizSettings?: Record<string, unknown> }> }) => {
       // The anchor: a task thread's drafts ride the TASK (unchanged, so a content task reads
       // byte-identically); a conversation's ride the THREAD (0115). Without one there is no
       // surface to render on — a channel-level draft would card nowhere.
       const anchor = thread ? { task: thread.id } : convoThreadId ? { thread: convoThreadId } : null;
       if (!anchor) return 'draft_posts needs a thread to deliver into — reply inside the conversation and draft there.';
       // the grounding gate (host/grounding.ts): a marketing room's brand docs are read before a draft is written
-      const gate = await ungrounded(db, ch.id, grounding, { threadId: convoThreadId, taskId: thread?.id });
+      const gate = await draftGround(db, ch.id, grounding, { threadId: convoThreadId, taskId: thread?.id });
       if (gate) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: the brand docs were not read this turn' }); return gate; }
       // the angle gate (host/ugcflow.ts): a VIDEO post is the UGC playbook's, and it drafts only after the human picked an angle
       if (input.posts.some((p) => p.script)) {
@@ -104,7 +110,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       // the drafts it holds — so there is no longer a place a draft can be invisible.
       // one cleaner for the tool path and the marketer's posts.json (normalizeDraft), so a
       // "Character count: 196/280" footer is stripped identically whichever door it came in
-      const drafts = input.posts.map((p, n) => { const d = normalizeDraft(p); return d && { ...d, seconds: seconds[n] }; }).filter((p): p is NonNullable<typeof p> => !!p);
+      const drafts = input.posts.map((p, n) => { const d = normalizeDraft(p); return d && { ...d, seconds: seconds[n], postizChannel: p.postizChannel, postizSettings: p.postizSettings }; }).filter((p): p is NonNullable<typeof p> => !!p);
       if (!drafts.length) return 'None of those entries were usable posts — each needs a supported platform and a body that is more than working notes.';
       // the frame (host/frames.ts): a name the shelf does not hold is refused before anything is written
       const frames = await framesFor(libraryDocs, ch.id, input.posts);
@@ -113,17 +119,21 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       const shots = await productShotsFor(libraryDocs, ch.id, drafts);
       if (shots) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a product beat names no shelf image' }); return shots; }
       let made = 0;
+      let why = ''; // the server's own words for a refused draft: a Postiz route is checked against the channel's rules
       for (const [i, d] of drafts.entries()) {
         const res = await post('/v1/commands', actor, {
           type: 'content.create', channel: ch.id, ...anchor, platform: d.platform, body: d.body,
           ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(i) ? { frame: frames.names.get(i) } : {}), ...(d.seconds ? { seconds: d.seconds } : {}),
+          ...(d.postizChannel ? { postizChannel: d.postizChannel } : {}), ...(d.postizSettings ? { postizSettings: d.postizSettings } : {}),
         }).catch(() => null);
         if (res?.ok) made += 1;
+        else if (res && !why) why = await Promise.resolve(res.json?.()).then((b?: { error?: string }) => b?.error ?? '').catch(() => '');
       }
-      if (!made) return 'The drafts could not be saved — say so plainly rather than pasting the posts into your reply.';
+      if (!made) return `The drafts could not be saved${why ? `: ${why}` : ''}. Say so plainly rather than pasting the posts into your reply.`;
+      if (why) log?.({ kind: 'tool', phase: 'result', summary: `draft_posts: a draft was refused: ${why.slice(0, 160)}` });
       log?.({ kind: 'tool', phase: 'call', summary: `draft_posts — ${made} draft${made === 1 ? '' : 's'}` });
       const letters = drafts.slice(0, made).map((_, i) => String.fromCharCode(97 + i)).join('/');
-      return `${made} draft${made === 1 ? '' : 's'} delivered as cards in this thread (${letters}) — the human reads them there and approves, schedules, or asks for changes. Do NOT repeat the posts in your reply: one short line naming what you drafted and what you'd change on their word.`;
+      return `${made} draft${made === 1 ? '' : 's'} delivered as cards in this thread (${letters}) — the human reads them there and approves, schedules, or asks for changes. Do NOT repeat the posts in your reply: one short line naming what you drafted and what you'd change on their word.${why ? ` ${drafts.length - made} draft${drafts.length - made === 1 ? ' was' : 's were'} refused: ${why}` : ''}`;
     } },
     { name: 'revise_posts', description: 'Rewrite drafts that are ALREADY on screen here, in place — always use this when the human asks to change a post ("make b punchier", "↩ Re draft b: shorten the hook"). Read the card first (read_drafts) and change it from what it holds. Name each by its card letter. The card keeps its letter and its earlier version stays readable beneath it, so the human sees what changed. Calling draft_posts instead would leave the old draft sitting there and add a second one beside it, which is the wrong answer to "change this".', schema: {
       revisions: z.array(z.object({

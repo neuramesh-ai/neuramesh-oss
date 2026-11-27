@@ -1,5 +1,7 @@
 # 16 — Sophisticated triage: work-type categorization + right-sized workflow (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** IMPLEMENTED (v1) 2026-07-04 — the spec of record. Shipped: backend `task_kind` enum +
 > routing enforcement (migration 0057), the orchestrator triage rewrite + tool `kind` params, the
 > board `kind` chip (both themes), and the bench right-sizing rubric + eval cases.

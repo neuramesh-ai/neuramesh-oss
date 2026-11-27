@@ -1,9 +1,10 @@
 // the Pro trial's birth rides workspace.create (workspace-birth.ts), against the REAL schema. a
-// person's first workspace gets 500 credits and the cloud machine, whatever door made it, also
+// person's first workspace gets its signup credits and the cloud machine, whatever door made it, also
 // with an invitation waiting (the phone's "Set up my own workspace"). a second workspace, or one
 // made by a member of another workspace, gets neither. before, only the first sign-in granted.
 // run via scripts/test-pg.sh, skipped without DATABASE_URL.
 import postgres from 'postgres';
+import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
 import { afterAll, describe, expect, it } from 'vitest';
 import { executeCommand } from '../src/handler';
 import { PostgresStore } from '../src/pgstore';
@@ -40,7 +41,7 @@ describe.skipIf(!DB)('workspace.create gives the first owned workspace its trial
     }
   };
 
-  it('the wizard’s own workspace gets 500 credits and a runner, a second one gets neither', () => withFleet(async () => {
+  it('the wizard’s own workspace gets its signup credits and a runner, a second one gets neither', () => withFleet(async () => {
     const tag = Date.now().toString(36);
     const userId = await person(tag);
     const first = await create(userId, `birth-${tag}`);
@@ -48,7 +49,7 @@ describe.skipIf(!DB)('workspace.create gives the first owned workspace its trial
 
     const one = await trialOf(first);
     expect(one.grants).toBe(1);
-    expect(one.micros).toBe(500 * 10_000);
+    expect(one.micros).toBe(SIGNUP_GRANT_CREDITS * 10_000);
     expect(one.runners).toHaveLength(1);
     expect(one.runners[0]).toMatchObject({ kind: 'runner', owner_user_id: userId, desired_replicas: 1 });
 

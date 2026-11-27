@@ -213,6 +213,24 @@ test('a mode marker round-trips and nothing else parses as one', () => {
 test('GPT chat advertises draft tools without promising local file writes', () => {
   const prompt = chatSystemPrompt(REX, 'general', { canUseTools: true, canWriteFiles: false });
   assert.match(prompt, /draft_posts/);
-  assert.match(prompt, /Files and commands are read-only/);
+  assert.match(prompt, /implementation runs in a delegated coding task through create_coding_task/);
+  assert.match(prompt, /Do not paste a proposed diff as a completed implementation/);
   assert.doesNotMatch(prompt, /\*\*Write files\.\*\*/);
+});
+
+// ── live narration and one coherent board clause (round 9) ───────────────────────────────────
+test('every chat prompt carries the one shared narration rule', async () => {
+  const { NARRATION_RULE } = await import('@neuramesh/shared');
+  for (const p of [chatSystemPrompt(REX, 'product', { canUseTools: true }), chatSystemPrompt(PATCH, 'product', { canUseTools: true, canWriteFiles: false })]) {
+    assert.ok(p.includes(NARRATION_RULE), 'the chat prompt must carry the shared rule, not a copy that drifts');
+  }
+});
+
+test('the worker clause and the coding handoff no longer contradict each other', () => {
+  const worker = chatSystemPrompt(PATCH, 'product', { canUseTools: true });
+  assert.match(worker, /Apart from the coding handoff below, nothing here becomes board work/);
+  assert.doesNotMatch(worker, /tell them to say so to the orchestrator/, 'the handoff says never send the person to another agent');
+  assert.match(worker, /The coding handoff: in an Agent Desk home thread/);
+  const rex = chatSystemPrompt(REX, 'product', { canUseTools: true });
+  assert.match(rex, /The coding handoff below is the other exception/);
 });

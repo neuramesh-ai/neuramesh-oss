@@ -29,13 +29,18 @@ function bakedCloudConfig(): Record<string, string> {
 
 const cloudDefine = bakedCloudConfig();
 
+// The Finance desktop release (src/finance-release.ts): a build carries Finance only with
+// NM_DESKTOP_FINANCE=1. One constant for all three processes, so the rail row, the bridge and the
+// IPC handlers always agree.
+const financeDefine = { __NM_DESKTOP_FINANCE__: JSON.stringify(process.env['NM_DESKTOP_FINANCE'] === '1') };
+
 export default defineConfig({
   // Externalized: the Agent SDK and PowerSync resolve binaries/workers
   // relative to their own package dirs — bundling breaks them.
   // Workspace packages are raw TypeScript and MUST be bundled in (Node
   // can't import .ts at runtime).
   main: {
-    define: cloudDefine,
+    define: { ...cloudDefine, ...financeDefine },
     // workspace packages are BUNDLED, never packaged: electron-builder ships `dependencies` as
     // node_modules and refuses a pnpm workspace symlink ("…/packages/relay/package.json must be
     // under …/apps/desktop" — v0.122.0's second build, 2026-09-05). So a workspace package lives
@@ -54,8 +59,9 @@ export default defineConfig({
     // shared replica schema and the ps_crud uploader from it.
     plugins: [externalizeDepsPlugin({ exclude: ['@neuramesh/shared', '@neuramesh/relay', '@neuramesh/relay-client', '@neuramesh/client-core'] })],
   },
-  preload: { plugins: [externalizeDepsPlugin()] },
+  preload: { define: financeDefine, plugins: [externalizeDepsPlugin()] },
   renderer: {
+    define: financeDefine,
     plugins: [
       react(),
       // Excalidraw's hand-drawn fonts, self-hosted (docs/38): the library falls back to a CDN

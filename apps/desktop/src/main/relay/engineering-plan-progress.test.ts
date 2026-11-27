@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { engineeringPlanTool, engineeringProgressTool, workPlanProblem } from './engineering-plan';
+import { engineeringPlanTool, engineeringProgressTool, workPlanProblem, workPlanRefusal } from './engineering-plan';
 import { engineeringRuntimeInput } from './engineering-runtime-input';
-import { ENGINEERING_CLINE_TOOL_POLICIES, type EngineeringRuntimeEvent } from '@neuramesh/shared';
+import { ENGINEERING_CLINE_TOOL_POLICIES, engineeringWorkPlanProblems, isEngineeringWorkPlan, type EngineeringRuntimeEvent } from '@neuramesh/shared';
 const plan = { summary: 'Implement', steps: [{ action: 'edit', target: 'a.ts', description: 'Fix the issue' }] };
 test('progress uses successful current history, including rewind and errors', async () => {
   const events: EngineeringRuntimeEvent[] = [];
@@ -52,6 +52,30 @@ test('a resumed progress tool starts from durable progress when the native snaps
   const result = await tool.execute({ updates: [{ step: 1, status: 'in_progress' }] });
   assert.equal(result.planProgress.statuses[0], 'in_progress');
   assert.deepEqual(result.planProgress.statuses.slice(1), complete.statuses.slice(1));
+});
+
+test('a refused plan names each broken rule and shows a plan the tool accepts', () => {
+  const tool = engineeringPlanTool(() => {});
+  assert.throws(() => tool.execute({ summary: 'Plan', steps: [{ action: 'write', target: 'src/a.mjs' }] }), (error: Error) => {
+    assert.match(error.message, /steps\[0\]\.action must be "edit" or "command", not "write"/);
+    assert.match(error.message, /steps\[0\]\.description is missing/);
+    assert.match(error.message, /A valid example: \{/);
+    return true;
+  });
+  assert.match(workPlanRefusal({ report: { investigation: 'x' } }), /summary is missing.*report\.nextStep.*report\.decisions.*steps is missing/);
+  // the example the refusal shows is itself a plan the tool records
+  const example = JSON.parse(workPlanRefusal({}).split('A valid example: ')[1]!);
+  assert.equal(isEngineeringWorkPlan(example), true);
+  assert.equal(tool.execute(example).recorded, true);
+});
+
+test('the problems list is empty exactly when the plan is accepted', () => {
+  const good = { summary: 'Implement', report: { investigation: 'Read it.', decisions: ['Test it.'], nextStep: 'Act.' }, keyPoints: ['k'], considerations: [], steps: [{ label: 'Edit', action: 'edit', target: 'a.ts', description: 'Fix' }] };
+  const cases: unknown[] = [good, plan, null, [], 'plan', {}, { ...good, summary: ' ' }, { ...good, summary: 'x'.repeat(8001) }, { ...good, report: null }, { ...good, report: { ...good.report, decisions: [] } },
+    { ...good, report: { ...good.report, nextStep: 'a\nb' } }, { ...good, keyPoints: [] }, { ...good, considerations: ['a', 'b', 'c', 'd'] }, { ...good, steps: [] },
+    { ...good, steps: [{ action: 'command', target: 'npm test', description: 'Run' }] }, { ...good, steps: [{ action: 'edit', target: ' ', description: 'Fix' }] },
+    { ...good, steps: [{ label: '', action: 'edit', target: 'a', description: 'b' }] }, { ...good, steps: Array.from({ length: 31 }, () => good.steps[0]) }];
+  for (const c of cases) assert.equal(engineeringWorkPlanProblems(c).length === 0, isEngineeringWorkPlan(c), JSON.stringify(c).slice(0, 120));
 });
 
 test('a refused plan names the rule it broke', () => {

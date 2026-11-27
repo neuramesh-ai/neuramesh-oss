@@ -15,7 +15,9 @@ export interface RepoFile { path: string; ref: string | null; size: number; sha:
 export interface TreeEntry { path: string; type: 'blob' | 'tree'; size: number | null }
 export interface RepoTree { ref: string; path: string; entries: TreeEntry[]; truncated: boolean }
 export interface RepoCommit { sha: string; message: string; date: string | null; author: string | null; url: string }
-export interface InstallationFacts { account: string; selection: 'all' | 'selected' }
+/** a pull request that is still open: the work in progress a person sees on the Product page */
+export interface OpenPull { number: number; title: string; draft: boolean; author: string | null; branch: string; labels: string[]; createdAt: string; updatedAt: string; url: string }
+export interface InstallationFacts { account: string; selection: 'all' | 'selected'; /** when GitHub says it was installed (the door's freshness test, announce-grant.ts) */ createdAt?: string | null }
 
 /** a path as GitHub wants it: no leading slash, no `..`, no trailing slash */
 export function cleanPath(p: string | null | undefined): string {
@@ -106,10 +108,19 @@ export async function readRepoCommits(slug: string, since: string, branch: strin
     .map((c) => ({ sha: c.sha, message: (c.commit?.message ?? '').split('\n')[0] ?? '', date: c.commit?.author?.date ?? null, author: c.author?.login ?? c.commit?.author?.name ?? null, url: c.html_url }));
 }
 
+/** the open pull requests, the newest update first (one page of 30). A failed read is an empty list,
+ *  the commits read's rule, so the merged facts beside it still answer. */
+export async function readOpenPulls(slug: string, opts: GitHubOpts): Promise<OpenPull[]> {
+  const r = await githubGet(`/repos/${slug}/pulls?state=open&sort=updated&direction=desc&per_page=30`, opts);
+  if (r.status < 200 || r.status >= 300 || !Array.isArray(r.json)) return [];
+  return (r.json as Array<{ number: number; title: string; draft?: boolean; html_url: string; created_at: string; updated_at: string; labels?: Array<{ name: string }>; head?: { ref?: string }; user?: { login?: string } | null }>)
+    .map((p) => ({ number: p.number, title: p.title, draft: p.draft === true, author: p.user?.login ?? null, branch: p.head?.ref ?? '', labels: (p.labels ?? []).map((l) => l.name), createdAt: p.created_at, updatedAt: p.updated_at, url: p.html_url }));
+}
+
 /** the installation as GitHub describes it: the account it sits on, and whether it covers every repository */
 export async function installationFacts(installationId: number, opts: AppOpts = {}): Promise<InstallationFacts> {
   const r = await githubGet(`/app/installations/${installationId}`, { ...opts, token: appJwt(opts.env, opts.now) });
   if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for installation ${installationId}`, r.status);
-  const b = r.json as { account?: { login?: string; slug?: string } | null; repository_selection?: string };
-  return { account: b.account?.login ?? b.account?.slug ?? '', selection: b.repository_selection === 'all' ? 'all' : 'selected' };
+  const b = r.json as { account?: { login?: string; slug?: string } | null; repository_selection?: string; created_at?: string | null };
+  return { account: b.account?.login ?? b.account?.slug ?? '', selection: b.repository_selection === 'all' ? 'all' : 'selected', createdAt: b.created_at ?? null };
 }

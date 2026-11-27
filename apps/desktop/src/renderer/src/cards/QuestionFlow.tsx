@@ -101,7 +101,7 @@ export function QuestionFlow({
   };
 
   return (
-    <div className="qcard">
+    <div className={isPermission ? 'qcard pending-permission' : 'qcard'}>
       <div className="qhead">
         {questions.length > 1 && <span className="qcount">{idx + 1}/{questions.length}</span>}
         {q.title ?? q.question}

@@ -21,14 +21,15 @@ function HandoffCard({ session, onContinue, onDismiss }: { session: EngineeringS
   );
 }
 
-export function CodingGate({ session, channelId, room, repoRow, repoName, onApproval, onReviewChanges, onContinueInAct, onDismissHandoff, onReopen }: {
+export function CodingGate({ inlineFileApproval = false, session, channelId, room, repoRow, repoName, onApproval, onReviewChanges, onContinueInAct, onDismissHandoff, onReopen }: {
+  inlineFileApproval?: boolean;
   session: EngineeringSession; channelId: string; room: string; repoRow: RepoUI | null; repoName: string;
   onApproval: (approved: boolean) => void; onReviewChanges: (path?: string) => void; onContinueInAct: () => void; onDismissHandoff: () => void;
   /** the GitHub grant landed: open the session again (useEngineeringRuntime reopen) */
   onReopen: () => void;
 }) {
   // a live approval outranks a stored GitHub wait: the machine that asks it reached the code
-  if (session.pendingApproval?.changes?.length) return null; // File approvals live with their durable inline change set.
+  if (!inlineFileApproval && session.pendingApproval?.changes?.length) return null; // File approvals live with their durable inline change set.
   if (session.pendingApproval) return <ApprovalCard session={session} onResolve={onApproval} onReview={onReviewChanges} />;
   // the machine cannot reach the code until GitHub is connected: the card leads (docs/design/repo-connect-2026-10)
   if (session.blockedOn === 'github') return <GitHubGate channelId={channelId} room={room} repoName={repoName} folder={repoRow?.org_name === 'local' || repoRow?.provider === 'local'} onConnected={onReopen} />;

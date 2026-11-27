@@ -1,9 +1,27 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ConversationBrain } from './brain-sync';
 
-const context = new AsyncLocalStorage<{ brain: ConversationBrain; turnId?: string }>();
+type Store = { brain: ConversationBrain; turnId?: string; historyAfter?: string; begin?: () => void };
+const context = new AsyncLocalStorage<Store>();
 export const bindConversationCallback = AsyncLocalStorage.bind;
-export const withConversationBrain = <T>(brain: ConversationBrain, run: () => Promise<T>, turnId?: string): Promise<T> => context.run({ brain, turnId }, run);
+/** `begin` writes the turn's opening events at the turn's first use of its brain, never before. A wake
+ *  that another machine answers (wake.ts, the lease) returns before that use, so it writes nothing. */
+export const withConversationBrain = <T>(brain: ConversationBrain, run: () => Promise<T>, turnId?: string, begin?: () => void): Promise<T> => context.run({ brain, turnId, ...(begin ? { begin } : {}) }, run);
+const started = (store: Store | undefined): Store | undefined => {
+  if (store?.begin) { const begin = store.begin; delete store.begin; begin(); }
+  return store;
+};
+/** Summarization is a derived operation, not a new assistant turn or tool permission. */
+export const withoutConversationBrain = <T>(run: () => Promise<T>): Promise<T> => context.exit(run);
+export function setConversationHistoryBoundary(timestamp: string | null | undefined): void {
+  const current = context.getStore(); if (current) current.historyAfter = timestamp ?? undefined;
+}
+export function conversationToolsThrough(timestamp: string): string {
+  const current = started(context.getStore());
+  const events = (current?.brain.events() ?? []).filter(event => ['tool.call', 'tool.result'].includes(event.type)
+    && event.timestamp <= timestamp && (!current?.historyAfter || event.timestamp > current.historyAfter));
+  return events.map(event => { const value = JSON.stringify({ id: event.id, type: event.type, payload: event.payload }); return value.length > 12000 ? `${value.slice(0, 12000)} [receipt ${event.id} excerpt; complete output retained in the journal]` : value; }).join('\n');
+}
 const attributed = (payload: unknown, turnId?: string): unknown => turnId && payload && typeof payload === 'object' && !Array.isArray(payload) ? { ...payload, turnId } : payload;
 export const recordConversationEvent = (type: string, payload: unknown, id?: string): void => captureConversationRecorder()(type, payload, id);
 export const excludeConversationSecret = (secret: string | undefined): void => context.getStore()?.brain.excludeSecret(secret);
@@ -12,20 +30,21 @@ export function publishConversationArtifact(path: string, body: unknown, actor: 
   if (!brain || !body || typeof body !== 'object') return null;
   const command = body as Record<string, unknown>;
   if ((path !== '/v1/artifacts' && !(path === '/v1/commands' && command['type'] === 'artifact.create')) || typeof command['inlineContent'] !== 'string') return null;
+  started(context.getStore());
   return brain.artifact(command, actor);
 }
 export function captureConversationRecorder(): typeof recordConversationEvent {
-  const brain = context.getStore()?.brain;
-  const turnId = context.getStore()?.turnId;
-  return (type, payload, id) => brain?.record(type, attributed(payload, turnId), id);
+  const store = context.getStore();
+  return (type, payload, id) => store && started(store)?.brain.record(type, attributed(payload, store.turnId), id);
 }
 
 /** Provider-neutral history. Tool outputs remain labelled data, never executable approvals. */
 export function conversationContext(currentPrompt = ''): string {
-  const events = context.getStore()?.brain.events() ?? [];
+  const events = started(context.getStore())?.brain.events() ?? [];
   if (!events.length) return '';
   const seen = new Set<string>();
   const portable = events.filter((event) => {
+    if (context.getStore()?.historyAfter && event.timestamp <= context.getStore()!.historyAfter!) return false;
     if (!['user.message', 'assistant.message', 'tool.call', 'tool.result'].includes(event.type)) return false;
     const text = (event.payload as { text?: unknown } | null)?.text;
     if (typeof text !== 'string') return true;

@@ -122,8 +122,9 @@ test('partial messages: the bubble gets each text block as it grows, and the rep
   assert.deepEqual(seen, [
     'Let me', 'Let me check the board.', // the first block types itself out…
     'Let me check the board.', // …and the complete block repeats it (the contract is whole-text-so-far)
+    '', // the block called a tool, so its words move to the progress lines and the text starts over
     // the thinking rides BESIDE the text (the repo-connect round's Option A): never in it
-    'Let me check the board. | thoughts: the board is empty',
+    ' | thoughts: the board is empty',
     'The board | thoughts: the board is empty', 'The board is empty. | thoughts: the board is empty', 'The board is empty. Give me a goal. | thoughts: the board is empty', // the next block starts over
     'The board is empty. Give me a goal. | thoughts: the board is empty',
   ]);
@@ -144,4 +145,33 @@ test('partialMessages asks for the partial stream only when a bubble is watching
   const seen: string[] = [];
   await drainQuery(stream([assistant([{ type: 'text', text: 'whole' }]), result('whole')]), 'fallback', undefined, (t) => seen.push(t));
   assert.deepEqual(seen, ['whole']);
+});
+
+test('words before a tool call stay on screen as a progress line, and every event wakes the idle clock', async () => {
+  const frames: Array<{ text: string; progress?: readonly string[] }> = [];
+  let events = 0;
+  const reply = await drainQuery(stream([
+    assistant([{ type: 'text', text: 'I search for recent wearable studies.' }, { type: 'tool_use', id: 't1', name: 'WebSearch', input: { query: 'wearables stress' } }]),
+    { type: 'tool_progress', tool_use_id: 't1', tool_name: 'WebSearch', elapsed_time_seconds: 30 },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'results' }] } },
+    assistant([{ type: 'text', text: 'Here is what exists today.' }]),
+    result('Here is what exists today.'),
+  ]), 'fallback', undefined, (text, _thinking, progress) => frames.push({ text, progress }), undefined, { onEvent: () => { events++; } });
+  assert.equal(reply, 'Here is what exists today.');
+  assert.equal(events, 4, 'a tool_progress ping is not new work');
+  assert.deepEqual(frames.at(-1), { text: 'Here is what exists today.', progress: ['I search for recent wearable studies.'] });
+  assert.ok(frames.some((f) => f.text === '' && f.progress?.length === 1), 'the line moves from the text into progress');
+});
+
+test('the SDK sends the words and their tool call as two messages with one id: the words still become a progress line', async () => {
+  const frames: Array<{ text: string; progress?: readonly string[] }> = [];
+  const said = (id: string, content: unknown[]) => ({ type: 'assistant', message: { id, content } });
+  await drainQuery(stream([
+    said('m1', [{ type: 'text', text: 'I read source 1 next.' }]),
+    said('m1', [{ type: 'tool_use', id: 't1', name: 'mcp__nm__read_source', input: { n: 1 } }]),
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'finding A' }] } },
+    said('m2', [{ type: 'text', text: 'Source 1: finding A.' }]),
+    result('Source 1: finding A.'),
+  ]), 'fallback', undefined, (text, _thinking, progress) => frames.push({ text, progress }));
+  assert.deepEqual(frames.at(-1), { text: 'Source 1: finding A.', progress: ['I read source 1 next.'] });
 });

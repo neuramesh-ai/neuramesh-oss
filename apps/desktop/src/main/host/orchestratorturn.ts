@@ -1,4 +1,7 @@
+import { withChatSteering } from './thread-followups';
+import { stoppedBy, type ReplyLiveness } from './permission-deadline';
 import { projectContext } from './project-context';
+import { intakeNoteFor } from './intake-note';
 // THE ORCHESTRATOR'S TURN — picking a transport and running one.
 //
 // Split out of startAgentHost to sit beside the four transports it dispatches to (orchturn.ts).
@@ -16,13 +19,15 @@ import { previousRunNote, scheduleOfThread } from './runwindow';
 import type { HostedAgent, SkillRef } from '../agents';
 import { contractFor } from '../contracts';
 import { HIRE_CARD_SPEC } from '../hirecards';
-import { type AgentAttachment } from '../runtime/adapter';
+import { providerFor, type AgentAttachment } from '../runtime/adapter';
 import { type OrchTransportArgs } from './orchturn';
+import { actOnAnnounced, geminiLoopNudges } from './announced';
 import { type RunHandle } from './runs';
-import { WEB_PREVIEW_PROMPT, composePrompt } from '@neuramesh/shared';
+import { NARRATION_RULE, STARTER_MODEL, WEB_PREVIEW_PROMPT, composePrompt } from '@neuramesh/shared';
+import { triageThinking } from '../runtime/thinking';
 import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { makeRuns } from './runs';
-import type { makeOrchTools } from './orchtools';
+import type { makeOrchTools, OrchTool } from './orchtools';
 import type { makeContent } from './content';
 import type { makeWorkspace } from './workspace';
 
@@ -40,6 +45,7 @@ export async function routineNoteFor(db: { getAll: <T>(sql: string, params?: unk
 }
 
 export function makeOrchTurn(ctx: {
+  permissionsFor?: ReturnType<typeof import('./chatturn').makeChatTurn>['permissionsFor'];
   db: ReplicaDatabase;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   buildOrchestratorTools: ReturnType<typeof makeOrchTools>['buildOrchestratorTools'];
@@ -69,18 +75,22 @@ export function makeOrchTurn(ctx: {
     run: RunHandle = NO_RUN,
     // live tokens to the renderer's bubble — the orchestrator NEVER streamed before this (the
     // transport had no onDelta), which is why rex's replies always appeared all at once
-    onDelta?: (t: string, thinking?: string) => void,
+    onDelta?: (t: string, thinking?: string, progress?: readonly string[]) => void,
+    // the reply's idle clock (permission-deadline.ts): every delta, stream event and tool call reports
+    // into it, approvals rest it, and its signal stops the model call when the reply goes quiet
+    live?: ReplyLiveness,
   ): Promise<string> {
     const actor = { kind: 'agent', id: agent.id, role: 'orchestrator' };
 
     const otools = await buildOrchestratorTools({
-      ch, agent, actor, skills, log, thread, convoThreadId, token,
+      ch, agent, actor, skills, log, thread, convoThreadId, token, permissionRunId:run.id || undefined,
       // a turn holding a task OWNS it (docs/harness §OWNING_KINDS); a room message is triage
       kind: thread ? 'own' : 'triage',
       // THE fix: the orchestrator can finally fan out. TOOL_KINDS.spawn has always listed 'triage',
       // but this registry never read the bus, so the capability was granted and never delivered.
       // a turn that OWNS a task funds its fan-out from the owning budget; a routing turn from triage
-      spawn: orchSpawnFor(agent, ch, convoThreadId ?? thread?.id ?? null, run, log, thread ? 'own' : 'triage'),
+      spawn: orchSpawnFor(agent, ch, convoThreadId ?? thread?.id ?? null, run, log, thread ? 'own' : 'triage',
+        convoThreadId && ctx.permissionsFor ? (seated, legRun) => ctx.permissionsFor!(seated, ch, convoThreadId, legRun, live?.wait) : undefined),
     });
 
     const projLine = await projectNote(db, ch.id, { taskId: thread?.id, threadId: convoThreadId });
@@ -119,7 +129,7 @@ export function makeOrchTurn(ctx: {
   - Draft them and hand them over with **draft_posts**, which renders each as a platform-native card the human approves, schedules, or asks you to change right here. That IS the deliverable. Never write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve.
   - If a MARKETER is in this room (check list_agents), spawn it as a subagent to write the copy — it opens with this room's brand docs, guidelines and connected accounts staged as files. Take what it returns and call draft_posts yourself. Draft them directly only when no marketer is here.
   - Ask FIRST only what genuinely changes the copy — which networks, how many, the angle — and only when you cannot infer it. One nmq card, prefilled from the room's brand goal. A reasonable guess you can revise beats a card that stalls the ask; drafts are cheap to redo (**revise_posts** rewrites one in place, keeping its letter and its history).
-  - CREATOR VIDEO (the UGC playbook, "ugc scripts", "creator videos") is TWO turns: read the shelf, then **propose_angles** (the angle card: two to five angles from the product's facts, the platforms and the film's length as chips) and STOP. The human's pick wakes you; only then draft_posts, one video post per picked platform in that angle, the script written to the picked length. A script drafted before the pick is refused. A beat that puts the app's screen on camera carries a SHOW line naming a real app screenshot: one a person put in Files (list_library scope project) or one shelve_repo_screenshot takes from the project's repository (list_repo_files finds the images). The film cuts to it there, because a video model invents any screen it draws. A creator holding a phone needs no SHOW, and a web capture or a drawn picture never stands in for the app.
+  - CREATOR VIDEO (the UGC playbook, "ugc scripts", "creator videos") is TWO turns: read the shelf, then **propose_angles** (the angle card: two to five angles from the product's facts, the platforms and the film's length as chips) and STOP. The human's pick wakes you; only then draft_posts, one video post per picked platform in that angle, the script written to the picked length. No platform picked means one per connected account, and with none connected, ask which platforms. The turn the pick wakes carries a note with the platforms and the length worked out: follow it, and make the draft_posts call in that turn. A script drafted before the pick is refused. A beat that puts the app's screen on camera carries a SHOW line naming a real app screenshot: one a person put in Files (list_library scope project) or one shelve_repo_screenshot takes from the project's repository (list_repo_files finds the images). The film cuts to it there, because a video model invents any screen it draws. A creator holding a phone needs no SHOW, and a web capture or a drawn picture never stands in for the app.
   - When the human asks to change a draft ("↩ Re draft b: …"), read_drafts then revise_posts, never draft_posts — a second card beside the old one is the wrong answer to "change this", and a rewrite from memory drops what they kept. Scheduling is schedule_posts, whose card is the human's approval gate; you can never publish.
   - YOU CAN DRAW. A picture is **generate_image** (re-runs the brief already on the card) or **revise_posts** with a new imageBrief (different art direction, redraws on its own). Never tell the human to press a button — if they asked for an image, make it. Give a post an imageBrief when it should carry a visual; Instagram and TikTok always need one.
   - A content ask becomes a TASK only on the normal bar: they asked for tracked work, or it is a campaign that must outlive this conversation across sessions and owners. Then create_task with kind:'content' (a lean plan — legs [build] with the drafting approach; born in plan review) and offerTo the marketer — never request_design or request_plan (drafting posts has no mockup gate and no plan step), and its Definition of Done is publish-readiness, never a pull request.${
@@ -198,6 +208,8 @@ export function makeOrchTurn(ctx: {
     // previous run rides as one line, and the session keeps its schedule's title (the server names it)
     const runContext = await previousRunNote(db, convoThreadId);
     const namedBySchedule = !!(await scheduleOfThread(db, convoThreadId));
+    // round 9: nm-api's intake decision (host/intake-note.ts), and the thread it already named
+    const intake = await intakeNoteFor(db, convoThreadId);
 
     // THE CONTRACT, not a literal. defaults/agents/orchestrator.yaml is the authoritative
     // statement of this agent's behaviour; this reads it. A machine-local copy overrides it
@@ -206,11 +218,13 @@ export function makeOrchTurn(ctx: {
     const contract = contractFor(agent.name, 'orchestrator');
     const powers = contract?.prompt?.['powers'] ?? '';
 
-    const style = contract?.prompt?.['style'] ?? '';
+    // live narration (round 9): one rule for every conversational turn, appended here so a machine-local
+    // contract copy that predates it still carries it (packages/shared/src/narration.ts)
+    const style = `${contract?.prompt?.['style'] ?? ''}\n\n${NARRATION_RULE}`;
 
     // conversation threads carry a provisional heuristic title until the orchestrator
     // names them — the instruction rides only on convo wakes (the tool is gated the same)
-    const convoNamer = convoThreadId && !namedBySchedule
+    const convoNamer = convoThreadId && !namedBySchedule && !intake.named
       ? `\n\nThis exchange lives in a conversation thread whose provisional title is the human's first message, near-verbatim. Once you understand the topic — normally in this first reply — call set_thread_title ONCE with a clean 2–6 word title (what it's ABOUT, e.g. "Backlog check-in", never their words echoed back), plus a one-line description when the title alone is thin. Don't rename it again unless the human asks.`
       : '';
 
@@ -234,7 +248,7 @@ export function makeOrchTurn(ctx: {
       'agent.name': agent.name, 'ch.slug': ch.slug, projLine, powers, style,
       skillsNote, convoNamer, marketingNote, marketingSchedulingContext,
       HIRE_CARD_SPEC,
-    }) + xResearchContext + routineContext + runContext;
+    }) + xResearchContext + routineContext + runContext + intake.note;
 
     // the task-thread turn is a contract block too (2026-08-18) — behaviour that cannot be read
     // cannot be reviewed, which is how the old literal kept a retired tool name for a week.
@@ -250,15 +264,42 @@ export function makeOrchTurn(ctx: {
     // Decoupled by provider: dispatch the SAME tool registry to the matching in-process transport.
     // The token is whatever resolveToken returned for the agent's provider (our free GEMINI_API_KEY
     // by default for a Gemini orchestrator; the user's subscription/key once they change the model).
+    const check = convoThreadId && ctx.permissionsFor?.(agent,ch,convoThreadId,run,live?.wait);
+    const toolsFor = (signal?: AbortSignal) => check ? otools.map(tool => ({...tool, run: async (input:Record<string,unknown>) => {
+      signal?.throwIfAborted();
+      const decision = await check('mcp__nm__' + tool.name,input);
+      if (decision.decision !== 'allow') throw new Error(decision.reason ?? 'Permission declined.');
+      signal?.throwIfAborted();
+      return tool.run(input);
+    }})) : otools;
+    // the nm tools this turn called, by name: a second run (host/announced.ts) is told not to repeat them
+    const called: string[] = [];
+    // a spawn waits on a subagent with its own idle limit (orchSpawnFor), so the call itself gets none
+    const counted = (tools: OrchTool[]): OrchTool[] => tools.map((tool) => ({ ...tool, run: (input: Record<string, unknown>) => {
+      called.push(tool.name);
+      return live ? live.tool(() => tool.run(input), { own: tool.name === 'spawn' }) : tool.run(input);
+    } }));
+    const pulsed = (t: string, th?: string, pg?: readonly string[]) => { live?.pulse(); onDelta?.(t, th, pg); };
     const args: OrchTransportArgs = {
-      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools: otools, log, attachments, onDelta,
+      nativeGate: check || undefined,
+      // a routing turn thinks at most at medium (round 9): its job is to decide, and High hid 2 minutes of silence.
+      // a turn inside a task's thread does the owned work, and keeps the person's level
+      model: agent.model, thinking: thread ? agent.thinking ?? null : triageThinking(agent.thinking), traceKey: convoThreadId ?? thread?.id ?? ch.id, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools:counted(toolsFor()), log: live && log ? (rec) => { live.pulse(); log(rec); } : log, attachments, onDelta: pulsed, onActivity: live?.pulse,
       // The turn used to run in os.tmpdir() with no file tools at all, which is why an
       // orchestrator asked to write a document truthfully said it could not. This is the SAME
       // directory its subagents work in (ensureChatWorkspace), so a file a leg produces is one
       // the orchestrator can read back and save with write_library_doc.
-      cwd: ensureChatWorkspace(convoThreadId ?? thread?.id ?? ch.id),
+      cwd: await ensureChatWorkspace(convoThreadId ?? thread?.id ?? ch.id),
     };
-    return dispatchOrchestrator(agent, args);
+    // a reply that only says what it will do runs the turn once more (host/announced.ts); the Gemini loop asks by itself
+    const once = (turn: (suffix: string) => Promise<string>): Promise<string> =>
+      geminiLoopNudges(providerFor(agent.runtime), agent.model === STARTER_MODEL, token) ? turn('') : actOnAnnounced(turn, { log, called: () => called });
+    return convoThreadId ? withChatSteering(convoThreadId, transcript, (context, controller, progress) =>
+      once((suffix) => dispatchOrchestrator(agent, { ...args, tools:counted(toolsFor(controller.signal)), transcript:context + suffix, abort:controller.signal, abortController:stoppedBy(live?.signal, controller),
+        onDelta:(text,thinking,lines)=>{ progress(text); pulsed(text,thinking,lines); } }))) : once((suffix) => {
+        const controller = stoppedBy(live?.signal, new AbortController());
+        return dispatchOrchestrator(agent, { ...args, transcript: transcript + suffix, abort: controller.signal, abortController: controller });
+      });
   }
 
   return { orchestratorTurn };

@@ -32,7 +32,11 @@ test('E5 — no bare wall-clock literal bounds a model turn any more', () => {
 test('the budget table is actually the thing being used', () => {
   assert.ok(HOST.includes('TURN_BUDGETS'), 'the host must read the budget table');
   const refs = (HOST.match(/TURN_BUDGETS\.(\w+)/g) ?? []).map((m) => m.split('.')[1]!);
-  assert.ok(refs.length >= 8, `expected the migrated call sites to reference budgets, saw ${refs.length}`);
+  assert.ok(refs.length >= 5, `expected the migrated call sites to reference budgets, saw ${refs.length}`);
+  // a reply a person waits for has no wall since 2026-11-25: it stops on the idle limit instead
+  // (host/permission-deadline.ts), at the wake, chat, owning, leg and deep work call sites
+  const idle = HOST.match(/withIdleDeadline\(/g) ?? [];
+  assert.ok(idle.length >= 10, `expected the reply call sites to use the idle limit, saw ${idle.length}`);
   for (const kind of new Set(refs)) {
     assert.ok((TURN_KINDS as readonly string[]).includes(kind), `TURN_BUDGETS.${kind} is not a turn kind`);
     assert.ok(TURN_BUDGETS[kind as keyof typeof TURN_BUDGETS].wallMs > 0);
@@ -114,8 +118,8 @@ test('the orchestrator spawn closure is actually PASSED at the wake call site', 
   // the trailing onDelta closure is the live-bubble feed (2026-08-06 — before it, an
   // orchestrator's reply never streamed and popped in whole), and it carries the turn's thoughts
   // beside the text (the repo-connect round's Option A)
-  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t, th\) => emitChat\(t, false, th\)\)/,
-    'and passes its run + the stream feed, so legs parent onto it and tokens reach the bubble');
+  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t, th, pg\) => emitChat\(t, false, th, pg\), live\)/,
+    'and passes its run, stream feed and idle clock, so the reply stays live through approvals');
 });
 
 test('a fan-out draws on the budget of the TURN, not of the role', () => {
@@ -126,7 +130,7 @@ test('a fan-out draws on the budget of the TURN, not of the role', () => {
   assert.ok(TURN_BUDGETS.triage.wallMs < TURN_BUDGETS.work.wallMs);
   assert.ok(TURN_BUDGETS.own.wallMs > TURN_BUDGETS.triage.wallMs, 'owning funds more than routing');
   assert.match(HOST, /let remaining = \{ \.\.\.TURN_BUDGETS\[kind\] \}/, 'orchSpawnFor slices from the turn kind');
-  assert.match(HOST, /orchSpawnFor\([^)]*thread \? 'own' : 'triage'\)/, 'and the caller passes which kind this turn is');
+  assert.match(HOST, /orchSpawnFor\([^)]*thread \? 'own' : 'triage'[,)]/, 'and the caller passes which kind this turn is');
 });
 
 test('the orchestrator prompt now tells it WHEN to fan out, not just that it can', () => {

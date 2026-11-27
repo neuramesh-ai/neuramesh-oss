@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { geminiDispatch, geminiOrchestratorTurn, orchToolsToBridge, zodShapeToGemini } from './orchturn';
 import { isNoCreditsError } from '../computenotice';
 import type { OrchTool } from './orchtools';
+import { actOnAnnounced, geminiLoopNudges } from './announced';
 
 const BASE = {
   model: 'gemini-3.5-flash-lite',
@@ -218,5 +219,125 @@ describe('zodShapeToGemini — the schema the house model is handed', () => {
     assert.equal(zodShapeToGemini({}, Type as never), undefined);
     const out = zodShapeToGemini({ rows: z.array(z.object({ a: z.string() }).optional()) }, Type as never);
     assert.deepEqual(out.properties.rows.items, { type: 'OBJECT', properties: { a: { type: 'STRING' } }, required: ['a'] });
+  });
+});
+
+describe('live narration on the API lane (round 9)', () => {
+  /** a scripted /v1/starter/stream: each round answers NDJSON words, then the raw REST body */
+  function stubStream(rounds: Array<{ words: string; body: unknown }>) {
+    const real = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      urls.push(String(url));
+      const next = rounds.shift();
+      if (!next) return new Response('{}', { status: 500 });
+      const lines = [JSON.stringify({ t: 'text', text: next.words }), JSON.stringify({ t: 'done', response: next.body })].join('\n') + '\n';
+      return new Response(lines, { status: 200, headers: { 'content-type': 'application/x-ndjson' } });
+    }) as unknown as typeof globalThis.fetch;
+    return { urls, restore: () => { globalThis.fetch = real; } };
+  }
+
+  test('a round that writes words and then calls a tool keeps its words as a progress line', async () => {
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: {}, run: async () => 'two tasks' };
+    const plan = 'I will check the board first.';
+    const f = stubStream([
+      { words: plan, body: { candidates: [{ content: { role: 'model', parts: [{ text: plan }, { functionCall: { name: 'list_tasks', args: {} } }] } }] } },
+      { words: 'You have two tasks.', body: restText('You have two tasks.') },
+    ]);
+    undo = f.restore;
+    const updates: Array<{ text: string; progress: readonly string[] }> = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, traceKey: 'thread-1',
+      onDelta: (text, _thinking, progress) => updates.push({ text, progress: progress ?? [] }) });
+    assert.equal(out, 'You have two tasks.', 'the posted reply is the answer only');
+    assert.ok(f.urls.every((u) => u.endsWith('/v1/starter/stream')));
+    const atTool = updates.find((u) => u.progress.length === 1 && u.text === '');
+    assert.ok(atTool, 'when the tool starts, the plan moves to the progress lines and the bubble types fresh');
+    assert.deepEqual(updates.at(-1), { text: 'You have two tasks.', progress: [plan] });
+  });
+});
+
+describe('a reply that only says what it will do (2026-11-17)', () => {
+  const draft: OrchTool = { name: 'draft_posts', description: 'hand over drafts', schema: { posts: z.array(z.string()) }, run: async () => '3 drafts delivered' };
+
+  test('the starter loop asks once for the call it announced, and the call runs', async () => {
+    let ran = 0;
+    const tool: OrchTool = { ...draft, run: async () => { ran += 1; return '3 drafts delivered'; } };
+    const f = stubFetch([
+      { body: restText('I will check the connected platforms and deliver the posts for your chosen angle.') },
+      { body: restCall('draft_posts', { posts: ['a', 'b', 'c'] }) },
+      { body: restText('Drafted three posts for the nervous system reset angle.') },
+    ]);
+    undo = f.restore;
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX });
+    assert.equal(out, 'Drafted three posts for the nervous system reset angle.');
+    assert.equal(ran, 1, 'the announced call must run');
+    const second = JSON.parse(String(f.calls[1]?.init.body));
+    assert.match(second.contents.at(-1).parts[0].text, /made no tool call, so nothing happened/);
+  });
+
+  test('a MALFORMED_FUNCTION_CALL round is asked again, not posted as the reply', async () => {
+    const f = stubFetch([
+      { body: { candidates: [{ content: { role: 'model', parts: [] }, finishReason: 'MALFORMED_FUNCTION_CALL' }] } },
+      { body: restCall('draft_posts', { posts: ['a'] }) },
+      { body: restText('Drafted one post.') },
+    ]);
+    undo = f.restore;
+    assert.equal(await geminiOrchestratorTurn({ ...BASE, tools: [draft], starter: true, ...CTX }), 'Drafted one post.');
+    assert.equal(f.calls.length, 3);
+  });
+
+  test('a call written as text is asked for once', async () => {
+    const f = stubFetch([
+      { body: restText('Drafting now.\n\n```tool_code\ndraft_posts(posts=["a"])\n```') },
+      { body: restCall('draft_posts', { posts: ['a'] }) },
+      { body: restText('Drafted one post.') },
+    ]);
+    undo = f.restore;
+    assert.equal(await geminiOrchestratorTurn({ ...BASE, tools: [draft], starter: true, ...CTX }), 'Drafted one post.');
+    assert.equal(f.calls.length, 3);
+  });
+
+  test('the loop asks only once: a second promise is the reply', async () => {
+    const f = stubFetch([
+      { body: restText('I will draft the posts now.') },
+      { body: restText('I will draft the posts now.') },
+    ]);
+    undo = f.restore;
+    assert.equal(await geminiOrchestratorTurn({ ...BASE, tools: [draft], starter: true, ...CTX }), 'I will draft the posts now.');
+    assert.equal(f.calls.length, 2);
+  });
+
+  test('a reply that waits on the human ends the turn with no extra round', async () => {
+    const f = stubFetch([{ body: restText('Which platforms should I draft for?') }]);
+    undo = f.restore;
+    assert.equal(await geminiOrchestratorTurn({ ...BASE, tools: [draft], starter: true, ...CTX }), 'Which platforms should I draft for?');
+    assert.equal(f.calls.length, 1);
+  });
+
+  // the Claude lane: the SDK query ends on a text-only message, so the turn runs once more from one level up
+  test('Claude lane: a text-only promise runs the turn once more, with the reply and the note in its transcript', async () => {
+    const suffixes: string[] = [];
+    const replies = ['I will check the connected platforms and deliver the posts.', 'Drafted three posts.'];
+    const out = await actOnAnnounced(async (suffix) => { suffixes.push(suffix); return replies.shift()!; }, { called: () => ['read_library_doc', 'read_library_doc'] });
+    assert.equal(out, 'Drafted three posts.');
+    assert.equal(suffixes[0], '');
+    assert.match(suffixes[1]!, /I will check the connected platforms/);
+    assert.match(suffixes[1]!, /made no tool call, so nothing happened/);
+    assert.match(suffixes[1]!, /already called read_library_doc\. Do not/, 'each tool named once');
+  });
+
+  test('Claude lane: a finished reply runs once, and a second run that stands down keeps the first words', async () => {
+    let runs = 0;
+    assert.equal(await actOnAnnounced(async () => { runs += 1; return 'Drafted three posts.'; }), 'Drafted three posts.');
+    assert.equal(runs, 1);
+    const replies = ['I will draft them now.', ''];
+    assert.equal(await actOnAnnounced(async () => replies.shift()!), 'I will draft them now.');
+  });
+
+  test('which lanes ask inside the loop: the house model and a Gemini key, never agy or another provider', () => {
+    assert.equal(geminiLoopNudges('gemini', true, ''), true);
+    assert.equal(geminiLoopNudges('gemini', false, 'key'), true);
+    assert.equal(geminiLoopNudges('gemini', false, ''), false);
+    assert.equal(geminiLoopNudges('anthropic', true, 'key'), false);
   });
 });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { NM_MCP_ALLOW, closeBridge, ensureAgyMcpAllow, ensureBridge, objectArgs, registerTurn, unregisterTurn } from './orchmcp';
+import { managedAgySettings, NM_MCP_ALLOW, closeBridge, ensureAgyMcpAllow, ensureBridge, objectArgs, registerTurn, unregisterTurn } from './orchmcp';
 
 const home = () => mkdtempSync(join(tmpdir(), 'nm-agy-allow-'));
 const settingsOf = (h: string) => join(h, '.gemini', 'antigravity-cli', 'settings.json');
@@ -48,4 +48,14 @@ test('a tool gets an object when agy forwards its arguments as a JSON string', a
   assert.deepEqual(seen, [{ commands: ['npm test'] }, { commands: ['npm test'] }, 'not json']);
   assert.deepEqual(objectArgs(undefined), {});
   assert.equal(objectArgs('[1, 2]'), '[1, 2]');
+});
+
+test('a managed agy session exposes only the host bridge to the model', () => {
+  const h = home();
+  const folder = join(h, '.gemini', 'config');
+  mkdirSync(folder, {recursive:true});
+  writeFileSync(join(folder,'mcp_config.json'),JSON.stringify({mcpServers:{nm:{},publisher:{}}}));
+  const settings = JSON.parse(managedAgySettings(h));
+  assert.deepEqual(settings.permissions.allow,[NM_MCP_ALLOW]);
+  for (const operation of ['command(*)','read_file(*)','write_file(*)','mcp(publisher/*)']) assert.ok(settings.permissions.deny.includes(operation));
 });

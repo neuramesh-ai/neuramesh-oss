@@ -6,6 +6,7 @@
 import { parseQuestionBlock } from './cards';
 import { repairCardFences } from './cardfence';
 import { routineCardText } from './routine-draft';
+import { parseSetupMarker, setupCardText } from './sales-setup';
 import { githubConnectedWords, needCardText, parseGitHubConnected } from './needs';
 
 const NMQ = /```nmq[ \t]*\n([\s\S]*?)```/g;
@@ -14,6 +15,8 @@ const NMQ = /```nmq[ \t]*\n([\s\S]*?)```/g;
 export function cardsAsWords(body: string): string {
   const connected = parseGitHubConnected(body);
   if (connected) return githubConnectedWords(connected);
+  // Sales setup's step markers and cards (sales-setup.ts): words, never a block to copy
+  if (parseSetupMarker(body) || body.includes('```nmsetup')) body = setupCardText(repairCardFences(body));
   if (!body.includes('```nm')) return body;
   return needCardText(routineCardText(repairCardFences(body))).replace(NMQ, (whole, inner: string) => {
     const q = parseQuestionBlock(inner);

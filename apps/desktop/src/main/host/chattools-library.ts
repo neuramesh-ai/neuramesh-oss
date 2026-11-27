@@ -37,7 +37,7 @@ export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent
   return [
     tool(
       'propose_angles',
-      'THE UGC PLAYBOOK, step two, after the research: post the ANGLE CARD in this conversation — two to five angles for the creator videos, each resting on a fact from the brand docs you just read, with "type your own" as the alternate and the room\'s platforms as chips (connected accounts come picked). Then STOP: the human\'s pick wakes you, and only then draft_posts, one video post per picked platform in the chosen angle. A creator script drafted before this card is answered is refused.',
+      'THE UGC PLAYBOOK, step two, after the research: post the ANGLE CARD in this conversation — two to five angles for the creator videos, each resting on a fact from the brand docs you just read, with "type your own" as the alternate and the room\'s platforms as chips (connected accounts come picked). Then STOP: the human\'s pick wakes you, and only then draft_posts, one video post per picked platform in the chosen angle (no platform picked: one per connected account, and with none connected, ask which platforms). A creator script drafted before this card is answered is refused.',
       {
         product: z.string().min(1).max(80).describe('the product name as the brand docs say it'),
         angles: z.array(z.object({
@@ -55,7 +55,7 @@ export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent
         const posted = await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, threadId, body: angleCard(input, conns, lengths) }).catch(() => null);
         if (!posted?.ok) return text('the angle card could not be posted — say so plainly rather than listing the angles in your reply');
         log({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });
-        return text(`Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle, the script written to the length they picked.`);
+        return text(`Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle (no platform picked: one per connected account, and with none connected, ask which platforms), the script written to the length they picked.`);
       },
     ),
   ];

@@ -103,6 +103,7 @@ const GenerateSchema = z.object({
   /** the machine shows the turn's thought summaries. only on request: an older machine joins every
    *  part's text, so a thought part would print in its reply */
   thoughts: z.boolean().optional(),
+  purpose: z.literal('action-review').optional(),
 });
 type StarterBody = z.infer<typeof GenerateSchema>;
 
@@ -146,7 +147,7 @@ export function starterRequest(b: StarterBody): Record<string, unknown> {
     contents: b.contents,
     ...(b.system ? { systemInstruction: { parts: [{ text: b.system }] } } : {}),
     ...(b.tools ? { tools: b.tools } : {}),
-    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...(b.thoughts ? { includeThoughts: true } : {}) } },
+    generationConfig: { ...(b.purpose === 'action-review' ? { maxOutputTokens: 160, responseMimeType: 'application/json' } : {}), thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...(b.thoughts ? { includeThoughts: true } : {}) } },
   };
 }
 
@@ -177,6 +178,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
     const res = await fetchFn(`${STARTER_MODEL_URL}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': pre.key },
+      ...(pre.body.purpose === 'action-review' ? { signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(2500)]) } : {}),
       body: JSON.stringify(starterRequest(pre.body)),
     });
     const payload = (await res.json().catch(() => ({}))) as { usageMetadata?: GeminiUsage };
@@ -201,7 +203,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
     }
     const [days, grants] = await Promise.all([
       sql<Array<Record<string, unknown>>>`
-        select to_char(day, 'YYYY-MM-DD') as day, minutes, active_seconds, model_calls,
+        select to_char(day, 'YYYY-MM-DD') as day, minutes, active_seconds, always_on_seconds, model_calls,
                model_in_tokens, model_out_tokens, model_micros, machine_micros, video_clips, video_micros
           from machine_usage
          where workspace_id = ${workspace}::uuid and day > (now() at time zone 'utc')::date - 31
@@ -219,6 +221,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
       days: days.map((d) => ({
         day: String(d['day']),
         activeSeconds: Number(d['active_seconds'] ?? 0),
+        alwaysOnSeconds: Number(d['always_on_seconds'] ?? 0),
         modelCalls: Number(d['model_calls'] ?? 0),
         modelInTokens: Number(d['model_in_tokens'] ?? 0),
         modelOutTokens: Number(d['model_out_tokens'] ?? 0),
@@ -272,7 +275,8 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
       },
       // capMinutes is ALWAYS null now — the daily minute cap died with the credits round;
       // minutes stay as telemetry and activeSeconds is the number that bills.
-      machine: { minutesToday: used.minutes, activeSecondsToday: used.activeSeconds, capMinutes: null, plan },
+      // alwaysOnSecondsToday: the awake seconds Always on billed on top (0176), priced as active
+      machine: { minutesToday: used.minutes, activeSecondsToday: used.activeSeconds, alwaysOnSecondsToday: used.alwaysOnSeconds, capMinutes: null, plan },
       // ALLOCATION, not usage: nothing meters bytes on the PVC yet. Sending the size the plan
       // provisions lets a surface say "10 GB included" — true, and actionable — instead of "not
       // yet metered", which told nobody anything. It must never be printed as "x of 10 GB used".

@@ -24,7 +24,8 @@ import { createApp } from '../src/app';
 import { creditBalance, grantCredits } from '../src/credit-ledger';
 import { computeFleetDesired } from '../src/fleet';
 import { bumpMachineWake } from '../src/fleet-lifecycle';
-import { ensureTeamShape, memberMachineOf, provisionMemberMachine } from '../src/member-machines';
+import { ensureTeamShape, memberMachineOf, provisionMemberMachine, reshapeParkedTeams } from '../src/member-machines';
+import { machineSweep } from '../src/fleet-lifecycle';
 import { PostgresStore } from '../src/pgstore';
 import { applyPlanPatch } from '../src/plan-flip';
 import { machineWorkspace } from '../src/relay';
@@ -93,7 +94,7 @@ beforeAll(async () => {
   alice = await makeUser('clerk_mm_alice', 'alice@member-machines.test');
   bob = await makeUser('clerk_mm_bob', 'bob@member-machines.test');
   cara = await makeUser('clerk_mm_cara', 'cara@member-machines.test');
-  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: 500 credits and a runner). the
+  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: its signup credits and a runner). the
   // suite's workspace is her second, born bare, so the flip below mints its runner as it always did
   await send(alice, { type: 'workspace.create', name: 'Member Machines Trial', slug: `mm-trial-${Date.now().toString(36)}` });
   const made = await j(await send(alice, { type: 'workspace.create', name: 'Member Machines', slug: `mm-${Date.now().toString(36)}` }));
@@ -327,7 +328,8 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     // alice is a member of this workspace, and bob's machine is still not hers to beat
     expect((await send(alice, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
     const stranger: Actor = { kind: 'human', id: '30000000-0000-0000-0000-000000000003' };
-    expect((await send(stranger, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
+    // a stranger is refused by the command scope guard before the handler looks (R10 NM-002): 403, not your workspace
+    expect((await send(stranger, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(403);
     const [ag] = await sql!`select id from agents where workspace_id = ${WS}::uuid limit 1`;
     const agent: Actor = { kind: 'agent', id: ag!['id'] as string, role: 'orchestrator' };
     expect((await send(agent, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(403);
@@ -397,5 +399,66 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     expect(liveMemberOf(await machinesOf(ws), eve.id)!.desired_replicas).toBe(0);
     // and a stranger cannot provision into a workspace they are not in
     expect((await send(bob, { type: 'machine.provision', workspace: ws })).status).toBe(403);
+  });
+});
+
+// THE MISSED TEAM SHAPE (George, live 2026-11-18). His Pro workspace got its second person (another
+// account of his own) without the first-invitation promotion, so his first machine stayed a shared
+// runner. A shared runner keeps no login, and he signed in to every CLI again after each stop. The
+// machine sweep now repairs such a workspace once its runner sleeps.
+describe.skipIf(!DB)('the machine sweep repairs a missed team shape', () => {
+  it('a sleeping shared runner becomes the owner\'s machine, keeps its id and its logins, and a new runner is minted asleep', async () => {
+    const owner = await makeUser('clerk_mm_gina', 'gina@member-machines.test');
+    const second = await makeUser('clerk_mm_hal', 'hal@member-machines.test');
+    await send(owner, { type: 'workspace.create', name: 'Gina Trial', slug: `mmg-trial-${Date.now().toString(36)}` });
+    const ws = (await j(await send(owner, { type: 'workspace.create', name: 'Gina Team', slug: `mmg-${Date.now().toString(36)}` }))).workspaceId as string;
+    expect(await toTeam(ws)).toBe('ok');
+    // the second person arrives with no invitation behind them: the legacy path the shape never saw
+    await sql!`insert into workspace_members (workspace_id, user_id, role) values (${ws}::uuid, ${second.id}::uuid, 'member')`;
+    const first = liveRunner(await machinesOf(ws))!;
+    await sql!`update machines set substrate = 'cloudrun' where id = ${first.id}::uuid`;
+    // the bug: the owner's machine is a runner in a team, and the vault keeps no login for one (machine-vault.ts)
+    expect(first.kind).toBe('runner');
+
+    // awake: the sweep leaves it alone, so no daemon is rolled under a turn
+    expect(first.desired_replicas).toBe(1);
+    expect(await reshapeParkedTeams(sql!)).not.toContain(ws);
+    expect(liveRunner(await machinesOf(ws))!.id).toBe(first.id);
+    // mid-drain: still alone
+    await sql!`update machines set desired_replicas = 0, drain_state = 'draining' where id = ${first.id}::uuid`;
+    expect(await reshapeParkedTeams(sql!)).not.toContain(ws);
+
+    // parked: the sweep repairs it
+    await sql!`update machines set drain_state = null where id = ${first.id}::uuid`;
+    const out = await machineSweep(sql!, 5, null);
+    expect(out.teamShaped).toContain(ws);
+    const rows = await machinesOf(ws);
+    const mine = liveMemberOf(rows, owner.id)!;
+    expect(mine.id, 'same id: the snapshot and the work come along').toBe(first.id);
+    expect(mine.token_hash).toBe(first.token_hash);
+    const runner = liveRunner(rows)!;
+    expect(runner.id).not.toBe(first.id);
+    expect(runner.desired_replicas, 'the repair mints the runner asleep').toBe(0);
+    // a member machine keeps its owner's logins, and the new runner keeps none (machine-vault.ts)
+    expect(mine.kind, 'the owner\'s machine keeps their logins now').toBe('member');
+    expect(runner.kind).toBe('runner');
+    // once: the next pass changes nothing
+    expect(await reshapeParkedTeams(sql!)).not.toContain(ws);
+    expect(live(await machinesOf(ws)).filter((m) => m.kind === 'runner')).toHaveLength(1);
+  });
+
+  it('a one-person Pro workspace and a Free one are left as they are', async () => {
+    const solo = await makeUser('clerk_mm_ivy', 'ivy@member-machines.test');
+    await send(solo, { type: 'workspace.create', name: 'Ivy Trial', slug: `mmi-trial-${Date.now().toString(36)}` });
+    const ws = (await j(await send(solo, { type: 'workspace.create', name: 'Ivy Solo', slug: `mmi-${Date.now().toString(36)}` }))).workspaceId as string;
+    expect(await toTeam(ws, `sub_mm_ivy_${Date.now()}`)).toBe('ok');
+    await sql!`update machines set desired_replicas = 0, drain_state = null where workspace_id = ${ws}::uuid`;
+    expect(await reshapeParkedTeams(sql!, 50)).not.toContain(ws);
+    // two people, but Free: no member machines exist on Free
+    const other = await makeUser('clerk_mm_jo', 'jo@member-machines.test');
+    await sql!`insert into workspace_members (workspace_id, user_id, role) values (${ws}::uuid, ${other.id}::uuid, 'member')`;
+    await sql!`update workspaces set plan = 'free' where id = ${ws}::uuid`;
+    expect(await reshapeParkedTeams(sql!, 50)).not.toContain(ws);
+    expect(live(await machinesOf(ws)).map((m) => m.kind)).toEqual(['runner']);
   });
 });

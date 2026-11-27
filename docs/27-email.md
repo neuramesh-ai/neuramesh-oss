@@ -1,5 +1,7 @@
 # 27 — Email (invites, lifecycle, broadcasts)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status 2026-07-23 — phases 1, 2 and 4 are BUILT and verified against real delivery.**
 > Migrations `0091_email` + `0092_workspace_invites`; `mail.ts` (Resend), `onauth.ts`,
 > `lifecycle.ts`; templates in `packages/shared/src/email/`; `pnpm mail:preview`.
@@ -197,7 +199,7 @@ NM_MAIL_DRY_RUN=1     render + log + persist, never hand to Resend (staging, loa
 NM_MAIL_ALLOWLIST     comma-separated addresses; anything else is skipped (pre-launch safety)
 ```
 
-**Raw `fetch`, no SDK.** Resend's send API is a single POST. `build:vercel` externalizes every
+**Raw `fetch`, no SDK.** Resend's send API is a single POST. `build:server` externalizes every
 dependency by name in an esbuild flag list — adding a package means touching the bundle config, and
 the only thing we'd gain is a wrapper around one HTTP call. `clerk.ts` sets the precedent (245 lines
 of Backend-API integration, zero deps).

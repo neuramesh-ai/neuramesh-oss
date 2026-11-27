@@ -15,6 +15,7 @@
 import type { z as Zod } from 'zod';
 import { REPO_CHANGES_DESC, REPO_FILE_DESC, REPO_TREE_DESC, SEARCH_X_DESC, searchXParams } from './tooldesc';
 import { WEB_CLICK_DESC, WEB_OPEN_DESC, WEB_READ_DESC, WEB_SCREENSHOT_DESC, WEB_TYPE_DESC, webClickParams, webOpenParams, webReadParams, webScreenshotParams, webTypeParams } from './tooldesc';
+import { BOARD_CATCH_UP_DESC, BOARD_LIST_DESC, BOARD_SEND_DESC, BOARD_TAKE_DESC, boardCatchUpParams, boardSendParams, boardTakeParams } from './tooldesc';
 
 type Shape = Record<string, Zod.ZodTypeAny>;
 export interface ToolSpec { description: string; params: (z: typeof Zod) => Shape }
@@ -160,6 +161,11 @@ export const TOOL_SPECS = {
   web_click: { description: WEB_CLICK_DESC, params: webClickParams },
   web_type: { description: WEB_TYPE_DESC, params: webTypeParams },
   web_screenshot: { description: WEB_SCREENSHOT_DESC, params: webScreenshotParams },
+  // Message boards (docs/design/message-boards-2026-11 §7.6): host/messageboards.ts is the one implementation behind every copy
+  message_board_list: { description: BOARD_LIST_DESC, params: () => ({}) },
+  message_board_catch_up: { description: BOARD_CATCH_UP_DESC, params: boardCatchUpParams },
+  message_board_send: { description: BOARD_SEND_DESC, params: boardSendParams },
+  message_board_take_handoff: { description: BOARD_TAKE_DESC, params: boardTakeParams },
 } satisfies Record<string, ToolSpec>;
 
 export type SpeccedTool = keyof typeof TOOL_SPECS;

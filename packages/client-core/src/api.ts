@@ -70,6 +70,10 @@ export interface MachinesUsage {
   machines: Array<{
     id: string; name: string; desiredReplicas: number; lastSeenAt: string | null; lastWakeAt: string | null; lifecycle: string | null;
     kind?: string; ownerUserId?: string | null; startedAt?: string | null; lastActiveAt?: string | null; idleStopMin?: number | null;
+    /** the stop and the breaker (servers from r8 on): "going to sleep", "paused" in machineState */
+    interactiveReady?: boolean | null; drainState?: string | null; drainReason?: string | null; bootLoopAt?: string | null; parkedAt?: string | null;
+    /** the last measured wake in ms, null before the first one (servers from 0190 on) */
+    lastWakeMs?: number | null;
   }>;
   outOfCredits?: boolean;
 }
@@ -114,6 +118,10 @@ export interface WorkspaceMembership {
   role?: string;
   memberCount?: number;
   plan?: string;
+  /** the Pro trial (docs/design/onboarding-2026-11/trial.md): the subscription's state, the trial's end, and whether a card is on file */
+  subscriptionStatus?: string | null;
+  currentPeriodEnd?: string | null;
+  cardOnFile?: boolean;
   /** false = the workspace exists but its wizard never finished (no agents yet). the first hosted
    *  sign-in makes the workspace on the server, so a client resumes the wizard on it. */
   onboarded?: boolean;
@@ -247,7 +255,7 @@ export class ControlApiClient {
   // birth-time contract the desktop's uploader honours (./crud-upload.ts).
   postMessage(input: {
     workspace: string; channel: string; project?: string; body: string; taskId?: string; id?: string;
-    threadId?: string; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
+    threadId?: string; permissionMode?: import('@neuramesh/shared').PermissionMode; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
     threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine';
     // 0144: `coding` when the repo chip was set — birth-only, like the rest
     threadKind?: 'chat' | 'coding';

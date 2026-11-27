@@ -1,7 +1,8 @@
 import { MARKETING_COMMANDS } from './command-union-marketing';
+import { CompanyProfileSchema } from './company-profile';
 import { z } from 'zod';
 import { MACHINE_COMMANDS } from './command-union-machine';
-import { SCHEDULE_RUN_COMMANDS } from './command-union-schedule';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
+import { SCHEDULE_RUN_COMMANDS } from './command-union-schedule';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';   import { EMAIL_COMMANDS } from './command-union-email';   import { SALES_COMMANDS } from './command-union-sales';   import { SETUP_AREA_COMMANDS } from './command-union-setup';
 import { WORK_PLAN_LEGS,
   MODEL_ID_SET, PACKS, CUSTOM_PACK_ID, isCustomPackId, TASK_KINDS, TASK_STATES, BEAT_STATUSES, RUN_KINDS, RUN_SETTLE_STATES, THREAD_MODES,
   // Human (companion) command schemas — defined in @neuramesh/shared so mobile/web
@@ -31,16 +32,20 @@ const customPackId = z.string().refine((p) => isCustomPackId(p), { message: 'not
 // A custom brain's role→model map: every agent role seated with a routable model, worker
 // mirroring developer (it is a legacy alias — one seat, not two). `satisfies` keeps the key
 // set compile-locked to AgentRole, so a new role can't silently ship unseated.
+// finance is optional on the wire: a desktop that predates the seat saves a brain without it, and
+// the seat then follows the orchestrator.
 const packRoles = z.object({
   worker: modelId, developer: modelId, reviewer: modelId, orchestrator: modelId,
   designer: modelId, sales: modelId, architect: modelId, curator: modelId, shipper: modelId, marketer: modelId,
-} satisfies Record<import('./index').AgentRole, typeof modelId>)
-  .refine((r) => r.worker === r.developer, { message: 'worker aliases developer — their models must match' });
+  finance: modelId.optional(),
+} satisfies Record<import('./index').AgentRole, z.ZodTypeAny>)
+  .refine((r) => r.worker === r.developer, { message: 'worker aliases developer — their models must match' })
+  .transform((r) => ({ ...r, finance: r.finance ?? r.orchestrator }));
 
 export const ActorSchema = z.object({
   kind: z.enum(['human', 'agent']),
   id: z.string().min(1),
-  role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer']).optional(),
+  role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer', 'finance']).optional(),
 });
 
 const taskId = z.string().min(1);
@@ -162,6 +167,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
+  z.object({ type: z.literal('task.request_release_checklist'), taskId }),
   z.object({ type: z.literal('task.claim_ship'), taskId }),
   z.object({
     type: z.literal('task.propose_ship_plan'),
@@ -265,7 +271,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     workspace: z.string().min(1),
     machineId: z.string().min(1),
     name: z.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-    role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer']).default('developer'),
+    role: z.enum(['worker', 'developer', 'reviewer', 'orchestrator', 'designer', 'sales', 'architect', 'curator', 'shipper', 'marketer', 'finance']).default('developer'),
     model: modelId.default('claude-opus-4-8'),
     runtime: z.enum(['claude-code', 'codex', 'gemini']).default('claude-code'),
     emoji: z.string().min(1).max(8).optional(), // persona face; omitted → client derives from name
@@ -321,7 +327,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     type: z.literal('memory.refresh_block'),
     workspace: z.string().min(1),
     channel: z.string().min(1),
-    kind: z.enum(['channel_summary', 'project_brief']).default('channel_summary'),
+    // project_summary (D15): the project memory block. `channel` names any channel of the project
+    kind: z.enum(['channel_summary', 'project_brief', 'project_summary']).default('channel_summary'),
     content: z.string().min(1).max(4000),
     basisCount: z.number().int().nonnegative().default(0),
   }),
@@ -391,6 +398,14 @@ export const CommandSchema = z.discriminatedUnion('type', [
     commRules: z.object({ ste100: z.boolean().optional(), noEmdash: z.boolean().optional(), custom: z.array(z.string().min(1).max(200)).max(8).optional() }).optional(),
     // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
     videoTier: z.enum(['starter', 'xpress', 'premium']).nullable().optional(),
+  }),
+  // the first run's card 1 (docs/design/onboarding-2026-11 O2): the company answers, and the company's
+  // name, which renames the workspace a site sign-up made as "<first name>'s workspace". HUMAN-only.
+  z.object({
+    type: z.literal('workspace.set_profile'),
+    workspace: z.string().min(1),
+    name: z.string().trim().min(1).max(60).optional(),
+    profile: CompanyProfileSchema,
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
@@ -607,7 +622,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     threadId: z.string().uuid(),
   }),
   // Settle (0137): settled_at and nothing else, HUMAN_ONLY, any thread (shared/threadstatus.ts). One line: the file's cap.
-  z.object({ type: z.literal('thread.settle'), workspace: z.string().min(1), threadId: z.string().uuid() }), z.object({ type: z.literal('thread.unsettle'), workspace: z.string().min(1), threadId: z.string().uuid() }),
+  // …and the same stamp on a task with no thread of its own (0192), on the same line for the same reason.
+  z.object({ type: z.literal('thread.settle'), workspace: z.string().min(1), threadId: z.string().uuid() }), z.object({ type: z.literal('thread.unsettle'), workspace: z.string().min(1), threadId: z.string().uuid() }), z.object({ type: z.literal('task.settle'), workspace: z.string().min(1), taskId: z.string().uuid() }), z.object({ type: z.literal('task.unsettle'), workspace: z.string().min(1), taskId: z.string().uuid() }),
   // docs/10 §15 — the thread brain override: which MODEL each role runs in THIS conversation.
   // HUMAN_ONLY, like every other spend of money the human did not ask for: an agent that could
   // set its own model could move itself onto the most expensive one in the catalog.
@@ -703,6 +719,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
     // THE ROUTINE WRITER (docs/design/routine-writer-2026-10): `thread` is the session rex wrote the routine
     // in. The routine runs in it from now on, and the server posts the divider there. Implies `routine`.
     routine: z.boolean().optional(), thread: z.string().uuid().optional(), replyGap: REPLY_GAP_FIELD.optional(), // the Replies part's queue gap
+    // A RELEASE WATCH (the Product page's Releases tab, 2026-11-22): the routine watches this repository of the
+    // room's project and drafts release posts for each new release, the release tick's own payload. Recurring only.
+    release: z.object({ repo: z.string().uuid(), slug: z.string().trim().min(3).max(200) }).optional(),
   }),
   z.object({ type: z.literal('schedule.set_status'), schedule: z.string().min(1), status: z.enum(['active', 'paused']) }),
   z.object({ type: z.literal('schedule.delete'), schedule: z.string().min(1) }),
@@ -722,7 +741,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   }),
   // the verbs the daemon's schedule tick writes (claim_run · mark_result · set_cursor) ride
   // commands-schedule.ts, the commands-machine.ts shape: this file sits at its ratchet cap
-  ...SCHEDULE_RUN_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS, // the reply queue's verbs (command-union-replies.ts) · a person's model for an agent (command-union-models.ts)
+  ...SCHEDULE_RUN_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS,   ...EMAIL_COMMANDS,   ...SALES_COMMANDS,   ...SETUP_AREA_COMMANDS, // the reply queue's verbs (command-union-replies.ts) · a person's model for an agent (command-union-models.ts) · email drafts (command-union-email.ts) · the Sales pipeline (command-union-sales.ts) · the area setup runs (command-union-setup.ts)
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
@@ -734,7 +753,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     // board row, and before this the card could only exist on a task — which is why an agent
     // asked for drafts in a thread had to propose one. Either anchor renders the same card.
     thread: z.string().min(1).optional(),
-    platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).default('x'),
+    // `postiz`: a network that only the project's Postiz account reaches, named by `postizChannel` (Postiz P4)
+    platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email', 'postiz']).default('x'),
     body: z.string().trim().min(1).max(10_000),
     schedule: z.string().min(1).optional(), // the schedule row this draft came from
     // the slot this draft is FOR (draft-ahead: the tick runs ~30min early; approve
@@ -757,6 +777,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     // video, the script is what the creator films. Kept in media.script, never in the body.
     // `frame`: the shelf image the film shows as the product (brand-grounding plan §6), by name. `seconds`: the film's length (video-rung plan §8), the human's pick on the angle card or their word; the door holds it inside the tier's range
     script: z.string().trim().min(1).max(10_000).optional(), frame: z.string().trim().min(1).max(200).optional(), seconds: z.number().int().min(1).max(60).optional(),
+    // a suggested Postiz route (Postiz P12): a channel of the project's account and its settings, checked against the channel's rules. Hosted only
+    postizChannel: z.string().min(1).max(128).optional(), postizSettings: z.record(z.string(), z.unknown()).optional(),
   }),
   // the human tweaks a draft's text/media before approving (calendar preview edit) — never
   // a published item, and agents never rewrite what a human is reviewing. mediaUrl: a url
@@ -785,6 +807,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     scheduledAt: z.string().datetime().optional(), // default: one hour out
   }),
   z.object({ type: z.literal('content.unschedule'), item: z.string().min(1) }),
+  // the Publish to pick (Postiz P5, HUMAN_ONLY, a draft only): a Postiz channel of the project's account, or null for the native account
+  z.object({ type: z.literal('content.set_route'), item: z.string().min(1), postizChannel: z.string().min(1).max(128).nullable(), postizSettings: z.record(z.string(), z.unknown()).optional() }),
   // a draft with no conversation moves into the session its first picture ask opened (HUMAN_ONLY)
   contentAnchorCommand,
   // connectors (marketing-channel plan §4.8): connecting is the OAuth round-trip (no command);

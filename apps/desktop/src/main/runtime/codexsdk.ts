@@ -22,7 +22,7 @@ import { ensureCli } from './cli';
 // Minimal shapes from @openai/codex-sdk (dynamically imported to keep the main bundle lean).
 export type CodexCtor = new (opts?: { codexPathOverride?: string; apiKey?: string; env?: Record<string, string>; config?: Record<string, unknown> }) => CodexClient;
 export interface CodexClient { startThread(opts?: ThreadOpts): CodexThread; resumeThread(id: string, opts?: ThreadOpts): CodexThread; }
-interface ThreadOpts { model?: string; modelReasoningEffort?: 'low' | 'medium' | 'high'; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workingDirectory?: string; skipGitRepoCheck?: boolean; approvalPolicy?: 'never' | 'on-request' | 'on-failure' | 'untrusted' }
+interface ThreadOpts { model?: string; modelReasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workingDirectory?: string; skipGitRepoCheck?: boolean; approvalPolicy?: 'never' | 'on-request' | 'on-failure' | 'untrusted' }
 // Codex accepts a plain string OR an array of typed input items — text + local_image (by file path).
 type CodexInput = string | Array<{ type: 'text'; text: string } | { type: 'local_image'; path: string }>;
 interface CodexThread { id: string | null; run(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ finalResponse: string; usage: CodexUsage | null }>; runStreamed(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ events: AsyncIterable<CodexEvent> }> }
@@ -157,14 +157,18 @@ export const codexSdkAdapter: RuntimeAdapter = {
   complete(system, user, token, model) {
     return reason(system, user, token, model);
   },
-  async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: unknown, _protectedPaths?: string[], opts?: TurnOpts) {
+  async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: import('./adapter').PermissionGate, _protectedPaths?: string[], opts?: TurnOpts) {
+    if (_permissionGate && opts?.permissionRules) {
+      const {starterRunQuery}=await import('./starter');
+      return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,_permissionGate,opts,{provider:'openai',token});
+    }
     // ── The tool bus (docs/harness/03) ─────────────────────────────────────────────────────────
     // Codex used to ignore proposeSkill / recordLesson / addBacklogItem entirely — they were not
     // even in this signature — so a Codex-seated worker silently could not record a lesson or park
     // a discovery, and beats depended on the model echoing NM_BEAT_DONE into stdout. The bus gives
     // it the SAME toolset a Claude worker gets, over the loopback MCP bridge.
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}), ...(opts?.messageBoards ? { messageBoards: opts.messageBoards } : {}) } },
       userDataDir(),
       log,
     );

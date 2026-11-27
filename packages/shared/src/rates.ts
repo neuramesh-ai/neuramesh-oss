@@ -50,14 +50,16 @@ export function priceModelCall(model: string, inTokens: number, outTokens: numbe
 
 // ── the grant ────────────────────────────────────────────────────────────────────────────
 //
-// FREE STARTS WITH 500 (the first-run doors, 2026-09-19, George: "cloud should indicate free 500
-// credits to get started"): a free hosted account's first workspace is granted SIGNUP_GRANT_CREDITS
+// FREE STARTS WITH 100 (George, 2026-11-24, the onboarding round: 500 was too much). A first brief
+// on the starter brain costs about 7 credits, so 100 pays for the first win and about two weeks of
+// daily briefs, the 14-day trial. It was 500 from the first-run doors (2026-09-19, George: "cloud
+// should indicate free 500 credits to get started"). A free hosted account's first workspace is granted SIGNUP_GRANT_CREDITS
 // once (control-api first-workspace.ts), so the starter brain answers before a key is added. The
-// refill worklist still skips `plan = 'free'`: the 500 do not renew, and the balance drains once.
+// refill worklist still skips `plan = 'free'`: the grant does not renew, and the balance drains once.
 // (Between 2026-09-12 and 2026-09-19 Free granted nothing.) MONTHLY_GRANT_CREDITS survives only as
 // a number old copy printed; no server path reads it. Pro's allocation is CLOUD_SEAT_MONTHLY_CREDITS
 // below, granted per seat at the plan flip and again on the 1st of every month.
-export const SIGNUP_GRANT_CREDITS = 500;
+export const SIGNUP_GRANT_CREDITS = 100;
 export const MONTHLY_GRANT_CREDITS = 500;
 
 /** the Pro plan's monthly allocation, PER SEAT. Chosen over 2,000 because at full
@@ -145,6 +147,8 @@ export function nextRefillOn(periodStart: string, today: Date, plan?: string | n
 // episode costs us at most 48h × $0.036/h ≈ $1.73, and gaming it buys nothing — wake-on-message
 // plus warm capacity already make a stopped machine a ~15s inconvenience, so there is no value
 // in holding one up. Priced with eyes open in docs/design/credits-billing-2026-08/plan.md §3.4.
+// THE ONE EXCEPTION is Always on (decision D2, 2026-11-06): a machine with no idle stop pays this rate
+// for every awake second, work or not (control-api machine-beat.ts).
 export const MACHINE_MICROS_PER_ACTIVE_MINUTE = 1_000;
 
 /** what a stretch of active seconds costs. Integer µUSD; sub-minute work rounds rather than

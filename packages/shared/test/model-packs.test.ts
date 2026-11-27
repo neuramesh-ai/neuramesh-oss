@@ -16,6 +16,7 @@ describe('catalog integrity', () => {
   it('offers the verified October models and preserves previous Claude IDs for saved picks', () => {
     expect(CURRENT_MODELS['claude-code']).toEqual(['claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
     expect(CURRENT_MODELS.gemini).toContain('gemini-4-argon');
+    expect(CURRENT_MODELS.gemini.slice(0, 4)).toEqual(['gemini-4-carbon', 'gemini-4-neon', 'gemini-4-argon', 'gemini-4-hydrogen']);
     for (const old of ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5']) {
       expect(LEGACY_MODELS).toContain(old);
       expect(MODEL_ID_SET.has(old)).toBe(true);
@@ -312,7 +313,7 @@ describe('custom brains (user-authored packs)', () => {
 describe('picker preview roles', () => {
   it('previews the six working roles — designer (docs/14) and marketer (marketing-channel plan) seated, support roles separate', () => {
     expect(PACK_PREVIEW_ROLES).toEqual(['orchestrator', 'architect', 'developer', 'reviewer', 'designer', 'marketer']);
-    expect(PACK_SUPPORT_ROLES).toEqual(['shipper', 'sales', 'curator']);
+    expect(PACK_SUPPORT_ROLES).toEqual(['shipper', 'sales', 'curator', 'finance']);
     // worker never previews — it aliases developer
     expect(PACK_PREVIEW_ROLES).not.toContain('worker');
     expect([...PACK_PREVIEW_ROLES, ...PACK_SUPPORT_ROLES, 'worker'].sort()).toEqual([...AGENT_ROLES].sort());

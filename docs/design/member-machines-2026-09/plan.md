@@ -281,6 +281,24 @@ replica covers one zone; `replicas` is the knob if more are ever bought.
   that never drew and never said why (the `content.revise` carrying `image_error` was refused too).
   The machine now signs with `NM_MACHINE_TOKEN` (`nmm_…`), which the /v1 gate already accepts.
 
+## 10b. The missed team shape (George, 2026-11-18)
+
+George's Pro workspace got its second person (another account of his own) without the
+first-invitation promotion. So his first machine stayed a shared runner. On Cloud Run a shared
+runner keeps no login (`machine-vault.ts`), and he signed in to every CLI again after each stop.
+
+- **The machine sweep repairs it.** `reshapeParkedTeams` finds each Pro workspace with two or more
+  people whose runner sleeps and whose owner has no member machine. It calls `ensureTeamShape` with
+  `parkedOnly`: the runner becomes the owner's machine (same id, same snapshot), and a new runner is
+  minted asleep. The kind takes effect at the next boot, so no awake daemon is rolled. Free is left
+  alone. The sweep log names each repair as `teamShaped=[…]`.
+- **The owner's waking machine keeps their session.** A message wakes the member machine and the
+  runner together, but the runner is usually awake first. It claimed a web session at once, lacked
+  the person's login, and the starter door moved the session to the NeuraMesh brain for good. Rung 0
+  now leaves the session to the sleeping member machine for `CLOUD_WAKE_WINDOW_MS` (150 s), when that
+  machine published the brain and the awake runner cannot serve it. After the window the runner
+  claims as before.
+
 ## 11. Open questions
 
 - **Existing free workspaces with more than one member** keep their members but cannot add more.

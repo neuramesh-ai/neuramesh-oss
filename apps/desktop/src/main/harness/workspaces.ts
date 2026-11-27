@@ -1,3 +1,4 @@
+import { hydratePath } from './hydration';
 // Task-workspace reclaim (worktree-berths round, docs/design/worktree-berths-2026-08).
 //
 // A task worktree is DERIVED state — branch on the remote, deliverables in artifacts — so removal
@@ -54,6 +55,9 @@ export async function removeTaskWorkspace(o: {
   /** the task's local branch (nm/<n>-slug) — deleted so clones stop accreting dead refs */
   branch?: string | null;
 }): Promise<string[]> {
+  await hydratePath(o.wtDir);
+  if (o.cloneDir) await hydratePath(o.cloneDir);
+  if (o.deliverableDir) await hydratePath(o.deliverableDir);
   const notes: string[] = [];
   if (o.cloneDir && existsSync(o.cloneDir)) {
     // `worktree remove` clears the dir AND `.git/worktrees/<name>`; `prune` covers the legacy
@@ -106,7 +110,9 @@ export function worktreeCloneDir(wtDir: string): string | null {
  */
 export async function removeEngineeringWorktree(wtDir: string): Promise<string[]> {
   const notes: string[] = [];
+  await hydratePath(wtDir);
   const cloneDir = worktreeCloneDir(wtDir);
+  if (cloneDir) await hydratePath(cloneDir);
   if (cloneDir && existsSync(cloneDir)) {
     const branch = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], wtDir).catch(() => '');
     await runGit(['worktree', 'remove', '--force', wtDir], cloneDir).then(() => notes.push('worktree'), () => {});

@@ -5,6 +5,9 @@ import { DomainError } from '../errors';
 export async function updateThreadTitleSql(sql: postgres.Sql, workspace: string, threadId: string,
   patch: { title?: string; description?: string }, opts?: { agentTitleOnce?: boolean }): Promise<void> {
   await sql.begin(async tx => {
+    // Replicated writes take the sync revision before touching rows. Acquire it in
+    // that same order before explicitly locking the thread shared with permission saves.
+    await tx`select revision from local_sync_state where singleton and enabled for update`;
     const [current] = await tx`select titled_at from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid for update`;
     if (!current) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`);
     if (patch.title !== undefined && opts?.agentTitleOnce && current['titled_at']) {

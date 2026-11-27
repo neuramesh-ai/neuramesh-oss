@@ -1,24 +1,33 @@
+import { memoryChannelAllowed, memoryFactView, lexicalMemory } from './memory-fact-view';
+import { MemDestinationStore } from './destinations';
+import { MemFinanceStore } from '../private-finance';
 import { startProjectMarketingMem, backfillSetupTasksMem } from './project-marketing-memory';
+import { setWorkspaceProfileMem } from './workspace-profile-memory';
 // The in-memory Store — extracted from store.ts (track C-store).
 //
 // What apps/desktop and most of the suite run against, so it is not a mock: it must
 // behave exactly as PostgresStore does. That equivalence has no test today (the pairs are
 // written twice, not shared), which is why this moves as ONE file rather than being cut
 // into repositories — the split waits for the contract suite that would prove it safe.
-import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, isGitHubNeedQuestion, planLabel, readAnswers, taskBranch, TaskSchema, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
+import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, isGitHubNeedQuestion, planLabel, readAnswers, taskBranch, TaskSchema, threadKindOf, threadModeOf, type Actor, type ActorRef, type Beat, type BeatStatus, type CompanyProfile, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, type WorkspaceMode, workspaceModeOf } from '@neuramesh/shared';
 import { DomainError } from '../errors';
-import { deleteScheduleMem, markScheduleResultMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
+import { deleteScheduleMem, markScheduleResultMem, releaseWatchForMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
 import { runScheduleNowMem } from './schedule-now';   import { routineSessionMem } from './routine-session';
 import { MemAnnounceStore } from './announce';   import { MemFilmStore } from './films';   import { MemReplyStore } from './replies';   import { MemAgentModelStore } from './agent-models';   import { MemGitHubProofStore } from './github-proofs';
-import { pickHumanWord, settleMemoryThread } from './thread-settle';
-import { anchorContentItemMem } from './content-anchor';
+import { pickHumanWord, settleMemoryTask, settleMemoryThread } from './thread-settle';
+import { anchorContentItemMem } from './content-anchor'; import { MemPostizContent } from './postiz-content';
 import { threadRoutineIdMem } from './routine-rule';   import { sessionTitle } from './session-title';
 import type { LifecycleRow } from '../lifecycle';
-import { normalizeTaskTitle } from './types';
-import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
+import { requireTaskOwner } from './task-owner';
+import { normalizeTaskTitle, type MutationResult, type ArtifactRow, type AttachmentInput, type ScheduleInput, type NMMessage, type DecisionSeed, type DecisionRow, type PolicyRow, type PolicyInput, type DesktopAuthResult, type RunInput, type WhiteboardRow, type WhiteboardMeta, type WhiteboardCreate, type WhiteboardLwwPatch, type WhiteboardUpdate } from './types';
 import type { Store } from './contract';   import type { VideoMeta } from './films';
 
 export class MemoryStore implements Store {
+  readonly destinations = new MemDestinationStore(async workspace => [
+    ...[...(this.wsMembers.get(workspace) ?? [])].map(id => ({ id, kind: 'human' as const, name: id, role: this.workspaces.some(w => w.id === workspace && w.createdBy === id) ? 'owner' : 'member', description: null, owner: this.workspaces.some(w => w.id === workspace && w.createdBy === id) })),
+    ...[...this.agentMeta].filter(([id,a]) => a.workspace === workspace && !this.retiredAgents.has(id)).map(([id,a]) => ({ id, kind: 'agent' as const, name: a.name, role: a.role, description: this.agentText.get(id)?.description ?? null, owner: false })),
+  ]);
+  readonly finance = new MemFinanceStore();
   readonly announcements = new MemAnnounceStore(() => ({ decisions: this.decisionRows, messages: this.messages, channels: this.channels, connectors: this.connectors, events: this.events, tasks: this.tasks }));   readonly films = new MemFilmStore();   readonly replies = new MemReplyStore((id) => this.messages.find((m) => m.id === id));   readonly agentModels = new MemAgentModelStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false, (id) => { const m = this.agentMeta.get(id); return m && { workspace: m.workspace, retired: this.retiredAgents.has(id) }; });   readonly githubProofs = new MemGitHubProofStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false);
   // readable in tests like `threads` — the memory store IS the test double
   tasks = new Map<string, Task>();
@@ -110,10 +119,10 @@ export class MemoryStore implements Store {
         const latest = Math.max(0, ...rounds.map((x) => x.r));
         for (const { a, r } of rounds) if (r === latest) a.promoted = true;
       }
-      if (out.dismissOpenDecisions) {
+      if (out.dismissOpenDecisions || out.dismissQuestionCards) {
         const at = new Date().toISOString();
         for (const d of this.decisionRows) {
-          if (d.taskId === id && d.status === 'open') {
+          if (d.taskId === id && d.status === 'open' && (out.dismissOpenDecisions || !d.requiresExactAnswer)) {
             d.status = 'dismissed';
             d.answeredAt = at;
           }
@@ -262,36 +271,24 @@ export class MemoryStore implements Store {
     return { workspace };
   }
 
-  async channelMemory(_workspace: string, channel: string) {
-    const facts = this.facts
-      .filter((f) => f.channel === channel)
-      .map((f) => ({
-        id: f.id,
-        content: f.content,
-        kind: f.kind,
-        taskNumber: f.taskId ? this.tasks.get(f.taskId)?.number ?? null : null,
-        validFrom: new Date(0).toISOString(),
-        validUntil: f.validUntil,
-        supersededBy: f.supersededBy,
-      }));
-    return { block: null, facts };
+  private privateMemoryChannels=new Set<string>();
+  async channelMemory(workspace: string, channel: string, actor?:Actor, marketing?:boolean) {
+    if(!await memoryChannelAllowed(this.channels,this.privateMemoryChannels,this.destinations,workspace,channel,actor,marketing))return {block:null,facts:[]};
+    return memoryFactView(this.facts,this.tasks,channel);
   }
+
 
   async recall(
     workspace: string,
     channel: string | null,
     query: string,
     k: number,
+    scope?: {actor?:Actor;marketing?:boolean},
   ): Promise<Array<{ id: string; kind: 'fact' | 'message'; body: string; channel: string; createdAt: string; score: number }>> {
-    // naive lexical rank — the memory store backs FSM unit tests only
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return this.messages
-      .filter((m) => m.workspace === workspace && (!channel || m.channel === channel))
-      .map((m) => ({ m, hits: terms.filter((t) => m.body.toLowerCase().includes(t)).length }))
-      .filter((x) => x.hits > 0)
-      .sort((a, b) => b.hits - a.hits)
-      .slice(0, k)
-      .map(({ m, hits }) => ({ id: m.id, kind: 'message' as const, body: m.body, channel: m.channel, createdAt: m.createdAt, score: hits }));
+    // naive lexical rank — the memory store backs FSM unit tests only (it keeps no projects, so no scope)
+    const allowed=new Set<string>();
+    for(const m of this.messages)if(m.workspace===workspace&&await memoryChannelAllowed(this.channels,this.privateMemoryChannels,this.destinations,workspace,m.channel,scope?.actor,scope?.marketing))allowed.add(m.channel);
+    return lexicalMemory(this.messages,workspace,channel,query,k,allowed);
   }
 
   private facts: Array<{ id: string; workspace: string; channel: string; content: string; kind: string; taskId: string | null; validUntil: string | null; supersededBy: string | null }> = [];
@@ -344,7 +341,7 @@ export class MemoryStore implements Store {
     return { id };
   }
 
-  private workspaces: Array<{ id: string; name: string; slug: string; createdBy: string; autoFailover: boolean; activeModelPack: string; commRules?: unknown; videoTier?: string | null }> = [];
+  private workspaces: Array<{ id: string; name: string; slug: string; createdBy: string; autoFailover: boolean; activeModelPack: string; commRules?: unknown; videoTier?: string | null; profile?: CompanyProfile | null }> = [];
   private plans = new Map<string, string>(); // workspace id → plan ('free' default); set by setWorkspacePlan (Stripe webhook / tests)
 
   async createWorkspace(input: { name: string; slug: string; createdBy: string }, event: NMEvent): Promise<{ workspaceId: string; channelId: string }> {
@@ -356,12 +353,13 @@ export class MemoryStore implements Store {
     return { workspaceId, channelId: crypto.randomUUID() };
   }
 
-  async listWorkspaces(userId: string): Promise<Array<{ id: string; name: string; slug: string; role: string; memberCount: number; autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null }>> {
+  async listWorkspaces(userId: string): Promise<Array<{ id: string; name: string; slug: string; role: string; memberCount: number; autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null; profile: CompanyProfile | null }>> {
     return this.workspaces
       .filter((w) => w.createdBy === userId)
-      .map((w) => ({ id: w.id, name: w.name, slug: w.slug, role: 'owner', memberCount: 1, autoFailover: w.autoFailover, activeModelPack: w.activeModelPack, commRules: w.commRules ?? null, plan: this.plans.get(w.id) ?? 'free', seats: 1, subscriptionStatus: null, currentPeriodEnd: null, primaryMachineId: null }));
+      .map((w) => ({ id: w.id, name: w.name, slug: w.slug, role: 'owner', memberCount: 1, autoFailover: w.autoFailover, activeModelPack: w.activeModelPack, commRules: w.commRules ?? null, plan: this.plans.get(w.id) ?? 'free', seats: 1, subscriptionStatus: null, currentPeriodEnd: null, primaryMachineId: null, profile: w.profile ?? null }));
   }
 
+  setWorkspaceProfile = (workspaceId: string, input: { name?: string; profile: CompanyProfile; by: string }, makeEvent: (workspace: string) => NMEvent) => setWorkspaceProfileMem(this.workspaces, this.events, workspaceId, input, makeEvent);
   async updateWorkspace(workspaceId: string, patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const w = this.workspaces.find((x) => x.id === workspaceId);
     if (!w) throw new DomainError('NOT_FOUND', 'workspace not found');
@@ -415,7 +413,7 @@ export class MemoryStore implements Store {
     return this.projects.filter((p) => p.workspace === workspace && p.status === 'active').length;
   }
 
-  async setWorkspacePlan(workspace: string, patch: { plan?: string; seats?: number; subscriptionStatus?: string | null; stripeCustomerId?: string | null; stripeSubscriptionId?: string | null; currentPeriodEnd?: string | null }): Promise<void> {
+  async setWorkspacePlan(workspace: string, patch: { plan?: string; seats?: number; subscriptionStatus?: string | null; stripeCustomerId?: string | null; stripeSubscriptionId?: string | null; currentPeriodEnd?: string | null; cardOnFile?: boolean }): Promise<void> {
     if (patch.plan !== undefined) this.plans.set(workspace, patch.plan); // memory store backs unit tests; only plan matters for gating
   }
 
@@ -445,7 +443,7 @@ export class MemoryStore implements Store {
 
   private clerkUsers = new Map<string, string>(); // clerkId -> internal uuid
 
-  async resolveClerkUser(clerkId: string, email: string | null): Promise<{ id: string; created: boolean }> {
+  async resolveClerkUser(clerkId: string, email: string | null, _selfAsserted = false): Promise<{ id: string; created: boolean }> {
     const existing = this.clerkUsers.get(clerkId);
     const id = existing ?? crypto.randomUUID();
     if (!existing) this.clerkUsers.set(clerkId, id);
@@ -487,10 +485,11 @@ export class MemoryStore implements Store {
     if (!task) throw new DomainError('NOT_FOUND', `task ${taskId} not found`);
     if (task.state !== 'todo' && task.state !== 'plan_review') throw new DomainError('ILLEGAL_TRANSITION', 'only todo or plan_review tasks can be offered');
     const agentId = await this.resolveOffer(task.workspace, task.channel, agentName);
+    requireTaskOwner(task.assignee?.id ?? task.offeredAgentId, agentId);
     const boundRepo = repo ? { id: repo.id, baseRef: repo.baseRef, branch: taskBranch(task.number, task.title) } : task.repo;
     this.tasks.set(taskId, {
       ...task,
-      offeredAgentId: agentId,
+      offeredAgentId: agentId, assignee: { kind: 'agent', id: agentId },
       repo: boundRepo,
       ...(checklist?.length ? { requirements: checklist, requirementsConfirmed: true } : {}),
       ...(dod ? { definitionOfDone: dod } : {}),
@@ -635,7 +634,7 @@ export class MemoryStore implements Store {
   private decisionRows: DecisionRow[] = [];
   private policyRows: PolicyRow[] = [];
 
-  threads: Array<{ id: string; workspace: string; channel: string; title: string; description: string; createdBy: string; taskId: string | null; rootMessageId?: string | null; mode: ThreadMode; kind?: ThreadKind; brainOverride?: BrainOverride | null; archivedAt?: string | null; settledAt?: string | null; filedAt?: string | null; filedReason?: string | null; scheduleId?: string | null }> = [];
+  threads: Array<{ id: string; workspace: string; channel: string; title: string; description: string; createdBy: string; taskId: string | null; rootMessageId?: string | null; mode: ThreadMode; kind?: ThreadKind; workspaceMode?: WorkspaceMode | null; brainOverride?: BrainOverride | null; archivedAt?: string | null; settledAt?: string | null; filedAt?: string | null; filedReason?: string | null; scheduleId?: string | null }> = [];
   async createThread(workspace: string, channelId: string, threadId: string, title: string, description: string, createdBy: string): Promise<void> {
     if (!this.threads.some((t) => t.id === threadId)) {
       this.threads.push({ id: threadId, workspace, channel: channelId, title, description, createdBy, taskId: null, rootMessageId: null, mode: 'tasks' });
@@ -670,7 +669,7 @@ export class MemoryStore implements Store {
   }
 
   /** 0137 — store/thread-settle.ts holds both rules; these only bind the arrays */
-  async setThreadSettled(workspace: string, threadId: string, settled: boolean): Promise<void> { settleMemoryThread(this.threads, workspace, threadId, settled); }
+  async setThreadSettled(workspace: string, threadId: string, settled: boolean): Promise<void> { settleMemoryThread(this.threads, workspace, threadId, settled); }   async setTaskSettled(workspace: string, taskId: string, settled: boolean): Promise<void> { settleMemoryTask(this.tasks, workspace, taskId, settled); }
   async latestHumanWord(taskId: string): Promise<{ id: string; createdAt: string } | null> { const t = await this.getTask(taskId); return t ? pickHumanWord(this.messages, this.threads, taskId, t.updatedAt) : null; }
 
   async threadFiling(workspace: string, threadId: string) {
@@ -715,7 +714,7 @@ export class MemoryStore implements Store {
     t.mode = mode;
   }
   /** 0144, coding threads — the pg twin is store/thread-machine.ts setThreadKindSql */
-  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void> { const t = this.threads.find((x) => x.id === threadId && x.workspace === workspace); if (!t) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`); t.kind = kind; }
+  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind, mode?: WorkspaceMode | null): Promise<void> { const t = this.threads.find((x) => x.id === threadId && x.workspace === workspace); if (!t) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`); t.kind = kind; if (mode !== undefined) t.workspaceMode = mode; }
 
   async shareCompute(workspace: string, userId: string, member: string, on: boolean): Promise<void> {
     const ids = [...(this.wsMembers.get(workspace) ?? new Set<string>())];
@@ -781,7 +780,7 @@ export class MemoryStore implements Store {
       // foreign key and used to 500 forever when the root had been purged; this store has no FK,
       // so without the same check the two stores would disagree exactly where it mattered.
       const namedRoot = msg.rootMessageId && this.messages.some((m) => m.id === msg.rootMessageId) ? msg.rootMessageId : null;
-      this.threads.push({ id: msg.threadId, workspace: msg.workspace, channel: msg.channel, title: sessionTitle(this.schedules.find((x) => x.id === msg.scheduleId && x.workspace === msg.workspace)?.title, msg.body), description: '', createdBy: `${msg.author.kind}:${msg.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg.id, mode: threadModeOf(msg.threadMode), kind: threadKindOf(msg.threadKind), brainOverride: parseBrainOverride(msg.brainOverride), scheduleId: this.schedules.some((x) => x.id === msg.scheduleId && x.workspace === msg.workspace) ? msg.scheduleId! : null });
+      this.threads.push({ id: msg.threadId, workspace: msg.workspace, channel: msg.channel, title: sessionTitle(this.schedules.find((x) => x.id === msg.scheduleId && x.workspace === msg.workspace)?.title, msg.body), description: '', createdBy: `${msg.author.kind}:${msg.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg.id, mode: threadModeOf(msg.threadMode), kind: threadKindOf(msg.threadKind), workspaceMode: threadKindOf(msg.threadKind) === 'coding' ? workspaceModeOf(msg.threadWorkspace) : null, brainOverride: parseBrainOverride(msg.brainOverride), scheduleId: this.schedules.some((x) => x.id === msg.scheduleId && x.workspace === msg.workspace) ? msg.scheduleId! : null });
     }
     // a later run of the session's own schedule renames it while nobody named it (pgstore's conflict branch)
     else if (msg.threadId) { const t = this.threads.find((x) => x.id === msg.threadId) as (typeof this.threads)[number] & { titledAt?: string | null }; const own = this.schedules.find((x) => x.id === msg.scheduleId && x.workspace === msg.workspace); if (t && own && !t.titledAt && t.scheduleId === own.id) t.title = sessionTitle(own.title, msg.body); }
@@ -811,7 +810,7 @@ export class MemoryStore implements Store {
       // a re-asked question supersedes its older open card in the same channel/thread. A GitHub
       // card's question names only its ask, so it supersedes only in its own conversation too.
       for (const prior of this.decisionRows) {
-        if (prior.status === 'open' && prior.workspace === msg.workspace && prior.channel === msg.channel && prior.taskId === (msg.taskId ?? null) && prior.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior.messageId)?.threadId ?? null) === (msg.threadId ?? null))) {
+        if (!d.requiresExactAnswer && !prior.requiresExactAnswer && prior.status === 'open' && prior.workspace === msg.workspace && prior.channel === msg.channel && prior.taskId === (msg.taskId ?? null) && prior.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior.messageId)?.threadId ?? null) === (msg.threadId ?? null))) {
           prior.status = 'dismissed';
           prior.answeredAt = new Date().toISOString();
         }
@@ -825,7 +824,7 @@ export class MemoryStore implements Store {
         asker: { kind: msg.author.kind, id: msg.author.id },
         question: d.question,
         options: d.options,
-        allowOther: d.allowOther,
+        allowOther: d.allowOther, requiresExactAnswer: d.requiresExactAnswer,
         status: 'open',
         answer: null,
         answeredBy: null,
@@ -840,7 +839,7 @@ export class MemoryStore implements Store {
     if (msg.author.kind === 'human') {
       for (const [question, answer] of readAnswers([msg.body])) {
         for (const row of this.decisionRows) {
-          if (row.status === 'open' && row.workspace === msg.workspace && row.channel === msg.channel && row.taskId === (msg.taskId ?? null) && row.question === question) {
+          if (!row.requiresExactAnswer && row.status === 'open' && row.workspace === msg.workspace && row.channel === msg.channel && row.taskId === (msg.taskId ?? null) && row.question === question) {
             row.status = 'answered';
             row.answer = answer;
             row.answeredBy = { kind: msg.author.kind, id: msg.author.id };
@@ -904,7 +903,7 @@ export class MemoryStore implements Store {
     return { id };
   }
   async deletePolicy(policyId: string, event: NMEvent): Promise<{ id: string }> {
-    const i = this.policyRows.findIndex((p) => p.id === policyId);
+    const i = this.policyRows.findIndex((p) => p.id === policyId && p.workspace === event.workspace);
     if (i === -1) throw new DomainError('NOT_FOUND', `policy ${policyId} not found`);
     this.policyRows.splice(i, 1);
     this.events.push(event);
@@ -1255,6 +1254,7 @@ export class MemoryStore implements Store {
     const c = this.channels.find((x) => x.id === channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
     c.kind = kind;
+    if(kind==='marketing')this.privateMemoryChannels.add(channelId);
     if (kind === 'marketing') await this.ensureSetupTaskMem(c);
     this.events.push(makeEvent(c.workspace));
     return { id: channelId };
@@ -1288,6 +1288,7 @@ export class MemoryStore implements Store {
     return { id: channelId, workspace: c.workspace };
   }
   async backfillSetupTasks(workspace: string): Promise<number> {
+    if (this.workspaces.find((w) => w.id === workspace)?.profile) return 0; // pgstore's rule, its profile half (workspace-profile-memory.ts)
     return backfillSetupTasksMem(this.channels.filter((c) => c.workspace === workspace), (c) => this.ensureSetupTaskMem(c));
   }
   startProjectMarketing = (projectId: string, userId: string, makeEvent: (workspace: string) => NMEvent) =>
@@ -1520,6 +1521,7 @@ export class MemoryStore implements Store {
       ?? this.connectors.find((x) => hit(x) && x.projectId === null);
     return c ? { id: c.id, status: c.status, handle: c.handle, ciphertext: this.connectorSecrets.get(c.id) ?? null } : null;
   }
+  readonly postizContent = new MemPostizContent(() => ({ items: this.contentItems, connectors: this.connectors, secrets: this.connectorSecrets, mime: (id: string) => this.contentMedia.get(id)?.mime ?? '' }));
   async markConnectorReauth(connectorId: string): Promise<void> {
     const c = this.connectors.find((x) => x.id === connectorId);
     // status only — the secret stays (see the Store contract). 'reauth_required', NOT the
@@ -1537,7 +1539,7 @@ export class MemoryStore implements Store {
   }
   async dueContentItems(nowIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; platform: string; body: string; mediaUrl?: string | null; mediaId?: string | null; mediaKind?: 'image' | 'video' | null; imageIntended: boolean }>> {
     return this.contentItems
-      .filter((i) => i.status === 'scheduled' && !!i.scheduledAt && i.scheduledAt <= nowIso)
+      .filter((i) => i.status === 'scheduled' && !!i.scheduledAt && i.scheduledAt <= nowIso && !this.postizContent.routed(i.id))
       .slice(0, limit)
       // the one media slot holds a picture or a film: the row's mime says which (pg: video_id vs image_id); a video post's hold is its film in flight
       .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, platform: i.platform, body: i.body, mediaUrl: i.mediaUrl, mediaId: i.mediaId ?? null, mediaKind: i.mediaId ? ((this.contentMedia.get(i.mediaId)?.mime ?? '').startsWith('video/') ? 'video' as const : 'image' as const) : null, imageIntended: i.script || i.videoPending ? !!i.videoPending && !i.mediaId : !!i.brief }));
@@ -1579,6 +1581,7 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(markScheduleResultMem(this.schedules, scheduleId, error).workspace));
     return { id: scheduleId };
   }
+  async releaseWatchFor(workspace: string, repoId: string): Promise<string | null> { return releaseWatchForMem(this.schedules, workspace, repoId); }
   async setScheduleCursor(scheduleId: string, cursor: { at: string; tag: string | null }, log: { at: string; key: string | null; note: string } | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     this.events.push(makeEvent(setScheduleCursorMem(this.schedules, scheduleId, cursor, log).workspace));
     return { id: scheduleId };

@@ -26,7 +26,7 @@ export const MACHINE_COMMANDS = [
   // while it sleeps (member-machines plan §4).
   // daemonVersion: the same reason — a cloud machine's image names its commit (NM_IMAGE_SHA) and
   // the beat is the only place it can say so. Optional: an older machine beats without it.
-  z.object({ type: z.literal('machine.heartbeat'), machineId: z.string().min(1), activeSeconds: z.number().int().min(0).max(3600).optional(), busy: z.boolean().optional(), runtimes, daemonVersion: z.string().min(1).max(64).optional() }),
+  z.object({ type: z.literal('machine.heartbeat'), machineId: z.string().min(1), activeSeconds: z.number().int().min(0).max(3600).optional(), busy: z.boolean().optional(), runtimes, permissionVersion: z.literal(1).optional(), daemonVersion: z.string().min(1).max(64).optional() }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
   z.object({ type: z.literal('machine.provision'), workspace: z.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC
@@ -38,6 +38,17 @@ export const MACHINE_COMMANDS = [
   // a login is about to land on a claim runner (round §4.2, D2): give it a disk of its own first.
   // HUMAN_ONLY, from the terminal's sign-in flows; a no-op answer for a machine already on a volume
   z.object({ type: z.literal('machine.promote'), workspace: z.string().min(1), machineId: z.string().uuid() }),
+  // a person moves a cloud machine to the newest published release (docs/design/whats-new-upgrades-2026-11).
+  // HUMAN_ONLY, anyone with access (machine-releases.ts mayUpgradeMachine). clientKey makes a retry the same
+  // attempt. stopWork: the person saw the confirm, so the drain may stop turns that run
+  z.object({ type: z.literal('machine.upgrade'), workspace: z.string().min(1), machineId: z.string().uuid(), toVersion: z.string().regex(/^\d{4}\.\d{2}\.\d+$/), mode: z.enum(['start', 'next_start', 'now', 'when_idle']), stopWork: z.boolean().optional(), clientKey: z.string().min(8).max(64) }),
+  // cancel an upgrade that waits (armed for idle, or staged for the next start). HUMAN_ONLY
+  z.object({ type: z.literal('machine.upgrade_cancel'), workspace: z.string().min(1), machineId: z.string().uuid() }),
+  // return to the last release within 24 h of a successful upgrade (plan §8.4), through the same drain and
+  // boot as an upgrade, and only to a release that reads the saved snapshot (§8.2). HUMAN_ONLY
+  z.object({ type: z.literal('machine.upgrade_rollback'), workspace: z.string().min(1), machineId: z.string().uuid(), clientKey: z.string().min(8).max(64) }),
+  // the What's new card's Later, ×, Undo and seen marks: per person and per release. HUMAN_ONLY
+  z.object({ type: z.literal('whats_new.mark'), version: z.string().regex(/^\d{4}\.\d{2}\.\d+$/), action: z.enum(['seen', 'later', 'dismiss', 'undo']) }),
   // the Code-session rows a host and a client keep (commands-code.ts) ride the same spread
   ...CODE_SESSION_COMMANDS,
 ] as const;
