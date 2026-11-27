@@ -135,7 +135,7 @@ export const day7Meta: TemplateMeta = {
   kind: 'lifecycle',
   shape: 'The threshold. A week into the Pro trial: the credits it started with, and what Pro adds',
   claims: [
-    ['The trial starts with 500 credits', 'rates.ts SIGNUP_GRANT_CREDITS; first-workspace.ts grantSignupCredits'],
+    ['The trial starts with 100 credits', 'rates.ts SIGNUP_GRANT_CREDITS; first-workspace.ts grantSignupCredits'],
     ['Bought credits never expire and work on every plan', 'credit-ledger.ts purchased pool; CreditsView.tsx'],
     ['Pro: 1,500 credits a seat, every month', 'rates.ts CLOUD_SEAT_MONTHLY_CREDITS; fleet-lifecycle.ts monthly refill'],
     ['A teammate needs Pro, and gets a cloud machine', 'entitlements.ts seatLimitReason; member-machines.ts provisionMemberMachine'],

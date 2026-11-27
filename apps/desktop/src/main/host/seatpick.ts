@@ -106,8 +106,8 @@ export async function seatAgent(
   if (!pack && !threadOverride && !pick) return agent;
   const custom = pack && isCustomPackId(pack) ? await deps.customPacksFor(row!.workspace_id) : [];
   const model = seatModel({ role: agent.role as AgentRole, currentModel: agent.model, modelSource: agent.modelSource, projectPack: pack, custom, threadOverride, memberPick: pick?.model ?? null });
-  const home = scope?.threadId ? await db.get<{ home_agent_id: string | null; home_thinking: string | null }>('select home_agent_id, home_thinking from threads where id = ?', [scope.threadId]).catch(() => null) : null;
-  const thinking = thinkingFor(model, home?.home_agent_id === agent.id && threadOverride?.[agent.role as AgentRole] ? { model, thinking: home.home_thinking as import('@neuramesh/shared').ThinkingLevel | null } : pick);
+  const home = owner?.id ? await db.get<{ home_agent_id: string | null; home_thinking: string | null; task_id: string | null }>('select home_agent_id, home_thinking, task_id from threads where id = ?', [owner.id]).catch(() => null) : null;
+  const thinking = thinkingFor(model, (home?.home_agent_id === agent.id || home?.task_id === scope?.taskId && !!scope?.taskId) && threadOverride?.[agent.role as AgentRole] ? { model, thinking: home?.home_thinking as import('@neuramesh/shared').ThinkingLevel | null } : pick);
   if (model === agent.model && thinking === (agent.thinking ?? null)) return agent;
   const why = threadOverride?.[agent.role as AgentRole] ? 'thread_brain' : pick?.model === model ? `member_pick=${requester}` : `project_pack=${pack}`;
   console.log(`agent_seat agent=${agent.name} ${why} ${agent.model} → ${model}${thinking ? ` thinking=${thinking}` : ''}`);

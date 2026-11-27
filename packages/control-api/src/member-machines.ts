@@ -10,6 +10,7 @@ import type postgres from 'postgres';
 import { creditBalance } from './credit-ledger';
 import { sqlOf } from './credits';
 import { createCloudMachine } from './fleet';
+import { clearBreakerOnHumanWake } from './private';
 import { mintMachineToken } from './machine-auth';
 import type { Store } from './store';
 
@@ -65,17 +66,24 @@ export async function provisionMemberMachine(sql: postgres.Sql, workspaceId: str
 /**
  * Tombstone the member's machine(s) here. The desired feed drops destroyed rows, so the operator
  * removes the StatefulSet, the token Secret and the PVC — the logins die with the membership,
- * by construction (architecture.md §2). The name is freed too: `(workspace_id, name)` is unique,
+ * by construction (architecture.md §2). On Cloud Run the login vault row goes too. The name is freed too: `(workspace_id, name)` is unique,
  * and a member who re-joins mints `member-<id>` again.
  */
 export async function destroyMemberMachine(sql: postgres.Sql, workspaceId: string, userId: string): Promise<string[]> {
+  // the login vault (0160) goes in the same statement: a tombstone keeps its id, so the cascade
+  // never fires, and a login must not outlive the membership it was made under
   const rows = await sql<{ id: string }[]>`
-    update machines
-       set lifecycle = 'destroyed', desired_replicas = 0, started_at = null, token_hash = null,
-           name = name || '-gone-' || left(id::text, 8)
-     where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
-       and ${LIVE(sql)}
-     returning id`;
+    with gone as (
+      update machines
+         set lifecycle = 'destroyed', desired_replicas = 0, started_at = null, token_hash = null,
+             name = name || '-gone-' || left(id::text, 8)
+       where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
+         and ${LIVE(sql)}
+       returning id
+    ), vault as (
+      delete from machine_vault where machine_id in (select id from gone)
+    )
+    select id from gone`;
   return rows.map((r) => r.id);
 }
 
@@ -113,18 +121,23 @@ export const mayUse = (m: MachineReach, userId: string): boolean =>
 export const mayAttach = (m: Pick<MachineReach, 'kind' | 'ownerUserId'>, userId: string): boolean =>
   m.kind === 'runner' || m.ownerUserId === userId;
 
-/** wake ONE machine, credits permitting — the by-id half of fleet-lifecycle's workspace wake */
-export async function wakeMachine(sql: postgres.Sql, machineId: string): Promise<{ woken: boolean; capped: boolean }> {
+/** wake ONE machine, credits permitting — the by-id half of fleet-lifecycle's workspace wake.
+ *  `human`: a person asked (Wake now, a park they answered). Only that wakes a machine whose
+ *  crash-loop breaker tripped, and it clears the stamp for one more boot (fleet-cloudrun-breaker.ts) */
+export async function wakeMachine(sql: postgres.Sql, machineId: string, opts: { human?: boolean } = {}): Promise<{ woken: boolean; capped: boolean }> {
   const reach = await machineReach(sql, machineId);
   if (!reach) return { woken: false, capped: false };
   if ((await creditBalance(sql, reach.workspaceId)).remainingMicros <= 0) return { woken: false, capped: true };
+  const human = opts.human === true;
   const rows = await sql<{ id: string }[]>`
-    update machines
+    update machines m
        set desired_replicas = 1, last_wake_at = now(),
            -- only a STOPPED machine is starting; re-waking a running one must not reset its clock
-           started_at = case when desired_replicas = 0 then now() else started_at end
-     where id = ${machineId}::uuid and kind <> 'local' and ${LIVE(sql)}
-     returning id`;
+           started_at = case when m.desired_replicas = 0 then now() else m.started_at end,
+           ${clearBreakerOnHumanWake(sql, () => sql`${human}::boolean`)}
+     where m.id = ${machineId}::uuid and m.kind <> 'local' and (m.lifecycle is null or m.lifecycle <> 'destroyed')
+       and (m.boot_loop_at is null or ${human}::boolean)
+     returning m.id`;
   return { woken: rows.length > 0, capped: false };
 }
 
@@ -138,14 +151,17 @@ export async function wakeMachine(sql: postgres.Sql, machineId: string): Promise
  * Idempotent: a workspace already in team shape is left alone. One transaction: a workspace is
  * never left without a runner.
  */
-export async function ensureTeamShape(sql: postgres.Sql, workspaceId: string): Promise<{ promoted: string | null; runner: string | null }> {
+export async function ensureTeamShape(sql: postgres.Sql, workspaceId: string, o: { parkedOnly?: boolean } = {}): Promise<{ promoted: string | null; runner: string | null }> {
   const out = await (sql.begin(async (_tx) => {
     const tx = _tx as unknown as postgres.Sql;
-    const [runner] = await tx<{ id: string; owner_user_id: string; substrate: string }[]>`
-      select id, owner_user_id, substrate from machines
+    const [runner] = await tx<{ id: string; owner_user_id: string; substrate: string; desired_replicas: number; drain_state: string | null }[]>`
+      select id, owner_user_id, substrate, desired_replicas, drain_state from machines
        where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE(tx)}
        for update`;
     if (!runner) return { promoted: null, runner: null, claimOwner: null };
+    // the sweep's repair changes only a runner that sleeps, so the kind lands at its next boot and no
+    // awake daemon is rolled out from under a turn. The row lock holds a message's wake until commit
+    if (o.parkedOnly && (runner.desired_replicas !== 0 || runner.drain_state !== null)) return { promoted: null, runner: runner.id, claimOwner: null };
     if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id, claimOwner: null };
     // A CLAIM runner holds no login and no volume: a login promotes it to a volume first
     // (fleet-claims.ts), and a promoted runner reads `volume` here. So the conversion's reason, the
@@ -155,8 +171,10 @@ export async function ensureTeamShape(sql: postgres.Sql, workspaceId: string): P
     // their own below, born asleep, exactly like anyone who joins.
     if (runner.substrate === 'claim') return { promoted: null, runner: runner.id, claimOwner: runner.owner_user_id };
     await tx`update machines set kind = 'member', name = ${`member-${runner.owner_user_id.slice(0, 8)}`} where id = ${runner.id}::uuid`;
+    // born awake at an invite, for keys and the starter brain. The sweep's repair mints it asleep: the
+    // next message wakes it (bumpMachineWake), and nobody pays for a boot that nothing asked for
     const fresh = await createCloudMachine(tx, {
-      workspaceId, kind: 'runner', ownerUserId: runner.owner_user_id, name: 'runner', tokenHash: mintMachineToken().hash, replicas: 1,
+      workspaceId, kind: 'runner', ownerUserId: runner.owner_user_id, name: 'runner', tokenHash: mintMachineToken().hash, replicas: o.parkedOnly ? 0 : 1,
     });
     console.log(`team_shape workspace=${workspaceId} promoted=${runner.id} runner=${fresh.id}`);
     return { promoted: runner.id, runner: fresh.id, claimOwner: null };
@@ -166,6 +184,37 @@ export async function ensureTeamShape(sql: postgres.Sql, workspaceId: string): P
     console.log(`team_shape workspace=${workspaceId} runner=${out.runner} stays a claim, owner machine ${mine.created ? `provisioned ${mine.id}` : mine.refused ?? 'exists'}`);
   }
   return { promoted: out.promoted, runner: out.runner };
+}
+
+/**
+ * THE MISSED TEAM SHAPE (2026-11-18). The shape runs at the first invitation on Pro, so a workspace
+ * that got its second person another way kept the owner's machine as a shared runner: a second
+ * member joined before the rule, or while the workspace was Free, then the workspace moved to Pro.
+ * A shared runner keeps no login (machine-vault.ts), so the owner signed in again after every stop
+ * (George, live: two of his own accounts in one workspace). The machine sweep repairs each such
+ * workspace once its runner sleeps. Pro only: Free has no member machines. Idempotent, and a
+ * handful per sweep so one pass never mints a fleet. Returns the workspaces it changed.
+ */
+export async function reshapeParkedTeams(sql: postgres.Sql, limit = 5): Promise<string[]> {
+  const due = await sql<{ id: string }[]>`
+    select w.id from workspaces w
+     where w.plan = 'cloud'
+       and (select count(*) from workspace_members wm where wm.workspace_id = w.id) >= 2
+       and exists (
+         select 1 from machines r
+          where r.workspace_id = w.id and r.kind = 'runner' and (r.lifecycle is null or r.lifecycle <> 'destroyed')
+            and r.substrate <> 'claim' and r.desired_replicas = 0 and r.drain_state is null
+            and not exists (select 1 from machines o
+                             where o.workspace_id = w.id and o.kind = 'member' and o.owner_user_id = r.owner_user_id
+                               and (o.lifecycle is null or o.lifecycle <> 'destroyed')))
+     order by w.id
+     limit ${limit}`;
+  const changed: string[] = [];
+  for (const { id } of due) {
+    const r = await ensureTeamShape(sql, id, { parkedOnly: true });
+    if (r.promoted) changed.push(id);
+  }
+  return changed;
 }
 
 /** the join hook — fire-and-forget, like the runner mint: a failed insert must never fail a join,

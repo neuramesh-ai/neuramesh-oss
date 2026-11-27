@@ -69,6 +69,10 @@ export const NM_TOOLS = [
   'web_click',
   'web_type',
   'web_screenshot',
+  'message_board_list',
+  'message_board_catch_up',
+  'message_board_send',
+  'message_board_take_handoff',
 ] as const;
 export type NmTool = (typeof NM_TOOLS)[number];
 
@@ -77,6 +81,13 @@ export type NmTool = (typeof NM_TOOLS)[number];
  *  watchdog tick reads the board, never the web. the host offers these only on a machine whose
  *  Chromium runs the agents' browser (apps/desktop browser/registry.ts), so the desktop never sees one. */
 const WEB_KINDS: readonly TurnKind[] = ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'];
+
+/** Message boards (docs/design/message-boards-2026-11 §7.6): the turns of an agent that a person gave
+ *  access to a board. narrow on purpose, and a smaller grant is easy to widen: a conversation, the
+ *  orchestrator's two turns and a worker's own turn. a subagent reports to its parent, and a sweep
+ *  reads the task board only. the host offers the family only when the agent has a credential
+ *  (apps/desktop host/messageboards.ts), so an agent with no grant never sees one. */
+const BOARD_KINDS: readonly TurnKind[] = ['chat', 'triage', 'own', 'work'];
 
 /**
  * Which turn kinds may call each nm tool.
@@ -156,6 +167,10 @@ export const TOOL_KINDS: Record<NmTool, readonly TurnKind[]> = {
   web_click: WEB_KINDS,
   web_type: WEB_KINDS,
   web_screenshot: WEB_KINDS,
+  message_board_list: BOARD_KINDS,
+  message_board_catch_up: BOARD_KINDS,
+  message_board_send: BOARD_KINDS,
+  message_board_take_handoff: BOARD_KINDS,
 };
 
 /** Is this tool available to this turn kind? The single reader every surface agrees through. */

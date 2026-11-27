@@ -1,5 +1,6 @@
-import { cardNotification, isLowRiskPermissionCard, parseAuthCard, parseCard, reviewPushFor } from '@neuramesh/shared';
+import { authCardBlock, cardNotification, isLowRiskPermissionCard, parseAuthCard, parseCard, reviewPushFor } from '@neuramesh/shared';
 import type { Store } from './store';
+import {marketingDeliveryAllowed} from './marketing-access';
 
 // Server-side push fan-out for the mobile companion. Fires when a task reaches a
 // human gate or an agent posts a decision card, to every human member of the
@@ -154,8 +155,16 @@ export class PushService {
     // A card that RECORDS a switch a routine already made asks nothing (app.ts mints no decision for
     // it), so it earns no lock-screen push either: the thread shows the switch (George, 2026-09-27,
     // "@rex cannot run on Claude here" on every routine run).
-    if (parseAuthCard(msg.body)?.switched) return;
-    const notif = cardNotification(msg.body, where);
+    const auth = parseAuthCard(msg.body);
+    if (auth?.switched) return;
+    // Older hosts do not send work context. Derive it from the owning thread instead of telling
+    // the phone that an unattended routine was an ordinary reply. No customer content is fetched.
+    const threadId = msg.threadId ?? auth?.scope?.threadId;
+    const routineId = auth && !auth.work && threadId
+      ? await this.store.getThreadRoutineId(msg.workspace, threadId).catch(() => null) : null;
+    const notificationBody = auth && !auth.work
+      ? authCardBlock({ ...auth, work: { kind: routineId ? 'routine' : msg.taskId ? 'task' : 'conversation' } }) : msg.body;
+    const notif = cardNotification(notificationBody, where);
     if (!notif) return;
     await this.dispatch({
       workspace: msg.workspace,
@@ -205,6 +214,7 @@ export class PushService {
     // per-recipient dedupe: skip anyone already pushed for this event in the window
     const recipients: string[] = [];
     for (const id of members) {
+      if(!await marketingDeliveryAllowed(this.store,id,p.workspace,p.data))continue;
       if (await this.store.recordPushOnce(id, p.dedupeKey, p.windowMs ?? DEDUPE_WINDOW_MS)) recipients.push(id);
     }
     if (recipients.length === 0) return;

@@ -34,6 +34,21 @@ describe.skipIf(!DB)('the GitHub connector on postgres', () => {
     expect(n!['n']).toBe(1);
     await expect(sql!`insert into connectors (workspace_id, provider) values (${WS}::uuid, 'gitlab')`).rejects.toThrow(/connectors_provider_check/);
   });
+  it('connectorsWithSecret lists each project\'s row for one provider, with its secret', async () => {
+    const rooms = await Promise.all([1, 2].map(async (n) => {
+      const proj = await j(await send(george, { type: 'project.create', workspace: WS, name: `Rows pg ${n} ${Date.now()}` }));
+      const chan = await j(await send(george, { type: 'channel.create', workspace: WS, project: proj.projectId, slug: `rows-${n}-${Date.now().toString(36)}` }));
+      return { project: proj.projectId as string, channel: chan.channelId as string };
+    }));
+    const a = await store!.upsertConnector({ workspace: WS, channelId: rooms[0]!.channel, provider: 'github', handle: 'acme/one', connectedBy: george.id, scopes: '' });
+    const b = await store!.upsertConnector({ workspace: WS, channelId: rooms[1]!.channel, provider: 'github', handle: 'acme/two', connectedBy: george.id, scopes: '' });
+    await store!.setConnectorSecret(b.id, 'sealed-two');
+    const rows = (await store!.postizContent.connectors(WS, 'github')).filter((r) => r.id === a.id || r.id === b.id);
+    expect(rows).toEqual([
+      { id: a.id, projectId: rooms[0]!.project, status: 'connected', handle: 'acme/one', ciphertext: null },
+      { id: b.id, projectId: rooms[1]!.project, status: 'connected', handle: 'acme/two', ciphertext: 'sealed-two' },
+    ]);
+  });
   it('the room\'s repository, through the project: the one with a GitHub address wins over a local primary (plan §7)', async () => {
     const proj = await j(await send(george, { type: 'project.create', workspace: WS, name: `GitHub repo ${Date.now()}` }));
     const chan = await j(await send(george, { type: 'channel.create', workspace: WS, project: proj.projectId, slug: `ghr-${Date.now().toString(36)}` }));

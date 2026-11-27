@@ -4,7 +4,7 @@
 // (docs/34), where the session runs and which client bore it (0134). Pure, so the phone's
 // connector is one call and test/upload.test.ts fails the moment a birth column stops reaching
 // the wire: a send that lost its designation would still land, and only the machine would notice.
-import { parseBrainOverride } from '@neuramesh/shared';
+import { isPermissionMode, parseBrainOverride } from '@neuramesh/shared';
 import type { ControlApiClient } from './api';
 
 export type MessageUploadInput = Parameters<ControlApiClient['postMessage']>[0];
@@ -19,6 +19,7 @@ export function messageUploadInput(id: string, d: Record<string, unknown>): Mess
   // ever set by the send that births the thread, and the server ignores it on an existing one
   const s = (k: string): string | undefined => (d[k] == null || d[k] === '' ? undefined : String(d[k]));
   const mode = s('birth_mode');
+  const permission = s('birth_permission_mode');
   const origin = s('birth_origin');
   const kind = s('birth_kind');
   return {
@@ -30,6 +31,7 @@ export function messageUploadInput(id: string, d: Record<string, unknown>): Mess
     taskId: s('task_id'),
     threadId: s('thread_id'),
     rootMessageId: s('root_message_id'),
+    ...(isPermissionMode(permission) ? { permissionMode: permission } : {}),
     threadMode: mode && MODES.has(mode) ? (mode as 'tasks' | 'chat') : undefined,
     // the brain the composer picked, role -> model. Parsed here rather than trusted: the column is
     // TEXT locally and jsonb server-side, and a malformed one must be no override, never a 400 that

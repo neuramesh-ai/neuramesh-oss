@@ -9,6 +9,20 @@ import { machineRuntimes, runtimeProbe, workspaceKeyProbe } from './localruntime
 const keys = (...providers: string[]) => async (p: string) => providers.includes(p);
 const none = async (): Promise<string[]> => [];
 
+test('a plan approved before startup waits for the first capability probe', async () => {
+  let ready!: (value: string[]) => void;
+  const local = new Promise<string[]>(resolve => { ready = resolve; });
+  let inspections = 0;
+  const probe = runtimeProbe({cloud:true, hasKey:keys(), local:() => { inspections++; return local; }});
+  const boot = probe.refresh();
+  const claim = probe.ensure('codex');
+  const heartbeat = probe.refresh();
+  ready(['codex']);
+  assert.deepEqual(await claim, ['codex']);
+  await Promise.all([boot, heartbeat]);
+  assert.equal(inspections, 1);
+});
+
 test('a laptop serves only its own logins and keys: a stored credential never made it capable', async () => {
   const r = await machineRuntimes({ cloud: false, hasKey: keys('anthropic', 'openai'), local: async () => ['gemini'] });
   assert.deepEqual(r, ['gemini']);

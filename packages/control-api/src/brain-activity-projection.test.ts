@@ -13,6 +13,9 @@ it('projects canonical tool calls with attribution and excludes prompts and prov
 it('keeps attributed public progress without exposing provider internals or copying final database messages', () => {
  const publicText=event('assistant.message',{text:'I’ll check the project documents.',turnId:'turn',provider:'agy',systemPrompt:'private'});
  expect(brainActivityProjection(publicText)).toEqual(event('assistant.message',{text:'I’ll check the project documents.',turnId:'turn'}));
+ const stage = {text:'Saving the working summary.',turnId:'turn'};
+ expect(brainActivityProjection(event('assistant.message',{...stage,source:'compaction',rawContext:'private'}))).toEqual(event('assistant.message',{...stage,source:'compaction'}));
+ expect(brainActivityProjection(event('assistant.message',{...stage,source:'provider-debug'}))).toEqual(event('assistant.message',stage));
  expect(brainActivityProjection(event('assistant.message',{text:'Copied final answer',actorId:'rex',turnId:'turn'}))).toBeUndefined();
  expect(brainActivityProjection(event('assistant.message',{text:'Unscoped text'}))).toBeUndefined();
  expect(brainActivityProjection(event('reasoning',{text:'private',turnId:'turn'}))).toBeUndefined();

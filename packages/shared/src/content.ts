@@ -72,7 +72,8 @@ export function liftScript(text: string): { rest: string; script?: string } {
 
 export function normalizeDraft(input: { platform?: string; body?: string; imageBrief?: string; mediaUrl?: string; script?: string }): DraftedPost | null {
   const platform = String(input.platform ?? 'x').toLowerCase().trim();
-  if (!(CONTENT_PLATFORMS as readonly string[]).includes(platform)) return null;
+  // `postiz`: a network only the project's Postiz account reaches (the draft names the channel)
+  if (!(CONTENT_PLATFORMS as readonly string[]).includes(platform) && platform !== 'postiz') return null;
   const split = splitBody(typeof input.body === 'string' ? input.body : '');
   const declaredBrief = typeof input.imageBrief === 'string' ? input.imageBrief.trim() : '';
   const rawMedia = typeof input.mediaUrl === 'string' ? input.mediaUrl.trim() : '';

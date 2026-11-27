@@ -10,11 +10,14 @@
 #
 #   1. a secret, by gitleaks: the tracked files, then the history. .gitleaks.toml allowlists the
 #      fixtures by name, each with its reason.
-#   2. a personal email domain, a Supabase project ref, a /Users/<name> machine path. Patterns,
+#   2. a personal email domain, a Supabase project ref, a /Users/<name> machine path, a Cloud Run
+#      service host with its project hash, a GCP service account of a real project id. Patterns,
 #      not a list of paths, so the next launch.json cannot slip through (review F10).
 #   3. every pattern in .public-scan.local, one extended regex per line, case-insensitive. That
 #      file is gitignored: it holds the founder's handles and the exact infra ids, so this script
-#      never prints them. CI writes it from the PUBLIC_SCAN_LOCAL secret when the secret is set.
+#      never prints them. The publish (publish-public.yml) writes it from the PUBLIC_SCAN_LOCAL
+#      secret when the secret is set. ci.yml's scan runs without it: a secret named in a job reaches
+#      its runner, and ci.yml's run on the runners every pull request in the gads enterprise shares.
 #      The private paths are excluded first, so the file can name the cloud project, the registry
 #      and the sync instance: they live under infra/ here and never ship.
 #   4. a tracked file under docs/evidence, private/ or var/.
@@ -22,7 +25,7 @@
 # Exit 0 = clean. Exit 1 = a hit, listed. Exit 2 = cannot run.
 # NM_SCAN_HISTORY=0 skips the history pass (public-snapshot.sh sets it: an orphan has no history).
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
+cd "$(git rev-parse --show-toplevel)" || exit 1
 
 fail=0
 ok()  { printf '✓ %s\n' "$*"; }
@@ -85,14 +88,22 @@ scan() { # $1 label, $2 extended regex, $3 extra git-grep flags (optional)
 scan "personal email domains" '@(gmail\.com|googlemail\.com|icloud\.com|me\.com|hotmail\.[a-z]+|outlook\.[a-z]+|live\.[a-z]+|yahoo\.[a-z.]+|proton\.me|protonmail\.com|alonge\.dev)'
 scan "Supabase project refs" '[a-z]{20}\.supabase\.(co|in)|supabase\.com/dashboard/project/[a-z]{20}'
 scan "/Users/<name> machine paths" '/Users/[A-Za-z0-9._-]+'
+scan "Cloud Run service hosts" '[a-z0-9-]+-[a-z0-9]{10}-[a-z]{2}\.a\.run\.app|[a-z0-9-]+-[0-9]{6,}\.[a-z]+-[a-z]+[0-9]\.run\.app'
+scan "GCP service account emails" '[a-z0-9-]+@[a-z][a-z0-9-]{5,29}\.iam\.gserviceaccount\.com|[0-9]+-compute@developer\.gserviceaccount\.com|[0-9]+@cloudbuild\.gserviceaccount\.com|[a-z0-9-]+@appspot\.gserviceaccount\.com'
+scan "GCP project numbers" 'projects/[0-9]{10,}'
 
 # ── 3. the private pattern file ──────────────────────────────────────────────────────────────
 if [ -f .public-scan.local ]; then
   grep -v -E '^[[:space:]]*(#|$)' .public-scan.local >"$work/patterns" || true
   n=$(grep -c . "$work/patterns" || true)
   if [ "$n" -gt 0 ]; then
+    # git grep exits 1 for no match, and more when it can't run: 128 for a pattern it can't read. Its
+    # error can quote the pattern, so it stays unprinted, and the scan fails
     out=$(git grep -n -I -E -i -f "$work/patterns" -- . ':!scripts/public-scan.sh' "${EXCL[@]}" 2>/dev/null)
-    if [ -n "$out" ]; then
+    rc=$?
+    if [ "$rc" -gt 1 ]; then
+      hit ".public-scan.local patterns could not run (git grep exit $rc): fix the pattern file"
+    elif [ -n "$out" ]; then
       hit ".public-scan.local patterns ($n patterns, $(printf '%s\n' "$out" | wc -l | tr -d ' ') lines)"
       printf '%s\n' "$out" | cut -c1-200
     else

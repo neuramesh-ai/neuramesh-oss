@@ -3,6 +3,7 @@
 // nothing, and GET /v1/workspaces lists it with role and plan. Run via scripts/test-pg.sh —
 // skipped without DATABASE_URL.
 import postgres from 'postgres';
+import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { onAuthArrival } from '../src/onauth';
@@ -67,6 +68,6 @@ describe.skipIf(!DB)('the first sign-in creates the workspace (postgres)', () =>
     // second arrival made no workspace, so it granted nothing either
     const [grants] = await sql!`select count(*)::int as c, coalesce(sum(micros), 0)::bigint as micros from credit_grants where workspace_id = ${workspaces[0].id}::uuid and kind = 'signup'`;
     expect(Number(grants!['c'])).toBe(1);
-    expect(Number(grants!['micros'])).toBe(500 * 10_000);
+    expect(Number(grants!['micros'])).toBe(SIGNUP_GRANT_CREDITS * 10_000);
   });
 });

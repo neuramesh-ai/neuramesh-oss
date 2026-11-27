@@ -55,6 +55,14 @@ The window is a **colored frame** that owns all chrome; content floats on an **e
   top is the one row that is chrome in every view. The panel still collapses to zero. A fold must
   not cost information, so while folded the pin wears the unread dot (`.ftfolddot`) the spine's
   tile used to carry.
+  ▸ **Amended again (2026-11-22, George): the fold is an icon column.** A folded side dock is
+  52px wide and keeps every door. From the top: the fold pin, New session, the destination rows
+  in their groups, All sessions (the ⌘Y search, because the fold hides the session list), and at
+  the foot Quick search, the workspace tile and the credit ring. It is the same DOM as the open
+  rail, so nothing remounts: CSS hides the labels, the session list and the foot's words. Each
+  icon names itself in a `data-tip` that opens beside it, toward the sheet. The tip shows only
+  while the rail is folded, because in the open rail the label already says it. A lit row stays
+  lit, and the More row keeps its count as a small badge.
 - **The frame has a RIGHT edge tenant: the SIDE DOCK** (rail-ink round 3, 2026-09-04, George —
   Codex as the reference; it was the Workbench from 2026-08-16 to this date). The dock is the
   workspace tab strip's own column (§8, [docs/36](36-workspace-tabs.md)): files, terminals,
@@ -213,13 +221,13 @@ frame, rail, sheet and side panel. Panes meet at a single rule, without a gap, r
 Objects have one outline. Passive wells have a wash and no outline. A control inside an outlined
 object has no outline of its own. Hover uses a wash without lift or a louder edge.
 Menus and modals retain an edge and a small shadow. Their veils have no blur.
-Needs you stays amber. Chrome, links, agent marks and primary buttons use ink. The Porch brand mark
-keeps oak. Board phases, charts, diffs and terminal output retain data colors.
+Needs you stays amber. Chrome, links and agent marks use ink. A clickable primary button and the
+Porch brand mark keep oak. Board phases, charts, diffs and terminal output retain data colors.
 
 | Token | Elevated | Paper |
 |---|---|---|
 | `--lift` | `translateY(-1px)` | `none` |
-| `--btn-primary` / `--btn-primary-ink` | Brand / brand ink | Text / ground |
+| `--btn-primary` / `--btn-primary-ink` | Brand / brand ink | Brand / brand ink |
 | `--card-hover` | Card | Hover wash |
 | `--diff-add` / `--diff-add-bg` | Existing diff rules | Accessible add ink / fill |
 | `--diff-del` / `--diff-del-bg` | Existing diff rules | Accessible remove ink / fill |
@@ -262,6 +270,9 @@ Per-theme, defined in `tokens.css` and mirrored in `client-core` THEMES (CI-enfo
 | `--shadow-sheet/card/lift/pop` | elevation ramp | |
 | `--viz-berths` / `--viz-donors` / `--viz-clones` | **chart-series identity** (worktree-berths round, 2026-08-11) — categorical, fixed order, one hue per entity across every mark (bars, bands, dots, meters) | dark `#5b93d8/#3aa183/#8a7bd9` · light `#2f6fc2/#1b8f68/#5c4ab8` |
 | `--viz-score` | **the report score's one hue** (marketing-os round, 2026-08-20) — the ReportCard's dial, dimension bars and trend marks, plus every score chip. Same calibrated blue as `--viz-berths` (pre-validated on the card surface); its own token so score surfaces can diverge without re-skinning a chart series. Never a status hue, never `--accent` | dark `#5b93d8` · light `#2f6fc2` |
+| `--viz-out` / `--viz-in` | **Finance money out and money in** (finance-canvas round, 2026-11-14): the two series of the Finance canvas charts, in that fixed order. Validated with the dataviz six checks on the card of all seven palettes. Text beside a mark keeps the text tokens | dark `#c87a45/#2aa0c8` · light `#a8582a/#0f7fa8` |
+| `--fin-over` | **a Finance budget over its limit** (finance-budget-analytics round, 2026-11-17): the third budget tone, after `--green` (under 80% of the limit) and `--warn` (80% to 100%). It fills the bar, the ring and the dot of an over budget, and it colors the line that says how much over. A status hue, never a chart series. Each palette holds 4.5:1 or more on its card | dark `#d77a6a` · soft-dark `#dc8372` · paper-dark `#d98270` · light `#b4432e` · cream-oak `#b2452f` · paper-light `#a63e2a` · paper-cream-oak `#a03c27` |
+| `--fin-in-ink` / `--fin-out-ink` | **Finance money ink** (finance-overview round, 2026-11-18, [the mockup](design/finance-overview-2026-11/mockups/finance-overview.html)): the amount of money in and money out on a row, a day total, a tile and a labeled bar. Money in is `--green` and money out is `--warn` (George: amber finds outflows at a glance), each mixed with `--text` (70% and 92%) so the amount holds 4.5:1 on the card. Plain `--green` is 3.3:1 on the cream-oak card. Defined on the Finance canvas (`finance-overview.css`), no new hex. Charts keep `--viz-out` for spending. A transfer and a pending amount stay `--muted` | derived from `--green` / `--warn` |
 | `--term-black` … `--term-bright-white` | **the terminal's ANSI-16 ramp** (terminal-colors round, 2026-08-26) — resolved into xterm's theme per ground: chromatics from the status family, neutrals from the theme's own ink ladder (darks stay soft-status; papers go ink-weight). Desktop-only, so *not* mirrored into client-core THEMES. The terminal also enforces a **4.5:1 contrast floor** (xterm `minimumContrastRatio`): a guest CLI styles for the theme *it* believes in — dark-assuming dim/24-bit output must stay readable on paper, and no palette entry can reach truecolor | ink hues on cream · soft-status hues on graphite |
 
 Rules of use:
@@ -275,7 +286,9 @@ Rules of use:
   Porch and true primary buttons ride `--brand`/`--brand-ink` (never `--accent`, which remains
   achromatic for selection/status in the darks) and stay oak everywhere. The small, deliberate
   action islands keep Graphite calm while making the product's primary move unmistakably ours
-  (primary-action ruling, 2026-08-30). The paper look uses ink for primary actions, as specified above.
+  (primary-action ruling, 2026-08-30). **A clickable primary is oak in every theme and both looks**
+  (George, 2026-11-25): a grey primary reads as a disabled one. A disabled primary is the inert well
+  (`--panel3` and `--dim`), never a faded oak.
 - **Status/FSM hues are theme-independent** — board-state colors never restyle per theme.
 - **Elevated links wear the theme's own oak, never an imported blue** (ruling 2026-07-28). `--link` is the
   single token behind every task ref, file ref, PR link and markdown link, so it is retuned per
@@ -308,7 +321,10 @@ Rules of use:
   is the quiet rest state, so the age alone says it (the row's label keeps the word). The bell's
   rows carry no extra mark; the badge already says every row there needs you. The needs-you rows carry NO buttons — approvals live on
   the artifact in the thread, a merge happens on the human's word, and the row's one act is Settle
-  (a swipe or a long-press on the phone, a hover control on the desktop).
+  (a swipe or a long-press on the phone, a hover control on the desktop). Since 2026-11-22 (the needs-you
+  round) the Needs you page and Today draw that act as `.tdsettle`: a check button at the row's end that
+  shows on hover or keyboard focus and keeps its space, so the row never moves. Touch has no hover, so
+  a phone always shows it. Today's rows keep their Review or Answer button beside it.
 
 - **A control exists only where it can act, and a rare reverse is an undo, not a control** (the
   settle round, 2026-09-09, George: "not sure what bring back means" → "not sure we need the back
@@ -502,11 +518,19 @@ real work — if it is decoration, drop it and keep the pill.
   ▸ **Amended 2026-10-03:** the Design Studio and the task peek, the two columns this rule was
   written for, retired into the side panel. No column of the sheet changes hands now. The rule
   stays for the next one.
+  ▸ **Amended 2026-11-14:** the Finance split is the next one. The canvas `flex-basis` opens from
+  0 to 69% once, when the first analysis starts, and the canvas content keeps its final width
+  through container units (`finance-canvas.css`). Later answers rise in place with no hand-off.
 - **Exits are guarded:** `animationend` handlers must check `e.target === el` (bubbled child
   animation events kill exits otherwise), and exit paths need a ~220ms timeout fallback so
   reduced-motion never strands an overlay.
 - **Constant motion is rationed:** typing dots (`nm-dot`), the step ring's orbiting halo — one
   heartbeat per surface, always stilled by `prefers-reduced-motion`.
+  ▸ **The live placeholder is bounded text change, not a heartbeat** (the home-quality round, George,
+  2026-11-19). Home's composer types its suggestions in and out, but it runs through the list two times
+  and then rests on the first suggestion, whole. So after about 30 seconds the stage keeps one heartbeat
+  (Porch). Each step changes text only, so no step is a blocking transition. Reduced motion shows each
+  label whole and fades the next one in over 150 ms, with the same two-loop limit.
 - **Active thread titles share the glassy text sweep** (George, 2026-10-24). In the web project
   rail, automation list and history search, `in_progress` titles use the same 2.3-second gradient
   as agent status text. Selection does not control the effect. Needs-you and settled titles stay
@@ -556,6 +580,19 @@ real work — if it is decoration, drop it and keep the pill.
   takes the same slot in the same frame and does not rise in again (`.msg[data-landed]`). The
   bubble wears the role chip that the ghost before it and the message after it wear. The caret
   does not blink under reduced motion.
+- **A machine start shows a count, and the plan is a receipt** (thread-wait-and-plan round, George,
+  2026-11-17, [mockups](design/thread-wait-and-plan-2026-11/mockups/thread-wait-and-plan.html)). Each
+  surface that shows a machine start (the thread's wait row, the boot pane, the pill's hover, the
+  composer chip) shows one count from the shared `machine-wait.ts`: "Ready in about m:ss", from the
+  machine's last measured wake, else 60 s. Past the estimate the count goes up as "Taking longer than
+  usual · m:ss" in `--warn`. The count uses tabular figures in `--dim` (`.waiteta`). Under a machine
+  wait that is not stalled, one quiet card (`.waitoffer`: `--card` on a `--card-border` hairline,
+  480px wide at most) makes one offer: the real Always on switch for a Pro member who may change the
+  machine, or Upgrade to Pro (`--brand`) on the free hosted plan. A person with no move gets no card.
+  The × hides the card in that browser. The intake plan is a receipt row (`.intakeplan`, the
+  `.codereceipt` idiom): "Outlined the plan · N steps" and a chevron that opens the steps under the
+  same left rule. Before the intake lands, the same place shows "Outlining the plan…" with the
+  `.liveact-txt` sheen. No new tokens.
 - **The launch moment (Porch):** full Peek (~3s) once on first open, the short wake (~0.9s)
   every launch after (`LaunchPeek`, replayable from Appearance). It plays over the frame on
   `--win`, `pointer-events: none` — the animation may never gate input — and reduced motion
@@ -564,6 +601,30 @@ real work — if it is decoration, drop it and keep the pill.
   docked) · lockup hover. Home's caught-up peek fires only when the needs-you queue *drains*.
 
 ## 8. Component idioms
+
+- **The What's new card** (whats-new-upgrades round, George, 2026-11-23). A machine release's notes and the
+  owner's upgrade ride the bottom-right stack that the reply reminders use (`.rmstack`), on the same surface:
+  `--overlay`, a `--border2` hairline, `--r-lg`, `--shadow-pop`, no veil. Collapsed, it is the `.updatecard`
+  anatomy with a poster in the icon seat. Open, it shows one feature at a time with its demo (a muted MP4
+  that loops, a dark and a light take, no autoplay under reduced motion), and a `--panel2` footer that holds
+  the upgrade. The footer paints `upgradeView` (`packages/shared/src/machine-upgrade-view.ts`), and the
+  phone paints the same function. It rises over 150 ms, rises clear of a composer docked at the bottom, and
+  at phone width it is a bottom sheet. Later and × carry Undo on the toast. No new tokens. On Success the
+  footer holds a quiet "Return to <version>" beside Close (`machine.upgrade_rollback`, the same `.wnlater`
+  text button as Later), for 24 hours after an upgrade.
+- **The site's hero film** (hero-film round, George, 2026-11-24, [plan](design/hero-film-2026-11/plan.md)).
+  The site's one video with sound. It plays muted and in a loop in the stage window (`.l-win`), in the
+  opposite theme of the page, and pauses out of view. Its controls are a group at the window's corner
+  (`.l-ctl`): the sound, then the pause, each in the `.l-play` recipe. The sound icon shows the state, and
+  the pause icon shows the action. Under reduced motion the poster shows with both controls, never an
+  autoplay. No new tokens.
+- **A staff page** (whats-new-upgrades round, slice 5, 2026-11-23). A page for NeuraMesh staff alone lives in
+  Settings, in a Staff group under Personal that shows only when `/v1/me` says `ops: true`. It is never a rail
+  row or a destination. Machine releases is the first one (`apps/hq/src/opsreleases/`): a `--card` with a
+  hairline table, the What's new chip tones for each state, and a release's actions in a row under it that its
+  chevron opens. Each action that changes a release or a machine asks for a reason in an elevated field
+  (`--card`, a `--border2` hairline, the ring on focus), and the danger style marks a withdraw. Under a
+  560 px container each release is a two-line row. No new tokens.
 
 **Setup progress update, 2026-10-21:** The sidebar shows a 38px progress circle with
 `done/total`. It always starts collapsed; the old expanded preference no longer opens it.
@@ -612,7 +673,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   George: B, `--term-red`, no foot line, the mark back, "NeuraMesh is starting up…" — visual
   contract `docs/design/first-run-stack-2026-09/`, evidence beside it). The picker's radio column
   becomes the status column: one 18px node per container in BOOT order (Postgres, then the API,
-  then PowerSync — the order `depends_on` runs, which the old list did not follow, so a person
+  then the API replica — the current local stack does not run PowerSync; this follows the order `depends_on` runs, which the old list did not follow, so a person
   watched the middle row wait for a container that was never asked to start), name · one fact on
   ONE line (`.lsgcname`), and a 1px segment that lights `--green` once the node above it is ready.
   Four node states and no words but one: ready = `--green` filled with a check · starting = an
@@ -628,7 +689,7 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   glances left and right every 9 s while the person waits (`lsg-glance`, no fill so it stays
   silent until the first look has played).
   ▸ **The failure card has three parts, or one.** The cause in plain words (`.lsgcause`, 14px
-  `--text`: "PowerSync stopped 3 times.", "Port 58081 is in use by another program."), the
+  `--text`: "The local API stopped 3 times.", "Port 58081 is in use by another program."), the
   container's own last line in a warm well (`.lsgwell`, `--panel2`, mono 11, three lines then a
   clip, selectable), and the remedy (`.lsgremedy`, 13px `--muted`: what Try again will do). `COPY
   DETAILS` puts the three lines on the clipboard, as a quiet button at the right of Try again ·
@@ -777,6 +838,18 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   a one-time act, the settled `.shsw` switch for a standing one). The repository is a mono chip
   (`.repochip`: owner/name, the branch dimmed, `Change` beside it), never a text field the person
   retypes. A machine marker (`‹release:…›` and its siblings in `thread/markers.ts`) never renders.
+  ▸ **The wizard's Team step and machine step** (George, 2026-11-25). The main agent's models show the NeuraMesh brain first and fold the rest
+  behind `Show N more models` (`.obmmore`, a `grid-template-rows` slide at `--dur`). A crew card's
+  model chip is a button that opens the model menu (`.obmchip`, the portalled `.obmodelpop`), and it
+  stays a plain chip when the NeuraMesh brain is the only choice. The wizard defaults an agent to a
+  provider only when the workspace can use it today: a typed API key, or a local sign-in, never a
+  subscription picked in the browser (`views/crew-defaults.ts`). The machine step lists what the
+  machine does for the person (`.obmachinefacts`, a green dot a row), never a region or a sandbox name.
+- **The Pro trial on Today** (2026-11-25, `docs/design/onboarding-2026-11/trial.md`, `pro/ProTrialCard.tsx`). The
+  `.tdtrial` card with a mono line in `--warn` for the days left (`.protrialleft`), and its actions in one
+  column (`.protrialacts`): the primary Add a card, and Not now on its own row under it (George). An ended trial
+  has no Not now and wears a `--warn` hairline. The first run's card 4 is the Pro offer with its own value list
+  (`ProOffer` `values`, `cta`), and the card sheet is portalled to `body`, because Today's sections animate in.
 - **The Pro offer** (the card trial, 2026-10-03, the canvas's Round 2, `docs/design/pro-front-door-2026-10`,
   `pro/ProOffer.tsx`). One component in two hosts, the wizard's Pro step (`.obbody.obbodywide`, 920px)
   and the Pro sheet (`.upmodal.pro`, 900px). What Pro gives sits on the left (`.proval`: an icon in a
@@ -922,6 +995,27 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   (`settings/connectors.ts`, tested) shared with the room's Connections list, read for the room the
   composer targets; the connect step is ONE component (`settings/ConnectPanel.tsx`) rendered by both.
   Only Home wears the foot. The thread composer, the launcher and the phone do not.
+  ▸ **Amended 2026-11-19 (the home-quality round, George, [docs/design/home-quality-2026-11](design/home-quality-2026-11/plan.md)):
+  the foot belongs to the connectors.** The pills leave it, and in their place one plain line says what a mark
+  does: **Connect a network for your agents.** (`.cfootline`, 12 px, `--muted`, `composer/foot-line.ts`). The
+  line stays while the person types, so `.cfoot.drafting` and its reserved seat retire. It goes when all
+  four marks are connected. A narrow box wraps it onto two lines, never under the marks. The suggestions
+  moved into the placeholder:
+  ▸ **The live placeholder** (`composer/ghost-cycle.ts` is the pure timeline, `useGhostCycle.ts` the clock,
+  `GhostLine.tsx` the layer). Over the empty box, a ghost layer (`.cghost`) in the composer's own grid cell,
+  with the textarea's metrics and the placeholder's `--dim` ink, types each suggestion's label (32 ms a
+  character), holds it whole (2.4 s), erases it (14 ms a character), rests (360 ms), then types the next.
+  It draws no caret of its own. A project with no suggestions cycles fixed examples, each with a full
+  prompt. A whole label wears the **Tab** keycap (`.cghostkey`, the kbd idiom: 9.5 px mono, `--dim`, a
+  `--border2` hairline, in 120 ms). Tab in the empty box puts the suggestion's full prompt in, whole or
+  still typing. In the rest, with Shift, or with text in the box, Tab keeps its meaning. A touch screen
+  (`pointer: coarse`) gets a **Use** button (`.cghostuse`, 24 px tall, a 44 px hit area) at the right end
+  of the first line. Any text stops the cycle in the same frame, and it goes on at the next suggestion
+  after the box stays empty for 2 s. A pointer over the box holds a whole label. Focus does not pause it,
+  because Home often opens focused and Tab needs focus. The typing is `aria-hidden`: the textarea keeps its
+  static placeholder, and `aria-describedby` reads a hidden line (`.cghostdesc`) that changes only when a
+  new label is whole. The cap over the box carries the @ and / hint ("or type / to use a skill"). With no
+  cap, the cycle ends on the static placeholder.
 - **Chips & pickers** — pill chips (`.cchip`) open upward `chippop` menus; time inputs are styled
   chips (`::-webkit-datetime-edit` styled, width-pinned). No raw `<select>` in user-facing rows.
 - **The machine chip** (desktop Code bridge, 2026-09-04 — rule D9; visual contract
@@ -982,8 +1076,8 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   `ComposerAgentControls` supplies the same agent and model menus. Picking a repository changes
   routing and adds coding controls; it keeps the input, draft and agent selector. Rex is the main
   agent by default. Selecting another agent adopts that agent's personal model preference, then
-  coding choices belong to this conversation. Low, Medium and High appear for supported models
-  and reach the runtime through the same atomic agent/model/effort selection. Both controls lock
+  coding choices belong to this conversation. Each model shows its own levels: Low, Medium and
+  High, and Extra high on Gemini 4 Neon and Hydrogen (`thinkingLevelsFor`, 2026-11-23). They reach the runtime through the same atomic agent/model/effort selection. Both controls lock
   during a turn and update after the host acknowledges a change. Transcript rows retain their
   original agent name and avatar when the selected agent changes. Provider groups still read the
   session's machine (`code-models.ts`); Gemini coding requires an API key. The legacy Engineering
@@ -1289,7 +1383,13 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   retired with it: a mode wearing a row's clothes was two doors onto one surface. Predicates in
   `navtree.ts` (`isChatRow` / `isCodeRow`), applied BEFORE the cap so the picker's counts and
   `askOutside` speak about the mode's rows. Not a destination tab strip (the ruling below stands).
-- **The nav's verb is a text row** (rail-ink round, 2026-09-04 — supersedes the shell round's
+- **The nav's verb is the rail's one primary button** (George, 2026-11-25, version B of the round).
+  `New session` is an oak button as wide as the rows (`.navpanel .navnewrow`): `--btn-primary`, the
+  hatch, the primary's uppercase 12px type, the compose glyph and `⌘N` at 72% of the ink. The folded rail
+  shows it as a 34px oak square. The caret and its New task and New routine rows retired, because almost
+  nobody used them and an agent in the session makes a task or a routine when asked. This reverses the
+  text row below. The rest of the paragraph stands.
+  ▸ *History:* **the nav's verb was a text row** (rail-ink round, 2026-09-04 — supersedes the shell round's
   accent pill): `New chat` is a compose glyph, the label at 560 and `⌘N` in dim mono, hover wash
   only; the caret beside it still carries the launcher's task mode, and New routine (since 2026-10-01 it opens
   the New session composer with `Make a routine: `, the routine writer). "Menus are text
@@ -1316,6 +1416,102 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   slot (`.navitemfact`) names the place. Code inside More stays the door onto the mode. Marketing OS
   stays at the top level (George picked A over C, which folded it too). Two glyphs: `IconSliders` for
   Customizations, `IconMoreH` for More. Code mode's band is unchanged.
+  ▸ **Groups (2026-11-22, George).** The band and More's menu sit in groups, and one hairline parts
+  two groups (`.navdestsep` in the band, `.navrowmenusep` in the menu, `group` on each row in
+  `shell/navdest.ts`). The band: New session, then the company's areas (Marketing · Finance), then
+  the workspace's tools (Agent Desk · Automations · Customizations · More). More's menu: Whiteboards ·
+  Files, then Tasks · Legacy coding sessions, then Message boards. No group has a label: the
+  hairline is the whole signal. In a right dock, More's menu opens toward the sheet.
+  ▸ **Amended again (2026-11-22, George, the Founder OS round): Team and Connections.** The workspace
+  group reads Team · Automations · Connections · Customizations · More. Agent Desk is renamed **Team**
+  (the label, the page head and the address `/team`; `/agent-desk` still opens it, and the view key
+  stays `team`). The head counts the people and the agents, and `Invite a person` sits beside
+  `Add agent`. A card names its model after its role, and one quiet line in the head band says the
+  rooms it watches (`.teamdesk-watches`). **Connections** leaves Customizations for its own row
+  (`IconPlug`) and its own page (`surfaces/ConnectionsSurface.tsx`, `/connections`;
+  `/customizations/connections` still opens it). Customizations is the Skills page alone, with no tab
+  strip. The Connections page groups every connection by its job, in a fixed order: Money · Growth ·
+  Team and product · Models · Media (`JOBS`, `CONNECTOR_JOB`). A group is a plain heading over a grid
+  of tiles (`.cxgrid`, 290 px at least): each tile is the elevated stratum, with the mark in a 32 px
+  tile, the name, one line that says what it does (`CONNECTOR_LINE`), and its state (`Connected` in
+  `--green`) or its act (Connect · Reconnect · Sign in · Set up). An open connect step widens its tile
+  across the grid. Two groups are doors and not connectors: Money (Kinshi) opens Finance, and Models
+  opens Workspace settings › Providers on that provider, with the verdict the Providers panel reads
+  (`providerStates`). The `.cxsec` cards stay for the Connectors panel of a Team card.
+  ▸ **Today and Needs you (2026-11-22, George, the Founder OS round).** A first group sits above the
+  areas: **Today** (`IconHome`) and **Needs you** (`IconNeeds`, a circle with a mark). Today is the
+  stage, view `dashboard`, and it is lit only while no session is open over it. A click on Today keeps
+  the composer's draft, and New session stays the verb that clears it. The stage's tab name and back
+  crumb say `Today`. Needs you opens its own page (`views/NeedsList.tsx`, `/needs-you`): every row of
+  the bell's queue in one column of 760 px, with the Message boards row last. The row wears the bell's
+  count in `.navitembadge`, and its spoken name says it (`Needs you. 11 items wait`). This retires the
+  2026-08-16 rule that a count of what waits belongs only on the bell: the Founder OS design (D4, D5)
+  makes Needs you a destination. The bell stays, and the two read one queue.
+  ▸ **The Needs you page settles (2026-11-22, George, the needs-you round, [plan](design/needs-you-2026-11/plan.md)).**
+  A row's Settle stamps its thread (`thread.settle`, 0137) for everyone in the workspace, and the task
+  does not move. A row of several questions settles the thread they were asked in (`settleTargets`). A task with no thread of its own
+  settles on itself (`task.settle`, `tasks.settled_at`, 0192), and so does a card hung on it, so one Settle never
+  hides a sibling. A Settle on a conversation's own row still hides the units it owns.
+  A newer gate or card brings the row back. The toast says `Settled` or `Settled N items` and carries the one Undo.
+  The page groups the rows by age (`needsGroups`): This week, Earlier, and Older than 2 weeks, each a
+  `.tdsechd` heading over a `.tdlist` card, in the queue's own order. The old group's heading carries
+  **Settle all N**, which settles the rows the filters show. An age past two weeks wears `--warn`. Over
+  the groups sits `.needsbar`: the kind segment `.needsseg` (All · Questions · Reviews · Other, each with
+  its count in tabular figures) and, when the rows span two projects or more, the project `ScopePill`.
+  The filters narrow the page only: the rail, the bell and Today keep the whole count. A row's meta line
+  names its kind in plain words (`needsWord`: Ready for review, Plan to review, Question). With nothing
+  in the queue, one line says `Nothing needs you.`, and a filter with no rows says `Nothing here.`
+  ▸ **The Needs you detail (2026-11-22, George, the needs-you round PR 2, Founder OS D5).** At 860 px and
+  wider the page is a split (`.needspage.split`): the list in a 440 px column, and the selected row's
+  detail (`views/NeedsDetail.tsx`) in `.needsside`, sticky, past a hairline. The first row is selected,
+  a selected row wears `--sel-bg`, and a row that leaves hands the selection to the row in its place.
+  A click on a row selects it, and the detail holds the door. D5 splits the items by size. A question is
+  small: its own `QuestionFlow` answers in place through `answerDecisionsThenPost`, so the decision
+  flips and the reply posts where the agent watches, exactly as from the thread. A gate on a task is
+  large: a kicker (kind · number · project · date), the title, one line of what waits (`waitLine`), the
+  facts as toks (PR, artifacts), the Definition of Done, then Open the task and Settle. A finished task
+  adds `To accept, say so in the task's thread.`, because an accept happens on the person's word there.
+  The list's keys: ↑ and ↓ (and j and k) move the selection and the focus, Enter opens, and S settles.
+  Below 860 px the list stands alone, and a tap opens the detail in a bottom sheet (`.needssheet`, over
+  the folded rail and under a modal) that the scrim, the grab bar and Escape close.
+  ▸ **The Settled tab (2026-11-23, George, the needs-you round 2, mockup frames 5 to 7).** The segment ends
+  with `Settled`, after a hairline (`.needsgap`), because it is not a kind of item. It lists what a
+  Settle hides (`settledRows`): the queue's own rules run with every stamp cleared, so a row that left
+  for another reason never shows here. The groups are `Settled today` and `Earlier`, by the stamp's
+  time. A row reads `kind · project · settled <age>` and carries `Restore` (its own act, `.tdrow.shelf`).
+  The pane says `You settled this <age>.` and holds Restore where Settle was. Restore clears every
+  stamp that hides the row, and a thread's stamp covers every item in that thread, so it can bring back
+  more than the one row. The toast says `Restored` with Undo, and S restores on this tab. On a phone a
+  settled row drops the word `settled` (`.tdsetw`) and keeps its age, and the chosen tab scrolls into
+  the segment's view. Empty: `Nothing is settled.` The page shows its bar while anything is settled, so
+  the tab stays reachable with nothing in Needs you.
+  ▸ **Product (2026-11-22, George, the Founder OS round).** The areas group reads Marketing · Finance ·
+  Product. Product (`IconCode`, the coding thread's prompt glyph) opens its page
+  (`views/ProductPage.tsx`, `/product`), which follows the active project through the project chip.
+  The head holds the chip, the project's primary repository and one verb: `New coding session` (the
+  stage with the repository chip set, the Code rail's door) or `Connect a repository`. Three lists
+  follow, in Today's anatomy (a plain heading over one elevated card with hairline rows): **Coding
+  sessions** (the project's coding threads, the ones that wait for an approval first), **Tasks in
+  progress** (open parent tasks on a repository) and **Shipped this month** (pull requests that merged
+  since the first of the month). The rules are pure (`views/product.ts`). A row opens its thread or its
+  task, so the page is a list of doors and never a second session surface. A row may wear a state word
+  on its right (`.tdtag`): quiet by default, `Needs you` in the `--warn` tint (the bell's own verdict),
+  `Shipped` in `--green`.
+  ▸ **Amended (2026-11-22, George): Product takes the Finance and Marketing shape.** Two columns
+  (`views/ProductWorkspace.tsx`, `.fin-split`): the chat on the left is the Marketing chat column
+  (`marketing/MarketingChat.tsx` with its `area`), a real room thread in the project's room, sent
+  unaddressed so the orchestrator answers and routes the work. The canvas on the right holds two tabs,
+  Overview · Releases, in the canvas tab strip (`.fin-tabs`). The divider drags between 55% and 76%,
+  and on a phone the canvas opens as a sheet. Overview keeps the coding
+  sessions and the open tasks, and `Shipped this month` moved to Releases, which reads GitHub
+  (`views/ReleasesTab.tsx`). Its head holds the repository, the watch's state (`The release watch
+  checks daily` in the green tag) and two verbs (`Summarize`, `Watch this repository`). Three lists
+  follow in the same anatomy: **In progress** (open pull requests, `Draft` tag), **Not released yet**
+  (`Merged`, green) and **Releases**, where each row wears `Drafted` (green), `Next check` (quiet) or
+  the `Draft posts` button. A row opens GitHub in a new tab. A button that acts apart from its row
+  carries `.own` and stays at phone width, where the other row buttons hide. A read that cannot run
+  says so in one note card with its fix (`.relnote`): `Connect GitHub`, `Connect GitHub again` or
+  `Try again`.
 - **A destination with more than one surface nests in the NAV, it does not grow tabs**
   (2026-08-13, George — Scheduled › Routines · Calendar). The disclosure already IS the
   navigation, so a tab strip inside the main area beside it would be a second door to the same
@@ -1830,9 +2026,41 @@ same compact control at the bottom right. This replaces the expanded card/pill b
      (never how the work runs), and a 1 px lift with `--shadow-lift` on hover. A card fills the composer
      with a first line, and so does the routine card since the routine writer (2026-10-01: `Make a routine: `;
      before, it opened the routine launcher). The wordmark watermark shows
-     again. Every composer menu opens upward again (`roomOn` measures above). The stage scrolls once a short
+     again. It sits at the bottom of the pane, outside the scroller (`.stagehost`, 2026-11-22), so it stays
+     there while the stage scrolls over it. Every composer menu opens upward again (`roomOn` measures above). The stage scrolls once a short
      window cannot hold it: auto margins centre the column, so its top stays reachable (the cards made the
      stage taller than a 660 px window).
+     ▸ **Amended 2026-11-19 (the home-quality round): the Finance row.** When this person may open Finance
+     and its Kinshi connection is `connected` (`destinationAccess('finance')` and `financeStatus()`, server
+     truth, `views/finance-cards.ts`), a third row of three cards sits under the six, after the stage's
+     eyebrow idiom (`.stagekick`, with the Finance wallet). A Finance card opens a NEW Finance chat with its
+     prompt in the Finance composer, because only the Finance turn has the Kinshi data and its cards. The
+     row rises in with `nm-rise` once both reads answer. The rail's Finance row wears the same wallet
+     (`IconWallet`).
+     ▸ **Amended 2026-11-22 (the Founder OS round, George): Today.** The six cards become three start
+     chips under the composer (`.stagechips`, the composer's own `.cchip`): Ship a feature · Draft a week
+     of posts · Schedule a routine. The phone keeps its six cards until its own round, and each hq chip
+     stays one of them (`apps/mobile/test/stage-cards.test.ts`). Under the chips sit Today's sections
+     (`views/TodaySections.tsx`), each a plain heading over one elevated card with hairline rows:
+     **The morning brief** comes first and takes the Finance row's place under the same server truth: one
+     elevated card (`.tdbrief`). Its head names it and its source (`From Kinshi`, with the time of the
+     balances) and holds `Ask about it`, which opens a Finance chat with a question drafted. Under a
+     hairline sits the KPI strip (cash in the bank, in this month, out this month, budgets). Under
+     another sit up to four lines about what changed, from the patterns Finance finds
+     (`financeRecommendations`, `briefLines`, the most urgent first), each a bold title and its body, two
+     lines at most. The Finance prompts follow the card as chips. Cash adds only the accounts in the
+     month's currency (`moneyFacts`). Runway, MRR and trials join the strip only when their sources
+     connect, so the card never shows a number that nobody reported. **Needs you** shows the first five
+     rows of the bell's queue (`bellQueue`: the same rows and the same count, never a second
+     derivation), each with Review or Answer and the row's Settle, and See all opens the Needs you page. With nothing to do,
+     one line says `Nothing needs you.`
+     **What your team did** lists the parent tasks accepted in the last seven days (`teamDid`). The column
+     starts near the top (`margin-block: clamp(12px, 6vh, 72px) auto`), because a centred column jumps up
+     when the sections load over the static first frame.
+     ▸ **The KPI strip** is a new idiom (`.kpistrip` + `.kpi`, `views/today.css`): up to four facts in a
+     row of the elevated card that holds it, a hairline between them, the label in `--muted` 12 px over the value at 22 px 600 with
+     tabular figures, and an optional line under it. A bad value wears `--fin-over`. Below 560 px the
+     strip is two columns.
   Plus the frame ruling recorded in §2 (the dock strip's retirement) and one structural fix:
   **the main section's top-right is ONE rail** — the room's crew clusters and views burger slot
   into the workspace strip's right end (`WTabStrip aux`) before the file-pane toggle, one flex
@@ -2114,6 +2342,105 @@ same compact control at the bottom right. This replaces the expanded card/pill b
   Task and chat status belongs in the overview; task assignment, description, subtasks, review history
   and marketing brand doors live there too. These doors open the existing details tab. Task editing
   remains beside the title. Task peeks retain their compact facts because they have no floating card.
+
+- **A door out of hq** (Message boards, 2026-11-13, [the plan](design/message-boards-2026-11/plan.md), artboard D1): a row
+  that opens a different app is the last row of the More menu. It keeps the row anatomy (a 13px icon, the label), and its
+  trail has the count in `.navitembadge` and then `IconArrowNE` at 12px. The mark says that the row opens a new tab. The
+  row never wears the selected fill, because the place is not a view of hq. While the menu is closed, the More row
+  carries the sum of the counts of its rows. The row exists only when the server gives an address (`boardsUrl` in
+  nm-config), so a Local connection has no row. In Needs you the same door is ONE row in the anatomy of the one-row
+  card (`.refic`, `.reftx`, `.refgo`): the title is the count in words, the second line is the app and the board, and
+  the action is `Open` with the same mark at 10px. Its messages are in the count of the bell. It is not a decision and
+  nothing settles it. The name in hq is always `Message boards`, because `Board` alone is the task board.
+
+- **Message boards is a second app on the same tokens** (`apps/boards`, 2026-11-13): its `src/styles/tokens.css` holds
+  the values of `apps/hq/src/tokens.css`, and `tokens.test.ts` fails when one of them differs. The app adds no token.
+  It has three rules of its own. Color marks one thing, a message that waits for a person (`--warn`). The author type
+  is a shape and a word: a circle is a person, a tinted square is a NeuraMesh agent, and an outline square is an
+  outside agent. There is no right panel: the roster cluster shows who has access, and one click opens the list.
+
+- **The canvas swap** (`.mk-swap`, the one-canvas round, 2026-11-18, [the mockup](design/marketing-one-canvas-2026-11/mockups/marketing-one-canvas.html)):
+  one tab can hold two views of one place. Marketing's Canvas tab holds the overview and the open thread's drafts. The
+  tab's first line is the swap line: on the left a `.fin-eyebrow` names what shows (the date, or the project and the
+  draft count), and on the right the agenda's Today | Tomorrow segmented control (`.mag-days`) reads `Overview | Drafts N`.
+  The line owns the eyebrow, so each view hides its own one. The control shows only while there is a second view to
+  show, and it stays at the same place in both views, so the way back is where the person left it. A view that arrives
+  while the person types does not take the tab: the segment wears a 5px `--link` dot (`.new`) until the person opens it.
+  The swap is a crossfade: the leaving view fades out on `--dur-exit` under the arriving one, which fades in with an
+  8px rise on `--dur`, and the arriving cards follow in a 20ms stagger on `--dur`. Reduced motion swaps at once. The
+  rules for which view shows are pure (`marketing/canvas-view.ts`), never a timestamp test.
+  ▸ **Finance uses it too** (finance-overview round, 2026-11-18): `Overview | Answers N`. Finance opens on the
+  overview, and an answer that the person asks for takes the tab, because the person asked for it.
+- **The money direction mark** (`.fin-dir`, `finance/FinanceTransactions.tsx`, the finance-overview round, 2026-11-18):
+  a 28px tile leads each transaction row. An up arrow on a 15% `--green` wash means money in, a down arrow on a 15%
+  `--warn` wash means money out, and a swap glyph on the neutral wash means a transfer, which counts in no total. A
+  pending row keeps its arrow inside an outline (no wash) and its amount in `--muted`. The amount wears the money ink of
+  its direction (§4) with a sign: `+` in, `−` out, none for a transfer. The arrow carries the direction, so color is
+  never its only sign. The 16px form (`data-size=sm`) labels a tile or a bar. Rows group by day, and each day header
+  says its money in and money out: money out from the server's daily spending, so a day split across two pages still
+  shows its whole total.
+- **Finance recommendations** (`.frecs`, `finance/FinanceRecommendations.tsx`, the finance-overview round, 2026-11-18):
+  one card under the Canvas tiles, a row per recommendation: the priority (High wears `--fin-over`, a status hue with
+  its word), the kind, a title with the real number, one sentence, and the rows behind it as chips that carry the
+  money-out ink. Each row offers Ask Finance (the text goes to the composer, the person sends it) and Mark as
+  addressed, and a `×` dismisses. A marked row folds to one line with Undo. The footer's tally opens the history,
+  which says who and when, with Restore for a dismissed one. Transactions gets a one-line strip with a pager and a
+  Flagged filter, and a flagged row wears a small bulb. The detectors are code and the words are a template, so no
+  model writes a recommendation.
+- **The category cell is a button** (`.fin-catbtn`, `finance/FinanceTransactions.tsx`, the finance-recategorize round,
+  2026-11-19, [the mockup](design/finance-recategorize-2026-11/mockups/finance-recategorize.html)): for the workspace
+  owner, a Transactions row's category cell keeps its look at rest, so the list stays calm. Row hover shows a chevron,
+  cell hover adds the `--hover-bg` wash (never a border swap, trap 3), and keyboard focus adds the `--focus-glow` ring.
+  On the phone the cell sits under the name and always shows its chevron, because touch has no hover. A member who
+  cannot manage Finance sees plain text. The cell opens a `ui/Popover` picker (`.fin-catpick`): search first, the
+  `.nmsel` list anatomy under Kinshi's groups, the CmdK keys, Esc gives focus back to the cell. On the phone the
+  picker is a bottom sheet. A save washes the changed rows in `--green` at 9% (150ms in, a 1.2s hold, 150ms out).
+- **The choice option** (`.fin-cp-opt`, `finance/CategoryPicker.tsx`, the same round): a full-width button on the card
+  stratum inside a popover, with a bold label, a muted second line and an arrow on the right. One click acts, so the
+  choice has no second Save button. Hover lifts it with `--shadow-lift`, focus wears the `--focus-glow` ring, a save
+  spins its arrow and disables the other option. A rule that the choice saves wears a small `Rule` tag beside the label.
+  The agent's proposal card (`CategoryChange`, `.fc-cat`) reuses the `BudgetChange` card anatomy with Dismiss and
+  Approve.
+- **The inline draft link to the canvas** (`marketing/CanvasDoor.tsx`, the same round): a draft in the chat keeps its
+  full card and every action. The strip of cards gains one door to the same drafts on the canvas: Finance's
+  `On the canvas · N drafts` tok (`.fin-tok.fin-canvastok`, `.on` while the canvas shows them) beside the split, and on
+  the phone Finance's answer card (`.fin-ansref`, `Open the canvas`), which opens the canvas sheet. The sheet never opens
+  by itself, because it covers the chat. A click on a card's body, away from its controls, opens Drafts with that card
+  in view and a `--ring` box shadow for one second. A unit's drafts get no door, because they live on the unit.
+- **The email card** (`.em-card`, `thread/EmailCard.tsx`, Inbox PR 7, 2026-11-23,
+  [frames 13, 15 to 17](design/inbox-sales-2026-11/mockups/inbox.html)): the card stratum, one per draft call, with a
+  row per email. A row is the letter tile (`.em-lt`), the person and the subject on one line, and the version in
+  `--fcode` (`Sent` in `--green`, a word beside it, so color is never the only sign). One row opens at a time, on
+  `--panel2`: the From, To and Subject grid, then the body on `--bg` in a `--border2` frame that the person edits in
+  place, and the agent's reason line with Request changes and Send. The footer says the address it sends from and
+  carries Send all N. A Send that waits its 10 s puts `N emails send in 8 s from <address>.` and a primary Undo in the
+  footer, beside the global hold toast (`inbox/send-hold.ts`, a hold's `key` names its card). On the phone Request
+  changes reads Change and Send all fills the footer. Inbox lists the cards that wait as a Drafts group (`.ib-tg.wt`
+  wears `--warn` for Waits for you), and its reader shows the same card with a door to the session (`.ib-lnk`).
+- **Sales** (`sales/`, 2026-11-23, [round 5, frames 1 to 10](design/inbox-sales-2026-11/mockups/sales.html)): the
+  Finance shape with the Product rows. The rail row sits between Finance and Product with the target glyph
+  (`IconTarget`, three rings), and its count is the outreach that waits. The Canvas tab's stage tiles (`.sl-stages`,
+  five `.sl-stage` cards in the card stratum, a mono count and the sum in tabular figures, Won in `--green`) open
+  Pipeline, and a tile with a deal that the sales agent moved in the last 10 minutes wears the `--ring` box shadow
+  (`.hi`). The board (`.sl-board`) is a column for each open stage and Won on a 3 % `--text` wash (`.sl-col`), at least
+  128 px wide, so a narrow canvas scrolls it sideways and never squeezes it. A deal card (`.sl-deal`) is the card
+  stratum with the next step under a hairline: `--warn` when it is late, `--dim` italic for No next step. A drop target
+  column wears the `--ring` inset. Lost folds under the board with the Inbox fold (`.ib-fold`). Contacts is a plain
+  table (`.sl-table`, the 10 px upper-case `--dim` head) in a `.tdlist` card. An outreach draft is the Inbox reader
+  and draft card with a From, To and Subject grid (`.sl-fields`, the subject an input in place), and a deal is the
+  same reader with a facts grid (`.sl-facts`) and its stage as a `.cchip` menu (`.sl-menu`). The first run is the
+  Finance empty canvas with the target mark (`.sl-emptymark`). On the phone the tiles wrap to three, the row buttons
+  go (the Product rule) and the Contacts table keeps three columns.
+- **The Publish door** (2026-11-24, `publish/PublishDoor.tsx`, plan I14 point 4). A preview of a file that can go out
+  (a video, an image or GIF, an HTML page, within the size limits) holds one Publish control where its head holds
+  Download: a `.btn.sm` Publish in the file preview's head (`.mkdocpanelhead`), the side panel's file head (`.wfhead`,
+  at the full `.btn` size of its Download) and the image lightbox bar, and a `.wfact` globe beside Download in the Files
+  row, which rests dim and comes up on hover like its neighbours (the actions column is 76 px for three icons). The door
+  opens the publish card in a `Modal wide` (`.pubc.dlg`: the card without its own border, head or shadow, because the
+  modal is the frame, and its primary button back to `width: auto`). A file with a live link shows the Published chip
+  and its menu (`.pubmark`) in place of the door. No door shows where Publish cannot work: the server's list says
+  `configured` or `canPublish` is false, or the type or size is outside the list. A dialog opened over the preview or
+  the lightbox takes Escape first, and over the lightbox it sits above it (`.alightbox ~ .overlay`).
 
 ## 9. The traps (etched — check these in review)
 

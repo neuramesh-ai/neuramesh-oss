@@ -10,10 +10,12 @@ import type { HostedAgent } from '../agents';
 
 import { adoptLegacyDir, planChatAdoption } from '../harness/migrate';
 
-import { chatWorkspaceDir, legacyChatWorkspaceDir } from '../chatmode';
+import { prepareChatWorkspace as ensureChatWorkspace } from '../harness/chat-workspace';
+import { hydratePath } from '../harness/hydration';
+import { chatWorkspaceDir } from '../chatmode';
 
 
-import { existsSync as existsSync_, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync as existsSync_, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as os_ from 'node:os';
 import { resolveInWorkspace, type SubjectRef } from '../harness/brain';
@@ -79,21 +81,6 @@ function subjectFor(t: { thread?: { number: number } | null; convoThreadId?: str
 }
 
 /**
- * A conversation's workspace, with its pre-merge directory adopted on first use.
- *
- * The adoption is here rather than in `chatWorkspaceDir` because that function is the pure half
- * of chat mode (testable with no disk, no database, no Electron) and a one-time move is neither.
- */
-function ensureChatWorkspace(threadId: string): string {
-  const dir = chatWorkspaceDir(os_.homedir(), threadId);
-  try {
-    adoptLegacyDir(legacyChatWorkspaceDir(os_.homedir(), threadId), dir, (line) => console.log(`agent_host ${line}`));
-  } catch { /* a failed adoption costs the old files' presence, never the turn */ }
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-/**
  * Sweep the rest of the pre-merge conversation directories in.
  *
  * `ensureChatWorkspace` only reaches a conversation somebody reopens, so a room's older threads
@@ -127,9 +114,11 @@ async function sweepLegacyChatDirs(): Promise<void> {
 }
 
 /** Files in a subject's workspace, newest first — what the conversation has actually produced. */
-function workspaceListing(subject: SubjectRef, cap = 40): Array<{ name: string; bytes: number; modified: string }> {
+async function workspaceListing(subject: SubjectRef, cap = 40): Promise<Array<{ name: string; bytes: number; modified: string }>> {
+  const sb = brain.open(subject);
+  await hydratePath(join(sb.path, 'workspace'));
   try {
-    const dir = brain.open(subject).workspaceDir();
+    const dir = sb.workspaceDir();
     return readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isFile() && !e.name.startsWith('.'))
       .map((e) => {
@@ -148,9 +137,11 @@ function workspaceListing(subject: SubjectRef, cap = 40): Array<{ name: string; 
  * result is checked to be INSIDE it. A prefix check on the joined path is what makes `../` and an
  * absolute path both impossible, rather than a blocklist of the spellings we thought of.
  */
-function workspaceRead(subject: SubjectRef, name: string, cap = 24_000): { ok: true; body: string } | { ok: false; error: string } {
+async function workspaceRead(subject: SubjectRef, name: string, cap = 24_000): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
   try {
-    const full = resolveInWorkspace(brain.open(subject).workspaceDir(), name);
+    const sb = brain.open(subject);
+    await hydratePath(join(sb.path, 'workspace'));
+    const full = resolveInWorkspace(sb.workspaceDir(), name);
     if (!full) return { ok: false, error: 'that path is outside this conversation’s workspace' };
     if (!existsSync_(full) || !statSync(full).isFile()) return { ok: false, error: `no file named "${name}" here — call list_workspace for the names` };
     const body = readFileSync(full, 'utf8');

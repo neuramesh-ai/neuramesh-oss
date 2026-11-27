@@ -1,5 +1,7 @@
 # Model config packs — plan (for review)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 **Current catalog update, 2026-10-16:** Opus 5.5, Sonnet 5.5 and Haiku 5.5 replace their previous
 generations in offered choices and pack defaults. Gemini 4 Argon is an additional stable choice.
 Old IDs remain accepted for saved picks and conversations. The September measurements below describe
@@ -120,7 +122,35 @@ seat (`claude-sonnet-4-6`) on both axes (6.6s q97 vs 23.1s q88) — a balanced r
 
 **Keeping packs current (process).** Provider lineups churn fast — Gemini and OpenAI were each a *generation* stale within weeks of the prior check. **Before every NeuraMesh release, re-verify the newest GA model per provider** (Anthropic · OpenAI · Google) against each provider's official model docs, and **surface the findings** — what's new, what's deprecated, what should change in the packs — so `PACKS` (packages/shared) and `RUNTIME_OPTS` never ship stale. A provider shipping a new flagship is the trigger to revisit the affected pack roles. Keep a dated "verified" line here on each pass.
 
-**Last verified: 2026-09-07.** A full generation had shipped since the previous pass. Added to
+**Last verified: 2026-11-23 (Gemini only).** Google made three Gemini 4 models stable in November
+2026. All three are now in `CURRENT_MODELS.gemini`, around Argon:
+
+| Model | Exact ID | Price per 1M tokens (in / out) | Levels |
+| --- | --- | --- | --- |
+| Gemini 4 Carbon | `gemini-4-carbon` | $2 / $10, then $4 / $20 from 2026-12-01 | low, medium, high |
+| Gemini 4 Neon | `gemini-4-neon` | $3 / $15, flat across the 1M window | low, medium, high, xhigh |
+| Gemini 4 Hydrogen | `gemini-4-hydrogen` | $1.50 / $7.50 | low, medium, high, xhigh |
+
+Sources: [the Gemini API models page](https://ai.google.dev/gemini-api/docs/models),
+[its pricing page](https://ai.google.dev/gemini-api/docs/pricing) and
+[the Hydrogen model page](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-hydrogen).
+Neon comes from Carbon and uses fewer tokens for each task. Hydrogen is the fast, low-cost tier.
+agy 1.5.2 lists `gemini-4-carbon-{low,medium,high}`, `gemini-4-neon-{low,medium,high,xhigh}` and
+`gemini-4-hydrogen-{low,medium,high}`. One live prompt returned an answer from Carbon (low), Neon
+(low and xhigh) and Hydrogen (high).
+
+- **Each model has its own levels.** `thinkingLevelsFor` in `agent-models.ts` is the one list. The pickers
+  show it, the server keeps only a level the model takes, and `levelFor` lowers Extra high to High
+  when a person moves a pick to a model without it.
+- **Extra high (`xhigh`) is new.** It is Google's top level on Neon and Hydrogen. An API key sends
+  `XHIGH`. agy has no Hydrogen xhigh, so a Google sign-in runs Hydrogen at High. No Claude or GPT model
+  offers it here yet, although both SDKs accept the value.
+- **No pack seats them yet.** A seat moves only on a bench run, and the bench prices all three now.
+- **Failover goes down the Gemini 4 line.** Carbon falls to Neon, Argon, Hydrogen, then 3.8 Flash.
+- **Argon stays.** The Gemini app replaced Argon with Neon, but the API still serves Argon.
+- **Vertex AI does not list Neon yet.** NeuraMesh calls the Gemini API, not Vertex AI, so this has no effect.
+
+**Verified 2026-09-07.** A full generation had shipped since the previous pass. Added to
 `CURRENT_MODELS`: `claude-fable-5-1` and `claude-opus-5` (Anthropic), `gpt-6-astra` and
 `gpt-5.6-terra` (OpenAI), `gemini-3.8-flash` (Google). Their predecessors stay listed until the
 benchmark re-run moves the seats off them, because a pack may never seat a model the catalog does

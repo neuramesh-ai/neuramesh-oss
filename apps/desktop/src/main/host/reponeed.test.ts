@@ -16,7 +16,7 @@ import { playbookTools } from './tools-playbooks';
 const LOCAL = { id: 'r1', org_name: 'local', name: 'neuramesh', clone_url: null, local_path: '~/code/neuramesh', provider: 'local' };
 const GITHUB = { id: 'r2', org_name: 'acme', name: 'site', clone_url: 'https://github.com/acme/site.git', local_path: null, provider: 'github' };
 
-function replica(o: { connected?: boolean; repo?: unknown | null; open?: number; title?: string | null; mode?: string | null; tasks?: Array<{ number: number; title: string; state: string; description: string | null }> } = {}) {
+function replica(o: { connected?: boolean; repo?: unknown | null; open?: number; title?: string | null; mode?: string | null; said?: string; tasks?: Array<{ number: number; title: string; state: string; description: string | null }> } = {}) {
   const seen: Array<{ sql: string; params: unknown[] }> = [];
   return {
     seen,
@@ -26,6 +26,7 @@ function replica(o: { connected?: boolean; repo?: unknown | null; open?: number;
       if (/from connectors/.test(sql)) return [{ n: o.connected ? 1 : 0 }] as T[];
       if (/from repos/.test(sql)) return (o.repo === null || o.repo === undefined ? [] : [o.repo]) as T[];
       if (/from decisions/.test(sql)) return [{ n: o.open ?? 0 }] as T[];
+      if (/select body from messages/.test(sql)) return (o.said === undefined ? [] : [{ body: o.said }]) as T[];
       if (/select mode from threads/.test(sql)) return (o.mode === undefined ? [] : [{ mode: o.mode }]) as T[];
       if (/from threads/.test(sql)) return (o.title === undefined ? [] : [{ title: o.title }]) as T[];
       if (/from tasks/.test(sql)) return (o.tasks ?? []).filter((t) => t.number === params[1]) as T[];
@@ -60,6 +61,19 @@ test('the card posts once, flagged as the tool\'s, with the lead line above it a
   // a second refusal in the same turn: the replica has not seen the row yet, the memo has
   assert.equal(await postRepoNeed({ db, post: p.post, actor: rex }, place, words), true);
   assert.equal(p.sent.length, 1);
+});
+
+test('a publish ask gets no card: the file is in Files, and the reader keeps its prose (George, 2026-11-24)', async () => {
+  const p = poster();
+  const ask = replica({ said: 'Publish design-mockup-v2-homepage-settle.html in Files in #build. Its file id is 6f1c0e1a-0000-4000-8000-000000000001.' });
+  assert.equal(await postRepoNeed({ db: ask, post: p.post, actor: rex }, place, words), false);
+  assert.equal(p.sent.length, 0);
+  // another ask in the same kind of session still gets its card
+  assert.equal(await postRepoNeed({ db: replica({ said: 'Look at the storage interface in the repo' }), post: p.post, actor: rex }, place, words), true);
+  assert.equal(p.sent.length, 1);
+  // a task's thread is work on the board, and keeps its card
+  resetNeedMemoForTest();
+  assert.equal(await postRepoNeed({ db: ask, post: p.post, actor: rex }, { workspace: 'ws', channel: 'ch-build', taskId: 'task-1' }, words), true);
 });
 
 test('a card already open in the conversation is enough: nothing posts, and the reader still stops', async () => {
@@ -123,6 +137,10 @@ test('readable means the connector, or a GitHub repository and this machine\'s g
   assert.deepEqual(await repoReadable(replica({ repo: GITHUB }), 'ch', async () => false), { ok: false, repoName: 'site' });
   assert.deepEqual(await repoReadable(replica({ repo: GITHUB }), 'ch', async () => true), { ok: true, repoName: 'site' });
   assert.deepEqual(await repoReadable(replica({ repo: null }), 'ch'), { ok: false, repoName: null });
+  // a git or bundle repository: not readable here, and marked so the caller puts no GitHub card up (r7 evals ede25023)
+  const git = { id: 'r3', org_name: 'e2e', name: 'ledger', clone_url: 'file:///nm/work/e2e/ledger.git', local_path: null, provider: 'git' };
+  assert.deepEqual(await repoReadable(replica({ repo: git, connected: true }), 'ch', async () => true), { ok: false, repoName: 'ledger', notGitHub: true });
+  assert.deepEqual(await repoReadable(replica({ repo: { ...git, clone_url: 'nm-bundle:k1', provider: 'bundle' } }), 'ch', async () => true), { ok: false, repoName: 'ledger', notGitHub: true });
 });
 
 test('the reader: a refusal a grant fixes puts the card up and tells the model to stop, and without the hook it keeps its prose', async () => {

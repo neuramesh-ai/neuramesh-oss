@@ -17,9 +17,9 @@ export async function requireActivation(store: Store, workspace: string): Promis
 }
 
 // Setup, account access and stopping work remain possible before activation.
-const SETUP = new Set<Command['type']>(['agent.register', 'workspace.create', 'workspace.update', 'workspace.delete', 'workspace.leave',
+const SETUP = new Set<Command['type']>(['agent.register', 'workspace.create', 'workspace.update', 'workspace.set_profile', 'workspace.delete', 'workspace.leave',
   'workspace.accept_invite', 'workspace.decline_invite', 'workspace.revoke_invite', 'workspace.remove_member', 'credential.set',
-  'account.delete', 'member.update_profile', 'task.cancel', 'thread.settle', 'run.settle', 'schedule.delete']);
+  'account.delete', 'member.update_profile', 'task.cancel', 'thread.settle', 'task.settle', 'run.settle', 'schedule.delete']);
 
 export async function requireCommandActivation(store: Store, cmd: Command): Promise<void> {
   if (!activationEnabled() || SETUP.has(cmd.type)) return;

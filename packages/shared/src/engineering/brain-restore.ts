@@ -35,7 +35,9 @@ export function restoreEngineeringBrain(shell: EngineeringSession, snapshot: Bra
     const before = new Set(session.messages.map(m => m.id));
     const p = object(record.payload);
     const apply = (wire: Record<string, unknown>) => { session = applyRemoteEngineeringEvent(session, wire); };
-    if (record.type === 'user.message' && typeof p.text === 'string') {
+    if (record.type === 'user.message' && typeof p.followupId === 'string') {
+      apply({type:'followup_received', id:p.followupId, text:p.text, attachments:p.attachments});
+    } else if (record.type === 'user.message' && typeof p.text === 'string') {
       if (isEngineeringSelection(p.selection)) session = { ...session, agentId: p.selection.agentId, modelOverride: p.selection.modelId, reasoningEffort: p.selection.reasoningEffort };
       if (typeof p.agent?.name === 'string') session = { ...session, agent: p.agent };
       session = beginRemoteEngineeringPrompt({ ...session, state: 'resumable', mode: p.mode === 'act' ? 'act' : 'plan' }, p.text);

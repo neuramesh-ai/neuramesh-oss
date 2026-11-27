@@ -29,6 +29,10 @@ describe('nextFallForward', () => {
   it('walks the OpenAI chain from the 2026-09 flagship', () => {
     expect(nextFallForward('gpt-6-astra', new Set())).toBe('gpt-5.6-sol');
     expect(nextFallForward('gpt-6-astra', new Set(['gpt-5.6-sol']))).toBe('gpt-5.6-terra');
+    expect(nextFallForward('gemini-4-carbon', new Set())).toBe('gemini-4-neon');
+    expect(nextFallForward('gemini-4-neon', new Set())).toBe('gemini-4-argon');
+    expect(nextFallForward('gemini-4-argon', new Set())).toBe('gemini-4-hydrogen');
+    expect(nextFallForward('gemini-4-hydrogen', new Set())).toBe('gemini-3.8-flash');
   });
   it('lands a superseded model on the CURRENT generation, never back onto its own', () => {
     // an agent still seated on a retired id must fall forward, not sideways into another retirement
@@ -183,7 +187,8 @@ describe('composeFailover — OpenAI Core (Sol on orchestrator) exhaustion', () 
     if (r.kind !== 'fall_forward') throw new Error('kind');
     expect(r.to).toBe('gpt-5.6-terra');
     expect(r.provider).toBe('openai');
-    // after the 2026-09 reseat Sol also holds designer, shipper and marketer in openai-core
-    expect([...r.roles].sort()).toEqual(['designer', 'marketer', 'orchestrator', 'shipper']);
+    // after the 2026-09 reseat Sol also holds designer, shipper and marketer in openai-core, and the
+    // finance seat follows the orchestrator (2026-11-17)
+    expect([...r.roles].sort()).toEqual(['designer', 'finance', 'marketer', 'orchestrator', 'shipper']);
   });
 });

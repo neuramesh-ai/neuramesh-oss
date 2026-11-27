@@ -58,3 +58,37 @@ test('only the parent assistant public text becomes attributed conversation prog
   assert.deepEqual(events.filter(e=>e.type==='assistant.message').map(e=>e.payload),[{text:'I found the launch brief.',turnId:'parent'}]);
   assert.equal(events.filter(e=>e.type==='runtime.event').length,3);
 });
+
+test('a native coding task has one journal owner and generic task work cannot race it', async () => {
+  const root = mkdtempSync('/tmp/nm-coding-writer-');
+  const around = hostConversationRecorder({ root, workspace:'workspace-a', actorId:'actor-a', apiUrl:'https://api.test', headers:async()=>({}),
+    db:{getAll:async<T>()=>[{id:'native-thread',kind:'coding'}] as T[]},
+    fetchImpl:async()=>{throw new Error('Generic recorder must not open the native coding journal');} });
+  let ran=0;
+  try {
+    const result=await around({key:'execute',kind:'work',cause:'board',agentId:'patch',subject:{kind:'task',number:12}},async()=>{ran++;return 'native result';});
+    assert.equal(result,'native result');assert.equal(ran,1);
+  } finally {rmSync(root,{recursive:true,force:true});}
+});
+
+test('a wake that another machine answers writes nothing to the thread, and the answering wake records it all', async () => {
+  const root = mkdtempSync('/tmp/nm-lease-writer-');
+  const commits: BrainConversationEvent[][] = [];
+  const messages = [{ id: 'm1', body: 'Write the report', author_kind: 'human', author_id: 'geo', created_at: '2026-11-25T21:31:20.000Z' }];
+  const around = hostConversationRecorder({ root, workspace: 'workspace-a', actorId: 'actor-a', apiUrl: 'https://api.test', headers: async () => ({}), intervalMs: 60_000,
+    db: { getAll: async <T>() => messages as T[] }, fetchImpl: async (_url, init) => {
+      if (init?.method !== 'POST') return new Response('', { status: 404 });
+      const request = JSON.parse(String(init.body));
+      commits.push(request.events);
+      return new Response(JSON.stringify({ ok: true, commitId: request.commitId, revision: commits.length }));
+    } });
+  const work = { key: 'wake', kind: 'chat' as const, cause: 'board' as const, agentId: 'rex', subject: { kind: 'thread' as const, id: 'thread-1' } };
+  try {
+    // the lease is lost: the wake returns before any model call
+    assert.equal(await around(work, async () => 'stood down'), 'stood down');
+    assert.equal(commits.length, 0);
+    await around(work, async () => { recordConversationEvent('assistant.message', { text: 'The report' }); });
+    assert.deepEqual(commits.flat().map((event) => event.type), ['user.message', 'turn.open', 'assistant.message', 'turn.settle']);
+    assert.equal(commits.flat()[0]!.id, 'message:m1');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

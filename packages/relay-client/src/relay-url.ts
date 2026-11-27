@@ -9,6 +9,10 @@
 // forgotten. An auth mode cannot.
 export const PROD_RELAY_URL = 'wss://relay.neuramesh.app';
 
+// THE SETTING MAY BE A LIST (gate A2, 2026-10): the relay shards, comma separated, in shard order.
+// It passes through as it is, and the client picks each machine's shard (relay-client.ts). Production
+// is one relay, so PROD_RELAY_URL is the list of one.
+
 /** the relay for this client: an explicit setting first, else production under Clerk, else none */
 export function relayUrlFor(explicit: string | undefined, authMode: string): string {
   const set = explicit?.trim();

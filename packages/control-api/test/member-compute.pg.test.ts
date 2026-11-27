@@ -13,6 +13,7 @@ const WS = 'a0000000-0000-0000-0000-00000000000a';
 const george: Actor = { kind: 'human', id: '00000000-0000-0000-0000-000000000001' };
 const rex: Actor = { kind: 'agent', id: '20000000-0000-0000-0000-000000000002', role: 'orchestrator' };
 const THIRD = 'c0000000-0000-0000-0000-0000000000c3';
+const SECOND = 'c0000000-0000-0000-0000-0000000000c2';
 
 const store = DB ? new PostgresStore(DB) : null;
 const app = store ? createApp(store) : null;
@@ -40,12 +41,14 @@ beforeAll(async () => {
     values (${WS}::uuid, ${MACHINE}::uuid, 'member-compute-agent', 'developer', 'claude-sonnet-5')
     on conflict (workspace_id, name) do update set role = 'developer' returning id`;
   AGENT = a!['id'] as string;
-  // A THIRD member, so "revoking one keeps everyone else" has an `else` to keep. With the two the
-  // fixtures ship, that assertion passes vacuously — the control below refuses to let it.
-  await sql`insert into nm_users (id, clerk_user_id, email)
-    values (${THIRD}::uuid, ${THIRD}, 'third@compute.test') on conflict (id) do nothing`;
-  await sql`insert into workspace_members (workspace_id, user_id, role, display_name)
-    values (${WS}::uuid, ${THIRD}::uuid, 'member', 'third') on conflict do nothing`;
+  // The base fixture has only the owner. Create both peers ourselves so the
+  // "revoking one keeps everyone else" assertion does not depend on test order.
+  for (const [id, name] of [[SECOND, 'second'], [THIRD, 'third']] as const) {
+    await sql`insert into nm_users (id, clerk_user_id, email)
+      values (${id}::uuid, ${id}, ${`${name}@compute.test`}) on conflict (id) do nothing`;
+    await sql`insert into workspace_members (workspace_id, user_id, role, display_name)
+      values (${WS}::uuid, ${id}::uuid, 'member', ${name}) on conflict do nothing`;
+  }
 });
 
 afterAll(async () => {

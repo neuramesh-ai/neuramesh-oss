@@ -19,17 +19,22 @@ import { fileTools } from '../runtime/starter';
 // The tools every orchestrator turn kind carries today. Kind differences ride on top.
 const BASE = [
   // accept_task (2026-09-08): accept on the human's WORD — the Accept button's replacement, routeTools
-  'accept_task', 'add_agent_to_channel', 'add_backlog_item', 'add_subtask', 'create_agent', 'create_project',
-  'create_task', 'draft_article', 'draft_posts', 'draft_replies', 'generate_image', 'list_agents', 'list_backlog', 'list_library',
+  // ask_mail_read + read_allowed_mail (2026-11-23, plan I12): one read of the person's mail, only with Allow once (host/tools-mail-read.ts)
+  // add_email_media (2026-11-23, plan I13): a picture, a GIF or a video link in an email on the card (host/tools-email-media.ts)
+  'accept_task', 'add_agent_to_channel', 'add_email_media', 'ask_mail_read', 'ask_publish', 'add_backlog_item', 'add_subtask', 'create_agent', 'create_project',
+  'create_task', 'draft_article', 'draft_emails', 'draft_posts', 'draft_replies', 'generate_image', 'list_agents', 'list_backlog', 'list_library',
   // the repository reads (2026-09-19, docs/design/github-connector-2026-09): what shipped, a file, the tree (host/tools-repo.ts)
   // shelve_repo_screenshot (2026-10-06): a real app screenshot taken from the repository for a video beat's SHOW line (host/chattools-product.ts); it replaced make_product_image
   'list_playbooks', 'list_projects', 'list_repo_changes', 'list_repo_files', 'list_repos', 'list_tasks', 'list_workspace', 'load_skill', 'offer_task',
   // propose_angles (2026-09-19): the UGC playbook's angle card, before any creator script is drafted (host/ugcflow.ts)
-  'post_thread', 'promote_backlog_item', 'propose_angles', 'propose_design_round', 'propose_impl_plan',
+  // the Postiz reads (2026-11-24, docs/design/postiz-connector-2026-11 P11): read only, the room's project's account (host/tools-postiz.ts)
+  'post_thread', 'postiz_analytics', 'postiz_channel_rules', 'postiz_channels', 'postiz_media', 'postiz_posts', 'promote_backlog_item', 'propose_angles', 'propose_design_round', 'propose_impl_plan',
   // read_drafts (2026-09-19): the cards on screen, read before revise_posts rewrites one (host/chattools-drafts.ts)
-  'propose_library_doc', 'read_drafts', 'read_library_doc', 'read_repo_file', 'read_workspace_file', 'recall', 'register_repo',
+  // publish_file (2026-11-24, plan I14 point 4): publish on the person's request, the server checks the word (host/tools-publish.ts)
+  'propose_library_doc', 'publish_file', 'read_allowed_mail', 'read_drafts', 'read_library_doc', 'read_repo_file', 'read_workspace_file', 'recall', 'register_repo',
   'request_changes', 'request_design', 'request_plan', 'request_verdict', 'revise_design',
-  'revise_plan', 'revise_posts', 'revise_replies', 'revise_ship_plan', 'run_playbook', 'schedule_posts', 'search_x',
+  // draft_emails + revise_emails (2026-11-23, docs/design/inbox-sales-2026-11 I8 to I10): an email card in the session (host/tools-email.ts)
+  'revise_emails', 'revise_plan', 'revise_posts', 'revise_replies', 'revise_ship_plan', 'run_playbook', 'schedule_posts', 'search_x',
   'share_images', 'shelve_repo_screenshot', 'start_deep_work', 'take_task', 'task_status', 'unschedule_posts', 'update_backlog_item',
 ];
 const WB_ALL = ['create_whiteboard', 'update_whiteboard', 'list_whiteboards', 'read_whiteboard'];

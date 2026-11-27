@@ -1,3 +1,4 @@
+import { sqlOf } from '../credits';
 // Plan + routine follow-ups that run AFTER the FSM mutate committed (2026-08-19).
 // Two side effects share this module because they share a shape: read the settled outcome,
 // act fail-soft (the transition that just committed must never be undone by its follow-up).
@@ -10,6 +11,23 @@ import type { Command } from '../commands';
 import type { MutationResult, Store } from '../store';
 import { actorAddress, taskTarget } from './guards';
 import { DomainError } from '../errors';
+
+/** A shared home can hold both scheduled and interactive work. Only the
+ * verified opener (or a historical, server-stamped routine creation event)
+ * authorizes skipping a task gate. A thread's schedule label isn't authority. */
+async function authorizedSchedule(store: Store, task: Task): Promise<string | null> {
+  if (!task.originThreadId) return null;
+  const sql = sqlOf(store);
+  if (!sql) return store.getThreadRoutineId(task.workspace, task.originThreadId);
+  if (task.permissionRunMessageId) {
+    const [claim] = await sql`select p.schedule_id from permission_schedule_claims p join schedules s on s.id=p.schedule_id
+      where s.workspace_id=${task.workspace} and p.message_id=${task.permissionRunMessageId}`;
+    return claim?.schedule_id ?? null;
+  }
+  const [legacy] = await sql`select payload->>'scheduleId' as id from events
+    where workspace_id=${task.workspace} and task_id=${task.id} and type='task.created' and payload->'routine'='true'::jsonb limit 1`;
+  return legacy?.id ?? null;
+}
 
 /** the ONE plan-message poster: the readable line + the ‹plan:vN› marker (shared planMessage), onto the task's thread */
 export async function postPlanMessage(store: Store, task: Task, actor: Actor, version: number, kind: PlanPostKind): Promise<void> {
@@ -49,7 +67,7 @@ export async function planRevisionFollowup(store: Store, actor: Actor, cmd: Comm
  * routine machine; floored like routineAccept: never repo-backed. */
 export function routinePlanApprove(task: Task, scheduleId: string): MutationResult {
   if (task.state !== 'plan_review') throw new DomainError('ILLEGAL_TRANSITION', `a routine plan auto-approve fires from plan_review, not ${task.state}`);
-  if (task.repo) throw new DomainError('NOT_PERMITTED', 'repo-backed plans are approved by a human, routine or not');
+  if (task.repo && !task.permissionRunMessageId) throw new DomainError('NOT_PERMITTED', 'repo-backed plans are approved by a human, routine or not');
   if (task.planApprovedAt) return { task, events: [] };
   const next: Task = { ...task, planApprovedAt: new Date().toISOString(), requirementsConfirmed: true, version: task.version + 1, updatedAt: new Date().toISOString() };
   const event = createEvent({
@@ -89,7 +107,7 @@ export function routineAccept(task: Task, scheduleId: string): MutationResult {
  */
 export async function routineAcceptFollowup(store: Store, cmd: Command & { taskId: string }, outcome: MutationResult): Promise<MutationResult> {
   if (cmd.type !== 'task.approve' || outcome.task.state !== 'done' || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await authorizedSchedule(store, outcome.task);
   if (!scheduleId) return outcome;
   const accepted = await store.mutate(cmd.taskId, async (t) => routineAccept(t, scheduleId)).catch(() => null);
   return accepted ? { ...accepted, events: [...outcome.events, ...accepted.events] } : outcome;
@@ -100,8 +118,8 @@ export async function routineAcceptFollowup(store: Store, cmd: Command & { taskI
  * renders already-approved, and the claim watch releases the work with nobody parked. Covers
  * the board-born route (promoted todo → request_plan) that the birth-time stamp cannot see. */
 export async function routinePlanFollowup(store: Store, cmd: Command, outcome: MutationResult): Promise<MutationResult> {
-  if (cmd.type !== 'task.propose_plan' || outcome.task.state !== 'plan_review' || outcome.task.planApprovedAt || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  if (cmd.type !== 'task.propose_plan' || outcome.task.state !== 'plan_review' || outcome.task.planApprovedAt || (outcome.task.repo && !outcome.task.permissionRunMessageId) || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await authorizedSchedule(store, outcome.task);
   if (!scheduleId) return outcome;
   const approved = await store.mutate(outcome.task.id, async (t) => routinePlanApprove(t, scheduleId)).catch(() => null);
   return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
@@ -132,7 +150,7 @@ export function routineDesignApprove(task: Task, scheduleId: string, round: numb
  * unit's creator, fail-soft) — the human reads a run, never a gate. */
 export async function routineDesignFollowup(store: Store, cmd: Command, outcome: MutationResult): Promise<MutationResult> {
   if (cmd.type !== 'task.propose_design' || outcome.task.state !== 'design_review' || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await authorizedSchedule(store, outcome.task);
   if (!scheduleId) return outcome;
   const approved = await store.mutate(outcome.task.id, async (t) => routineDesignApprove(t, scheduleId, cmd.round)).catch(() => null);
   if (!approved) return outcome;

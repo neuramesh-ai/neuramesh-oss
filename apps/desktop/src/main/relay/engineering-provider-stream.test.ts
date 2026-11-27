@@ -114,16 +114,18 @@ test('an unfinished tool cannot keep the turn running forever by streaming nonem
   assert.equal(cancelled, true);
 });
 
-test('keepalive frames cannot keep a silent reasoning response alive indefinitely', async () => {
-  const receipts: EngineeringStreamReceipt[] = [];
-  let i = 0;
-  const call = engineeringProviderFetch(async () => sse(new ReadableStream({ async pull(c) {
-    await delay(10);
-    c.enqueue(encoder.encode(i++ === 0 ? 'data: {"type":"response.reasoning_summary_text.delta","delta":"thinking"}\n\n' : 'event: keepalive\ndata: {"type":"keepalive"}\n\n'));
-  } })), r => receipts.push(r), 45);
-  await assert.rejects((await call('https://provider.test')).text(), /stopped making progress/);
-  assert.equal(receipts[0]?.timeoutKind, 'provider_progress');
-});
+for (const contentType of ['text/event-stream', undefined]) {
+  test(`keepalives cannot mask a stalled reasoning stream with ${contentType ?? 'no Content-Type'}`, async () => {
+    const receipts: EngineeringStreamReceipt[] = [];
+    const chunks = ['da', 'ta: {"type":"response.reasoning_summary_text.delta","delta":"thinking"}\n\n'];
+    const call = engineeringProviderFetch(async () => new Response(new ReadableStream({ async pull(c) {
+      await delay(10);
+      c.enqueue(encoder.encode(chunks.shift() ?? 'event: keepalive\ndata: {"type":"keepalive"}\n\n'));
+    } }), { headers: contentType ? { 'content-type': contentType } : {} }), r => receipts.push(r), 45);
+    await assert.rejects((await call('https://provider.test')).text(), /stopped making progress/);
+    assert.equal(receipts[0]?.timeoutKind, 'provider_progress');
+  });
+}
 
 test('active Anthropic and chat-completion streams are meaningful progress', async () => {
   for (const chunk of [ { type: 'content_block_delta', delta: { type: 'text_delta', text: 'hello' } }, { choices: [{ delta: { content: 'hello' } }] } ]) {

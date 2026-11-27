@@ -218,6 +218,24 @@ export const THREAD_POSTS =
   `select id, channel_id, thread_id, task_id, platform, body, media, status, scheduled_at, published_at, external_url, created_at from content_items
     where thread_id = ? order by created_at`;
 
+// One session's email cards (0199): every email, sent and replaced ones too, so a card shows what went. params: [threadId]
+export const THREAD_EMAILS =
+  `select * from email_drafts where thread_id = ? order by created_at, letter`;
+// The email drafts that wait for a person in one workspace (Inbox's Drafts group, a session's Needs you). params: [workspaceId]
+export const EMAIL_DRAFTS_WAITING =
+  `select * from email_drafts where workspace_id = ? and status = 'draft' order by updated_at desc`;
+// One session's read requests (0203, plan I12), each with its state and what the read gave. params: [threadId]
+export const THREAD_MAIL_GRANTS =
+  `select * from mail_grants where thread_id = ? order by created_at`;
+// The read requests that wait for a person in one workspace (a session's Needs you). params: [workspaceId]
+export const MAIL_GRANTS_WAITING =
+  `select * from mail_grants where workspace_id = ? and status = 'asked' order by created_at desc`;
+// The Sales pipeline (0201): every contact and deal of one workspace, for a person with Sales access. params: [workspaceId]
+export const SALES_CONTACTS = `select * from sales_contacts where workspace_id = ? order by created_at desc`;
+export const SALES_DEALS = `select * from sales_deals where workspace_id = ? order by updated_at desc`;
+// The outreach emails of one workspace: every email that names a deal, so a deal shows what waits and what went. params: [workspaceId]
+export const SALES_OUTREACH = `select * from email_drafts where workspace_id = ? and deal_id is not null order by created_at desc`;
+
 // Machines with the columns the compute ladder and the chip read (0114/0126): whose, what kind, what it serves. params: [workspaceId]
 export const MACHINES_WITH_KIND_FOR_WORKSPACE =
   `select id, name, platform, daemon_version, last_seen_at, kind, owner_user_id, runtimes from machines where workspace_id = ? order by name`;

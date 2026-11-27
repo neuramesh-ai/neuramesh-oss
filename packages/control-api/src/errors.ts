@@ -36,10 +36,16 @@ export type DomainErrorCode =
   | 'AUTH_FAILED'
   | 'SESSION_EXPIRED'
   | 'AUTH_UNAVAILABLE'
+  | 'AUTH_DELETE_FAILED'
   | 'CONFLICT'
   // whiteboard.update carried a baseRev the board has moved past (docs/38) — the caller
   // re-reads the board and reapplies; LWW with no silent clobber.
   | 'WHITEBOARD_STALE'
+  // email.revise or email.edit named a version older than the email's (plan I9): the writer reads it again first
+  | 'EMAIL_STALE'
+  // a Cloud Run machine wrote with an epoch older than its row's (fleet-cloudrun.ts): a resize
+  // overlaps the old instance with the new one, and only the newest may write
+  | 'STALE_EPOCH'
   | 'DUPLICATE_TASK'
   | 'PLAN_LIMIT'
   | 'MACHINE_LIMIT'
@@ -52,6 +58,13 @@ export type DomainErrorCode =
   | 'IMPORT_WORKSPACE'
   | 'IMPORT_ORDER'
   | 'IMPORT_TOO_LARGE'
+  // machine upgrades (docs/design/whats-new-upgrades-2026-11): Upgrade now on a machine with work and no
+  // confirm; a release that is not the newest published one; an ops hold on every upgrade; a return to a
+  // release that cannot read the saved snapshot (plan §8.2)
+  | 'UPGRADE_BUSY'
+  | 'RELEASE_NOT_OFFERED'
+  | 'UPGRADES_HELD'
+  | 'ROLLBACK_BLOCKED'
   | 'NOT_FOUND';
 
 const STATUS: Record<DomainErrorCode, number> = {
@@ -104,9 +117,22 @@ const STATUS: Record<DomainErrorCode, number> = {
   // 503 — auth infrastructure (Clerk / network / config) failed transiently. Clients must
   // retry and keep the user signed in; a Clerk outage may never force a re-login.
   AUTH_UNAVAILABLE: 503,
+  // 502 — Clerk did not delete the sign-in identity: the account row stays, and a second try can finish
+  AUTH_DELETE_FAILED: 502,
   CONFLICT: 409,
+  // 409 — work runs on the machine; the answer names it, and a confirmed retry (stopWork) passes
+  UPGRADE_BUSY: 409,
+  // 409 — the newest release moved, or the named one was withdrawn: the client reads it again
+  RELEASE_NOT_OFFERED: 409,
+  // 423 — ops hold every upgrade for a short time; the same request passes when the hold ends
+  UPGRADES_HELD: 423,
+  // 409 — the last release cannot read the snapshot this machine saved: a boot on it would lose work
+  ROLLBACK_BLOCKED: 409,
   // 409 — same family as CONFLICT: the state is already past what you built on
   WHITEBOARD_STALE: 409,
+  EMAIL_STALE: 409,
+  // 409 — same family: the machine is past the epoch the caller holds
+  STALE_EPOCH: 409,
   // 409 — an agent tried to create a task an open same-title sibling already covers
   // (the double-triage class). The message names the existing task so the caller's
   // turn can act on it instead of retrying the create.

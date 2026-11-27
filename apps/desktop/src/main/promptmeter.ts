@@ -13,10 +13,11 @@
 // strings), not the runtime's own serialization overhead, so the numbers are comparable across
 // commits rather than absolute.
 import type { ZodTypeAny } from 'zod';
-import { composePrompt } from '@neuramesh/shared';
+import { NARRATION_RULE, composePrompt } from '@neuramesh/shared';
 import type { TurnKind } from '@neuramesh/shared';
 import { shippedContract } from './contracts';
 import { makeOrchTools, type OrchTool } from './host/orchtools';
+import type { MessageBoardTools } from './host/messageboards';
 import { DEFS } from './harness/tooldefs';
 import { WHITEBOARD_DEFS } from './harness/tooldefs-whiteboard';
 
@@ -51,7 +52,7 @@ export function weighTools(tools: Array<{ name: string; description: string; sch
  * a turn is actually HANDED, where a source-text grep saw only what the file mentions — the
  * difference that let the #272 split drop the whiteboard spread while every test stayed green.
  */
-export async function buildStubOrchestratorRegistry(kind: TurnKind & ('triage' | 'own' | 'sweep'), sweepScope?: 'digest' | 'watchdog' | 'monitor'): Promise<OrchTool[]> {
+export async function buildStubOrchestratorRegistry(kind: TurnKind & ('triage' | 'own' | 'sweep'), sweepScope?: 'digest' | 'watchdog' | 'monitor', access: { messageBoards?: MessageBoardTools } = {}): Promise<OrchTool[]> {
   const never = async (): Promise<never> => { throw new Error('promptmeter stub — tools are weighed, never run'); };
   const host = makeOrchTools({
     db: { getAll: async () => [] } as never,
@@ -70,6 +71,10 @@ export async function buildStubOrchestratorRegistry(kind: TurnKind & ('triage' |
     whiteboardClosures: () => ({ list: never, read: never, create: never, update: never }) as never,
     workspaceListing: () => [],
     workspaceRead: () => ({ ok: false as const, error: 'promptmeter stub' }),
+    // the budgets weigh the registry of an agent with NO access to a message board: the daemon's own
+    // answer (host/messageboards.ts), which is "no access" with no machine token. a test hands
+    // `access.messageBoards` to see the registry of an agent with a grant
+    ...(access.messageBoards ? { messageBoardsFor: async () => access.messageBoards } : {}),
   } as never);
   return host.buildOrchestratorTools({
     ch: { id: 'meter-ch', slug: 'meter', workspace_id: 'meter-ws' },
@@ -109,6 +114,10 @@ export async function staticPayloadReport(): Promise<{ lines: string[]; totals: 
   const lines: string[] = [];
   const totals: Record<string, number> = {};
   const contract = weighContract('orchestrator', ['channel', 'powers', 'style']);
+  // the narration rule rides every channel and thread turn, appended to the style block in TS
+  // (host/orchestratorturn.ts), so the meter weighs it as part of the contract the model reads
+  contract.blocks.push({ block: 'narration', chars: NARRATION_RULE.length + 2 });
+  contract.total += NARRATION_RULE.length + 2;
   lines.push(`contract orchestrator: ${contract.blocks.map((b) => `${b.block} ${b.chars}`).join(' · ')} = ${contract.total} chars (~${tok(contract.total)} tok)`);
   totals['contract.orchestrator'] = contract.total;
   // the extracted TS-literal blocks (2026-08-18 P4) — measured as their own surfaces so their

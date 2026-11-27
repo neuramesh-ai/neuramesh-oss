@@ -1,6 +1,7 @@
 // The release routine on postgres (release-drafts plan §4.2 and §4.8): the nested jsonb merge behind
 // schedule.set_cursor, the routines marketing.setup plants, and the announcements store's rows.
 // Runs only against a real database (scripts/test-pg.sh); rls.pg.test.ts covers the new tables' RLS.
+import {randomUUID} from 'node:crypto';
 import type { Actor } from '@neuramesh/shared';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -14,10 +15,11 @@ const sql = DB ? postgres(DB) : null;
 const WS = 'a0000000-0000-0000-0000-00000000000a';
 const REPO = 'b0000000-0000-0000-0000-000000000001'; // acme/marketing-site, from the fixtures
 const george: Actor = { kind: 'human', id: '00000000-0000-0000-0000-000000000001' };
-const plume: Actor = { kind: 'agent', id: 'plume', role: 'marketer' };
+let marketingThread = '';
+let plume: Actor;
 const j = (r: Response): Promise<any> => r.json() as Promise<any>;
 function send(actor: Actor, body: unknown) {
-  return app!.request('/v1/commands', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(actor) }, body: JSON.stringify(body) });
+  return app!.request('/v1/commands', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(actor),...(actor.kind==='agent'&&marketingThread?{'x-nm-agent-context':JSON.stringify({workspace:WS,subject:{kind:'thread',id:marketingThread}})}:{}) }, body: JSON.stringify(body) });
 }
 
 afterAll(async () => { await sql?.end(); await store?.close?.(); });
@@ -27,6 +29,11 @@ describe.skipIf(!DB)('the release routine on postgres', () => {
     const proj = await j(await send(george, { type: 'project.create', workspace: WS, name: `Release pg ${Date.now()}` }));
     const chan = await j(await send(george, { type: 'channel.create', workspace: WS, project: proj.projectId, slug: `mk-${Date.now().toString(36)}` }));
     await send(george, { type: 'channel.set_kind', channel: chan.channelId, kind: 'marketing' });
+    const [host]=await sql!`insert into machines(workspace_id,owner_user_id,name) values(${WS},${george.id},${'release-fixture-'+randomUUID()}) returning id`;
+    const [worker]=await sql!`insert into agents(workspace_id,machine_id,name,role) values(${WS},${host!.id},${'release-worker-'+randomUUID()},'marketer') returning id`;
+    plume={kind:'agent',id:worker!.id,role:'marketer'};marketingThread=randomUUID();
+    await sql!`insert into threads(id,workspace_id,channel_id,title,created_by) values(${marketingThread},${WS},${chan.channelId},'Release routine',${george.id})`;
+    await sql!`insert into workspace_destination_members(workspace_id,destination,principal_kind,principal_id,added_by) values(${WS},'marketing','agent',${plume.id},${george.id})`;
     await sql!`update workspaces set plan = 'cloud' where id = ${WS}::uuid`;
     const r = await j(await send(george, { type: 'marketing.setup', channel: chan.channelId, website: 'https://acme.dev', releases: { repoId: REPO, slug: 'acme/marketing-site', now: true, watch: true, at: '09:00', tz: 'UTC' } }));
     expect(r.releases).toEqual({ now: true, watch: 'armed' });
@@ -52,6 +59,27 @@ describe.skipIf(!DB)('the release routine on postgres', () => {
     expect((await send(plume, { type: 'schedule.set_cursor', schedule: once['id'], cursor: { at, tag: null } })).status).toBe(200); // the one-shot carries `release` too
     const plain = await j(await send(george, { type: 'schedule.create', channel: chan.channelId, title: 'Plain', prompt: 'say hi', cadence: 'daily', routine: true }));
     expect((await send(plume, { type: 'schedule.set_cursor', schedule: plain.scheduleId, cursor: { at, tag: null } })).status).toBe(422);
+  });
+
+  it('schedule.create with release: one watch per repository, read from payload.release on postgres', async () => {
+    const proj = await j(await send(george, { type: 'project.create', workspace: WS, name: `Release watch pg ${Date.now()}` }));
+    const chan = await j(await send(george, { type: 'channel.create', workspace: WS, project: proj.projectId, slug: `pw-${Date.now().toString(36)}` }));
+    const watch = { type: 'schedule.create', channel: chan.channelId, title: 'Release drafts · site', prompt: 'Draft release posts.', cadence: 'daily', atTime: '09:00', tz: 'UTC', release: { repo: REPO, slug: 'acme/marketing-site' } };
+    // not this project's repository yet
+    expect((await j(await send(george, watch))).code).toBe('INVALID_INPUT');
+    await sql!`insert into project_repos (project_id, repo_id) values (${proj.projectId}::uuid, ${REPO}::uuid) on conflict do nothing`;
+    // the daily watch that marketing.setup armed above already reads it in this workspace
+    const existing = await store!.releaseWatchFor(WS, REPO);
+    expect(existing).toBeTruthy();
+    const again = await send(george, watch);
+    expect(again.status).toBe(409);
+    expect((await j(again)).code).toBe('CONFLICT');
+    // a finished or a one-shot row never counts
+    await sql!`update schedules set status = 'done' where workspace_id = ${WS}::uuid and payload->'release'->>'repo' = ${REPO}`;
+    expect(await store!.releaseWatchFor(WS, REPO)).toBeNull();
+    const armed = await j(await send(george, watch));
+    expect(armed.scheduleId).toBeTruthy();
+    expect(await store!.releaseWatchFor(WS, REPO)).toBe(armed.scheduleId);
   });
 
   it('the announcements store: create, claim the queue, update, the image bytes, the caps, the claim, the installations', async () => {

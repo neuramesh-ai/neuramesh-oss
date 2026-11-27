@@ -17,7 +17,7 @@ export const FIRST_RUN_COPY = {
   title: 'Where should your workspace live?',
   sub: 'Pick one now. You can upgrade to the cloud at any time.',
   mac: { name: 'This Mac', fact: 'No account. Your workspace and keys stay on this Mac.' },
-  cloud: { name: 'The cloud', fact: '500 free credits to start. Sync across desktop, web and mobile.' },
+  cloud: { name: 'The cloud', fact: '100 free credits to start. Sync across desktop, web and mobile.' },
   continue: 'Continue →',
   signin: 'Sign in',
   foot: 'Have an account? Sign in opens neuramesh.app',

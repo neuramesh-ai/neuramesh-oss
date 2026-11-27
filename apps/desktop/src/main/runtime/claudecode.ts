@@ -7,7 +7,7 @@
 // Split out of agents.ts, where it was the largest single function (~340 lines). It moved
 // WHOLE and unchanged: it closes over nothing in agents.ts — every binding it uses is an
 // import — and it has exactly one consumer, the `runQuery` seat on the anthropic adapter.
-import { CLAUDE_DESIGN_MCP_URL } from '@neuramesh/shared';
+import { CLAUDE_DESIGN_MCP_URL, MESSAGE_BOARD_TOOLS } from '@neuramesh/shared';
 import { nmToolServer } from './nmtools';
 import { WEB_TOOL_NAMES } from './nmtools-web';
 import { createBeatRun } from '../beats';
@@ -44,6 +44,10 @@ export async function claudeCode(
   protectedPaths?: string[],
   opts?: TurnOpts,
 ): Promise<string> {
+  if (permissionGate && opts?.permissionRules && !promptOverride?.claudeDesign) {
+    const {starterRunQuery}=await import('./starter');
+    return starterRunQuery(agent,t,dir,channelBlock,repoBacked,ac,log,skills,proposeSkill,reworkNotes,attachmentsNote,recordLesson,lessonsNote,promptOverride,addBacklogItem,beats,permissionGate,opts,{provider:'anthropic',token});
+  }
   const { query } = await import('@anthropic-ai/claude-agent-sdk');
   // The worker's plan → beats (docs/17), coordinated by createBeatRun with two write
   // paths and first-declare-wins: the explicit nm declare_beats/advance_beat tools
@@ -94,7 +98,7 @@ export async function claudeCode(
           // the SDK's default base toolset omits it). The claude_code preset pins the
           // full standard toolset explicitly instead of renting per-version defaults.
           tools: { type: 'preset' as const, preset: 'claude_code' as const },
-          allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__screenshot', 'mcp__nm__load_skill', 'mcp__nm__propose_skill', 'mcp__nm__record_lesson', 'mcp__nm__add_backlog_item', ...(promptOverride?.claudeDesign ? ['mcp__claude-design__*'] : []), ...(beatRun ? ['mcp__nm__declare_beats', 'mcp__nm__advance_beat'] : []), ...(opts?.spawn ? ['mcp__nm__spawn'] : []), ...(opts?.park ? ['mcp__nm__park'] : []), ...(opts?.whiteboards ? ['mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard'] : []), ...(opts?.searchX ? ['mcp__nm__search_x'] : []), ...(opts?.draftReplies ? ['mcp__nm__draft_replies'] : []), ...(opts?.repo ? ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'] : []), ...(opts?.web ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
+          allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__screenshot', 'mcp__nm__load_skill', 'mcp__nm__propose_skill', 'mcp__nm__record_lesson', 'mcp__nm__add_backlog_item', ...(promptOverride?.claudeDesign ? ['mcp__claude-design__*'] : []), ...(beatRun ? ['mcp__nm__declare_beats', 'mcp__nm__advance_beat'] : []), ...(opts?.spawn ? ['mcp__nm__spawn'] : []), ...(opts?.park ? ['mcp__nm__park'] : []), ...(opts?.whiteboards ? ['mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard'] : []), ...(opts?.searchX ? ['mcp__nm__search_x'] : []), ...(opts?.draftReplies ? ['mcp__nm__draft_replies'] : []), ...(opts?.repo ? ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'] : []), ...(opts?.web ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : []), ...(opts?.messageBoards ? MESSAGE_BOARD_TOOLS.map((n) => `mcp__nm__${n}`) : [])],
           permissionMode: 'bypassPermissions',
           // The policy gate (agent permission engine, Phase 1). PreToolUse fires even under
           // bypassPermissions and sees every tool; the gate maps the call, evaluates policy,

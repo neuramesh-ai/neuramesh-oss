@@ -6,17 +6,14 @@
 // and can restart freely. see protocol.ts for the frame vocabulary and close codes.
 import type { IncomingMessage } from 'node:http';
 import type { RawData, WebSocket } from 'ws';
-import { CLOSE, isChannelFrame, parseMessage, toB64, type ChannelFrame, type ChannelLane, type RelayMessage } from './protocol.js';
+import { CLIENT_FRAME_TYPES, CLOSE, isChannelFrame, parseMessage, toB64, type ChannelFrame, type MachineLane, type RelayMessage } from './protocol.js';
 import { admitStream } from './stream-lane.js';
 import { admitBrowser } from './browser-lane.js';
+import { shardIndexFor, wrongShardReason } from './shard.js';
+import { pendingSockets } from './pending.js';
 
-export interface HubOptions {
-  /** nmm_ token in, identity out; null = unknown token; throws = control-api unreachable */
-  validateMachine(token: string): Promise<{ machineId: string; workspaceId: string } | null>;
-  /** clerk bearer + target machine in, membership verdict out; throws = unreachable */
-  validateClient(clerkToken: string, machineId: string): Promise<{ allowed: boolean; userId?: string }>;
-  log?(line: string): void;
-}
+import type { HubOptions } from './hub-options.js';
+export type { HubOptions } from './hub-options.js';
 
 /** `lanes`: what the daemon's hello said it serves (an older daemon names none) */
 interface MachineEdge { sock: WebSocket; workspaceId: string; lanes: ReadonlySet<string> }
@@ -29,7 +26,7 @@ interface ClientEdge {
   ingressBytes: number; ingressWindowStartedAt: number;
 }
 
-export interface Hub { handleConnection(sock: WebSocket, req: IncomingMessage): void; stats(): { machines: string[]; clients: number } }
+export interface Hub { handleConnection(sock: WebSocket, req: IncomingMessage): void; stats(): { machines: string[]; clients: number }; /** unidentified sockets held now (NM-007) */ pending(): number }
 
 export const MAX_RELAY_SOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
 export const MAX_CLIENT_INGRESS_BYTES_PER_SECOND = 8 * 1024 * 1024, MAX_CHANNELS_PER_CLIENT = 8, MAX_CHANNELS_PER_MACHINE = 32;
@@ -47,7 +44,6 @@ export const sendBounded = (sock: SendSocket, m: RelayMessage, onOverflow?: () =
   sock.send(payload);
   return true;
 };
-const send = (sock: WebSocket, m: RelayMessage): void => { sendBounded(sock, m); };
 
 const rawToText = (raw: RawData): string =>
   Array.isArray(raw) ? Buffer.concat(raw).toString('utf8') : Buffer.from(raw as Buffer).toString('utf8');
@@ -62,8 +58,9 @@ class Pump {
   private backlogBytes = 0;
   private handler: ((text: string) => void) | null = null;
   private overflowed = false;
-  constructor(sock: WebSocket) {
+  constructor(private readonly sock: WebSocket, private readonly canServe: () => boolean) {
     sock.on('message', (raw) => {
+      if (!this.allowed()) return;
       if (this.overflowed) return;
       const text = rawToText(raw);
       if (this.handler) { this.handler(text); return; }
@@ -76,10 +73,15 @@ class Pump {
       this.backlog.push(text); this.backlogBytes += bytes;
     });
   }
+  private allowed(): boolean {
+    if (this.canServe()) return true;
+    this.sock.close(CLOSE.RETIRED, 'relay ownership changed'); return false;
+  }
   set(h: (text: string) => void): void {
     if (this.overflowed) return;
     this.handler = h;
     while (this.handler === h && this.backlog.length > 0) {
+      if (!this.allowed()) { this.backlog = []; this.backlogBytes = 0; return; }
       const text = this.backlog.shift()!; this.backlogBytes -= Buffer.byteLength(text); h(text);
     }
   }
@@ -90,12 +92,27 @@ class Pump {
 
 export function createHub(opts: HubOptions): Hub {
   const log = opts.log ?? (() => {});
+  const canServe = () => opts.canServe?.() ?? true;
+  const allowed = (sock: WebSocket): boolean => {
+    if (canServe()) return true;
+    sock.close(CLOSE.RETIRED, 'relay ownership changed'); return false;
+  };
+  const send = (sock: WebSocket, message: RelayMessage): void => { if (allowed(sock)) sendBounded(sock, message); };
   const machines = new Map<string, MachineEdge>();
   // attachment state is keyed by machineId, NOT by socket, so a machine reconnect
   // (takeover) keeps its clients attached — only a true machine-gone clears it
   const attached = new Map<string, Set<ClientEdge>>();
   const owners = new Map<string, Map<string, ClientEdge>>();
 
+  // THE SHARD RULE (shard.ts). null = the only relay. Otherwise a machine's home is the shard its id
+  // hashes to, and a socket for a machine that lives elsewhere hears where (CLOSE.WRONG_SHARD)
+  const shards = opts.shard && opts.shard.urls.length > 1 ? opts.shard : null;
+  /** where a machine lives when that is not here: the refusal's reason. null = here */
+  const elsewhere = (machineId: string): { home: number; reason: string } | null => {
+    if (!shards) return null;
+    const home = shardIndexFor(machineId, shards.urls.length);
+    return home === shards.index ? null : { home, reason: wrongShardReason(home, shards.urls.length, shards.urls[home] ?? '') };
+  };
   const engineeringCounts = (client: ClientEdge): { actor: number; machine: number } => {
     let actor = 0;
     let machine = 0;
@@ -142,8 +159,20 @@ export function createHub(opts: HubOptions): Hub {
     }
   };
 
+  /** a channel changes hands between two sockets of one person (a resume): every budget set it sits in moves too */
+  const moveChannel = (from: ClientEdge, to: ClientEdge, ch: string): void => {
+    for (const set of ['channels', 'engineeringChannels', 'streamChannels', 'browserChannels'] as const) {
+      if (from[set].delete(ch)) to[set].add(ch);
+    }
+    owners.get(to.machineId)?.set(ch, to);
+  };
+
+  // the unidentified sockets: each holds a deadline until it attaches or says hello (pending.ts, NM-007)
+  const pending = pendingSockets({ deadlineMs: opts.attachDeadlineMs, max: opts.maxPending, log });
+  const identified = pending.identified;
+
   const machineEdge = (sock: WebSocket, bearer: string): void => {
-    const pump = new Pump(sock);
+    const pump = new Pump(sock, canServe);
     let self: string | null = null;
     sock.on('close', () => {
       // guard: after a takeover the OLD socket's close must not evict the new one
@@ -152,7 +181,7 @@ export function createHub(opts: HubOptions): Hub {
     void opts
       .validateMachine(bearer)
       .then((identity) => {
-        if (sock.readyState !== sock.OPEN) return;
+        if (sock.readyState !== sock.OPEN || !allowed(sock)) return;
         if (!identity) return sock.close(CLOSE.UNAUTHORIZED, 'unknown machine token');
         pump.set((text) => {
           const m = parseMessage(text);
@@ -160,10 +189,37 @@ export function createHub(opts: HubOptions): Hub {
             // first message must be the hello announce, and it must match the credential
             if (!m || m.t !== 'hello') return sock.close(CLOSE.PROTOCOL, 'expected hello');
             if (m.machineId !== identity.machineId) return sock.close(CLOSE.UNAUTHORIZED, 'machine id mismatch');
+            const machineLanes = new Set<string>(m.lanes ?? []);
+            // A MACHINE ON THE WRONG SHARD. One that names `shard` follows the refusal to its home, so
+            // its browsers find it where they look. An older daemon cannot follow: it would redial
+            // here forever, so it is served here, and a browser that dials here still meets it
+            const away = elsewhere(identity.machineId);
+            if (away && machineLanes.has('shard')) {
+              log(`refuse_machine_wrong_shard machine=${identity.machineId} home=${away.home}`);
+              return sock.close(CLOSE.WRONG_SHARD, away.reason);
+            }
+            if (away) log(`machine_off_shard machine=${identity.machineId} home=${away.home} (an older daemon: served here)`);
             const prev = machines.get(identity.machineId);
-            machines.set(identity.machineId, { sock, workspaceId: identity.workspaceId, lanes: new Set(m.lanes ?? []) });
+            machines.set(identity.machineId, { sock, workspaceId: identity.workspaceId, lanes: machineLanes });
             self = identity.machineId;
-            if (prev) { log(`takeover machine=${identity.machineId}`); prev.sock.close(CLOSE.TAKEOVER, 'replaced by a newer connection'); }
+            identified(sock);
+            if (m.readinessProtocol === 1) send(sock, { t: 'registered', machineId: identity.machineId });
+            if (prev) {
+              log(`takeover machine=${identity.machineId}`);
+              prev.sock.close(CLOSE.TAKEOVER, 'replaced by a newer connection');
+              // A TAKEOVER KEEPS ITS CLIENTS (attached and owners are keyed by machine), and a machine that
+              // resumes hears which channels still have one: a resume open without `from`, in the client's
+              // name (protocol.ts, RESUME). After the machine's own rotation that changes nothing. After a
+              // socket the machine lost while this side never saw it close, its sessions had detached, and
+              // this takes them back for clients that never left
+              if (machineLanes.has('resume')) {
+                for (const [ch, client] of owners.get(identity.machineId) ?? []) {
+                  const lane = client.engineeringChannels.has(ch) ? 'engineering' : client.streamChannels.has(ch) ? 'stream'
+                    : client.browserChannels.has(ch) ? 'browser' : undefined;
+                  send(sock, { ch, t: 'open', resume: true, ...(lane ? { lane } : {}), ...(client.userId ? { actorId: client.userId } : {}) });
+                }
+              }
+            }
             else log(`machine_online machine=${identity.machineId}`);
             return;
           }
@@ -181,10 +237,25 @@ export function createHub(opts: HubOptions): Hub {
   const clientFrame = (client: ClientEdge, frame: ChannelFrame): void => {
     const machine = machines.get(client.machineId);
     if (!machine) return; // machine dropped; this client's close is already in flight
+    // `detach` and `resumed` are the relay's and the machine's words, never a client's
+    if (!CLIENT_FRAME_TYPES.has(frame.t)) return log(`drop_client_frame machine=${client.machineId} ch=${frame.ch} t=${frame.t}`);
     if (frame.t === 'open') {
       const chs = owners.get(client.machineId) ?? new Map<string, ClientEdge>();
       owners.set(client.machineId, chs);
-      const holder = chs.get(frame.ch);
+      let holder = chs.get(frame.ch);
+      if (frame.resume === true) {
+        // a daemon from before resume reads the open as a new one and starts a second shell: refuse
+        if (!machine.lanes.has('resume')) return send(client.sock, { ch: frame.ch, t: 'close', reason: 'This machine cannot resume a session. Open it again.' });
+        // A RESUME TAKES ITS CHANNEL BACK. The same person's newer socket (a reconnect after a cut, or
+        // the browser's own rotation) re-opens a channel that its older socket still holds, because
+        // the relay has not seen that socket go yet. The channel moves, so the older socket's close
+        // costs the session nothing. Another person's socket never takes it.
+        if (holder && holder !== client && client.userId !== null && holder.userId === client.userId) {
+          moveChannel(holder, client, frame.ch);
+          log(`resume_handover machine=${client.machineId} ch=${frame.ch} user=${client.userId}`);
+          holder = client;
+        }
+      }
       if (holder && holder !== client) {
         log(`refuse_open machine=${client.machineId} ch=${frame.ch} (owned elsewhere)`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
@@ -237,16 +308,22 @@ export function createHub(opts: HubOptions): Hub {
   };
 
   const clientEdge = (sock: WebSocket): void => {
-    const pump = new Pump(sock);
+    const pump = new Pump(sock, canServe);
     let self: ClientEdge | null = null;
     sock.on('close', () => {
       if (!self) return;
       attached.get(self.machineId)?.delete(self);
       const machine = machines.get(self.machineId);
-      // tell the daemon its channels died so it can reap the ptys behind them
+      const held = owners.get(self.machineId);
+      // A DEPARTED CLIENT DETACHES ITS SESSIONS on a machine that can resume them (protocol.ts,
+      // RESUME): a terminal or a Code session lives on for the machine's grace window, and the same
+      // person's next socket takes it back. A live-reply or browser channel is no session and ends,
+      // and an older machine hears close, as before, so it can reap the ptys behind them.
       for (const ch of self.channels) {
-        owners.get(self.machineId)?.delete(ch);
-        if (machine) sendBounded(machine.sock, { ch, t: 'close' }, () => {});
+        if (!held || held.get(ch) !== self) continue; // a resume moved it to a newer socket
+        held.delete(ch);
+        const resumable = machine?.lanes.has('resume') && !self.streamChannels.has(ch) && !self.browserChannels.has(ch);
+        if (machine) sendBounded(machine.sock, { ch, t: resumable ? 'detach' : 'close' }, () => {});
       }
       self.channels.clear();
       self.engineeringChannels.clear(); self.streamChannels.clear(); self.browserChannels.clear();
@@ -254,11 +331,19 @@ export function createHub(opts: HubOptions): Hub {
     pump.set((text) => {
       const m = parseMessage(text);
       if (!m || m.t !== 'attach') return sock.close(CLOSE.PROTOCOL, 'expected attach');
+      // A BROWSER ON THE WRONG SHARD hears where its machine lives before any credential is checked:
+      // the answer is a hash anyone can compute, and it spares control-api a lookup. A machine that is
+      // here anyway (an older daemon that cannot follow) is served here
+      const away = machines.has(m.machineId) ? null : elsewhere(m.machineId);
+      if (away) {
+        log(`refuse_wrong_shard machine=${m.machineId} home=${away.home}`);
+        return sock.close(CLOSE.WRONG_SHARD, away.reason);
+      }
       pump.pause(); // frames sent optimistically during validation buffer, in order
       void opts
         .validateClient(m.token, m.machineId)
         .then((verdict) => {
-          if (sock.readyState !== sock.OPEN) return;
+          if (sock.readyState !== sock.OPEN || !allowed(sock)) return;
           if (!verdict.allowed) return sock.close(CLOSE.FORBIDDEN, 'forbidden');
           if (!machines.has(m.machineId)) return sock.close(CLOSE.MACHINE_OFFLINE, 'machine offline');
           const edge: ClientEdge = {
@@ -266,11 +351,12 @@ export function createHub(opts: HubOptions): Hub {
             channels: new Set(), engineeringChannels: new Set(), streamChannels: new Set(), browserChannels: new Set(), ingressBytes: 0, ingressWindowStartedAt: Date.now(),
           };
           self = edge;
+          identified(sock);
           const set = attached.get(m.machineId) ?? new Set<ClientEdge>();
           attached.set(m.machineId, set);
           set.add(edge);
           log(`client_attached machine=${m.machineId} user=${edge.userId ?? '?'}`);
-          send(sock, { t: 'attached', machineId: m.machineId, lanes: [...(machines.get(m.machineId)?.lanes ?? [])] as ChannelLane[] });
+          send(sock, { t: 'attached', machineId: m.machineId, lanes: [...(machines.get(m.machineId)?.lanes ?? [])] as MachineLane[] });
           pump.set((t2) => {
             if (!allowClientIngress(edge, t2)) return;
             const f = parseMessage(t2);
@@ -289,8 +375,14 @@ export function createHub(opts: HubOptions): Hub {
   return {
     handleConnection(sock, req) {
       sock.on('error', (e) => log(`socket_error: ${e.message}`));
+      if (!allowed(sock)) return;
       // the token has no whitespace, so the blanks and the token cannot trade characters (CodeQL, 2026-09-18)
       const bearer = /^Bearer[ \t]+(\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
+      // a Message boards token buys nothing on the relay. it closes here, before the socket holds a
+      // pending slot and before control-api hears of it. the prefix is BOARD_TOKEN_PREFIX in
+      // packages/shared (message-boards.ts): this image carries the relay package alone, so it is a literal
+      if (bearer?.startsWith('nmbd_')) { log('refuse_board_token'); return sock.close(CLOSE.UNAUTHORIZED, 'a Message boards token does not work on the relay'); }
+      if (!pending.admit(sock)) return;
       if (bearer?.startsWith('nmm_')) machineEdge(sock, bearer);
       else clientEdge(sock);
     },
@@ -299,5 +391,6 @@ export function createHub(opts: HubOptions): Hub {
       for (const set of attached.values()) clients += set.size;
       return { machines: [...machines.keys()], clients };
     },
+    pending: () => pending.size(),
   };
 }

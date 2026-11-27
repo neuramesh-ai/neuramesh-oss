@@ -13,7 +13,7 @@ import type { ExecTask, HostedAgent } from '../agents';
 import { type SubjectRef } from '../harness/brain';
 import { Subtree, planSpawn } from '../harness/subagents';
 import { type Seat } from './lookups';
-import { withTimeout } from './turnkit';
+import { withIdleDeadline } from './permission-deadline';
 import { searchXText, type ApiGetFn } from './searchx';
 import { workerWeb } from './webshot';
 import { makeRepoReader } from './reporead';
@@ -90,27 +90,26 @@ export function makeLegs(ctx: {
       });
       subtree.add({ turnId: run.id || runKey, role: i.role as AgentRole, label, state: 'running' });
       // the model rides in the detail: the step log prints the summary to a person, and the seat chip names the brain
-      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role} · ${Math.round(decision.budget.wallMs / 60_000)}m`, detail: { model: seated.model } });
+      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role}`, detail: { model: seated.model } });
       try {
         const cred = await resolveToken(apiUrl, where.workspace, seated, ownerActorId);
-        const out = await withTimeout(
+        // a leg has no limit on total time: it stops when its log goes quiet (permission-deadline.ts)
+        const lines = narrate(run, log ?? (() => {}));
+        const out = await withIdleDeadline(async live =>
           runtimeFor(seated.runtime).runQuery(
             // narrate: the child's activity lines become ITS run's live step, so the leg row says what
             // the subagent is actually doing rather than what it was doing at t=0
-            seated, task, dir, cred.token ?? '', null, false, undefined, narrate(run, log ?? (() => {})),
+            seated, task, dir, cred.token ?? '', null, false, undefined, (rec) => { live.pulse(); lines(rec); },
             undefined, undefined, undefined, undefined, undefined, undefined,
             // a caller-authored turn: the child works ONE piece and reports back to its parent
-            { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger task for ${parent.name}. Do exactly this piece, then report what you produced and how you validated it. You cannot submit, accept or file board work — your parent owns this workflow and reports for you.${brainBriefing({ kind: 'task', number: task.number }, dir)}` },
+            { prompt: `${i.prompt}\n\nYou are a subagent working ONE piece of a larger task for ${parent.name}. Do exactly this piece, then report what you produced and how you validated it. You cannot submit, accept or file board work — your parent owns this workflow and reports for you.${await brainBriefing({ kind: 'task', number: task.number }, dir)}` },
             undefined, undefined, undefined, undefined,
             // the leg's REAL kind on the bus (TOOL_KINDS can finally grant a leg something), and
             // the X read closed over this room — host/searchx.ts, the one implementation
             { turnKind: 'leg', searchX: (q) => searchXText(apiGet, { kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, { workspaceId: where.workspace, channelId: where.channelId }, q),
               repo: makeRepoReader({ apiGet, actor: { kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, db, channelId: where.channelId }),
               web: workerWeb(seated.name, dir, log) },
-          ),
-          decision.budget.wallMs,
-          `subagent "${label}" exceeded its ${Math.round(decision.budget.wallMs / 60_000)}m slice`,
-        );
+          ));
         subtree.settle(run.id || runKey, 'done', legSummary(out));
         await run.settle('done', legSummary(out));
         // The subagent's result lands in the SUBJECT's brain, two ways (docs/harness/01, /02):
@@ -178,12 +177,12 @@ export function makeLegs(ctx: {
    * needs, and inlining five notes into every sibling's prompt is how a fan-out's context cost turns
    * quadratic.
    */
-  function brainBriefing(subject: SubjectRef | null, dir: string): string {
+  async function brainBriefing(subject: SubjectRef | null, dir: string): Promise<string> {
     const lines = [`Your working directory is ${dir} — it is SHARED with everyone else working this subject, and it persists between turns.`];
     if (!subject) return `\n\n${lines[0]} Write what you produce there.`;
     try {
       const b = brain.open(subject);
-      const files = workspaceListing(subject, 20);
+      const files = await workspaceListing(subject, 20);
       const notes = b.notes();
       const results = b.messages().filter((m) => m.kind === 'result');
       if (files.length) lines.push(`Already in it: ${files.map((f) => f.name).join(', ')}. Read what is relevant before you start, and EDIT an existing file rather than writing a near-duplicate beside it.`);

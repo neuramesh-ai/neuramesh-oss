@@ -64,7 +64,7 @@ export async function registerThisMachine(conn: Connection, actorId: (c: Connect
         await fetch(`${conn.apiUrl}/v1/commands`, {
           method: 'POST',
           headers: await headers(),
-          body: JSON.stringify({ type: 'machine.heartbeat', machineId }),
+          body: JSON.stringify({ type: 'machine.heartbeat', machineId, permissionVersion: 1 }),
         }).catch(() => {});
       })();
     }, 30_000);

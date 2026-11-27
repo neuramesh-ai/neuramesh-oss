@@ -9,6 +9,7 @@
 // PURE AND INJECTED, so the whole state machine is testable without a browser, a socket or a
 // cluster. The only thing this file knows how to do is decide.
 import type { MachineStatus } from '@neuramesh/shared';
+import { markMachineJoining } from './machine-joining';
 
 /** the two states a person can actually tell apart (the mockup round cut the rest) */
 export type EnsurePhase = 'starting' | 'connecting';
@@ -72,6 +73,8 @@ export async function ensureMachine(
         const seen = await deps.lastSeenAt();
         const id = await deps.machineId();
         if (seen !== null && seen > started && id) {
+          // its relay socket comes a moment after this beat: the first attach waits for it (machine-joining.ts)
+          markMachineJoining(id);
           onPhase('connecting');
           return { ok: true, machineId: id };
         }
@@ -121,6 +124,8 @@ export async function ensureMachine(
 
     if (status === 'capped') return { ok: false, reason: 'capped', detail: CAPPED_DETAIL };
     if (status === 'online' && id) {
+      // its first beat is in, its relay socket a moment later: the first attach waits for it (machine-joining.ts)
+      markMachineJoining(id);
       onPhase('connecting');
       return { ok: true, machineId: id };
     }

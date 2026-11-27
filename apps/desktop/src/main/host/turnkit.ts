@@ -4,7 +4,7 @@
 // withTimeout lives here so the budget discipline has ONE home: adoption.test.ts asserts no
 // call site bounds a turn with a wall-clock literal instead of TURN_BUDGETS[kind].wallMs.
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { carryCards, resolveInstructions } from '@neuramesh/shared';
+import { addProgressLine, carryCards, resolveInstructions } from '@neuramesh/shared';
 import { buildClaudeUserContent, chatSystemPrompt, claudePathOption, imageBlocks, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { claudeEffort } from '../runtime/thinking';
 import { classifyExecError } from '../execpolicy';
@@ -96,7 +96,7 @@ function typedText(m: { parent_tool_use_id?: string | null; event?: any }, live:
   onDelta?.(live.typing, live.thinking || undefined);
 }
 
-export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string, thinking?: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp: string }): Promise<string> {
+export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string, thinking?: string, progress?: readonly string[]) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp?: string; onEvent?: () => void }): Promise<string> {
   let text = '';
   // the text block being written right now, from the partial stream events (partialMessages): the
   // bubble gets it growing, the same whole-text-so-far contract as the complete block below, which
@@ -109,10 +109,21 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // text the model wrote in a message with NO tool call: substantive words, which the final-text
   // rule would otherwise drop when a later tool call and its confirmation close the turn
   const spoken: string[] = [];
+  // the words of each message that went on to call a tool: they stay on screen as the turn's progress
+  // lines while it works (round 9, as the Gemini and agy lanes do), and the bubble's text holds only
+  // the block being written now
+  let progress: readonly string[] = [];
+  // the last words the model wrote, keyed to their message: the SDK sends a text block and the tool
+  // call after it as two assistant messages with ONE message id, so the call finds its words here
+  let words: { id: unknown; text: string } | null = null;
+  const typed = onDelta && ((t: string, thinking?: string) => onDelta(t, thinking, progress));
   for await (const m of stream) {
+    // every event, visible or not, keeps a reply's idle clock awake (permission-deadline.ts), except
+    // tool_progress: the CLI sends it every 30 s while a tool runs, so it would hold a hung call open forever
+    if (m.type !== 'tool_progress') expect?.onEvent?.();
     recordRuntimeEvent('claude', m);
-    if (m.type === 'stream_event') { typedText(m, live, onDelta); continue; }
-    if (m.type === 'system' && m.subtype === 'init' && expect) {
+    if (m.type === 'stream_event') { typedText(m, live, typed); continue; }
+    if (m.type === 'system' && m.subtype === 'init' && expect?.mcp) {
       const inv = await settledInventory(stream, m, expect.mcp);
       log?.({ kind: 'turn', summary: `tools: ${inv.summary}`, level: inv.ok ? 'info' : 'warn' });
       // no nm server = no board, no shelf, no cards: the turn cannot do its job, so it says so and
@@ -126,13 +137,20 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
           if (text) earlier.push(text);
           text = b.text;
           if (standalone) spoken.push(b.text);
-          onDelta?.(b.text, live.thinking || undefined);
+          onDelta?.(b.text, live.thinking || undefined, progress);
+          if (!m.parent_tool_use_id && !isStandDown(b.text)) words = { id: m.message.id, text: b.text };
           // NO_REPLY is addressed to US, not to a reader — the daemon drops the turn on it. Logged
           // as narration it rendered a bare "NO_REPLY" line in the activity feed under the tool
           // calls, which is the wiring showing through (founder report). The stand-down is already
           // recorded properly by the wake's own `stood_down` log line.
           if (!isStandDown(b.text)) log?.({ kind: 'turn', summary: b.text.slice(0, 280) });
         } else if (b.type === 'tool_use') {
+          if (onDelta && words && words.id === m.message.id && !m.parent_tool_use_id) {
+            progress = addProgressLine(progress, words.text);
+            live.typing = '';
+            onDelta('', live.thinking || undefined, progress);
+          }
+          words = null;
           log?.({ kind: 'tool', phase: 'call', summary: toolSummary(b.name, b.input), detail: b.input, toolUseId: b.id });
           // the worker's own plan → beats: TodoWrite carries the full ordered list each update
           if (onTodos && b.name === 'TodoWrite' && Array.isArray(b.input?.todos)) onTodos(b.input.todos);

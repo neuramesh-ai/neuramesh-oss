@@ -153,18 +153,20 @@ export const NM_VERBS: Record<string, { verb: string; cat?: ToolCat }> = {
   take_task: { verb: 'takes the task' },
   declare_beats: { verb: 'plans the steps' },
   advance_beat: { verb: 'moves to the next step' },
-  search_x: { verb: 'searches posts on X', cat: 'search' },
+  search_x: { verb: 'searches posts on X', cat: 'search' }, postiz_channels: { verb: 'reads the Postiz channels', cat: 'check' }, postiz_posts: { verb: 'reads the Postiz calendar', cat: 'check' }, postiz_channel_rules: { verb: 'reads a channel\'s rules in Postiz', cat: 'check' }, postiz_analytics: { verb: 'reads the Postiz numbers', cat: 'check' }, postiz_media: { verb: 'searches the Postiz media', cat: 'search' }, // the Postiz reads (postiz-connector-2026-11 P11)
   draft_posts: { verb: 'drafts the posts' },
   revise_posts: { verb: 'revises the posts' },
   read_drafts: { verb: 'reads the drafts', cat: 'check' },
   draft_replies: { verb: 'drafts the replies' },
   revise_replies: { verb: 'revises the replies' },
+  draft_emails: { verb: 'drafts the emails' }, revise_emails: { verb: 'revises the emails' }, add_email_media: { verb: 'adds a picture to the email' }, ask_mail_read: { verb: 'asks to read your mail' }, read_allowed_mail: { verb: 'reads the allowed mail', cat: 'check' }, list_deals: { verb: 'reads the pipeline', cat: 'check' }, upsert_contact: { verb: 'saves a contact' }, upsert_deal: { verb: 'saves a deal' }, move_deal: { verb: 'moves a deal' },
   draft_article: { verb: 'drafts the article' },
   propose_angles: { verb: 'proposes the angles' },
   generate_image: { verb: 'draws an image' },
   make_product_image: { verb: 'makes a product image' }, // retired 2026-10-06; past runs still show the step
   shelve_repo_screenshot: { verb: 'takes a screenshot from the repository' },
   share_images: { verb: 'shares the images' },
+  ask_publish: { verb: 'asks to publish a file' }, publish_file: { verb: 'publishes a file' },
   spawn: { verb: 'starts a subagent' },
   // the rest of the registries (2026-10-05, the review of round 2): a tool with no row here spoke its
   // underscores ("accept task"), so every name a registry hands a turn has words (the desktop's
@@ -190,6 +192,11 @@ export const NM_VERBS: Record<string, { verb: string; cat?: ToolCat }> = {
   web_click: { verb: 'clicks an item on the page', cat: 'search' },
   web_type: { verb: 'types text on the page', cat: 'search' },
   web_screenshot: { verb: 'takes a screenshot of the page', cat: 'search' },
+  // Message boards (harness.ts NM_TOOLS)
+  message_board_list: { verb: 'checks the message boards', cat: 'check' },
+  message_board_catch_up: { verb: 'reads a message board', cat: 'check' },
+  message_board_send: { verb: 'posts to a message board' },
+  message_board_take_handoff: { verb: 'takes a handoff' },
 };
 
 // the Claude Code tools a summary names bare (host/turnkit.ts toolSummary). null = plumbing worth no words

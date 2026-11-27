@@ -1,3 +1,4 @@
+import { cronAuthorized } from './cron-auth';
 // A ROUTINE WAKES THE MACHINE THAT RUNS IT (George, 2026-09-04).
 //
 // Routines fire from a daemon's minute tick (host/schedules.ts) — a machine has to be awake to
@@ -30,12 +31,15 @@ export function routineWakeHorizonMin(): number {
   return Number.isFinite(n) && n > 0 ? n : 10;
 }
 
-/** workspaces with an active schedule due inside the horizon and nothing up to run it */
-export async function dueRoutineWorkspaces(sql: postgres.Sql, horizonMin: number): Promise<string[]> {
+/** workspaces with an active schedule due inside the horizon and nothing up to run it. `only` names
+ *  one workspace: the sandbox's e2e door (e2e-routes.ts) runs this same pass for its own workspace,
+ *  so a test never wakes another lane's runner. The cron passes nothing and sees every workspace. */
+export async function dueRoutineWorkspaces(sql: postgres.Sql, horizonMin: number, only: string | null = null): Promise<string[]> {
   const rows = await sql<{ workspace_id: string }[]>`
     select distinct s.workspace_id
       from schedules s
      where s.status = 'active'
+       and (${only}::uuid is null or s.workspace_id = ${only}::uuid)
        and s.next_run_at is not null
        and s.next_run_at <= now() + make_interval(mins => ${horizonMin}::int)
        -- something is already up: a cloud machine the fleet intends up, or a laptop beating
@@ -69,8 +73,8 @@ export type RunnerBump = (sql: postgres.Sql, workspaceId: string) => Promise<voi
 
 /** the pass: one bump per workspace; the woken/capped verdict is read back from the row rather
  *  than assumed, because the bump reports nothing. */
-export async function wakeForDueRoutines(sql: postgres.Sql, bump: RunnerBump, horizonMin = routineWakeHorizonMin()): Promise<RoutineWakeResult> {
-  const considered = await dueRoutineWorkspaces(sql, horizonMin);
+export async function wakeForDueRoutines(sql: postgres.Sql, bump: RunnerBump, horizonMin = routineWakeHorizonMin(), only: string | null = null): Promise<RoutineWakeResult> {
+  const considered = await dueRoutineWorkspaces(sql, horizonMin, only);
   const woken: string[] = [];
   const capped: string[] = [];
   for (const ws of considered) {
@@ -87,8 +91,7 @@ export async function wakeForDueRoutines(sql: postgres.Sql, bump: RunnerBump, ho
  *  (vercel.json), the machine-sweep idiom. */
 export function routineWakeRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, bump: RunnerBump): void {
   app.get('/internal/routines-due', async (c) => {
-    const secret = process.env['CRON_SECRET'];
-    if (!secret || c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: 'forbidden' }, 403);
+    if (!(await cronAuthorized(c.req.header('authorization')))) return c.json({ error: 'forbidden' }, 403);
     const sql = sqlOf(store);
     if (!sql) return c.json({ error: 'fleet not served by this store' }, 501);
     const out = await wakeForDueRoutines(sql, bump);

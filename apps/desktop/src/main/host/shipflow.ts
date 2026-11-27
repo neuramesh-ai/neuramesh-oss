@@ -102,14 +102,14 @@ const {
 
 async function shipperFlow(agent: HostedAgent, t: ShipTask, opts: { resume: boolean }) {
   agent = await seatFor(agent, t.channel_id, { taskId: t.id }); // per-project + per-thread brains (docs/10)
-  const actor = { kind: 'agent', id: agent.id, role: 'shipper' };
+  const actor = { kind: 'agent', id: agent.id, role: agent.role };
   const beats = beatCursor(actor, t.id);
   const beatsLive = process.env['NM_AGENT_MODE'] !== 'echo';
   try {
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     // gate check is convenience here (the server enforces it on claim_ship)
     const policy = await projectPolicy(db, t.channel_id);
-    if (!policy.shipGate && !opts.resume) return;
+    if (!policy.shipGate && !opts.resume && !t.coding_owner) return;
     if (!opts.resume) {
       const claim = await post('/v1/commands', actor, { type: 'task.claim_ship', taskId: t.id });
       if (claim.status >= 400 && claim.status < 500) return; // lost the race, gate off, or state moved — a fresh signal re-fires

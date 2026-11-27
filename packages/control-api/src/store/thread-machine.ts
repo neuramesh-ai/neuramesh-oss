@@ -2,7 +2,7 @@
 // machine chip (or the desktop default), moved afterwards only by a human (`thread.set_machine`).
 // Leaf helpers of PostgresStore, kept out of pgstore.ts on its ratchet's own terms.
 import type postgres from 'postgres';
-import type { ThreadKind } from '@neuramesh/shared';
+import type { ThreadKind, WorkspaceMode } from '@neuramesh/shared';
 import { DomainError } from '../errors';
 
 /** the machine's id when it belongs to the workspace, else null — a designation naming a foreign
@@ -18,8 +18,14 @@ export async function setThreadMachineSql(sql: postgres.Sql, workspace: string, 
 }
 
 /** 0144, coding threads: a conversation's kind — `chat`, or `coding` (the coding runtime works on a
- *  repository in it). The same leaf shape as the machine above; handler/thread.ts holds the rules. */
-export async function setThreadKindSql(sql: postgres.Sql, workspace: string, threadId: string, kind: ThreadKind): Promise<void> {
-  const [row] = await sql<Array<{ id: string }>>`update threads set kind = ${kind}, updated_at = now() where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid returning id`;
+ *  repository in it). The same leaf shape as the machine above; handler/thread.ts holds the rules.
+ *  `mode` (round 9, 0177): `repo` or `scratch` sets threads.workspace_mode, `null` clears it (a thread
+ *  back to chat), and `undefined` leaves it as it is (the old rule). Callable inside a transaction:
+ *  store/coding-workspace.ts bindCodingWorkspace holds the gate around it. */
+export async function setThreadKindSql(sql: postgres.Sql | postgres.TransactionSql, workspace: string, threadId: string, kind: ThreadKind, mode?: WorkspaceMode | null): Promise<void> {
+  const q = sql as postgres.Sql;
+  const [row] = mode === undefined
+    ? await q<Array<{ id: string }>>`update threads set kind = ${kind}, updated_at = now() where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid returning id`
+    : await q<Array<{ id: string }>>`update threads set kind = ${kind}, workspace_mode = ${mode}, updated_at = now() where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid returning id`;
   if (!row) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`);
 }

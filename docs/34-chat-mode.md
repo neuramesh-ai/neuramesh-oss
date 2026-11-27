@@ -1,5 +1,7 @@
 # 34 — Chat mode: the Tasks toggle (spec + build notes)
 
+> **November 2026 deployment update:** feature contracts and dated evidence below are retained, but references to PowerSync sync rules, Supabase hosting, Vercel API deploys or GKE fleet rolls describe the former deployment. Current production uses Cloud Run, Cloud SQL and the authenticated API replica. Follow [the architecture](09-system-architecture.md) and [release guide](11-releases.md) for changes; do not replay historical deploy commands.
+
 > **Status:** BUILT (2026-07-27). Mockup: `mockups/chat-mode.html` (R1, four themes). Evidence:
 > `docs/evidence/chat-mode/` (cream + graphite, from the real renderer).
 > One chip on the composer decides what a message *becomes*. **Tasks on** — today's board flow, byte
@@ -177,8 +179,9 @@ file/shell tools — logged as a degradation, never silently passed off as the f
   mean doing the work and showing nothing for it. The post-turn sweep is the same mechanism a
   scratch task's deliverables already use — and every drop is NAMED in the activity log, because
   silent truncation reads as "that was everything" (the #1015 lesson).
-- **A chat turn gets 12 minutes, not 4.** The board's 4-minute wall is a *triage* budget. A chat
-  may search, write a document and run code in one turn.
+- **A chat turn has no limit on total time** (2026-11-25, was 12 minutes). It stops only when
+  nothing new comes for 2 minutes (`withIdleDeadline`, `host/permission-deadline.ts`). A chat may
+  search, write a document and run code in one turn, and some research takes longer than others.
 - **Evidence trap:** the capture script spawned Chrome with a piped stdout it never drained.
   Against a `file://` mockup that survives; against a Vite dev-server page Chrome fills the pipe
   buffer in seconds and **blocks mid-navigation**, which reads exactly like a hung CDP call. The

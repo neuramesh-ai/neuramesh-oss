@@ -1,5 +1,5 @@
 // Plan + prompt-block builders — extracted from agents.ts (track B1).
-import { composePrompt } from '@neuramesh/shared';
+import { composePrompt, IMPLEMENTATION_PLAN_SKILL } from '@neuramesh/shared';
 import { contractFor } from '../contracts';
 import type { RuntimeAdapter } from '../runtime/adapter';
 import type { ExecTask } from '../agents';
@@ -47,7 +47,7 @@ export async function buildImplementationPlan(
   study?: ((system: string, user: string) => Promise<string>) | null,
 ): Promise<string> {
   onPhase?.(study ? 'mixture-of-agents: planner studying the workspace + drafting the plan' : 'mixture-of-agents: planner drafting the implementation plan');
-  const draftSystem = 'You are a staff engineer drafting an implementation plan. Research the best approach and the realistic options, state the constraints, and produce a concrete, ordered plan in markdown.';
+  const draftSystem = `You are a staff engineer drafting an implementation plan.\n\n${IMPLEMENTATION_PLAN_SKILL}`;
   const draft = study
     ? await study(
         `${draftSystem}\n\nYou have READ-ONLY access to a workspace containing the code this plan targets and any approved design mockups. Open the files before you plan: read the approved mockups end to end (they are the visual contract), find the real modules, components, and tokens the change touches, and name actual paths in your plan. Never guess at a file you could have read. You cannot write, edit, or run commands here — only read.`,

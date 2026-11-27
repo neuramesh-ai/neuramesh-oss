@@ -18,6 +18,7 @@ import type { LogFn } from '../agentlog';
 import { jsonSchemaFor } from './toolschema';
 import type { RepoReader } from '../host/reporead';
 import type { WebTools } from '../browser/agent-tools';
+import type { MessageBoardTools } from '../host/messageboards';
 export type { RepoReader };
 
 /** What a tool returns. `image` rides the Claude path as an image block and degrades to its note elsewhere. */
@@ -60,6 +61,9 @@ export interface ToolHost {
   /** the agents' browser (board C3): browser/agent-tools.ts closed over the turn. absent = no
    *  Chromium on this machine, and the five web_* tools never exist */
   web?: WebTools;
+  /** Message boards (docs/design/message-boards-2026-11 §7.6): host/messageboards.ts bound to the
+   *  turn's agent. absent = the agent has no access to a board, and the four tools never exist */
+  messageBoards?: MessageBoardTools | null;
 }
 
 /** Whiteboards (docs/38): what the daemon injects. One bundle, built once per turn, shared by the
@@ -131,6 +135,10 @@ function serviceable(name: NmTool, host: ToolHost): boolean {
     case 'web_click':
     case 'web_type':
     case 'web_screenshot': return !!host.web;
+    case 'message_board_list':
+    case 'message_board_catch_up':
+    case 'message_board_send':
+    case 'message_board_take_handoff': return !!host.messageBoards;
   }
 }
 

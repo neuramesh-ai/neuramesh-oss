@@ -7,7 +7,7 @@ import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { controlApiRequestUrl, type Actor } from '@neuramesh/shared';
 import type { EngineeringOpenMeta } from '../../../engineering-protocol';
 import { apiAuthHeaders } from '../../apiauth';
-import { createLocalEngineeringHost, LocalEngineeringSessions } from '../../relay/engineering-local-host';
+import { sharedLocalEngineeringHost, LocalEngineeringSessions } from '../../relay/engineering-local-host';
 import { apiUrl, ws, actorId, thisMachineId, thisMachineName } from '../../sync';
 
 // the sessions the local lane holds open right now, for the one reader outside this module: the
@@ -41,7 +41,7 @@ export function registerLocalEngineering({ db }: { db: () => ReplicaDatabase }):
     if (host && host.workspaceId === ws()) return host.sessions;
     live = null;
     const authHeaders = () => apiAuthHeaders(apiUrl(), { kind: 'human', id: actorId() } as Actor);
-    const created = createLocalEngineeringHost({ db: db(), apiUrl: apiUrl(), workspaceId: ws(), authHeaders, machineId: thisMachineId(), log: (line) => console.log(`[engineering:local] ${line}`) });
+    const created = sharedLocalEngineeringHost({ db: db(), apiUrl: apiUrl(), workspaceId: ws(), authHeaders, machineId: thisMachineId(), log: (line) => console.log(`[engineering:local] ${line}`) });
     host = { workspaceId: ws(), sessions: new LocalEngineeringSessions(created, actorId) };
     live = host.sessions;
     return host.sessions;

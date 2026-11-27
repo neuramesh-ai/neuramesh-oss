@@ -69,3 +69,21 @@ A snapshot records what the server offers at a version, because that is what the
 3. When the second desktop without the item is published, its ledger-header PR moves the supported list. Then no snapshot that the check holds has the item. The server may drop it, and the line leaves `RETIRED`.
 
 A narrower field is a removal too. Add a new field instead, or retire the field and narrow it after two published desktops. The review checks each `RETIRED` line: a desktop that still uses a retired item breaks in silence two releases later.
+
+## The machine lane
+
+A cloud machine runs the daemon of its release, and it keeps that release until its owner upgrades ([whats-new-upgrades](design/whats-new-upgrades-2026-11/plan.md) §9). The daemon is a client of the API, the replica feed and the relay, as the desktop is. So the server keeps what each supported machine release uses, by the same rules. The files of this lane are private, with the Cloud Run lane that they read.
+
+- **The corpus.** `contracts/machine/<version>.json` holds the contract of each release. The release PR writes it with `node scripts/contract-snapshot.mjs --kind machine --version <version>`. The tree does not name the release, so the command takes the name.
+- **What a snapshot keeps.** The commands, the routes, the client schema and the relay, read by the readers of the desktop lane. Then three parts that only a machine uses:
+
+| Contract | Source | A break |
+|---|---|---|
+| Boot and status requests | `BootSchema` in `packages/control-api/src/fleet-cloudrun-routes.ts`, `StatusSchema` in `fleet-cloudrun.ts` | the rules of a command field |
+| Boot and control answers | the types `BootIdentity` in `fleet-cloudrun-boot.ts` and `Control` in `fleet-cloudrun.ts`, read with the TypeScript checker | a field that is gone, or a field that the server always sent and now may leave out |
+| Env names | the container that `machineContainer` in `packages/fleet/src/cloudrun-spec.ts` builds | a name that the fleet no longer sets |
+
+- **The supported list.** `SUPPORTED_MACHINE_VERSIONS` in `packages/shared/src/machine-floor.ts`, newest first. CI cannot read the published releases, so a person keeps the list. A release joins it when it is published. It leaves only after the support floor (`supportFloor`) passed it and no machine runs it.
+- **The check.** `packages/control-api/test/machine-contracts.test.ts` holds the tree to each supported release and to each newer snapshot, the candidate of a release PR. A failure names the release and the item, for example `machine 2026.11.1 · machine env NM_RELAY_URL: the fleet no longer sets the name on a machine (rule 2)`. Its planted cases prove first that it can fail. Run it with `pnpm --filter @neuramesh/control-api test -- machine-contracts`.
+- **Remove something.** Add the item to `MACHINE_RETIRED` in `packages/control-api/src/client-contracts/machine-retired.ts`. It takes the forms of the desktop lane, and also `machine boot request field <name>`, `machine status request field <name>`, `machine boot answer field <path>`, `machine control answer field <path>` and `machine env <name>`. The next release PR leaves the item out. When no release in the supported list has it, the server may drop it. An item that the desktop also uses needs a line in `RETIRED` too.
+- **What the check cannot see.** The bodies of the other machine routes (the token renewal, the snapshot URLs, the facts, the parks and the vault): the routes are in the set, and the bodies are not. The env names that a deploy adds through `FLEET_CLOUDRUN_MACHINE_ENV`. The type of an answer field: the check compares names and presence only.

@@ -4,9 +4,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from 'no
 import { join } from 'node:path';
 import type { BrainCommitRequest, BrainCommitResult, BrainConversationEvent, BrainThreadSnapshot } from '@neuramesh/shared';
 import { brainRoot } from './brain';
+import { readWithRetry } from './read-retry';
 import { durableAppend, durableWrite, packEvent, packRuntime, portableBrainValue, readJSON, unpackEvent, unpackRuntime } from './brain-sync-codec';
 export { portableBrainValue } from './brain-sync-codec';
-export { bindConversationCallback, captureConversationRecorder, conversationContext, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
+export { bindConversationCallback, captureConversationRecorder, conversationContext, conversationToolsThrough, setConversationHistoryBoundary, withoutConversationBrain, excludeConversationSecret, publishConversationArtifact, recordConversationEvent, withConversationBrain } from './brain-sync-context';
 
 export interface BrainSyncOptions {
   workspace: string;
@@ -17,7 +18,13 @@ export interface BrainSyncOptions {
   root?: string;
   deviceId?: string;
   fetchImpl?: typeof fetch;
+  /** the wait between load attempts (tests pass an instant one) */
+  sleep?: (ms: number) => Promise<void>;
   intervalMs?: number;
+  /** round 9 live narration: upload a progress event (PROGRESS_EVENTS) after this many ms instead of
+   *  intervalMs, so the activity row shows the agent's plan and tool steps within a beat. Unset keeps
+   *  the plain interval (Code sessions and tests) */
+  progressFlushMs?: number;
   log?: (line: string) => void;
   headersForActor?: (actor: { kind: string; id: string; role?: string }) => Promise<Record<string, string>>;
 }
@@ -25,6 +32,16 @@ export interface BrainSyncOptions {
 interface LocalState { revision: number; acknowledged: number; runtimeHash?: string }
 interface RuntimeState { messages?: unknown[]; metadata?: Record<string, unknown> }
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
+/** the events a person watches arrive: a turn opening, its narration and its tool steps */
+export const PROGRESS_EVENTS: ReadonlySet<string> = new Set(['turn.open', 'assistant.message', 'tool.call', 'tool.result']);
+/** Every open brain in this process, so a Cloud Run drain can flush each outbox before its snapshot
+ *  (cloudrun/lifecycle.ts). The agent host and Code sessions each keep their brains private. */
+const liveBrains = new Set<ConversationBrain>();
+export async function flushConversationBrains(): Promise<{ flushed: number; failed: number }> {
+  const results = await Promise.allSettled([...liveBrains].map((brain) => brain.flush()));
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  return { flushed: results.length - failed, failed };
+}
 /** An append-only fsynced journal plus an idempotent durable cloud outbox. */
 export class ConversationBrain {
   readonly path: string;
@@ -34,6 +51,8 @@ export class ConversationBrain {
   private eventIds: Set<string>;
   private readonly secrets = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** when the armed timer fires (ms since epoch): a sooner upload may replace a later one */
+  private timerDue = 0;
   private flushing: Promise<void> | null = null;
   private closed = false;
   private runtimeDirty = false;
@@ -57,6 +76,7 @@ export class ConversationBrain {
     this.eventIds = new Set(this.journal.map((event) => event.id));
     if (this.state.acknowledged > this.journal.length) throw new Error('The local brain checkpoint is incomplete. Restore the thread before its next turn.');
     if (this.pending() || this.runtimeDirty || existsSync(join(this.path, 'pending.json')) || existsSync(join(this.path, 'uploads'))) this.schedule();
+    liveBrains.add(this);
   }
 
   private recover(): BrainConversationEvent[] {
@@ -94,7 +114,7 @@ export class ConversationBrain {
     durableAppend(join(this.path, 'events.jsonl'), JSON.stringify(event) + '\n');
     this.journal.push(event);
     this.eventIds.add(event.id);
-    this.schedule();
+    this.schedule(PROGRESS_EVENTS.has(type) ? this.options.progressFlushMs : undefined);
   }
 
   setRuntime(messages: unknown[], metadata?: Record<string, unknown>): void {
@@ -116,7 +136,7 @@ export class ConversationBrain {
     const dir = join(this.path, 'uploads');
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const request = { workspace: this.options.workspace, threadId: this.options.threadId, id, name: body['name'], mime: data?.[1] ?? body['mime'] ?? 'text/plain', contentBase64: bytes.toString('base64'), sha256,
-      ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
+      ...(body['capture'] ? { capture: body['capture'] } : {}), ...(body['kind'] ? { kind: body['kind'] } : {}), ...(body['tags'] ? { tags: body['tags'] } : {}), ...(body['messageId'] ? { messageId: body['messageId'] } : {}), ...(body['channel'] ? { channel: body['channel'] } : {}) };
     durableWrite(join(dir, `${digest(id)}.json`), JSON.stringify({ actor, request }));
     this.schedule();
     await this.flushArtifacts();
@@ -149,34 +169,54 @@ export class ConversationBrain {
     }
   }
 
-  /** Never replace unsent local work with a remote head. A conflict retains the local branch. */
+  /** Never replace unsent local work with a remote head. A newer head takes the unsent events on top. */
   async hydrate(): Promise<void> {
-    const response = await this.call(`${brainApiBaseUrl(this.options.apiUrl)}/v1/brain/threads/${encodeURIComponent(this.options.threadId)}?workspace=${encodeURIComponent(this.options.workspace)}&format=compact`, {
-      headers: await this.options.headers(), signal: AbortSignal.timeout(30_000),
-    });
-    if (response.status === 404) return;
-    if (!response.ok) throw new Error(`The cloud brain could not load (${response.status}). Retry before this thread continues.`);
-    const remote = await response.json() as BrainThreadSnapshot;
-    if (!Number.isInteger(remote.revision) || !Array.isArray(remote.events) || remote.workspace !== this.options.workspace || remote.threadId !== this.options.threadId) throw new Error('The cloud brain returned an invalid checkpoint.');
-    if (remote.revision <= this.state.revision) return;
+    const remote = await this.head();
+    if (!remote || remote.revision <= this.state.revision) return;
     // A lost commit response is recovered by the durable request first. Its id remains stable.
     if (existsSync(join(this.path, 'pending.json'))) await this.flush();
     if (remote.revision <= this.state.revision) return;
-    if (this.pending() || this.runtimeDirty) throw new Error('This thread changed on another device. The local events are safe. Sync or resolve the local branch first.');
-    const events = remote.events.map(unpackEvent);
-    durableWrite(join(this.path, 'events.jsonl'), events.map((event) => JSON.stringify(event) + '\n').join(''));
-    this.journal = events;
-    this.eventIds = new Set(events.map((event) => event.id));
-    this.runtime = { messages: unpackRuntime(remote.runtimeMessages), metadata: remote.metadata };
-    durableWrite(join(this.path, 'runtime.json'), JSON.stringify(this.runtime));
-    this.state = { revision: remote.revision, acknowledged: remote.events.length, runtimeHash: digest(JSON.stringify(this.runtime)) };
-    this.runtimeDirty = false;
-    durableWrite(join(this.path, 'state.json'), JSON.stringify(this.state));
+    this.rebase(remote);
   }
 
-  private schedule(): void {
-    if (this.closed || this.timer) return;
-    this.timer = setTimeout(() => { this.timer = null; void this.flush().catch((error: unknown) => { this.options.log?.(`brain_sync_pending: ${error instanceof Error ? error.message : 'upload failed'}`); this.schedule(); }); }, this.options.intervalMs ?? 5_000);
+  private async head(): Promise<BrainThreadSnapshot | null> {
+    // the first turn after a wake loads this in the machine's busiest seconds: a slow or dropped
+    // load is tried again before the turn fails (harness/read-retry.ts)
+    const response = await readWithRetry(async (signal) => this.call(`${brainApiBaseUrl(this.options.apiUrl)}/v1/brain/threads/${encodeURIComponent(this.options.threadId)}?workspace=${encodeURIComponent(this.options.workspace)}&format=compact`, {
+      headers: await this.options.headers(), signal,
+    }), { timeoutMs: 30_000, slowText: 'The conversation memory did not load in time.', ...(this.options.sleep ? { sleep: this.options.sleep } : {}) });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`The cloud brain could not load (${response.status}). Retry before this thread continues.`);
+    const remote = await response.json() as BrainThreadSnapshot;
+    if (!Number.isInteger(remote.revision) || !Array.isArray(remote.events) || remote.workspace !== this.options.workspace || remote.threadId !== this.options.threadId) throw new Error('The cloud brain returned an invalid checkpoint.');
+    return remote;
+  }
+
+  /** Lay the unsent events over a newer head. An event the head already holds (a message both writers
+   *  recorded, or one sent before a restored snapshot) drops. Two runtime checkpoints do not merge. */
+  private rebase(remote: BrainThreadSnapshot): void {
+    if (this.runtimeDirty || remote.revision < this.state.revision) throw new Error('This thread changed on another device. The local events are safe. Sync or resolve the local branch first.');
+    const events = remote.events.map(unpackEvent); const held = new Set(events.map((event) => event.id));
+    const unsent = this.journal.slice(this.state.acknowledged).filter((event) => !held.has(event.id));
+    // A crash before state.json lands replays these as unsent. The next conflict drops them again.
+    this.journal = [...events, ...unsent];
+    durableWrite(join(this.path, 'events.jsonl'), this.journal.map((event) => JSON.stringify(event) + '\n').join(''));
+    this.eventIds = new Set(this.journal.map((event) => event.id));
+    this.runtime = { messages: unpackRuntime(remote.runtimeMessages), metadata: remote.metadata };
+    durableWrite(join(this.path, 'runtime.json'), JSON.stringify(this.runtime));
+    this.state = { revision: remote.revision, acknowledged: events.length, runtimeHash: digest(JSON.stringify(this.runtime)) };
+    this.runtimeDirty = false; durableWrite(join(this.path, 'state.json'), JSON.stringify(this.state));
+    if (unsent.length) this.options.log?.(`brain_rebased: ${unsent.length} events onto revision ${remote.revision}`);
+  }
+
+  private schedule(soonMs?: number): void {
+    if (this.closed) return;
+    const delay = Math.min(soonMs ?? Infinity, this.options.intervalMs ?? 5_000);
+    const due = Date.now() + delay;
+    // an armed timer stands unless this upload must go sooner (a progress event behind a plain one)
+    if (this.timer) { if (this.timerDue <= due) return; clearTimeout(this.timer); }
+    this.timerDue = due;
+    this.timer = setTimeout(() => { this.timer = null; void this.flush().catch((error: unknown) => { this.options.log?.(`brain_sync_pending: ${error instanceof Error ? error.message : 'upload failed'}`); this.schedule(); }); }, delay);
     this.timer.unref?.();
   }
 
@@ -190,6 +230,7 @@ export class ConversationBrain {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     await this.flushArtifacts();
     const pendingFile = join(this.path, 'pending.json');
+    let rebases = 0;
     while (this.pending() || this.runtimeDirty || existsSync(pendingFile)) {
       // Retry a persisted request before inspecting newer events. The same commit id and
       // bytes recover a lost acknowledgement even if a later event exceeds the wire limit.
@@ -216,17 +257,22 @@ export class ConversationBrain {
         };
         durableWrite(pendingFile, JSON.stringify(request));
       }
-      let result: BrainCommitResult;
-      try {
-        const response = await this.call(`${brainApiBaseUrl(this.options.apiUrl)}/v1/brain/threads/${encodeURIComponent(this.options.threadId)}/commits`, {
-          method: 'POST', headers: { 'content-type': 'application/json', ...(await this.options.headers()) },
-          body: JSON.stringify(request), signal: AbortSignal.timeout(60_000),
-        });
-        if (response.status === 409) throw new Error('This thread changed on another device. The local brain branch is safe.');
-        if (!response.ok) throw new Error(`The cloud brain upload failed (${response.status}). The local events remain queued.`);
-        result = await response.json() as BrainCommitResult;
-        if (result.commitId !== request.commitId || result.revision !== request.expectedRevision + 1) throw new Error('The cloud brain returned an invalid commit acknowledgement.');
-      } catch (error) { throw error; }
+      const response = await this.call(`${brainApiBaseUrl(this.options.apiUrl)}/v1/brain/threads/${encodeURIComponent(this.options.threadId)}/commits`, {
+        method: 'POST', headers: { 'content-type': 'application/json', ...(await this.options.headers()) },
+        body: JSON.stringify(request), signal: AbortSignal.timeout(60_000),
+      });
+      if (response.status === 409) {
+        // The server checks the commit id first, so this request never landed: another writer moved the head.
+        const code = (await response.json().catch(() => null) as { code?: string } | null)?.code;
+        if (rebases < 3 && (code === 'BRAIN_CONFLICT' || code === 'BRAIN_EVENT_REUSED')) {
+          const remote = await this.head();
+          if (remote) { this.rebase(remote); unlinkSync(pendingFile); rebases++; continue; }
+        }
+        throw new Error('This thread changed on another device. The local brain branch is safe.');
+      }
+      if (!response.ok) throw new Error(`The cloud brain upload failed (${response.status}). The local events remain queued.`);
+      const result = await response.json() as BrainCommitResult;
+      if (result.commitId !== request.commitId || result.revision !== request.expectedRevision + 1) throw new Error('The cloud brain returned an invalid commit acknowledgement.');
       // Crash after state rename but before unlink must not count the same events twice.
       if (this.state.revision < result.revision) {
         this.state = { revision: result.revision, acknowledged: this.state.acknowledged + request.events.length, runtimeHash: request.runtimeMessages ? digest(JSON.stringify({ messages: unpackRuntime(request.runtimeMessages), ...(request.metadata ? { metadata: request.metadata } : {}) })) : this.state.runtimeHash };
@@ -238,6 +284,6 @@ export class ConversationBrain {
   }
 
   async close(): Promise<void> {
-    try { await this.flush(); } finally { this.closed = true; if (this.timer) clearTimeout(this.timer); }
+    try { await this.flush(); } finally { this.closed = true; if (this.timer) clearTimeout(this.timer); liveBrains.delete(this); }
   }
 }

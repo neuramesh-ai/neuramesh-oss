@@ -7,7 +7,7 @@
 //
 // Raw fetch, no SDK and no jsonwebtoken: the App JWT is three base64url parts and one RSA-SHA256
 // signature from node:crypto (clerk.ts verifies the same shape from the other side), and
-// build:vercel externalizes dependencies by name (the mail.ts precedent).
+// build:server externalizes dependencies by name (the mail.ts precedent).
 import { createHmac, createPrivateKey, createSign, timingSafeEqual } from 'node:crypto';
 import type { ScanPr, ScanRelease, ScanTag } from '@neuramesh/shared';
 

@@ -1,0 +1,36 @@
+.composer-actions-end { display: inline-flex; align-items: center; justify-content: flex-end; gap: inherit; margin-left: auto; max-width: 100%; }
+.composer-actions-end .cagchips, .tcompose .composer-actions-end .tsend { margin-left: 0; }
+.teamdesk-cardbody .tcompose { container: agent-composer / inline-size; }
+@container agent-composer (max-width: 430px) {
+  .perm-trigger > span, .perm-trigger > svg:last-child { display: none; }
+  .composer-actions-end .composer-agent-identity { min-width: 0; }
+  .composer-agent-identity .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.perm-trigger{display:inline-flex;align-items:center;gap:5px;flex-shrink:0}
+.perm-menu{box-sizing:border-box;position:fixed;z-index:10050;width:min(310px,calc(100vw - 16px));overflow:auto;overscroll-behavior:contain;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);box-shadow:0 10px 30px #0002;transform-origin:bottom right;animation:nm-permission-in .15s ease-out both}
+.perm-heading,.perm-foot,.perm-menu>small{display:block;color:var(--muted);font-size:11px;padding:5px 8px}
+.perm-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px;background:transparent;border:0;color:inherit;text-align:left;border-radius:6px;cursor:pointer;font:inherit}
+.perm-menu button[aria-checked=true],.perm-menu button:hover,.perm-menu button:focus-visible{background:var(--panel3)}
+.perm-menu button:focus-visible,.perm-trigger:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.perm-menu b,.perm-menu small{display:block}.perm-menu b{font-size:13px;font-weight:600}.perm-menu small{margin-top:2px;color:var(--muted);font-size:12px;line-height:1.4}
+.perm-menu svg{flex-shrink:0;color:var(--accent)}.perm-foot{border-top:1px solid var(--border);margin-top:4px}.perm-foot button{font-size:11px;padding:4px 0}
+.permission-settings{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 15px}.permission-settings small{display:block;color:var(--muted);margin-top:3px}.permission-restrictions>summary{cursor:pointer;margin-bottom:12px;color:var(--muted)}
+@keyframes nm-permission-in{from{opacity:0;transform:translateY(5px) scale(.99)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.perm-menu{animation:none}}
+.perm-request{margin:0 0 7px;padding:11px;border:1px solid var(--border);border-radius:9px;background:var(--panel2);color:var(--text);animation:nm-permission-in .15s ease-out}
+.perm-request b,.perm-request small{display:block}.perm-request small{color:var(--muted)}.perm-request pre{overflow:auto;margin:7px 0}.perm-request>div{display:flex;justify-content:flex-end;gap:6px;margin-top:7px}
+@media(prefers-reduced-motion:reduce){.perm-request{animation:none}}
+
+/* The actionable request lives above the composer. Resolved receipts stay in history. */
+.threadpanel:has(.tcompose .perm-request) .qcard.pending-permission { display: none; }
+
+.trow .cchip.coding-mode-chip {
+  flex: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.trow .cchip.coding-mode-chip:hover:not(:disabled) { color: var(--text); background: var(--hover-bg); }
+.trow .cchip.coding-mode-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.coding-mode-menu button[aria-checked="true"]:not(:hover):not(:focus-visible) { background: transparent; }
+.perm-menu.coding-mode-menu { width: min(240px, calc(100vw - 16px)); }

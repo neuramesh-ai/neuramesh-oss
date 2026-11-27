@@ -5,7 +5,7 @@
 // (the desktop's local-first autosave, forwarded by PowerSync uploadData) is LWW — highest
 // rev wins and a stale patch is ACKed as applied:false, because a throwing autosave wedges
 // the whole upload queue behind one lost race (the v0.29.2 phone-wedge class).
-import type { Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { MemoryStore } from '../src/store';
@@ -33,9 +33,13 @@ async function makeRoom(): Promise<string> {
 
 const SCENE = JSON.stringify({ elements: [{ type: 'rectangle', x: 0, y: 0 }], appState: { viewBackgroundColor: '#ffffff' } });
 
-beforeEach(() => {
+beforeEach(async () => {
   store = new MemoryStore();
   app = createApp(store);
+  // Workspace reads require a registered agent; an actor header alone establishes no membership.
+  sol.id = (await store.registerAgent({ workspace: 'ws_acme', machineId: 'm1', name: 'Sol', role: 'developer',
+    model: 'gpt-5.6-sol', runtime: 'codex', channels: [] },
+  createEvent({ type: 'agent.registered', workspace: 'ws_acme', source: formatAddress({ kind: 'human', id: 'george' }), target: 'resource/workspace/ws_acme', payload: {} }))).id;
 });
 
 describe('whiteboard.create — the agent door', () => {

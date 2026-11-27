@@ -1,10 +1,10 @@
 // THE MODEL MENU (docs/design/models-and-replies-2026-10, boards D2 and D4): the house brain, then one
 // group per provider from the SHARED catalog, ready providers first in their state and the rest dim with
 // the one act that fixes them. A row takes a thinking level when its model does: the chevron opens
-// Low · Medium · High under the row (the board drew them beside it, but the menu scrolls and a flyout
+// the model's own levels (Low · Medium · High, and Extra high where the model has it) under the row (the board drew them beside it, but the menu scrolls and a flyout
 // clips). The same body serves the model chip (the agent the composer talks to), the agent menu
 // (one agent's model) and the Code chip (a coding session's model), so they can never list different models.
-import { CURRENT_MODELS, DEFAULT_THINKING, modelLabel, STARTER_MODEL, takesThinking, THINKING_LABEL, THINKING_LEVELS, type ThinkingLevel } from '@neuramesh/shared';
+import { CURRENT_MODELS, DEFAULT_THINKING, modelLabel, STARTER_MODEL, takesThinking, THINKING_LABEL, thinkingLevelsFor, type ThinkingLevel } from '@neuramesh/shared';
 import { useState, type ReactNode } from 'react';
 import { ProviderLogo } from '../brain/providers';
 import { chipLabel, type ProviderKey, type ProviderState } from './picks';
@@ -61,7 +61,7 @@ export function ModelMenu({ head, current, level, states, onPick, onConnect, foo
         {levels === model && (
           <div className="cmodlv" role="radiogroup" aria-label={`Thinking for ${modelLabel(model)}`}>
             <span className="k">Thinking</span>
-            {THINKING_LEVELS.map((l) => (
+            {thinkingLevelsFor(model).map((l) => (
               <button key={l} type="button" role="radio" aria-checked={on && level === l} className={on && level === l ? 'on' : ''}
                 onClick={() => { setLevels(null); pick(model, l); }}>{THINKING_LABEL[l]}</button>
             ))}

@@ -1,0 +1,23 @@
+# a pull request run tests the merge commit of refs/pull/N/merge, and GitHub keeps that commit nowhere in its
+# API. this step records its tree and its base as the name of an artifact. after a squash merge onto the same
+# base, the release finds that record and starts without a second run of the checks (infra/cloudrun/ci/reuse.py)
+name: tested tree
+description: Record the tree and the base that this pull request run tests
+runs:
+  using: composite
+  steps:
+    - id: record
+      shell: bash
+      run: |
+        # a shallow checkout keeps the parent in the commit object
+        tree=$(git rev-parse 'HEAD^{tree}')
+        base=$(git cat-file commit HEAD | sed -n 's/^parent //p' | head -n 1)
+        echo "$tree $base" > "$RUNNER_TEMP/tested-tree"
+        echo "name=tested-$tree-$base" >> "$GITHUB_OUTPUT"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.record.outputs.name }}
+        path: ${{ runner.temp }}/tested-tree
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: error

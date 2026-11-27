@@ -34,7 +34,7 @@ describe('an nmauth card and the needs-you queue', () => {
     expect(r.status).toBe(200);
     const open = await opened();
     expect(open).toHaveLength(1);
-    expect(open[0]!.question).toBe('@rex cannot run here. This machine has no OpenAI / Codex login. Sign in again, or switch this conversation to the NeuraMesh brain, on credits.');
+    expect(open[0]!.question).toBe('Reply could not run. Codex login unavailable on this machine. Use NeuraMesh brain on credits, or reconnect the provider on a machine you own and run it there.');
   });
 
   it('a switched card (the routine already moved) asks nothing and mints nothing', async () => {

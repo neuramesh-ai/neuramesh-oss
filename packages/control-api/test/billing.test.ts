@@ -155,3 +155,16 @@ describe('trialReminderFromEvent: Stripe’s 3-day notice becomes the email the 
     expect(planPatchFromEvent(event({ id: 'sub_1', status: 'trialing', trial_end: 1792195200, metadata: { workspace_id: 'ws_1' } }))).toBeNull();
   });
 });
+
+// the Pro trial with no card (trial-cardless.ts): a card added to it completes a SETUP session, which names
+// no subscription, and the subscription says whether a card is on file
+describe('planPatchFromEvent and the trial with no card', () => {
+  it('ignores a completed setup session, so the workspace keeps its subscription id', () => {
+    expect(planPatchFromEvent({ type: 'checkout.session.completed', data: { object: { mode: 'setup', client_reference_id: 'ws_1', subscription: null } } })).toBeNull();
+  });
+  it('reads the card on file from the subscription', () => {
+    const sub = (pm: string | null) => ({ type: 'customer.subscription.updated', data: { object: { id: 'sub_1', status: 'trialing', default_payment_method: pm, metadata: { workspace_id: 'ws_1' } } } });
+    expect(planPatchFromEvent(sub(null))!.patch.cardOnFile).toBe(false);
+    expect(planPatchFromEvent(sub('pm_1'))!.patch.cardOnFile).toBe(true);
+  });
+});

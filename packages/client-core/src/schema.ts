@@ -4,8 +4,10 @@ import { artifacts, beats, decisions, runs, tasks } from './tables/board';
 import { agent_channels, agents, machines, policies, workspace_members } from './tables/crew';
 import { code_sessions, connectors, content_items, reply_reminders, schedules, skill_packs, skills, whiteboards } from './tables/content';
 import { memory_blocks, project_agents, project_repos, projects, repos } from './tables/infra';
+import { email_drafts, mail_grants } from './tables/email';
+import { sales_contacts, sales_deals } from './tables/sales';
 
-export const TABLES = { channels, projects, project_agents, messages, threads, tasks, machines, agents, agent_channels, repos, project_repos, artifacts, beats, runs, decisions, policies, memory_blocks, skills, skill_packs, schedules, content_items, connectors, workspace_members, channel_members, whiteboards, code_sessions, reply_reminders };
+export const TABLES = { channels, projects, project_agents, messages, threads, tasks, machines, agents, agent_channels, repos, project_repos, artifacts, beats, runs, decisions, policies, memory_blocks, skills, skill_packs, schedules, content_items, connectors, workspace_members, channel_members, whiteboards, code_sessions, reply_reminders, email_drafts, mail_grants, sales_contacts, sales_deals };
 
 export const AppSchema = { tables: Object.entries(TABLES).map(([name, table]) => ({ name, ...table })) };
 

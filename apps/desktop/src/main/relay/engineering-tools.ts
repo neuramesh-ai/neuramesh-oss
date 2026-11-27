@@ -22,7 +22,7 @@ function outsideWorkspace(path: string): Error {
   return new Error(`Engineering refused a path outside the selected repository: ${path}`);
 }
 
-async function existingWorkspacePath(root: string, path: string): Promise<string> {
+export async function existingWorkspacePath(root: string, path: string): Promise<string> {
   const candidate = lexicalPath(root, path);
   if (!isWithin(root, candidate)) throw outsideWorkspace(path);
   const canonical = await realpath(candidate);
@@ -32,7 +32,7 @@ async function existingWorkspacePath(root: string, path: string): Promise<string
 
 /** Resolve a write target through its deepest existing ancestor. This catches a new file below a
  * symlink that points outside the repository without requiring the target itself to exist. */
-async function writableWorkspacePath(root: string, path: string): Promise<string> {
+export async function writableWorkspacePath(root: string, path: string): Promise<string> {
   const candidate = lexicalPath(root, path);
   if (!isWithin(root, candidate)) throw outsideWorkspace(path);
   const tail: string[] = [];

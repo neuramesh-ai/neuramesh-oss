@@ -74,3 +74,37 @@ describe('thread.settle (0137)', () => {
     expect((await j(res)).code).toBe('NOT_FOUND');
   });
 });
+
+// 0192: the same stamp on a task with no thread of its own (a task made on the board, a promoted
+// backlog item, an older unit), so its Needs you row and the cards hung on it can settle.
+describe('task.settle (0192)', () => {
+  async function boardTask() {
+    return (await j(await send(george, { type: 'task.create', workspace: WS, channel: 'dev', title: 'Write the demo agenda' }))).task as { id: string; state: string; version: number; updatedAt: string };
+  }
+
+  it('a human settles and unsettles a task, and the task does not move: same state, same version, same updatedAt', async () => {
+    const task = await boardTask();
+    const on = await send(george, { type: 'task.settle', workspace: WS, taskId: task.id });
+    expect(on.status).toBe(200);
+    expect(await j(on)).toMatchObject({ ok: true, taskId: task.id, settled: true });
+    const after = (await store.getTask(task.id)) as unknown as { state: string; version: number; updatedAt: string; settledAt?: string | null };
+    expect(after.settledAt).toBeTruthy();
+    expect([after.state, after.version, after.updatedAt]).toEqual([task.state, task.version, task.updatedAt]);
+
+    const off = await send(george, { type: 'task.unsettle', workspace: WS, taskId: task.id });
+    expect(await j(off)).toMatchObject({ ok: true, settled: false });
+    expect(((await store.getTask(task.id)) as unknown as { settledAt?: string | null }).settledAt).toBeNull();
+  });
+
+  it('an AGENT cannot settle a task', async () => {
+    const task = await boardTask();
+    const res = await send(rex, { type: 'task.settle', workspace: WS, taskId: task.id });
+    expect(res.status).toBe(403);
+    expect((await j(res)).code).toBe('HUMAN_ONLY');
+  });
+
+  it('an unknown task is refused rather than a silent success', async () => {
+    const res = await send(george, { type: 'task.settle', workspace: WS, taskId: '44444444-4444-4444-8444-444444444444' });
+    expect(res.status).toBe(404);
+  });
+});

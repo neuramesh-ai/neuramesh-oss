@@ -12,7 +12,7 @@ export const welcomeMeta: TemplateMeta = {
   claims: [
     ['The six default agents and their roles', 'onboarding-wizard.ts STARTER_CREW'],
     ['Any of them can be renamed before launch', 'hq OnboardingCrew.tsx; mobile wizard.tsx crew step'],
-    ['Cloud trial activation unlocks 500 credits; desktop works with your own subscriptions', 'control-api activation-credits.ts; rates.ts SIGNUP_GRANT_CREDITS'],
+    ['Cloud trial activation unlocks 100 credits; desktop works with your own subscriptions', 'control-api activation-credits.ts; rates.ts SIGNUP_GRANT_CREDITS'],
     ['Agents work on the cloud machine after the tab closes', 'hq OnboardingMachine.tsx; machines idle-stop after 48 h (docs/07)'],
     ['Setup resumes at the machine: four screens to launch', 'onboarding-wizard.ts initialWizard step 2; hq webnm-boot.ts resumeWorkspaceId'],
     ['The same workspace opens in the iPhone app', 'mobile sign-in.tsx; the desktop-signin hand-off'],
@@ -21,7 +21,7 @@ export const welcomeMeta: TemplateMeta = {
 };
 
 // THE PRO TRIAL (George, 2026-09-25): the welcome goes to every new hosted account, and that
-// account's workspace already runs in the browser with its cloud machine and 500 credits. the old
+// account's workspace already runs in the browser with its cloud machine and its signup credits. the old
 // welcome sent everyone to the Mac download ("Connect this Mac"), so the one CTA opens hq instead.
 export function renderWelcome(v: { openUrl: string; unsubscribeUrl: string }): RenderedEmail {
   const subject = 'Six of them, and they all have names';

@@ -23,7 +23,7 @@ export function billingPublishableKey(): string | null {
 }
 
 let _stripe: Stripe | null = null;
-function stripe(): Stripe {
+export function stripe(): Stripe {
   if (!SECRET) throw new Error('billing not configured (STRIPE_SECRET_KEY unset)');
   if (!_stripe) _stripe = new Stripe(SECRET);
   return _stripe;
@@ -129,6 +129,8 @@ export interface PlanPatch {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   currentPeriodEnd?: string | null;
+  /** the subscription has a default payment method (0209): Today asks for a card while it is false */
+  cardOnFile?: boolean;
 }
 
 // past_due keeps Cloud access (grace) until the subscription is actually canceled/unpaid.
@@ -148,7 +150,9 @@ export function planPatchFromEvent(event: BillingEventLike): { workspace: string
     // a CREDIT-PACK purchase completes through the same event with mode 'payment'. It must
     // NEVER touch the plan — without this guard, buying a $5 pack on free flipped the
     // workspace to Cloud, which is a plan grant for a hundredth of the price.
-    if ((obj['mode'] as string) === 'payment') return null;
+    // a SETUP session (a card added to a trial with no card, trial-cardless.ts) names no subscription,
+    // and a plan patch from it would clear the workspace's subscription id
+    if ((obj['mode'] as string) === 'payment' || (obj['mode'] as string) === 'setup') return null;
     const workspace = (obj['client_reference_id'] as string) || metaWorkspace;
     if (!workspace) return null;
     // no subscriptionStatus here: the subscription events own it. a trial's subscription is
@@ -181,6 +185,7 @@ export function planPatchFromEvent(event: BillingEventLike): { workspace: string
         ...(periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1000).toISOString() } : {}),
         stripeCustomerId: (obj['customer'] as string) ?? null,
         stripeSubscriptionId: (obj['id'] as string) ?? null,
+        cardOnFile: !!obj['default_payment_method'],
       },
     };
   }

@@ -1,6 +1,6 @@
 // The one email layout + its block helpers. Table-based with inlined styles because that is
 // what email clients render, regardless of what generates it, so this is hand-rolled rather
-// than pulling in React Email or MJML (control-api's build:vercel externalizes every dep by
+// than pulling in React Email or MJML (control-api's build:server externalizes every dep by
 // name; a new one means touching the bundle config to wrap what is ~200 lines).
 //
 // Verified via `pnpm mail:preview` across both themes and 390px/640px widths.

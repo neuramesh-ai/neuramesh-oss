@@ -52,6 +52,9 @@ export const content_items = new Table({
   created_by: column.text,
   last_error: column.text,
   created_at: column.text,
+  // 0208 — the Postiz route a person picked (an integration id), and the post Postiz holds once approved
+  postiz_channel: column.text,
+  postiz_post_id: column.text,
 });
 
 // reply reminders (0146, the reply queue): one queued reply per row. The reply card draws its slots

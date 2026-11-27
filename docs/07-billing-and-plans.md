@@ -25,7 +25,7 @@ per-workspace, and the desktop doesn't use `@clerk/clerk-react`).
 | Local machines | 1 (`MACHINE_LIMIT`, transfer-or-upgrade) | unlimited |
 | Cloud machine | **none** on a Mac. A hosted first workspace (the Pro trial) gets **one runner** with the workspace (`workspace-birth.ts`), billed from its credits | the runner (keys + starter brain), minted by the webhook at the flip to Pro (`plan-flip.ts`, `FLEET_AUTOPROVISION` gates dev stacks) **plus a machine per member**, born asleep at join; 50 GB each |
 | Teammate seats | **1** — the owner (`FREE_SEAT_CAP`; an invitation is refused with Pro named) | per seat; the first invitation promotes the runner into the owner's machine; **the seat count follows the roster** (below) |
-| Monthly credits | **500 once**, at the person's first workspace, whatever door made it (2026-09-19, `workspace-birth.ts` since 2026-10-03); no refill: the worklist filters `plan = 'cloud'` | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
+| Monthly credits | **100 once** (500 until 2026-11-24), at the person's first workspace, whatever door made it (2026-09-19, `workspace-birth.ts` since 2026-10-03); no refill: the worklist filters `plan = 'cloud'` | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
 
 A blocked command returns `PLAN_LIMIT` (402) / `MACHINE_LIMIT` (402); the desktop routes those to the
 upgrade modal / the transfer-or-upgrade card — never a dead-end.
@@ -80,13 +80,13 @@ pnpm --filter @neuramesh/control-api dev    # control-api on :8787
 # copy the printed whsec_… into STRIPE_WEBHOOK_SECRET, restart the control-api
 ```
 
-### Production (Vercel control-api at api.neuramesh.app)
+### Production (Cloud Run control API at api.neuramesh.app)
 
 Create a webhook endpoint → `https://api.neuramesh.app/webhooks/stripe` with the six events above
 (`checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
 `customer.subscription.deleted`, `invoice.payment_failed`, `customer.subscription.trial_will_end`).
 Put its `whsec_…` and `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` / `STRIPE_PUBLISHABLE_KEY` /
-`NM_BILLING_RETURN_URL` in Vercel env. The card trial's wallets also need hq's domain in Stripe
+`NM_BILLING_RETURN_URL` in Pulumi-managed Secret Manager/runtime configuration. The card trial's wallets also need hq's domain in Stripe
 (Settings › Payment methods › Payment method domains: `hq.neuramesh.app`).
 Webhooks go ONLY to the hosted control-api (never the desktop's embedded API).
 
@@ -108,7 +108,7 @@ ledger: `packages/control-api/src/credit-ledger.ts` · dashboard: the **Credits*
 |---|---|
 | Brain (starter model via `POST /v1/starter/generate`, or `/v1/starter/stream` for a reply that types itself out, one price for both: docs/10 §15.9) | vendor-reported tokens × list price (`MODEL_RATES`), and the thinking tokens at the output rate, as Google bills them (2026-10-04). An unknown model costs 0, never a guess. |
 | Machine, **active** | **1 credit / 10 worked minutes** (`MACHINE_MICROS_PER_ACTIVE_MINUTE`); the daemon samples work every 5 s and reports `activeSeconds` on each heartbeat |
-| Machine, standby | free — bounded by the **48 h idle stop** (`NM_IDLE_STOP_MIN`, default 2880; `idle_stop_min IS NULL` = never) |
+| Machine, standby | free on a normal machine, bounded by the **idle stop** (`NM_IDLE_STOP_MIN`: code default 2880, Cloud Run 15 by decision D2. `idle_stop_min IS NULL` = never. The **Always on** switch sets it. An Always on machine pays the active rate for every awake second, see below) |
 | Storage | included per plan (10 GB free / 50 GB cloud, `planDiskGb`); `STORAGE_MICROS_PER_GB_HOUR` is `null` — **not metered yet** |
 
 **Two pools** (migration 0130, `workspace_credits`): a **grant** pool that resets each period (1,500 ×
@@ -123,6 +123,33 @@ is reported as `outOfCredits` on `/v1/machines/usage`, and the client shows `no_
 spinner); the `*/5` `machine-sweep` cron parks a machine at zero balance after a 10-minute
 run-drain grace; `chargeMachineActivity` never refuses (the work already happened — pools clamp,
 telemetry stays true). `GET /v1/usage` returns the three lines + balance + rate version.
+
+**Always on** (decision D2, `packages/control-api/src/machine-always-on.ts`). A person can keep one
+cloud machine awake past the idle window. The switch is in the compute panel, under each cloud
+machine (`apps/hq/src/compute/AlwaysOnRow.tsx`).
+
+- `POST /v1/machines/always-on` with `{ workspace, machineId, on }`. Human only.
+- The owner of a member machine can switch their own machine. A workspace owner or admin can switch
+  the runner. Other people get 403. A local machine gets 409 `LOCAL_MACHINE`.
+- On sets `idle_stop_min` to NULL. Off writes the column default back. The idle sweeps then use
+  `NM_IDLE_STOP_MIN` again. `GET /v1/machines/usage` reports the effective window per machine
+  (`idleStopMin`, NULL when Always on).
+- A repeat is a no-op. Each real change writes one `machine.always_on_set` event.
+- Always on does not wake the machine. It does not stop the credit cap: at a zero balance the sweep
+  parks the machine as usual. It does not stop the crash-loop breaker.
+- **Billed as active** (George, 2026-11-06). While Always on is on and the machine is up, every awake
+  second costs the active price (`priceActiveSeconds`), also when the machine does no work. That is
+  about 6 credits an hour. A normal machine still pays only for its active seconds.
+- The heartbeat charges it (`packages/control-api/src/machine-beat.ts`). Each beat of an Always on
+  machine with `desired_replicas = 1` charges the wall time since the last beat
+  (`machines.billed_through`, migration 0176). The window starts no earlier than `started_at` and is
+  at most 60 s. The active seconds of the beat are inside the same window, so the beat charges
+  max(active, window), not the sum. A machine that is down sends no beat, so it pays nothing.
+- The charge never refuses. The pools clamp at zero, and the cap sweep then parks the machine.
+- `machine_usage.always_on_seconds` holds the extra awake seconds. `active_seconds` stays the
+  "worked" figure. `machine_micros` holds the money for both. `GET /v1/usage` reports
+  `machine.alwaysOnSecondsToday`, and the Credits screen shows it beside the worked hours.
+
 
 **Packs.** One-time Stripe Checkout on **any plan**, free included: `$5 / 500 · $10 / 1,000 ·
 $25 / 2,500` pre-filled, and any whole amount between `MIN_PACK_CREDITS` (500) and
@@ -148,11 +175,35 @@ one workspace's machines (#375).
 **Not built / open:** per-user credit attribution inside a workspace; storage metering (columns
 defined, unwritten); granting for BYOS tokens (never — those stay the user's).
 
-## Free in the cloud starts with 500 credits (2026-09-19, the first-run doors)
+## Every hosted sign-up starts on Pro (2026-11-25)
+
+> George, 2026-11-25 (`docs/design/onboarding-2026-11/trial.md`): a person who signs up on the web, in hq or on
+> the phone starts on Pro, as a trial or paid. The card requirement (`NM_REQUIRE_TRIAL_ACTIVATION=1`) stays on.
+> - **A card** starts a 14-day trial (the card trial below). **"Add a card later"**, the phone's first run, and
+>   a workspace that never added a card (on its owner's next visit) start a **7-day trial with no card**:
+>   `POST /v1/billing/trial/start` creates a Stripe subscription in its trial with no payment method, which
+>   Stripe cancels at the trial's end when no card came (`trial-cardless.ts`, `PRO_TRIAL_DAYS_NO_CARD`).
+> - Both trials get 100 credits (`SIGNUP_GRANT_CREDITS`) once, through the same activation grant. 1,500 credits
+>   a seat each month starts with the paid plan.
+> - One trial with no card for each person (`nm_users.trial_claimed_at`, 0209), for the owner only, and only
+>   with a confirmed email.
+> - A card added during the trial (`POST /v1/billing/trial/card`, a setup session, then `/card/sync` or the
+>   webhook) becomes the subscription's default and moves the trial to 14 days from its start.
+>   `workspaces.card_on_file` (0209) says whether Today asks for a card.
+> - When the trial ends with no card, the workspace is inactive again: the machine stops, and its work stays.
+
+## Free in the cloud starts with 100 credits (2026-11-24, the onboarding round)
+
+> George, 2026-11-24: the grant drops from 500 to 100. A first brief on the starter brain costs about 7
+> credits, so 100 pays for the first win and about two weeks of daily briefs, the length of the trial.
+> The card trial now comes after the first win (docs/design/onboarding-2026-11 O6). The desktop's door
+> says 100 from its next release. The section below is the 2026-09-19 history.
+
+## Free in the cloud started with 500 credits (2026-09-19, the first-run doors)
 
 > **Amended 2026-09-19** ([docs/design/first-run-doors-2026-09](design/first-run-doors-2026-09/plan.md)).
 > George: "cloud should indicate free 500 credits to get started". A free hosted account's **first
-> workspace is granted `SIGNUP_GRANT_CREDITS` (500) once**, at its creation (the ledger's `signup`
+> workspace is granted `SIGNUP_GRANT_CREDITS` (500 then, 100 since 2026-11-24) once**, at its creation (the ledger's `signup`
 > kind, best effort behind the creation: a sign-in never fails because a ledger row did not land).
 > Since 2026-10-03 the grant and the runner ride `workspace.create` itself (`workspace-birth.ts`), for
 > the person's first workspace, so a workspace the wizard makes after an invitation gets them too.

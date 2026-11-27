@@ -26,7 +26,8 @@ export async function listLibrary(libraryDocs: LibraryReader, channelId: string,
   const docs = await libraryDocs(channelId, 60, scope, undefined, undefined, offset);
   if (!docs.length) return `no documents in this ${scope === 'room' ? 'project' : scope}`;
   return JSON.stringify(docs.map((d) => ({
-    name: d.name, kind: d.kind, promoted: !!d.promoted,
+    // the id names the file for publish_file and ask_publish from a session in any room
+    id: d.id, name: d.name, kind: d.kind, promoted: !!d.promoted,
     ...(scope === 'room' ? {} : { room: d.room, project: d.project }),
     created: d.created_at, size: (d.inline_content ?? '').length,
   })));

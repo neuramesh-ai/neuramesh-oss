@@ -18,6 +18,9 @@ describe('coding composer choices', () => {
     expect(engineeringEffort('gpt-5.6-sol')).toBe('medium');
     expect(engineeringEffort('claude-haiku-4-5', 'high')).toBe('high');
     expect(engineeringEffort(STARTER_MODEL, 'high')).toBeNull();
+    expect(engineeringEffort('gemini-4-neon', 'xhigh')).toBe('xhigh');
+    // a switch from Neon to Carbon carries Extra high down to Carbon's top level
+    expect(engineeringEffort('gemini-4-carbon', 'xhigh')).toBe('high');
   });
   it('keeps earlier authors when another agent takes the next turn', () => {
     let s = applyRemoteEngineeringEvent(initial(), { type: 'ready', agent: rex, reasoningEffort: 'high', modelId: 'gpt-5.6-sol', model: 'gpt-5.6-sol', provider: 'openai' });

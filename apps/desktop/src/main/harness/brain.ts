@@ -1,3 +1,4 @@
+import { assertHydrated } from './hydration';
 // The brain (docs/harness/01) — one directory per SUBJECT, shared by every agent that works it.
 //
 // The gap it closes: a thread's state is scattered across agent-logs.db (keyed by agent + run), a
@@ -168,7 +169,7 @@ export class SubjectBrain {
     return new Ledger(join(this.dir('turns'), `${turnId}.jsonl`));
   }
 
-  workspaceDir(): string { return this.dir('workspace'); }
+  workspaceDir(): string { assertHydrated(join(this.path, 'workspace')); return this.dir('workspace'); }
 
   /**
    * A note written FOR THE NEXT AGENT. This is the whole reason the brain is per-subject: an arriving
@@ -262,6 +263,7 @@ export class Brain {
 
   /** Reclaim a subject's brain — called with the worktree reclaim on accepted/closed. */
   reclaim(s: SubjectRef): void {
+    assertHydrated(subjectPath(s, this.root));
     rmSync(subjectPath(s, this.root), { recursive: true, force: true });
   }
 

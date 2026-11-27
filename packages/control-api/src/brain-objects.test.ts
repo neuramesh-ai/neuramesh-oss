@@ -4,6 +4,22 @@ import { tmpdir } from 'node:os';
 import { expect, it, vi } from 'vitest';
 import { configuredBrainObjects, FileBrainObjects, GcsBrainObjects } from './brain-objects';
 
+it('permits real file persistence for the isolated loopback harness and refuses production or public binding', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'nm-brain-harness-'));
+  try {
+    vi.stubEnv('NM_LOCAL', '0'); vi.stubEnv('NM_BRAIN_GCS_BUCKET', '');
+    vi.stubEnv('NM_BRAIN_STORAGE_DIR', root); vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NM_ALLOW_ACTOR_HEADER', '1'); vi.stubEnv('HOST', '127.0.0.1');
+    const objects = configuredBrainObjects()!;
+    const bytes = Buffer.from('real isolated coding transcript');
+    const ref = await objects.put('qualification/transcript', bytes, 'text/plain');
+    expect(await objects.get(ref)).toEqual(bytes);
+    vi.stubEnv('NODE_ENV', 'production'); expect(configuredBrainObjects()).toBeNull();
+    vi.stubEnv('NODE_ENV', 'development'); vi.stubEnv('HOST', '0.0.0.0'); expect(configuredBrainObjects()).toBeNull();
+    vi.stubEnv('HOST', '127.0.0.1'); vi.stubEnv('NM_ALLOW_ACTOR_HEADER', '0'); expect(configuredBrainObjects()).toBeNull();
+  } finally { vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }); }
+});
+
 it('atomically writes immutable objects, verifies bytes, and rejects path traversal', async () => {
   const root = await mkdtemp(join(tmpdir(), 'nm-brain-objects-'));
   try {

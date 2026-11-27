@@ -7,6 +7,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { makeTurnContext } from './turncontext';
+import { defaultBaselineRules, type PermissionMode } from '@neuramesh/shared';
+import { makeThreadPermissionGate } from '../thread-permission-gate';
+import { chatPermissionAction } from '../chat-permission-action';
+import type { PermissionGate } from '../runtime/adapter';
 
 type Row = { author_kind: string; author_id: string; body: string; created_at: string };
 
@@ -63,4 +67,62 @@ test('short threads are unchanged: everything present, in order, uncapped', asyn
   const out = await harness([row(1, 'first'), row(2, 'second', 'agent-1'), row(3, 'third')]);
   assert.ok(out.indexOf('human: first') < out.indexOf('you: second'), 'order or authorship broke');
   assert.ok(out.indexOf('you: second') < out.indexOf('human: third'));
+});
+
+// The subagent floor (George, 2026-11-18): spawn is safe, so no card stands in front of the leg.
+// The leg therefore runs behind the conversation's own gate, for its seated agent, and each of its
+// actions is decided on its own. A safe spawn hands down no approval.
+
+async function spawnLeg(mode: PermissionMode | null) {
+  const rules = defaultBaselineRules();
+  const gateFor = (seated: { name: string }, run: { id: string }): PermissionGate => {
+    const modeGate = makeThreadPermissionGate(async () => mode, async () => ({ verdict: 'ask', reason: 'reviewer' }));
+    return async (name, input) => {
+      const mapped = chatPermissionAction(name, input);
+      if (!mapped) return { decision: 'allow' };
+      const decision = await modeGate.decide(mapped.kind, mapped.actions, rules);
+      // a card would post here, as the seated agent on the leg's run: the test records the ask
+      return decision?.verdict === 'allow' ? { decision: 'allow' } : { decision: 'deny', reason: `${decision?.verdict} · ${seated.name} · ${run.id}` };
+    };
+  };
+  let legGate: PermissionGate | undefined;
+  const tc = makeTurnContext({
+    apiUrl: 'https://unreachable.invalid', ownerActorId: 'owner', db: { getAll: async () => [] }, blockFor: async () => '',
+    alog: () => () => {}, narrate: () => () => {}, legSummary: (out: string) => out, recordLegResult: () => {}, brainBriefing: () => '',
+    ensureChatWorkspace: () => '/tmp/nm-leg', taskOf: async () => null, seatLabel: () => 'designer', repoFor: () => ({}),
+    resolveSeat: async () => ({ agent: { id: 'ivy', name: 'ivy', runtime: 'claude', role: 'marketer' }, from: null }),
+    openRun: async () => ({ id: 'leg-run', step: async () => {}, settle: async () => {} }),
+    resolveToken: async () => ({ token: 'token' }),
+    runtimeFor: () => ({ runQuery: async (...args: unknown[]) => { legGate = args[17] as PermissionGate | undefined; return 'done'; } }),
+  } as never);
+  const rex = { id: 'rex', name: 'rex', role: 'orchestrator' } as never;
+  const parent = { id: 'parent-run', step: async () => {}, settle: async () => {} };
+  const spawn = tc.orchSpawnFor(rex, { id: 'room', slug: 'marketing', workspace_id: 'ws' }, 'thread', parent, undefined, 'triage', mode ? gateFor as never : undefined);
+  assert.deepEqual(await spawn({ role: 'marketer', prompt: 'draft the launch schedule for next week', label: 'schedule' }), { ok: true, summary: 'done' });
+  return legGate;
+}
+
+// the leg's wall budget is a real setTimeout that outlives the leg (turnkit withTimeout): fake it
+test('a safe spawn hands the leg the thread gate, never a blanket approval', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const parentGate = makeThreadPermissionGate(async () => 'default', async () => assert.fail('spawn reached the reviewer'));
+  const spawn = chatPermissionAction('mcp__nm__spawn', {})!;
+  assert.equal((await parentGate.decide(spawn.kind, spawn.actions, defaultBaselineRules()))?.verdict, 'allow');
+
+  const leg = (await spawnLeg('default'))!;
+  assert.ok(leg, 'the leg runs behind a gate');
+  assert.deepEqual(await leg('Bash', { command: 'rm -rf dist' }), { decision: 'deny', reason: 'ask · ivy · leg-run' });
+  assert.deepEqual(await leg('WebFetch', { url: 'https://example.com' }), { decision: 'deny', reason: 'ask · ivy · leg-run' });
+  assert.deepEqual(await leg('mcp__connector__send_email', {}), { decision: 'deny', reason: 'ask · ivy · leg-run' });
+  assert.deepEqual(await leg('Write', { file_path: 'schedule.md' }), { decision: 'allow' }); // Default edits files
+  assert.deepEqual(await leg('mcp__nm__record_lesson', {}), { decision: 'allow' });
+  assert.deepEqual(await leg('Read', { file_path: '/home/me/.ssh/id_rsa' }), { decision: 'deny', reason: 'deny · ivy · leg-run' });
+
+  const careful = (await spawnLeg('request-review'))!;
+  assert.deepEqual(await careful('Write', { file_path: 'schedule.md' }), { decision: 'deny', reason: 'ask · ivy · leg-run' });
+});
+
+test('a fan-out with no conversation gate runs its leg as before', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  assert.equal(await spawnLeg(null), undefined);
 });

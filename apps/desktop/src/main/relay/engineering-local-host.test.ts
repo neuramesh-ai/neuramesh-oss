@@ -14,9 +14,16 @@ const fakeCore = {
   restore: async () => ({ messages: [], checkpoint: { ref: 'x', createdAt: Date.now(), runCount: 1 } }),
 } as unknown as ClineCore;
 const createCore = (async () => fakeCore) as typeof import('@cline/sdk').ClineCore.create;
-const db = { get: async () => null, getAll: async () => [] } as unknown as Parameters<typeof createLocalEngineeringHost>[0]['db'];
+const db = {
+  get: async (sql: string) => {
+    // Replica.get throws for an absent row; ordinary coding threads have no task_id.
+    if (sql.includes('task_id is not null')) throw new Error('No row found');
+    return null;
+  },
+  getAll: async () => [],
+} as unknown as Parameters<typeof createLocalEngineeringHost>[0]['db'];
 const meta = (threadId = 'e1', machineId?: string): EngineeringOpenMeta => ({
-  threadId, repoId: 'r1', repoName: 'app', branch: 'main', mode: 'plan',
+  threadId, agentId:'agent-1', repoId: 'r1', repoName: 'app', branch: 'main', mode: 'plan',
   permissions: { read: true, edit: false, command: false, web: false, mcp: false },
   policy: { read: true, edit: true, command: true, web: true, mcp: true },
   ...(machineId ? { machineId } : {}),
@@ -26,7 +33,7 @@ function hostWith(seen: { headers: Array<Record<string, string>>; metas: Enginee
   const host = createLocalEngineeringHost({
     db, apiUrl: 'https://api.test', workspaceId: 'w1',
     authHeaders: async () => ({ 'x-nm-actor': '{"kind":"human","id":"u1"}' }),
-    fetchImpl: async (_input, init) => { seen.headers.push(Object.fromEntries(new Headers(init?.headers).entries())); return new Response(JSON.stringify({ token: 'sk-test', authMode: 'apikey' }), { status: 200 }); },
+    fetchImpl: async (input, init) => { if(String(input).includes('/v1/agent-replica/')){assert.equal(new Headers(init?.headers).get('x-nm-actor'),JSON.stringify({kind:'agent',id:'agent-1'}));assert.equal(new URL(String(input)).searchParams.get('requester'),'u1');return Response.json({schemaVersion:1,cursor:'test-cursor',workspaces:['w1'],hasMore:false,changes:[{table:'channels',id:'c1',row:{id:'c1',workspace_id:'w1',slug:'general'}},{table:'threads',id:new URL(String(input)).searchParams.get('thread'),row:{id:new URL(String(input)).searchParams.get('thread'),workspace_id:'w1',channel_id:'c1'}}]});}seen.headers.push(Object.fromEntries(new Headers(init?.headers).entries())); return new Response(JSON.stringify({ token: 'sk-test', authMode: 'apikey' }), { status: 200 }); },
     createCore, log: () => {},
     resolveCwd: async () => '/work/app',
     resolveBrain: async () => ({ modelId: 'claude-sonnet-4-6' }),

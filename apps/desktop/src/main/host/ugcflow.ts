@@ -103,6 +103,42 @@ export async function angleAnswer(db: AttDbLike, at: { threadId?: string | null;
   return msgs.slice(last + 1).find((m) => m.author_kind === 'human' && !!m.body?.trim())?.body ?? null;
 }
 
+/**
+ * THE PICK, WORKED OUT IN CODE (2026-11-17). The answer turn used to get only the card's words
+ * ("… · platforms: none picked · length: 8 s") and a prompt that said "one video post per picked
+ * platform", which says nothing when none is picked. rex answered "I will check the connected
+ * platforms" and stopped. The platforms and the length are decided here: the picked platforms,
+ * else the connected accounts, else a question to the human.
+ */
+export function anglePickNote(answer: string, connected: readonly string[]): string {
+  const picked = pickedPlatforms(answer);
+  const platforms = picked.length ? picked : connected.filter((p) => (PLATFORM_IDS as string[]).includes(p));
+  const seconds = pickedLength(answer);
+  const said = answer.replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!platforms.length) return `[The human answered the angle card: "${said}". They picked no platform and no account is connected. Ask the human which platforms to draft for, in one question card, and stop. Do not draft yet.]`;
+  const whose = picked.length ? 'the platforms the human picked' : 'the connected accounts, because the human picked no platform';
+  const names = platforms.map((p) => PLATFORM_LABELS[p as keyof typeof PLATFORM_LABELS] ?? p).join(', ');
+  return `[The human answered the angle card: "${said}". Draft now, in this turn: call draft_posts with one video post for each of ${whose} (${names}) in the chosen angle${seconds ? `, each script written to ${seconds} seconds` : ''}. The brand docs were read for the card, so draft_posts needs no second read. Make the call. Do not only say that you will.]`;
+}
+
+/** the transcript note for a turn whose trigger IS the human's answer to the thread's last angle card, else '' */
+export async function angleTurnNote(db: AttDbLike, channelId: string, at: { threadId?: string | null; taskId?: string | null }, trigger: string): Promise<string> {
+  const answer = await angleAnswer(db, at);
+  if (!answer || answer.trim() !== trigger.trim()) return '';
+  return `\n\n${anglePickNote(answer, await connectedPlatforms(db, channelId, at))}`;
+}
+
+/**
+ * The grounding gate `draft_posts` asks (host/grounding.ts), with one more proof of a read: an
+ * answered angle card. `propose_angles` posts the card only after a read of the shelf (angleGate),
+ * so the turn the answer wakes does not have to read the same docs again before it drafts.
+ */
+export async function draftGround(db: AttDbLike, channelId: string, grounding: Grounding, at: { threadId?: string | null; taskId?: string | null }): Promise<string | null> {
+  const gate = await ungrounded(db, channelId, grounding, at);
+  if (!gate) return null;
+  return (await angleAnswer(db, at)) !== null ? null : gate;
+}
+
 /** the length each video draft carries: the tool's own `seconds` when the human named one in the
  *  conversation, else the angle card's pick, read off the answer by code; a text post carries none */
 export async function draftSeconds<P extends { script?: string; seconds?: number }>(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }, posts: P[]): Promise<Array<number | undefined>> {
@@ -128,7 +164,7 @@ export async function connectedPlatforms(db: AttDbLike, channelId: string, at: i
 export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'apiGet' | 'ch' | 'actor' | 'log' | 'grounding'>, msgAnchor: () => { taskId: string } | { threadId: string } | null): OrchTool[] {
   const { z, db, post, apiGet, ch, actor, log, grounding } = tc;
   return [
-    { name: 'propose_angles', description: 'THE UGC PLAYBOOK, step two, after the research: post the ANGLE CARD in this conversation — two to five angles for the creator videos, each resting on a fact from the brand docs you just read, with "type your own" as the alternate and the room\'s platforms as chips (connected accounts come picked). Then STOP: the human\'s pick wakes you, and only then draft_posts, one video post per picked platform in the chosen angle. A creator script drafted before this card is answered is refused.', schema: {
+    { name: 'propose_angles', description: 'THE UGC PLAYBOOK, step two, after the research: post the ANGLE CARD in this conversation — two to five angles for the creator videos, each resting on a fact from the brand docs you just read, with "type your own" as the alternate and the room\'s platforms as chips (connected accounts come picked). Then STOP: the human\'s pick wakes you, and only then draft_posts, one video post per picked platform in the chosen angle (no platform picked: one per connected account, and with none connected, ask which platforms). A creator script drafted before this card is answered is refused.', schema: {
       product: z.string().min(1).max(80).describe('the product name as the brand docs say it'),
       angles: z.array(z.object({
         title: z.string().min(1).max(60).describe('the angle, as a creator would pitch it, e.g. "The 2am spiral" or "Before and after"'),
@@ -143,7 +179,7 @@ export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'apiGet' | 
       const posted = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: angleCard(input, conns, lengths) }).catch(() => null);
       if (!posted?.ok) return 'the angle card could not be posted — say so plainly rather than listing the angles in your reply';
       log?.({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });
-      return `Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle, the script written to the length they picked.`;
+      return `Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle (no platform picked: one per connected account, and with none connected, ask which platforms), the script written to the length they picked.`;
     } },
   ];
 }

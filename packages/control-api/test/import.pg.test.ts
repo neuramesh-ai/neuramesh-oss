@@ -123,7 +123,7 @@ beforeAll(async () => {
   srcSubtask = (await j(await send(alice, { type: 'task.create', workspace: SRC, channel: 'general', title: 'a step of the move' }))).task.id as string;
   await sql`update tasks set parent_task_id = ${srcTask}::uuid where id = ${srcSubtask}::uuid`;
   srcThread = crypto.randomUUID();
-  const msg = await app!.request('/v1/messages', { method: 'POST', headers: hdr(alice), body: JSON.stringify({ workspace: SRC, channel: srcGeneral, body: 'the first word, about #1002', threadId: srcThread }) });
+  const msg = await app!.request('/v1/messages', { method: 'POST', headers: hdr(alice), body: JSON.stringify({ workspace: SRC, channel: srcGeneral, body: 'the first word, about #1001', threadId: srcThread }) });
   expect(msg.status).toBe(200);
   srcMessage = (await j(msg)).message.id as string;
   const reply = await app!.request('/v1/messages', { method: 'POST', headers: hdr(alice), body: JSON.stringify({ workspace: SRC, channel: srcGeneral, body: 'a reply', threadId: srcThread }) });
@@ -185,16 +185,18 @@ describe.skipIf(!DB)('POST /v1/workspaces/:id/import/batches', () => {
     expect(run.results[0]!.storage!.usedBytes).toBeGreaterThan(0);
 
     // every table: the manifest's count landed under the target's workspace_id, less the two merges
-    const merged: Partial<Record<ExportTable, number>> = { agents: 1, repos: 1 };
+    // agents: rex and ledger, the Finance agent each workspace's orchestrator brings (2026-11-17)
+    const merged: Partial<Record<ExportTable, number>> = { agents: 2, repos: 1 };
     for (const t of EXPORT_TABLES) {
       const ids = exp.rows[t].map((r) => plan.ids[r.id]!);
       expect(await landed(TGT, t, ids), t).toBe(exp.manifest.counts[t] - (merged[t] ?? 0));
     }
     const written = run.results.filter((r) => r.seq > 0 && !plan.batches[r.seq]!.links).reduce((n, r) => n + r.written, 0);
-    expect(written).toBe(Object.values(exp.manifest.counts).reduce((a, b) => a + b, 0) - 2);
+    expect(written).toBe(Object.values(exp.manifest.counts).reduce((a, b) => a + b, 0) - 3);
 
     // agents merge by name, repos by (provider, org, name): the map names the target's own rows
-    expect(run.idMap).toEqual({ [plan.ids[srcRex]!]: tgtRex, [plan.ids[srcRepo]!]: tgtRepo });
+    const ledgerOf = async (ws: string) => (await sql!`select id from agents where workspace_id = ${ws}::uuid and name = 'ledger'`)[0]!['id'] as string;
+    expect(run.idMap).toEqual({ [plan.ids[srcRex]!]: tgtRex, [plan.ids[await ledgerOf(SRC)]!]: await ledgerOf(TGT), [plan.ids[srcRepo]!]: tgtRepo });
     const [mover] = await sql!`select status, machine_id from agents where workspace_id = ${TGT}::uuid and name = 'mover'`;
     expect(mover).toMatchObject({ status: 'offline', machine_id: null });
     // rex's imported registrations point at the target's rex and at the imported rooms
@@ -214,7 +216,8 @@ describe.skipIf(!DB)('POST /v1/workspaces/:id/import/batches', () => {
     const [firstMsg] = await sql!`select body from messages where id = ${nid(srcMessage)}::uuid`;
     const oldNumber = exp.rows.tasks.find((t) => t.id === srcTask)!.number;
     expect(firstMsg!['body']).toBe(`the first word, about #${run.numberMap[String(oldNumber)]}`);
-    expect(oldNumber).toBe(1002);
+    // a new workspace plants no setup task at birth (docs/design/onboarding-2026-11 O7), so the first task is #1001
+    expect(oldNumber).toBe(1001);
 
     // the colliding project slug takes a suffix, and the imported project is not the default
     const [project] = await sql!`select slug, is_default from projects where id = ${nid(exp.rows.projects[0]!.id)}::uuid`;
@@ -240,7 +243,7 @@ describe.skipIf(!DB)('POST /v1/workspaces/:id/import/batches', () => {
     expect(again.numberMap).toEqual(run.numberMap);
     expect(again.slugMap).toEqual(run.slugMap);
     for (const t of EXPORT_TABLES) {
-      expect(await landed(TGT, t, exp.rows[t].map((r) => plan.ids[r.id]!))).toBe(exp.manifest.counts[t] - (t === 'agents' || t === 'repos' ? 1 : 0));
+      expect(await landed(TGT, t, exp.rows[t].map((r) => plan.ids[r.id]!))).toBe(exp.manifest.counts[t] - (t === 'agents' ? 2 : t === 'repos' ? 1 : 0));
     }
   });
 

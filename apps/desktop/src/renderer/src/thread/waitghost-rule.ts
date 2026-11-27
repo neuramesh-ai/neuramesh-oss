@@ -18,6 +18,7 @@
 // The phone already answered this, and the ladder here is its ladder (apps/mobile's ActivityStrip,
 // 2026-09-07): every rung is something we can prove, and the last one is the one that kills the
 // dead air. One question, one answer, three clients.
+import { replyFailureText } from '@neuramesh/shared';
 import { addressedIn, agentInChannel, MACHINE_WAIT_LINE, MACHINE_WAIT_STALLED, unaddressedWake, waitTimedOut, waitTimeoutLine, WAIT_THINKING, type MachineStatus } from '@neuramesh/shared';
 import type { AgentRow } from '../bridge/rows-crew';
 
@@ -156,7 +157,7 @@ export function waitGhostFor(input: {
   // the face stays whoever actually died, not who we thought would answer.
   if (run?.state === 'failed') {
     const who = agents.find((a) => a.id === run.agent_id) ?? agent;
-    return { agent: who, kind: 'dead', line: run.summary || 'The answer did not start.', stalled: true };
+    return { agent: who, kind: 'dead', line: replyFailureText(run.summary), stalled: true };
   }
   if (machine && PROGRESS[machine]) {
     const stalled = !!STALLED[machine];

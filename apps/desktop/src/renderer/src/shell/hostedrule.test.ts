@@ -11,7 +11,7 @@ const dev = { kind: 'custom', authMode: 'dev' } as const;
 const customClerk = { kind: 'custom', authMode: 'clerk' } as const;
 const customLocal = { kind: 'custom', authMode: 'local' } as const;
 
-test('a cloud connection on a free workspace row is NOT gated: Free in the cloud starts with 500 credits', () => {
+test('a cloud connection on a free workspace row is NOT gated: Free in the cloud starts with its signup credits', () => {
   assert.equal(hostedGateFor(cloud, 'free'), false);
 });
 

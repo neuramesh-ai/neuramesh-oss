@@ -27,7 +27,9 @@ const writeFlag = (k: string, v: boolean): void => {
 const APPSTORE_URL = 'https://apps.apple.com/app/id6787487455';
 
 /** the row's verb. the card form carried a sentence; a corner carries a word. */
-const VERB: Record<OnboardingItem['id'], string> = { machine: '', subscription: 'Connect', team: 'Invite', desktop: 'Get', mobile: 'Show QR' };
+// the tool rows exist only for a workspace from the hosted first run, which the desktop does not pass
+const VERB: Record<OnboardingItem['id'], string> = { machine: '', subscription: 'Connect', team: 'Invite', desktop: 'Get', mobile: 'Show QR',
+  'tool-mail': '', 'tool-github': '', 'tool-bank': '', 'tool-social': '', 'tool-posthog': '' };
 
 /** the link choice (lib/links.ts): the desktop asks here-or-the-OS-browser, the web client is
  *  already a browser and opens a new tab */

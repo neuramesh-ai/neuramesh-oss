@@ -1,3 +1,4 @@
+import { TASK_SKILL_SEED } from '../src/seed/task-skill-seed';
 // Version-aware refresh of the BUNDLED skill packs, against the REAL schema (0021 + 0025).
 // Run via scripts/test-pg.sh / ci-db-bootstrap.sh — skipped without DATABASE_URL.
 //
@@ -216,7 +217,7 @@ describe.skipIf(!DB)('bundled skill packs: version-aware refresh', () => {
     await sql!`update skill_packs set version = 'sha-of-my-fork', status = 'ready' where channel_id = ${chId}::uuid and name = 'gstack'`;
 
     const r = await j(await send(george, { type: 'skillpack.seed_defaults', workspace: ws, channel: chId }));
-    expect(r).toMatchObject({ added: SKILL_SEED.length - 1, refreshed: 0 }); // the others still land
+    expect(r).toMatchObject({ added: TASK_SKILL_SEED.length + SKILL_SEED.length - 1, refreshed: 0 }); // the others still land
 
     const mine = (await sql!`select version, origin, description from skill_packs where channel_id = ${chId}::uuid and name = 'gstack'`)[0]!;
     expect(mine['version']).toBe('sha-of-my-fork');
@@ -237,7 +238,7 @@ describe.skipIf(!DB)('the marketing-os case (kind = marketing, two seed lists)',
   it('a marketing room takes BOTH lists, each at its content-derived version', async () => {
     mktId = (await sql!`select id from channels where workspace_id = ${ws}::uuid and slug = 'marketing'`)[0]!['id'] as string;
     const r = await j(await seedMarketing());
-    expect(r).toMatchObject({ added: MARKETING_SKILL_SEED.length + MARKETING_OS_SKILL_SEED.length, refreshed: 0 });
+    expect(r).toMatchObject({ added: TASK_SKILL_SEED.length + MARKETING_SKILL_SEED.length + MARKETING_OS_SKILL_SEED.length, refreshed: 0 });
     const row = (await sql!`select id, version from skill_packs where channel_id = ${mktId}::uuid and name = ${OS.pack.name}`)[0]!;
     osPackId = row['id'] as string;
     expect(row['version']).toBe(bundledPackVersion(OS));

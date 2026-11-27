@@ -9,7 +9,11 @@ import { DEFAULT_THINKING, type EngineeringControls, type ThinkingLevel } from '
 
 /** agy's model ids carry the thinking level as a suffix (`agy models`). a model agy does not list maps to null */
 const AGY_FAMILIES: Record<string, { id: string; levels: readonly ThinkingLevel[] }> = {
+  'gemini-4-carbon': { id: 'gemini-4-carbon', levels: ['low', 'medium', 'high'] },
+  'gemini-4-neon': { id: 'gemini-4-neon', levels: ['low', 'medium', 'high', 'xhigh'] },
   'gemini-4-argon': { id: 'gemini-4-argon', levels: ['low', 'medium', 'high'] },
+  // agy 1.5.2 lists no gemini-4-hydrogen-xhigh, so an Extra high pick runs at high on this lane
+  'gemini-4-hydrogen': { id: 'gemini-4-hydrogen', levels: ['low', 'medium', 'high'] },
   'gemini-3.8-flash': { id: 'gemini-3.8-flash', levels: ['low', 'medium', 'high'] },
   'gemini-3.1-pro-preview': { id: 'gemini-3.1-pro', levels: ['low', 'high'] },
 };
@@ -19,7 +23,8 @@ export function agyModelFor(modelId: string, effort?: ThinkingLevel | null): str
   const family = AGY_FAMILIES[modelId];
   if (!family) return null;
   const wanted = effort ?? DEFAULT_THINKING;
-  // a level the family lacks takes the next one up, so a pick never quietly thinks less
+  // a level the family lacks takes the next one up, so a pick never quietly thinks less. above the
+  // family's top level, the top level is the most agy has
   const level = family.levels.includes(wanted) ? wanted : family.levels.find((l) => l === 'high') ?? family.levels[0]!;
   return `${family.id}-${level}`;
 }

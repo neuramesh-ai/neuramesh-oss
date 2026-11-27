@@ -171,7 +171,7 @@ describe('the emails open the workspace, not the Mac download', () => {
     const w = renderWelcome({ openUrl: 'https://hq.x', unsubscribeUrl: 'https://x/u/t' });
     expect(w.html).toContain('href="https://hq.x"');
     expect(w.text).toContain('Open your workspace');
-    expect(w.text).toContain('cloud trial with 500 credits');
+    expect(w.text).toContain('cloud trial with 100 credits');
     expect(w.text).toContain('free desktop app with your own subscriptions');
     expect(w.text).toContain('Payment details are only needed to activate cloud work');
     expect(w.text).toContain('activate the cloud trial or skip billing');

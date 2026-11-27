@@ -180,8 +180,15 @@ ipcMain.handle('nm:alerts', async () => ({
 ipcMain.handle('nm:connector-start', async (_e, { channelId, provider }: { channelId: string; provider?: string }) => {
   const [ch] = await db().getAll<{ workspace_id: string }>(`select workspace_id from channels where id = ? limit 1`, [channelId]).catch(() => [] as Array<{ workspace_id: string }>);
   if (!ch) return { ok: false };
-  const url = `${apiUrl()}/connect/${encodeURIComponent(provider ?? 'x')}/start?workspace=${encodeURIComponent(ch.workspace_id)}&channel=${encodeURIComponent(channelId)}&actor=${encodeURIComponent(actorId())}`;
-  void shell.openExternal(url);
+  // GitHub keeps its public start (github-connect.ts); a social start is signed in since R10 (NM-011): the
+  // server checks this person against the room and answers the provider's authorize page
+  if ((provider ?? 'x') === 'github') {
+    void shell.openExternal(`${apiUrl()}/connect/github/start?workspace=${encodeURIComponent(ch.workspace_id)}&channel=${encodeURIComponent(channelId)}&actor=${encodeURIComponent(actorId())}`);
+    return { ok: true };
+  }
+  const out = await api(`/v1/connect/${encodeURIComponent(provider ?? 'x')}/start`, { workspace: ch.workspace_id, channel: channelId }).catch(() => null) as { url?: unknown } | null;
+  if (typeof out?.url !== 'string' || !/^https:\/\//.test(out.url)) return { ok: false };
+  void shell.openExternal(out.url);
   return { ok: true };
 });
 // The GitHub connector's resolve (docs/design/github-connector-2026-09): the server checks whether the
